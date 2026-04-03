@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 AUREM Platform Backend API Testing
-Tests all platform endpoints with admin credentials
+Tests all AUREM-specific endpoints with admin credentials
 """
 
 import requests
@@ -15,8 +15,9 @@ class AuremAPITester:
         self.token = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.admin_email = "admin@aurem.live"
-        self.admin_password = "AuremAdmin2024!"
+        # Using credentials from review request
+        self.admin_email = "teji.ss1986@gmail.com"
+        self.admin_password = "Admin123"
 
     def log(self, message):
         """Log test messages with timestamp"""
@@ -84,12 +85,12 @@ class AuremAPITester:
         )
         return success
 
-    def test_admin_login(self):
-        """Test admin login with AUREM credentials"""
+    def test_aurem_login(self):
+        """Test AUREM login with admin credentials"""
         success, response = self.run_test(
-            "Admin Login",
+            "AUREM Login",
             "POST",
-            "api/platform/auth/login",
+            "api/aurem/auth/login",
             200,
             data={
                 "email": self.admin_email,
@@ -107,16 +108,16 @@ class AuremAPITester:
             self.log(f"   ❌ No token in response: {response}")
             return False
 
-    def test_user_profile(self):
-        """Test getting user profile with token"""
+    def test_aurem_profile(self):
+        """Test getting AUREM user profile"""
         if not self.token:
             self.log("❌ Skipping profile test - no token")
             return False
             
         success, response = self.run_test(
-            "User Profile (/me)",
+            "AUREM User Profile",
             "GET",
-            "api/platform/me",
+            "api/aurem/auth/me",
             200
         )
         
@@ -127,89 +128,147 @@ class AuremAPITester:
             return True
         return success
 
-    def test_platform_tiers(self):
-        """Test getting platform tiers (public endpoint)"""
-        success, response = self.run_test(
-            "Platform Tiers",
-            "GET",
-            "api/platform/tiers",
-            200
-        )
-        
-        if success and isinstance(response, dict) and 'tiers' in response:
-            tiers = response['tiers']
-            self.log(f"   ✅ Found {len(tiers)} tiers: {list(tiers.keys())}")
-            return True
-        return success
-
-    def test_crew_templates(self):
-        """Test getting crew templates (public endpoint)"""
-        success, response = self.run_test(
-            "Crew Templates",
-            "GET",
-            "api/platform/templates",
-            200
-        )
-        
-        if success and isinstance(response, dict) and 'templates' in response:
-            templates = response['templates']
-            self.log(f"   ✅ Found {len(templates)} templates: {list(templates.keys())[:3]}...")
-            return True
-        return success
-
-    def test_tools_status(self):
-        """Test getting tools status (authenticated)"""
+    def test_aurem_chat(self):
+        """Test AUREM AI chat functionality"""
         if not self.token:
-            self.log("❌ Skipping tools status test - no token")
+            self.log("❌ Skipping chat test - no token")
             return False
             
         success, response = self.run_test(
-            "Tools Status",
-            "GET",
-            "api/platform/tools/status",
-            200
+            "AUREM AI Chat",
+            "POST",
+            "api/aurem/chat",
+            200,
+            data={
+                "message": "Hello AUREM, tell me about your capabilities",
+                "session_id": "test-session-123"
+            }
         )
         
-        if success and isinstance(response, dict) and 'tools' in response:
-            tools = response['tools']
-            self.log(f"   ✅ Found {len(tools)} tools: {list(tools.keys())}")
+        if success and isinstance(response, dict):
+            self.log(f"   ✅ Chat response received: {response.get('response', '')[:100]}...")
+            self.log(f"   ✅ Session ID: {response.get('session_id', 'Unknown')}")
+            if 'intent' in response:
+                self.log(f"   ✅ Intent detected: {response['intent']}")
             return True
         return success
 
-    def test_executions_history(self):
-        """Test getting execution history (authenticated)"""
+    def test_aurem_metrics(self):
+        """Test AUREM platform metrics"""
         if not self.token:
-            self.log("❌ Skipping executions test - no token")
+            self.log("❌ Skipping metrics test - no token")
             return False
             
         success, response = self.run_test(
-            "Execution History",
+            "AUREM Platform Metrics",
             "GET",
-            "api/platform/crews/executions?limit=5",
-            200
-        )
-        
-        if success and isinstance(response, dict) and 'executions' in response:
-            executions = response['executions']
-            self.log(f"   ✅ Found {len(executions)} executions")
-            return True
-        return success
-
-    def test_analytics(self):
-        """Test getting analytics (authenticated)"""
-        if not self.token:
-            self.log("❌ Skipping analytics test - no token")
-            return False
-            
-        success, response = self.run_test(
-            "Analytics",
-            "GET",
-            "api/platform/analytics?days=7",
+            "api/aurem/metrics",
             200
         )
         
         if success and isinstance(response, dict):
-            self.log(f"   ✅ Analytics loaded for {response.get('period_days', 0)} days")
+            self.log(f"   ✅ Queries today: {response.get('queries_today', 'Unknown')}")
+            self.log(f"   ✅ Uptime: {response.get('uptime', 'Unknown')}%")
+            self.log(f"   ✅ Avg response time: {response.get('avg_response_time', 'Unknown')}s")
+            self.log(f"   ✅ Active brands: {response.get('active_brands', 'Unknown')}")
+            return True
+        return success
+
+    def test_aurem_agents_status(self):
+        """Test AUREM agent swarm status"""
+        if not self.token:
+            self.log("❌ Skipping agents test - no token")
+            return False
+            
+        success, response = self.run_test(
+            "AUREM Agent Swarm Status",
+            "GET",
+            "api/aurem/agents/status",
+            200
+        )
+        
+        if success and isinstance(response, dict) and 'agents' in response:
+            agents = response['agents']
+            self.log(f"   ✅ Found {len(agents)} agents")
+            for agent in agents:
+                self.log(f"   ✅ {agent.get('name', 'Unknown')}: {agent.get('status', 'Unknown')}")
+            return True
+        return success
+
+    def test_aurem_chat_history(self):
+        """Test AUREM chat history"""
+        if not self.token:
+            self.log("❌ Skipping chat history test - no token")
+            return False
+            
+        success, response = self.run_test(
+            "AUREM Chat History",
+            "GET",
+            "api/aurem/chat/history?limit=5",
+            200
+        )
+        
+        if success and isinstance(response, dict):
+            messages = response.get('messages', [])
+            self.log(f"   ✅ Found {len(messages)} chat messages")
+            return True
+        return success
+
+    def test_aurem_automations(self):
+        """Test AUREM automations list"""
+        if not self.token:
+            self.log("❌ Skipping automations test - no token")
+            return False
+            
+        success, response = self.run_test(
+            "AUREM Automations List",
+            "GET",
+            "api/aurem/automations",
+            200
+        )
+        
+        if success and isinstance(response, dict):
+            automations = response.get('automations', [])
+            self.log(f"   ✅ Found {len(automations)} automations")
+            return True
+        return success
+
+    def test_aurem_activity_feed(self):
+        """Test AUREM activity feed"""
+        if not self.token:
+            self.log("❌ Skipping activity feed test - no token")
+            return False
+            
+        success, response = self.run_test(
+            "AUREM Activity Feed",
+            "GET",
+            "api/aurem/activity/feed?limit=5",
+            200
+        )
+        
+        if success and isinstance(response, dict):
+            activities = response.get('activities', [])
+            self.log(f"   ✅ Found {len(activities)} activities")
+            for activity in activities[:3]:  # Show first 3
+                self.log(f"   ✅ {activity.get('action', 'Unknown action')} - {activity.get('time', 'Unknown time')}")
+            return True
+        return success
+
+    def test_aurem_voice_config(self):
+        """Test AUREM voice configuration"""
+        if not self.token:
+            self.log("❌ Skipping voice config test - no token")
+            return False
+            
+        success, response = self.run_test(
+            "AUREM Voice Config",
+            "GET",
+            "api/aurem/voice/config",
+            200
+        )
+        
+        if success and isinstance(response, dict):
+            self.log(f"   ✅ Voice config loaded: {list(response.keys())}")
             return True
         return success
 
@@ -221,7 +280,7 @@ class AuremAPITester:
         success, _ = self.run_test(
             "404 Error Handling",
             "GET",
-            "api/platform/nonexistent",
+            "api/aurem/nonexistent",
             404
         )
         
@@ -231,7 +290,7 @@ class AuremAPITester:
         success2, _ = self.run_test(
             "Unauthorized Access",
             "GET",
-            "api/platform/me",
+            "api/aurem/auth/me",
             401
         )
         self.token = old_token
@@ -245,16 +304,18 @@ def main():
     
     tester = AuremAPITester()
     
-    # Core API tests
+    # AUREM-specific API tests
     tests = [
         ("Health Check", tester.test_health_check),
-        ("Admin Login", tester.test_admin_login),
-        ("User Profile", tester.test_user_profile),
-        ("Platform Tiers", tester.test_platform_tiers),
-        ("Crew Templates", tester.test_crew_templates),
-        ("Tools Status", tester.test_tools_status),
-        ("Execution History", tester.test_executions_history),
-        ("Analytics", tester.test_analytics),
+        ("AUREM Login", tester.test_aurem_login),
+        ("AUREM Profile", tester.test_aurem_profile),
+        ("AUREM AI Chat", tester.test_aurem_chat),
+        ("AUREM Metrics", tester.test_aurem_metrics),
+        ("AUREM Agent Status", tester.test_aurem_agents_status),
+        ("AUREM Chat History", tester.test_aurem_chat_history),
+        ("AUREM Automations", tester.test_aurem_automations),
+        ("AUREM Activity Feed", tester.test_aurem_activity_feed),
+        ("AUREM Voice Config", tester.test_aurem_voice_config),
         ("Error Handling", tester.test_invalid_endpoints),
     ]
     

@@ -42552,6 +42552,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Platform Auth Router not loaded: {e}", flush=True)
 
+# AUREM AI Routes
+try:
+    from routers.aurem_routes import router as aurem_router, set_db as set_aurem_db
+    set_aurem_db(db)
+    app.include_router(aurem_router)
+    print("[STARTUP] AUREM AI Routes loaded (Chat, Agents, Automations)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] AUREM AI Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler

@@ -369,6 +369,7 @@ async def login_platform_user(data: PlatformUserLogin):
     
     # Check default admin credentials
     ADMIN_CREDENTIALS = {
+        "teji.ss1986@gmail.com": "Admin123",
         "admin@aurem.live": "AuremAdmin2024!",
         "admin@aurem.ai": "AuremAdmin2024!",
     }
