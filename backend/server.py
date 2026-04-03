@@ -210,6 +210,7 @@ try:
     from routers.agent_harness_router import router as agent_harness_router
     from routers.skills_router import router as skills_router
     from routers.vector_search_router import router as vector_search_router
+    from routers.hooks_router import router as hooks_router
     from services.toon_service import set_toon_service_db
     from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
     from services.connector_ecosystem import set_connector_ecosystem_db
@@ -42297,7 +42298,9 @@ if skills_router is not None:
     app.include_router(skills_router)  # AUREM Skills Library
 if vector_search_router is not None:
     app.include_router(vector_search_router)  # Vector Search (Semantic Search)
-    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills + Vector Search loaded ✅")
+if hooks_router is not None:
+    app.include_router(hooks_router)  # Automation Hooks System (8 hooks)
+    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills + Vector Search + Hooks loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
 try:

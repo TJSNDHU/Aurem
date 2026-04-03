@@ -49,7 +49,7 @@ class PreDeployHook(BaseHook):
         }
         """
         environment = context.get("environment", "production")
-        skip_tests = context.get("skip_tests", False)
+        # skip_tests = context.get("skip_tests", False)  # Reserved for future use
         
         warnings = []
         errors = []
