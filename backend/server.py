@@ -203,15 +203,23 @@ try:
     from routers.admin_mission_control_router import set_db as set_mission_control_db
     from routers.subscription_public_router import router as subscription_public_router, set_db as set_subscription_public_db
     from routers.custom_subscription_router import router as custom_subscription_router, set_db as set_custom_subscription_db
+    from routers.self_healing_router import router as self_healing_router
+    from routers.connector_router import router as connector_router
     from services.toon_service import set_toon_service_db
+    from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
+    from services.connector_ecosystem import set_connector_ecosystem_db
 except ImportError as e:
     logging.warning(f"[STARTUP] Mission Control imports failed: {e}")
     set_mission_control_db = None
     set_subscription_public_db = None
     set_custom_subscription_db = None
     set_toon_service_db = None
+    set_self_healing_ai_db = None
+    set_connector_ecosystem_db = None
     subscription_public_router = None
     custom_subscription_router = None
+    self_healing_router = None
+    connector_router = None
 
 # Crypto Signal Engine - Conditionally loaded (disabled for deployment)
 crypto_router = None
@@ -42244,7 +42252,11 @@ if subscription_public_router is not None:
     app.include_router(subscription_public_router)  # Public subscription plans
 if custom_subscription_router is not None:
     app.include_router(custom_subscription_router)  # Custom/A-la-carte subscriptions
-    logging.info("[STARTUP] Subscription Public router loaded ✅")
+if self_healing_router is not None:
+    app.include_router(self_healing_router)  # Self-Healing AI
+if connector_router is not None:
+    app.include_router(connector_router)  # Connector Ecosystem
+    logging.info("[STARTUP] Subscription + Self-Healing + Connectors loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
 try:
@@ -42964,4 +42976,4 @@ async def shutdown_db_client():
     # Close MongoDB client
     if client is not None:
         client.close()
-        logging.info("✓ Database connection closed")
+        logging.info("Database connection closed")
