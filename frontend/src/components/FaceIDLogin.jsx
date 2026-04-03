@@ -237,7 +237,8 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover'
+            objectFit: 'cover',
+            transform: 'scaleX(-1)'  /* Mirror for natural view */
           }}
         />
         <canvas
@@ -247,7 +248,8 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
             top: 0,
             left: 0,
             width: '100%',
-            height: '100%'
+            height: '100%',
+            transform: 'scaleX(-1)'  /* Match video mirror */
           }}
         />
 

@@ -54,21 +54,40 @@ const FaceIDTrainer = ({ onComplete }) => {
 
   const startCamera = async () => {
     try {
+      setError(null); // Clear any previous errors
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 }
+        video: { 
+          width: 640, 
+          height: 480,
+          facingMode: 'user' // Use front camera on mobile
+        }
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
         setCapturing(true);
         
-        // Start face detection loop
-        detectFace();
+        // Wait a moment for video to stabilize, then start detection
+        setTimeout(() => {
+          detectFace();
+        }, 500);
       }
     } catch (err) {
       console.error('Camera access denied:', err);
-      setError('Camera access denied. Please allow camera access.');
+      let errorMessage = 'Camera access denied. Please allow camera access.';
+      
+      if (err.name === 'NotFoundError') {
+        errorMessage = 'No camera found on this device.';
+      } else if (err.name === 'NotAllowedError') {
+        errorMessage = 'Camera permission denied. Please enable camera in browser settings.';
+      } else if (err.name === 'NotReadableError') {
+        errorMessage = 'Camera is in use by another application.';
+      }
+      
+      setError(errorMessage);
+      setLoading(false);
     }
   };
 
@@ -242,7 +261,8 @@ const FaceIDTrainer = ({ onComplete }) => {
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover'
+            objectFit: 'cover',
+            transform: 'scaleX(-1)'  /* Fix: Mirror video to show natural view */
           }}
         />
         <canvas
@@ -252,7 +272,8 @@ const FaceIDTrainer = ({ onComplete }) => {
             top: 0,
             left: 0,
             width: '100%',
-            height: '100%'
+            height: '100%',
+            transform: 'scaleX(-1)'  /* Match video mirror */
           }}
         />
 
