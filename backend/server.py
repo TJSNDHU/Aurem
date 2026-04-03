@@ -42647,6 +42647,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Subscription Routes not loaded: {e}", flush=True)
 
+# Growth Engine Routes (GitHub + Outreach)
+try:
+    from routers.growth_routes import router as growth_router, set_db as set_growth_db
+    set_growth_db(db)
+    app.include_router(growth_router)
+    print("[STARTUP] Growth Engine Routes loaded (GitHub Listener + Lead Mining + Outreach)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Growth Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
