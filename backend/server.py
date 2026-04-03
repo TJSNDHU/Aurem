@@ -42221,6 +42221,12 @@ try:
 except ImportError as e:
     logging.warning(f"AUREM Chat router not loaded: {e}")
 
+try:
+    from routers.biometric_secure import router as biometric_secure_router
+    app.include_router(biometric_secure_router)  # Biometric Authentication (Face + PIN)
+except ImportError as e:
+    logging.warning(f"Biometric Secure router not loaded: {e}")
+
 # PWA (Progressive Web App) Router for Luxury Mobile Experience
 try:
     from routers.pwa_router import router as pwa_router

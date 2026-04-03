@@ -1,21 +1,28 @@
 /**
  * FaceID Login Gate
  * Biometric authentication using facial recognition
+ * Fetches stored face descriptor from backend
+ * Falls back to PIN entry if face verification fails
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader, AlertCircle, Unlock, Lock } from 'lucide-react';
 import * as faceapi from 'face-api.js';
+import PINEntry from './PINEntry';
 
-const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
+
+const FaceIDLogin = ({ email, onSuccess, onFallbackToPassword }) => {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [showPinEntry, setShowPinEntry] = useState(false);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('Initializing...');
+  const [attemptCount, setAttemptCount] = useState(0);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const storedDescriptorRef = useRef(null);
+  const emailRef = useRef(email);
 
   useEffect(() => {
     initFaceID();
@@ -29,23 +36,24 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
 
   const initFaceID = async () => {
     try {
-      // Check if FaceID is trained
-      const trained = localStorage.getItem('faceid_trained');
-      if (!trained) {
-        setError('FaceID not setup. Please use password login to setup.');
+      // Check if user has biometric enabled in backend
+      const statusResponse = await fetch(`${API_URL}/api/biometric/status/${emailRef.current}`);
+      
+      if (!statusResponse.ok) {
+        setError('Biometric not setup. Please use password login.');
         setLoading(false);
         return;
       }
 
-      // Load stored descriptor
-      const descriptorData = localStorage.getItem('faceid_descriptor');
-      if (!descriptorData) {
-        setError('FaceID data not found');
+      const statusData = await statusResponse.json();
+      
+      if (!statusData.biometric_enabled) {
+        setError('Biometric not setup for this account');
         setLoading(false);
         return;
       }
 
-      storedDescriptorRef.current = new Float32Array(JSON.parse(descriptorData));
+      console.log('[FaceID Login] Biometric enabled - loading models...');
 
       // Load models
       setStatus('Loading face recognition models...');
@@ -100,7 +108,7 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-      if (detection && storedDescriptorRef.current) {
+      if (detection) {
         // Draw on canvas
         if (canvasRef.current) {
           const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
@@ -108,17 +116,32 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
           
           const ctx = canvasRef.current.getContext('2d');
           ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          
+          // Flip context for mirrored drawing
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.translate(-canvasRef.current.width, 0);
+          
           faceapi.draw.drawDetections(canvasRef.current, resizedDetection);
+          
+          ctx.restore();
         }
 
-        // Compare with stored descriptor
-        const distance = faceapi.euclideanDistance(
-          detection.descriptor,
-          storedDescriptorRef.current
-        );
+        // Send to backend for verification
+        setStatus('Verifying face...');
+        
+        const response = await fetch(`${API_URL}/api/biometric/verify-face`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailRef.current,
+            face_descriptor: Array.from(detection.descriptor)
+          })
+        });
 
-        // Threshold: 0.6 is standard for face-api.js
-        if (distance < 0.6) {
+        const data = await response.json();
+
+        if (response.ok && data.success) {
           setStatus('Face recognized! Logging in...');
           setScanning(false);
           
@@ -128,17 +151,29 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
             tracks.forEach(track => track.stop());
           }
 
-          // Success - auto-login
+          // Success - trigger login
           setTimeout(() => {
-            // In production, this would trigger a backend auth call
-            // For now, simulate login with stored credentials
-            const email = localStorage.getItem('faceid_email') || 'teji.ss1986@gmail.com';
-            onSuccess(email);
+            onSuccess(emailRef.current);
           }, 500);
           
           return;
         } else {
-          setStatus(`Scanning... (confidence: ${Math.round((1 - distance) * 100)}%)`);
+          // Face not recognized - increment attempt count
+          const newCount = attemptCount + 1;
+          setAttemptCount(newCount);
+          
+          setStatus(`${data.message} - Attempt ${newCount}/3`);
+          
+          // After 3 failed attempts, offer PIN fallback
+          if (newCount >= 3) {
+            setScanning(false);
+            if (videoRef.current.srcObject) {
+              const tracks = videoRef.current.srcObject.getTracks();
+              tracks.forEach(track => track.stop());
+            }
+            setShowPinEntry(true);
+            return;
+          }
         }
       } else {
         setStatus('Looking for face...');
@@ -146,6 +181,7 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
 
     } catch (err) {
       console.error('Auth error:', err);
+      setStatus('Verification error - retrying...');
     }
 
     // Continue scanning
@@ -153,6 +189,23 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
       setTimeout(() => authenticateFace(), 100);
     }
   };
+
+  // Show PIN entry if face recognition failed 3 times
+  if (showPinEntry) {
+    return (
+      <PINEntry
+        email={emailRef.current}
+        onSuccess={onSuccess}
+        onBack={() => {
+          setShowPinEntry(false);
+          setAttemptCount(0);
+          setScanning(false);
+          setLoading(true);
+          initFaceID();
+        }}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -292,21 +345,40 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
         )}
       </div>
 
-      <button
-        onClick={onFallbackToPassword}
-        data-testid="use-password-button"
-        style={{
-          padding: '8px 16px',
-          background: 'none',
-          border: '1px solid #333',
-          borderRadius: 8,
-          color: '#888',
-          fontSize: 12,
-          cursor: 'pointer'
-        }}
-      >
-        Use Password Instead
-      </button>
+      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+        <button
+          onClick={onFallbackToPassword}
+          data-testid="use-password-button"
+          style={{
+            padding: '8px 16px',
+            background: 'none',
+            border: '1px solid #333',
+            borderRadius: 8,
+            color: '#888',
+            fontSize: 12,
+            cursor: 'pointer'
+          }}
+        >
+          Use Password Instead
+        </button>
+
+        <button
+          onClick={() => setShowPinEntry(true)}
+          data-testid="use-pin-button"
+          style={{
+            padding: '8px 16px',
+            background: 'linear-gradient(135deg, #D4AF37 0%, #8B7355 100%)',
+            border: 'none',
+            borderRadius: 8,
+            color: '#050505',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          Use PIN Instead
+        </button>
+      </div>
 
       <style jsx>{`
         @keyframes scan {

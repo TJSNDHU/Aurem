@@ -1,18 +1,21 @@
 /**
  * FaceID Training Interface
  * Captures user's face data for biometric authentication
+ * Part 1 of biometric setup (followed by PIN setup)
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CheckCircle, AlertCircle, Loader, User } from 'lucide-react';
 import * as faceapi from 'face-api.js';
+import PINSetup from './PINSetup';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-const FaceIDTrainer = ({ onComplete }) => {
+const FaceIDTrainer = ({ email, onComplete }) => {
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captured, setCaptured] = useState(false);
+  const [showPinSetup, setShowPinSetup] = useState(false);
   const [error, setError] = useState(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
@@ -205,10 +208,6 @@ const FaceIDTrainer = ({ onComplete }) => {
 
       faceDescriptorRef.current = Array.from(avgDescriptor);
       
-      // Store in localStorage (in production, send to backend)
-      localStorage.setItem('faceid_descriptor', JSON.stringify(Array.from(avgDescriptor)));
-      localStorage.setItem('faceid_trained', 'true');
-      
       setCaptured(true);
       
       // Stop camera
@@ -217,10 +216,10 @@ const FaceIDTrainer = ({ onComplete }) => {
         tracks.forEach(track => track.stop());
       }
 
-      // Call completion callback
-      if (onComplete) {
-        setTimeout(() => onComplete(), 1500);
-      }
+      // Move to PIN setup after short delay
+      setTimeout(() => {
+        setShowPinSetup(true);
+      }, 1500);
 
     } catch (err) {
       console.error('Face capture failed:', err);
@@ -231,7 +230,7 @@ const FaceIDTrainer = ({ onComplete }) => {
   };
 
   const skipFaceID = () => {
-    // User chose to skip biometric setup
+    // User chose to skip biometric setup entirely
     console.log('[FaceID] User skipped biometric setup');
     
     // Stop camera if running
@@ -240,7 +239,7 @@ const FaceIDTrainer = ({ onComplete }) => {
       tracks.forEach(track => track.stop());
     }
     
-    // Mark as skipped in localStorage
+    // Mark as skipped in localStorage (no backend setup)
     localStorage.setItem('faceid_trained', 'skipped');
     
     // Proceed to dashboard
@@ -248,6 +247,17 @@ const FaceIDTrainer = ({ onComplete }) => {
       onComplete();
     }
   };
+
+  // If showing PIN setup, render that instead
+  if (showPinSetup) {
+    return (
+      <PINSetup
+        email={email}
+        faceDescriptor={faceDescriptorRef.current}
+        onComplete={onComplete}
+      />
+    );
+  }
 
   if (loading) {
     return (
