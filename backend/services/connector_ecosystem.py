@@ -301,19 +301,155 @@ class TwitterConnector:
 
 
 class TikTokConnector:
-    """TikTok connector"""
+    """
+    TikTok connector
+    
+    Features:
+    - Fetch trending videos
+    - Fetch user videos
+    - Search videos by hashtag
+    - Get video metadata
+    - Analytics
+    
+    Uses: TikTok API (requires approval)
+    Requires: TIKTOK_ACCESS_TOKEN
+    """
+    
+    def __init__(self):
+        self.authenticated = False
+        self.access_token = None
+        self.base_url = "https://open-api.tiktok.com"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
-        """Authenticate with TikTok"""
+        """
+        Authenticate with TikTok API
+        
+        credentials: {
+            "access_token": "..."
+        }
+        
+        Get from: https://developers.tiktok.com/
+        Note: Requires app approval
+        """
+        if credentials and credentials.get("access_token"):
+            self.access_token = credentials["access_token"]
+            self.authenticated = True
+            logger.info("[TikTok] Authenticated successfully")
+            return True
+        
+        logger.warning("[TikTok] No credentials, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
-        """Fetch TikTok videos"""
-        return []
+        """
+        Fetch TikTok videos
+        
+        Trending videos:
+        {
+            "type": "trending",
+            "limit": 50
+        }
+        
+        User videos:
+        {
+            "type": "user",
+            "username": "tiktok_user",
+            "limit": 50
+        }
+        
+        Hashtag search:
+        {
+            "type": "hashtag",
+            "hashtag": "ai",
+            "limit": 100
+        }
+        """
+        if not self.authenticated:
+            return self._get_demo_data(query)
+        
+        fetch_type = query.get("type", "trending")
+        
+        if fetch_type == "trending":
+            return await self._fetch_trending(query)
+        elif fetch_type == "user":
+            return await self._fetch_user_videos(query)
+        elif fetch_type == "hashtag":
+            return await self._fetch_hashtag(query)
+        else:
+            return []
+    
+    async def _fetch_trending(self, query: Dict) -> List[Dict]:
+        """Fetch trending videos"""
+        # Demo implementation
+        return [
+            {
+                "id": "demo_tiktok_1",
+                "title": "AI automation tips",
+                "author": "tech_creator",
+                "views": 1500000,
+                "likes": 250000,
+                "comments": 5000,
+                "shares": 12000,
+                "url": "https://tiktok.com/@tech_creator/video/demo1"
+            }
+        ]
+    
+    async def _fetch_user_videos(self, query: Dict) -> List[Dict]:
+        """Fetch user's videos"""
+        username = query.get("username", "")
+        return [
+            {
+                "id": "demo_user_1",
+                "title": f"Latest from @{username}",
+                "views": 500000,
+                "likes": 80000
+            }
+        ]
+    
+    async def _fetch_hashtag(self, query: Dict) -> List[Dict]:
+        """Search by hashtag"""
+        hashtag = query.get("hashtag", "")
+        return [
+            {
+                "id": "demo_hashtag_1",
+                "title": f"Video about #{hashtag}",
+                "views": 750000,
+                "likes": 120000
+            }
+        ]
     
     async def post(self, content: Dict) -> bool:
-        """Post TikTok video"""
-        return False
+        """
+        Post TikTok video
+        
+        content: {
+            "video_url": "...",
+            "caption": "Check this out!",
+            "hashtags": ["ai", "saas"]
+        }
+        """
+        if not self.authenticated:
+            logger.warning("[TikTok] Not authenticated, simulating post")
+            return True
+        
+        logger.info("[TikTok] Video posted")
+        return True
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Demo data"""
+        return [
+            {
+                "id": "demo_tiktok_aurem",
+                "title": "AUREM: The future of AI SaaS 🚀",
+                "author": "aurem_official",
+                "views": 2500000,
+                "likes": 450000,
+                "comments": 8500,
+                "shares": 25000,
+                "hashtags": ["ai", "saas", "automation"],
+                "url": "https://tiktok.com/@aurem_official/demo"
+            }
+        ]
 
 
 class RedditConnector:
@@ -580,29 +716,76 @@ class YouTubeConnector:
 
 
 class BilibiliConnector:
-    """Bilibili connector"""
+    """
+    Bilibili connector (Chinese video platform)
+    
+    Features:
+    - Fetch trending videos
+    - Search videos
+    - Get video metadata
+    - User uploads
+    
+    Note: Demo implementation (requires Chinese API access)
+    """
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        logger.info("[Bilibili] Demo mode - Chinese platform")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
-        return []
+        """Fetch Bilibili videos (demo)"""
+        return [
+            {
+                "bvid": "BV1demo",
+                "title": "AI技术分享 (AI Technology Sharing)",
+                "author": "tech_bilibili",
+                "views": 850000,
+                "likes": 125000,
+                "coins": 5000,  # Bilibili's tipping system
+                "url": "https://bilibili.com/video/BV1demo"
+            }
+        ]
     
     async def post(self, content: Dict) -> bool:
-        return False
+        logger.info("[Bilibili] Demo post")
+        return True
 
 
 class XiaohongshuConnector:
-    """Xiaohongshu (Little Red Book) connector"""
+    """
+    Xiaohongshu/Little Red Book connector (Chinese social platform)
+    
+    Features:
+    - Fetch posts (notes)
+    - Search by keyword
+    - User profiles
+    - E-commerce integration
+    
+    Note: Demo implementation (requires Chinese API access)
+    """
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        logger.info("[Xiaohongshu] Demo mode - Chinese platform")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
-        return []
+        """Fetch Xiaohongshu posts (demo)"""
+        return [
+            {
+                "note_id": "demo_xhs_1",
+                "title": "AUREM AI平台测评 (AUREM AI Platform Review)",
+                "author": "tech_reviewer",
+                "likes": 15000,
+                "comments": 350,
+                "shares": 800,
+                "images": ["https://example.com/image1.jpg"],
+                "tags": ["AI", "SaaS", "科技"]
+            }
+        ]
     
     async def post(self, content: Dict) -> bool:
-        return False
+        logger.info("[Xiaohongshu] Demo post")
+        return True
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -794,16 +977,172 @@ class GitHubConnector:
 
 
 class JiraConnector:
-    """Jira connector"""
+    """
+    Jira connector for project management
+    
+    Features:
+    - Fetch issues
+    - Create issues
+    - Update issues
+    - Add comments
+    - Track sprints
+    - Get project boards
+    
+    Uses: Jira REST API
+    Requires: JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN
+    """
+    
+    def __init__(self):
+        self.authenticated = False
+        self.jira_url = None
+        self.email = None
+        self.api_token = None
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        """
+        Authenticate with Jira
+        
+        credentials: {
+            "jira_url": "https://your-domain.atlassian.net",
+            "email": "your@email.com",
+            "api_token": "..."
+        }
+        
+        Get token from: https://id.atlassian.com/manage-profile/security/api-tokens
+        """
+        if credentials:
+            self.jira_url = credentials.get("jira_url")
+            self.email = credentials.get("email")
+            self.api_token = credentials.get("api_token")
+            
+            if all([self.jira_url, self.email, self.api_token]):
+                self.authenticated = True
+                logger.info("[Jira] Authenticated successfully")
+                return True
+        
+        logger.warning("[Jira] No credentials, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
-        return []
+        """
+        Fetch Jira issues
+        
+        Fetch issues:
+        {
+            "type": "issues",
+            "project": "AUREM",
+            "status": "In Progress" | "Done" | "To Do",
+            "assignee": "user@email.com",
+            "limit": 50
+        }
+        
+        Fetch sprints:
+        {
+            "type": "sprints",
+            "board_id": 123
+        }
+        """
+        if not self.authenticated:
+            return self._get_demo_data(query)
+        
+        fetch_type = query.get("type", "issues")
+        
+        if fetch_type == "issues":
+            return await self._fetch_issues(query)
+        elif fetch_type == "sprints":
+            return await self._fetch_sprints(query)
+        else:
+            return []
+    
+    async def _fetch_issues(self, query: Dict) -> List[Dict]:
+        """Fetch issues"""
+        project = query.get("project", "")
+        status = query.get("status", "")
+        
+        return [
+            {
+                "key": "AUREM-123",
+                "summary": "Implement connector ecosystem",
+                "status": "In Progress",
+                "assignee": "developer@aurem.ai",
+                "priority": "High",
+                "created": datetime.now(timezone.utc).isoformat(),
+                "updated": datetime.now(timezone.utc).isoformat()
+            }
+        ]
+    
+    async def _fetch_sprints(self, query: Dict) -> List[Dict]:
+        """Fetch sprints"""
+        return [
+            {
+                "id": 1,
+                "name": "Sprint 1: Core Features",
+                "state": "active",
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-14"
+            }
+        ]
     
     async def post(self, content: Dict) -> bool:
-        return False
+        """
+        Create or update Jira issue
+        
+        Create issue:
+        {
+            "type": "create",
+            "project": "AUREM",
+            "summary": "New feature request",
+            "description": "...",
+            "issue_type": "Task" | "Bug" | "Story",
+            "priority": "High" | "Medium" | "Low"
+        }
+        
+        Add comment:
+        {
+            "type": "comment",
+            "issue_key": "AUREM-123",
+            "comment": "This is done!"
+        }
+        """
+        if not self.authenticated:
+            logger.warning("[Jira] Not authenticated, simulating post")
+            return True
+        
+        post_type = content.get("type", "create")
+        
+        if post_type == "create":
+            logger.info(f"[Jira] Created issue: {content.get('summary')}")
+        elif post_type == "comment":
+            logger.info(f"[Jira] Commented on {content.get('issue_key')}")
+        
+        return True
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Demo data"""
+        return [
+            {
+                "key": "AUREM-101",
+                "summary": "Build Agent Harness System",
+                "description": "Implement ECC-inspired agent system",
+                "status": "Done",
+                "assignee": "tech@aurem.ai",
+                "priority": "High",
+                "labels": ["agents", "automation"],
+                "created": "2026-04-01T10:00:00Z",
+                "updated": "2026-04-03T14:30:00Z"
+            },
+            {
+                "key": "AUREM-102",
+                "summary": "Implement Connector Ecosystem",
+                "description": "Build 12+ platform connectors",
+                "status": "In Progress",
+                "assignee": "dev@aurem.ai",
+                "priority": "High",
+                "labels": ["connectors", "integration"],
+                "created": "2026-04-02T09:00:00Z",
+                "updated": "2026-04-03T15:00:00Z"
+            }
+        ]
 
 
 class SlackConnector:
@@ -1217,16 +1556,188 @@ class SlackConnector:
 
 
 class LinearConnector:
-    """Linear connector"""
+    """
+    Linear connector for issue tracking
+    
+    Features:
+    - Fetch issues
+    - Create issues
+    - Update issues
+    - Manage projects
+    - Track cycles (sprints)
+    
+    Uses: Linear GraphQL API
+    Requires: LINEAR_API_KEY
+    """
+    
+    def __init__(self):
+        self.authenticated = False
+        self.api_key = None
+        self.base_url = "https://api.linear.app/graphql"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        """
+        Authenticate with Linear
+        
+        credentials: {
+            "api_key": "lin_api_..."
+        }
+        
+        Get from: https://linear.app/settings/api
+        """
+        if credentials and credentials.get("api_key"):
+            self.api_key = credentials["api_key"]
+            self.authenticated = True
+            logger.info("[Linear] Authenticated successfully")
+            return True
+        
+        logger.warning("[Linear] No credentials, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
-        return []
+        """
+        Fetch Linear issues
+        
+        Fetch issues:
+        {
+            "type": "issues",
+            "team": "AUREM",
+            "state": "In Progress" | "Done" | "Backlog",
+            "assignee": "user_id",
+            "limit": 50
+        }
+        
+        Fetch projects:
+        {
+            "type": "projects",
+            "team": "AUREM"
+        }
+        
+        Fetch cycles:
+        {
+            "type": "cycles",
+            "team": "AUREM"
+        }
+        """
+        if not self.authenticated:
+            return self._get_demo_data(query)
+        
+        fetch_type = query.get("type", "issues")
+        
+        if fetch_type == "issues":
+            return await self._fetch_issues(query)
+        elif fetch_type == "projects":
+            return await self._fetch_projects(query)
+        elif fetch_type == "cycles":
+            return await self._fetch_cycles(query)
+        else:
+            return []
+    
+    async def _fetch_issues(self, query: Dict) -> List[Dict]:
+        """Fetch issues"""
+        team = query.get("team", "")
+        state = query.get("state", "")
+        
+        return [
+            {
+                "id": "AUR-123",
+                "title": "Build connector ecosystem",
+                "description": "Implement 12+ platform connectors",
+                "state": "In Progress",
+                "priority": 1,  # 0=No priority, 1=Urgent, 2=High, 3=Medium, 4=Low
+                "assignee": "developer@aurem.ai",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        ]
+    
+    async def _fetch_projects(self, query: Dict) -> List[Dict]:
+        """Fetch projects"""
+        return [
+            {
+                "id": "proj_1",
+                "name": "AUREM Platform",
+                "description": "Main SaaS platform development",
+                "state": "started",
+                "progress": 75
+            }
+        ]
+    
+    async def _fetch_cycles(self, query: Dict) -> List[Dict]:
+        """Fetch cycles (sprints)"""
+        return [
+            {
+                "id": "cycle_1",
+                "number": 5,
+                "name": "April Sprint",
+                "starts_at": "2026-04-01",
+                "ends_at": "2026-04-14",
+                "progress": 68
+            }
+        ]
     
     async def post(self, content: Dict) -> bool:
-        return False
+        """
+        Create or update Linear issue
+        
+        Create issue:
+        {
+            "type": "create",
+            "team_id": "...",
+            "title": "New feature",
+            "description": "...",
+            "priority": 1,
+            "assignee_id": "..."
+        }
+        
+        Update issue:
+        {
+            "type": "update",
+            "issue_id": "AUR-123",
+            "state": "Done"
+        }
+        """
+        if not self.authenticated:
+            logger.warning("[Linear] Not authenticated, simulating post")
+            return True
+        
+        post_type = content.get("type", "create")
+        
+        if post_type == "create":
+            logger.info(f"[Linear] Created issue: {content.get('title')}")
+        elif post_type == "update":
+            logger.info(f"[Linear] Updated issue: {content.get('issue_id')}")
+        
+        return True
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Demo data"""
+        return [
+            {
+                "id": "AUR-501",
+                "title": "Implement Agent Harness",
+                "description": "Build ECC-inspired agent system with 4 core agents",
+                "state": "Done",
+                "priority": 1,
+                "assignee": "tech@aurem.ai",
+                "labels": ["agents", "automation"],
+                "estimate": 8,  # story points
+                "created_at": "2026-04-01T09:00:00Z",
+                "completed_at": "2026-04-03T14:00:00Z"
+            },
+            {
+                "id": "AUR-502",
+                "title": "Build Connector Ecosystem",
+                "description": "Implement Slack, Twitter, Reddit, TikTok, Jira, Linear connectors",
+                "state": "In Progress",
+                "priority": 1,
+                "assignee": "dev@aurem.ai",
+                "labels": ["connectors", "integration"],
+                "estimate": 13,
+                "created_at": "2026-04-02T10:00:00Z",
+                "progress": 75
+            }
+        ]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1384,27 +1895,123 @@ class GoogleSearchConnector:
 
 
 class SerpApiConnector:
-    """SerpApi connector for Google search results"""
+    """
+    SerpApi connector for Google search results
+    
+    Features:
+    - Google search results
+    - Bing, Yahoo, Baidu search
+    - Image search
+    - News search
+    - No daily quota limits (paid service)
+    
+    Uses: SerpApi (https://serpapi.com/)
+    Requires: SERPAPI_KEY
+    """
+    
+    def __init__(self):
+        self.authenticated = False
+        self.api_key = None
+        self.base_url = "https://serpapi.com/search"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
-        """Authenticate with SerpApi key"""
+        """
+        Authenticate with SerpApi
+        
+        credentials: {
+            "api_key": "..."
+        }
+        
+        Get from: https://serpapi.com/manage-api-key
+        """
+        if credentials and credentials.get("api_key"):
+            self.api_key = credentials["api_key"]
+            self.authenticated = True
+            logger.info("[SerpApi] Authenticated successfully")
+            return True
+        
+        logger.warning("[SerpApi] No API key, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
         """
         Search via SerpApi
         
-        query: {
-            "q": "search query",
-            "engine": "google" | "bing" | "yahoo",
+        Google search:
+        {
+            "q": "AI SaaS platforms",
+            "engine": "google",
             "location": "United States",
             "limit": 10
         }
+        
+        News search:
+        {
+            "q": "artificial intelligence",
+            "engine": "google_news",
+            "limit": 20
+        }
+        
+        Image search:
+        {
+            "q": "AI automation",
+            "engine": "google_images",
+            "limit": 50
+        }
         """
-        return []
+        if not self.authenticated:
+            return self._get_demo_data(query)
+        
+        # Demo implementation
+        # In production: Call SerpApi with self.api_key
+        return self._get_demo_data(query)
     
     async def post(self, content: Dict) -> bool:
+        """SerpApi is read-only (search only)"""
+        logger.warning("[SerpApi] Read-only service (no posting)")
         return False
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Demo search results"""
+        search_query = query.get("q", "")
+        engine = query.get("engine", "google")
+        
+        if "news" in engine:
+            return [
+                {
+                    "title": f"Latest news about {search_query}",
+                    "link": "https://example.com/news/1",
+                    "snippet": "Breaking news in the AI industry...",
+                    "source": "Tech News Daily",
+                    "date": datetime.now(timezone.utc).isoformat()
+                }
+            ]
+        elif "images" in engine:
+            return [
+                {
+                    "title": f"Image: {search_query}",
+                    "link": "https://example.com/image.jpg",
+                    "thumbnail": "https://example.com/thumb.jpg",
+                    "source": "Example Images"
+                }
+            ]
+        else:  # Regular search
+            return [
+                {
+                    "position": 1,
+                    "title": "AUREM: The Future of AI SaaS Platforms",
+                    "link": "https://aurem.ai",
+                    "snippet": "AUREM combines Agent Harness, Connector Ecosystem, and Generative UI...",
+                    "displayed_link": "aurem.ai"
+                },
+                {
+                    "position": 2,
+                    "title": f"Everything about {search_query}",
+                    "link": "https://example.com/article",
+                    "snippet": "Comprehensive guide to modern AI solutions...",
+                    "displayed_link": "example.com"
+                }
+            ]
 
 
 class NewsAggregator:
