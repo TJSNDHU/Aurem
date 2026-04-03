@@ -16,6 +16,7 @@ const FaceIDTrainer = ({ onComplete }) => {
   const [error, setError] = useState(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [status, setStatus] = useState('Initializing...');
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -35,19 +36,26 @@ const FaceIDTrainer = ({ onComplete }) => {
   const loadModels = async () => {
     try {
       setLoading(true);
+      setStatus('Loading face recognition models...');
+      
       // Load face-api.js models from CDN
       const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
       
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+      console.log('[FaceID] Loading models from:', MODEL_URL);
+      
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      ]);
       
       setModelsLoaded(true);
       setLoading(false);
-      console.log('Face-API models loaded');
+      setStatus('Models loaded. Ready to start camera.');
+      console.log('[FaceID] All models loaded successfully');
     } catch (err) {
-      console.error('Failed to load models:', err);
-      setError('Failed to load face recognition models');
+      console.error('[FaceID] Failed to load models:', err);
+      setError(`Failed to load face recognition models: ${err.message}`);
       setLoading(false);
     }
   };
@@ -55,6 +63,7 @@ const FaceIDTrainer = ({ onComplete }) => {
   const startCamera = async () => {
     try {
       setError(null); // Clear any previous errors
+      setStatus('Starting camera...');
       
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
@@ -67,15 +76,19 @@ const FaceIDTrainer = ({ onComplete }) => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        setCapturing(true);
         
-        // Wait a moment for video to stabilize, then start detection
+        setCapturing(true);
+        setStatus('Camera started. Detecting face...');
+        console.log('[FaceID] Camera started, beginning face detection');
+        
+        // Wait for video to stabilize, then start detection
         setTimeout(() => {
+          console.log('[FaceID] Starting detection loop');
           detectFace();
-        }, 500);
+        }, 1000); // Increased to 1 second for better stability
       }
     } catch (err) {
-      console.error('Camera access denied:', err);
+      console.error('[FaceID] Camera error:', err);
       let errorMessage = 'Camera access denied. Please allow camera access.';
       
       if (err.name === 'NotFoundError') {
@@ -88,33 +101,62 @@ const FaceIDTrainer = ({ onComplete }) => {
       
       setError(errorMessage);
       setLoading(false);
+      setStatus('');
     }
   };
 
   const detectFace = async () => {
-    if (!videoRef.current || !modelsLoaded) return;
+    if (!videoRef.current || !modelsLoaded || !capturing) {
+      console.log('[FaceID] Detection skipped:', { 
+        hasVideo: !!videoRef.current, 
+        modelsLoaded, 
+        capturing 
+      });
+      return;
+    }
 
-    const detection = await faceapi
-      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (detection) {
-      setFaceDetected(true);
+    try {
+      console.log('[FaceID] Running face detection...');
       
-      // Draw detection on canvas
-      if (canvasRef.current) {
-        const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
-        const resizedDetection = faceapi.resizeResults(detection, dims);
+      const detection = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({
+          inputSize: 224,
+          scoreThreshold: 0.5
+        }))
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (detection) {
+        console.log('[FaceID] Face detected! Score:', detection.detection.score);
+        setFaceDetected(true);
+        setStatus('Face detected! Position steady...');
         
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        
-        faceapi.draw.drawDetections(canvasRef.current, resizedDetection);
-        faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetection);
+        // Draw detection on canvas
+        if (canvasRef.current && videoRef.current) {
+          const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
+          const resizedDetection = faceapi.resizeResults(detection, dims);
+          
+          const ctx = canvasRef.current.getContext('2d');
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          
+          // Flip context for mirrored drawing
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.translate(-canvasRef.current.width, 0);
+          
+          faceapi.draw.drawDetections(canvasRef.current, resizedDetection);
+          faceapi.draw.drawFaceLandmarks(canvasRef.current, resizedDetection);
+          
+          ctx.restore();
+        }
+      } else {
+        console.log('[FaceID] No face detected in frame');
+        setFaceDetected(false);
+        setStatus('Looking for face...');
       }
-    } else {
-      setFaceDetected(false);
+    } catch (err) {
+      console.error('[FaceID] Detection error:', err);
+      setStatus('Detection error - retrying...');
     }
 
     // Continue detection loop
@@ -277,7 +319,7 @@ const FaceIDTrainer = ({ onComplete }) => {
           }}
         />
 
-        {/* Face Detection Indicator */}
+        {/* Status Overlay */}
         {capturing && (
           <div style={{
             position: 'absolute',
@@ -289,7 +331,8 @@ const FaceIDTrainer = ({ onComplete }) => {
             borderRadius: 8,
             display: 'flex',
             alignItems: 'center',
-            gap: 8
+            gap: 8,
+            zIndex: 10
           }}>
             <div style={{
               width: 8,
@@ -304,7 +347,7 @@ const FaceIDTrainer = ({ onComplete }) => {
               fontWeight: 600,
               textTransform: 'uppercase'
             }}>
-              {faceDetected ? 'Face Detected' : 'Looking for face...'}
+              {status || (faceDetected ? 'Face Detected' : 'Looking for face...')}
             </span>
           </div>
         )}
