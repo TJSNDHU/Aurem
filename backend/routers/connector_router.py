@@ -51,7 +51,7 @@ async def list_platforms():
         "social": ["twitter", "tiktok", "reddit"],
         "video": ["youtube", "bilibili", "xiaohongshu"],
         "dev_tools": ["github", "jira", "slack", "linear"],
-        "web": ["duckduckgo", "serpapi"],
+        "web": ["google", "serpapi"],
         "news": ["news"],
         "total": 12
     }
@@ -245,14 +245,14 @@ async def get_latest_news(topic: str = "technology", limit: int = 20):
 
 
 @router.get("/web/search")
-async def web_search(q: str, engine: str = "duckduckgo", limit: int = 10):
+async def web_search(q: str, engine: str = "google", limit: int = 10):
     """
     Perform web search
     
     Args:
         q: Search query
-        engine: duckduckgo or serpapi
-        limit: Number of results
+        engine: google or serpapi
+        limit: Number of results (max 10 for Google)
     """
     ecosystem = get_connector_ecosystem()
     

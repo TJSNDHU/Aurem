@@ -54,7 +54,7 @@ class ConnectorEcosystem:
             "linear": LinearConnector(),
             
             # Web & News
-            "duckduckgo": DuckDuckGoConnector(),
+            "google": GoogleSearchConnector(),  # Replaced DuckDuckGo
             "serpapi": SerpApiConnector(),
             "news": NewsAggregator()
         }
@@ -484,83 +484,153 @@ class LinearConnector:
 # WEB & NEWS CONNECTORS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class DuckDuckGoConnector:
-    """DuckDuckGo real-time search"""
+class GoogleSearchConnector:
+    """Google Custom Search API - Real Google results"""
     
     def __init__(self):
-        self.authenticated = True  # No auth needed
+        self.authenticated = False
+        self.api_key = None
+        self.search_engine_id = None
+        self.base_url = "https://www.googleapis.com/customsearch/v1"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
-        """No auth needed for DuckDuckGo"""
-        return True
+        """
+        Authenticate with Google Custom Search API
+        
+        credentials: {
+            "api_key": "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "search_engine_id": "your_cx_id"
+        }
+        
+        Get API Key: https://console.cloud.google.com/apis/credentials
+        Create Search Engine: https://programmablesearchengine.google.com/
+        """
+        if not credentials:
+            logger.error("[Google] No credentials provided")
+            return False
+        
+        self.api_key = credentials.get("api_key")
+        self.search_engine_id = credentials.get("search_engine_id")
+        
+        if not self.api_key or not self.search_engine_id:
+            logger.error("[Google] Missing api_key or search_engine_id")
+            return False
+        
+        # Test API key with a simple search
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    self.base_url,
+                    params={
+                        "key": self.api_key,
+                        "cx": self.search_engine_id,
+                        "q": "test",
+                        "num": 1
+                    }
+                ) as response:
+                    if response.status == 200:
+                        self.authenticated = True
+                        logger.info("[Google] Authenticated successfully")
+                        return True
+                    else:
+                        error_data = await response.json()
+                        logger.error(f"[Google] Auth failed: {error_data}")
+                        return False
+        except Exception as e:
+            logger.error(f"[Google] Auth error: {e}")
+            return False
     
     async def fetch(self, query: Dict) -> List[Dict]:
         """
-        Search DuckDuckGo
+        Search Google
         
         query: {
-            "q": "search query",
-            "limit": 10,
-            "region": "us-en"  # optional
+            "q": "artificial intelligence",
+            "limit": 10,  # max 10 per request
+            "language": "en",
+            "country": "us",
+            "date_restrict": "d7"  # last 7 days (optional)
         }
+        
+        Returns:
+        [
+            {
+                "title": "...",
+                "snippet": "...",
+                "url": "...",
+                "displayLink": "techcrunch.com"
+            }
+        ]
         """
+        if not self.authenticated:
+            logger.error("[Google] Not authenticated")
+            return []
+        
         search_query = query.get("q", "")
-        limit = min(query.get("limit", 10), 25)  # Max 25 results
-        region = query.get("region", "us-en")
+        limit = min(query.get("limit", 10), 10)  # Google allows max 10 per request
+        language = query.get("language", "en")
+        country = query.get("country", "us")
+        date_restrict = query.get("date_restrict")  # e.g., "d7" for last 7 days
         
         if not search_query:
-            logger.error("[DuckDuckGo] No search query provided")
+            logger.error("[Google] No search query provided")
             return []
         
         try:
-            # DuckDuckGo Instant Answer API
-            api_url = "https://api.duckduckgo.com/"
             params = {
+                "key": self.api_key,
+                "cx": self.search_engine_id,
                 "q": search_query,
-                "format": "json",
-                "no_html": 1,
-                "skip_disambig": 1
+                "num": limit,
+                "lr": f"lang_{language}",
+                "gl": country
             }
             
+            if date_restrict:
+                params["dateRestrict"] = date_restrict
+            
             async with aiohttp.ClientSession() as session:
-                async with session.get(api_url, params=params) as response:
+                async with session.get(self.base_url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
                         
+                        items = data.get("items", [])
                         results = []
                         
-                        # Abstract (main answer)
-                        if data.get("Abstract"):
+                        for item in items:
                             results.append({
-                                "type": "abstract",
-                                "title": data.get("Heading", ""),
-                                "text": data.get("Abstract"),
-                                "url": data.get("AbstractURL"),
-                                "source": data.get("AbstractSource")
+                                "title": item.get("title"),
+                                "snippet": item.get("snippet"),
+                                "url": item.get("link"),
+                                "displayLink": item.get("displayLink"),
+                                "formattedUrl": item.get("formattedUrl"),
+                                "image": item.get("pagemap", {}).get("cse_image", [{}])[0].get("src") if "pagemap" in item else None
                             })
                         
-                        # Related topics
-                        for topic in data.get("RelatedTopics", [])[:limit]:
-                            if "Text" in topic:
-                                results.append({
-                                    "type": "related",
-                                    "title": topic.get("Text", "")[:100],
-                                    "text": topic.get("Text", ""),
-                                    "url": topic.get("FirstURL")
-                                })
+                        # Get quota info
+                        search_info = data.get("searchInformation", {})
+                        total_results = search_info.get("totalResults", "0")
+                        search_time = search_info.get("searchTime", 0)
                         
-                        logger.info(f"[DuckDuckGo] Found {len(results)} results for '{search_query}'")
-                        return results[:limit]
+                        logger.info(f"[Google] Found {len(results)} results in {search_time}s (total: {total_results})")
+                        
+                        return results
+                    
+                    elif response.status == 429:
+                        logger.error("[Google] Quota exceeded (100 queries/day limit)")
+                        return []
+                    
                     else:
-                        logger.error(f"[DuckDuckGo] Search failed: {response.status}")
+                        error_data = await response.json()
+                        logger.error(f"[Google] Search failed: {error_data}")
                         return []
         
         except Exception as e:
-            logger.error(f"[DuckDuckGo] Search error: {e}")
+            logger.error(f"[Google] Search error: {e}")
             return []
     
     async def post(self, content: Dict) -> bool:
-        """Not applicable for DuckDuckGo"""
+        """Not applicable for Google Search"""
         return False
 
 
