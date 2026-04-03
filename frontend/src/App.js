@@ -9,7 +9,7 @@ import { Toaster } from "sonner";
 import "./App.css";
 
 // Lazy load components
-const AuremAuth = lazy(() => import('./platform/AuremAuth'));
+const FaceIDAuthWrapper = lazy(() => import('./components/FaceIDAuthWrapper'));
 const AuremDashboard = lazy(() => import('./platform/AuremDashboard'));
 const PlatformLanding = lazy(() => import('./platform/PlatformLanding'));
 
@@ -39,7 +39,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<PlatformLanding />} />
             <Route path="/platform" element={<PlatformLanding />} />
-            <Route path="/auth" element={<AuremAuth />} />
+            <Route path="/auth" element={<FaceIDAuthWrapper />} />
             <Route path="/login" element={<Navigate to="/auth" replace />} />
             <Route path="/register" element={<Navigate to="/auth?mode=register" replace />} />
             
