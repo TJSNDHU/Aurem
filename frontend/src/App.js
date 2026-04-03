@@ -14,6 +14,7 @@ const AuremDashboard = lazy(() => import('./platform/AuremDashboard'));
 const PlatformLanding = lazy(() => import('./platform/PlatformLanding'));
 const AdminMissionControl = lazy(() => import('./platform/AdminMissionControl'));
 const CustomSubscriptionBuilder = lazy(() => import('./platform/CustomSubscriptionBuilder'));
+const AdminPlanManager = lazy(() => import('./platform/AdminPlanManager'));
 
 // Loading Spinner
 const LoadingSpinner = () => (
@@ -51,6 +52,7 @@ function App() {
             
             {/* Admin Routes */}
             <Route path="/admin/mission-control" element={<AdminMissionControl />} />
+            <Route path="/admin/plans" element={<AdminPlanManager />} />
             <Route path="/subscriptions/custom" element={<CustomSubscriptionBuilder />} />
             
             {/* Catch-all redirect */}

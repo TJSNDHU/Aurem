@@ -203,6 +203,7 @@ try:
     from routers.admin_mission_control_router import set_db as set_mission_control_db
     from routers.subscription_public_router import router as subscription_public_router, set_db as set_subscription_public_db
     from routers.custom_subscription_router import router as custom_subscription_router, set_db as set_custom_subscription_db
+    from routers.admin_plan_management import router as admin_plan_router, set_db as set_admin_plan_db
     from routers.self_healing_router import router as self_healing_router
     from routers.connector_router import router as connector_router
     from services.toon_service import set_toon_service_db
@@ -3952,6 +3953,12 @@ async def startup_event():
                     set_subscription_public_db(db)
                 if set_custom_subscription_db is not None:
                     set_custom_subscription_db(db)
+                if set_admin_plan_db is not None:
+                    set_admin_plan_db(db)
+                if set_self_healing_ai_db is not None:
+                    set_self_healing_ai_db(db)
+                if set_connector_ecosystem_db is not None:
+                    set_connector_ecosystem_db(db)
                 logging.info(f"✅ Admin Mission Control (TOON) initialized ({time.time()-t0:.2f}s)")
             except Exception as e:
                 logging.warning(f"⚠️ Mission Control initialization error: {e}")
@@ -42252,6 +42259,8 @@ if subscription_public_router is not None:
     app.include_router(subscription_public_router)  # Public subscription plans
 if custom_subscription_router is not None:
     app.include_router(custom_subscription_router)  # Custom/A-la-carte subscriptions
+if admin_plan_router is not None:
+    app.include_router(admin_plan_router)  # Admin Plan Management
 if self_healing_router is not None:
     app.include_router(self_healing_router)  # Self-Healing AI
 if connector_router is not None:
