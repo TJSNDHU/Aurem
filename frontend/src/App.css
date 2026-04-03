@@ -1,34 +1,381 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/**
+ * AUREM AI Platform - Global Styles
+ * Theme: Obsidian Executive
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+:root {
+  /* AUREM Color Palette */
+  --aurem-obsidian: #050505;
+  --aurem-charcoal: #0A0A0A;
+  --aurem-slate: #1A1A1A;
+  --aurem-gold: #D4AF37;
+  --aurem-gold-light: #E5C76B;
+  --aurem-gold-dark: #8B7355;
+  --aurem-emerald: #009874;
+  --aurem-emerald-light: #00B88A;
+  --aurem-text: #F4F4F4;
+  --aurem-text-muted: #888888;
+  --aurem-border: rgba(212, 175, 55, 0.15);
+  
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  
+  /* Shadows */
+  --shadow-gold: 0 0 30px rgba(212, 175, 55, 0.15);
+  --shadow-emerald: 0 0 30px rgba(0, 152, 116, 0.15);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+html {
+  scroll-behavior: smooth;
 }
 
-.App-link {
-    color: #61dafb;
+body {
+  font-family: var(--font-sans);
+  background-color: var(--aurem-obsidian);
+  color: var(--aurem-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--aurem-gold);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--aurem-charcoal);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--aurem-gold-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--aurem-gold);
+}
+
+/* Selection */
+::selection {
+  background: var(--aurem-gold);
+  color: var(--aurem-obsidian);
+}
+
+/* Focus States */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--aurem-gold);
+  outline-offset: 2px;
+}
+
+/* Buttons */
+.aurem-btn-primary {
+  background: linear-gradient(135deg, var(--aurem-gold), var(--aurem-gold-dark));
+  color: var(--aurem-obsidian);
+  font-weight: 600;
+  padding: 12px 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--font-sans);
+}
+
+.aurem-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-gold);
+}
+
+.aurem-btn-secondary {
+  background: transparent;
+  color: var(--aurem-text);
+  font-weight: 500;
+  padding: 12px 32px;
+  border-radius: 8px;
+  border: 1px solid var(--aurem-border);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--font-sans);
+}
+
+.aurem-btn-secondary:hover {
+  border-color: var(--aurem-gold);
+  color: var(--aurem-gold);
+}
+
+/* Cards */
+.aurem-card {
+  background: var(--aurem-charcoal);
+  border: 1px solid var(--aurem-border);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.aurem-card:hover {
+  border-color: var(--aurem-gold);
+  box-shadow: var(--shadow-gold);
+}
+
+/* Glass Effect */
+.aurem-glass {
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--aurem-border);
+}
+
+/* Gradient Text */
+.aurem-gradient-text {
+  background: linear-gradient(135deg, var(--aurem-gold), var(--aurem-emerald));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Status Indicators */
+.aurem-status-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--aurem-emerald);
+}
+
+.aurem-status-active::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--aurem-emerald);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+/* Loading Animation */
+.aurem-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.aurem-loading span {
+  width: 8px;
+  height: 8px;
+  background: var(--aurem-gold);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.aurem-loading span:nth-child(1) { animation-delay: -0.32s; }
+.aurem-loading span:nth-child(2) { animation-delay: -0.16s; }
+.aurem-loading span:nth-child(3) { animation-delay: 0; }
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+/* Input Fields */
+.aurem-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--aurem-charcoal);
+  border: 1px solid var(--aurem-border);
+  border-radius: 8px;
+  color: var(--aurem-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.aurem-input:focus {
+  border-color: var(--aurem-gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+.aurem-input::placeholder {
+  color: var(--aurem-text-muted);
+}
+
+/* Labels */
+.aurem-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--aurem-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Badges */
+.aurem-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 100px;
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--aurem-gold);
+  border: 1px solid var(--aurem-border);
+}
+
+.aurem-badge-emerald {
+  background: rgba(0, 152, 116, 0.1);
+  color: var(--aurem-emerald);
+  border-color: rgba(0, 152, 116, 0.2);
+}
+
+/* Dividers */
+.aurem-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--aurem-border),
+    transparent
+  );
+  margin: 24px 0;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease forwards;
+}
+
+/* Grid Overlay (subtle) */
+.aurem-grid-bg {
+  background-image: 
+    linear-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* Noise Texture */
+.aurem-noise {
+  position: relative;
+}
+
+.aurem-noise::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .aurem-btn-primary,
+  .aurem-btn-secondary {
+    padding: 10px 24px;
+    font-size: 14px;
+  }
+  
+  .aurem-card {
+    padding: 16px;
+  }
+}
+
+/* Utility Classes */
+.text-gold { color: var(--aurem-gold); }
+.text-emerald { color: var(--aurem-emerald); }
+.text-muted { color: var(--aurem-text-muted); }
+.bg-obsidian { background-color: var(--aurem-obsidian); }
+.bg-charcoal { background-color: var(--aurem-charcoal); }
+.border-gold { border-color: var(--aurem-gold); }

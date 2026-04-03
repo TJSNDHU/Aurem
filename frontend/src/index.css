@@ -1,115 +1,643 @@
+/* 
+ * Self-hosted fonts for better performance (no third-party dependency)
+ * Using @fontsource packages for optimized, subset WOFF2 fonts
+ */
+
+/* Import self-hosted fonts - Latin subset only (~15KB vs 100KB+ from Google) */
+@import '@fontsource/playfair-display/400.css';
+@import '@fontsource/playfair-display/500.css';
+@import '@fontsource/playfair-display/600.css';
+@import '@fontsource/playfair-display/700.css';
+@import '@fontsource/manrope/300.css';
+@import '@fontsource/manrope/400.css';
+@import '@fontsource/manrope/500.css';
+@import '@fontsource/manrope/600.css';
+@import '@fontsource/manrope/700.css';
+
+/* LaVela secondary brand fonts - self-hosted for performance */
+@import '@fontsource/cormorant-garamond/300.css';
+@import '@fontsource/cormorant-garamond/400.css';
+@import '@fontsource/cormorant-garamond/500.css';
+@import '@fontsource/cormorant-garamond/600.css';
+@import '@fontsource/cormorant-garamond/700.css';
+@import '@fontsource/montserrat/300.css';
+@import '@fontsource/montserrat/400.css';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+
+/* OROÉ brand font - luxury display face */
+@import '@fontsource/cinzel/400.css';
+@import '@fontsource/cinzel/500.css';
+@import '@fontsource/cinzel/600.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* 
+ * Font Fallback System with size-adjust
+ * Prevents CLS (Cumulative Layout Shift) by matching fallback font metrics
+ * to custom font metrics. Text won't "jump" when fonts load.
+ */
+
+/* Playfair Display fallback - matches Georgia metrics */
+@font-face {
+  font-family: 'Playfair Display Fallback';
+  src: local('Georgia'), local('Times New Roman');
+  size-adjust: 105%; /* Playfair is slightly larger than Georgia */
+  ascent-override: 95%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+/* Manrope fallback - matches system sans-serif metrics */
+@font-face {
+  font-family: 'Manrope Fallback';
+  src: local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  size-adjust: 100%;
+  ascent-override: 92%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+/* Cinzel Fallback - for OROÉ luxury display (prevent CLS) */
+@font-face {
+  font-family: 'Cinzel Fallback';
+  src: local('Times New Roman'), local('Georgia'), local('serif');
+  size-adjust: 104%;
+  ascent-override: 90%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
+/* Cormorant Garamond Fallback - for LaVela brand (prevent CLS) */
+@font-face {
+  font-family: 'Cormorant Garamond Fallback';
+  src: local('Georgia'), local('Times New Roman'), local('serif');
+  size-adjust: 98%;
+  ascent-override: 94%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+/* Apply fallback fonts with smooth transition */
+:root {
+  --font-heading: 'Playfair Display', 'Playfair Display Fallback', Georgia, serif;
+  --font-body: 'Manrope', 'Manrope Fallback', system-ui, sans-serif;
+  --font-cinzel: 'Cinzel', 'Cinzel Fallback', 'Times New Roman', serif;
+  --font-cormorant: 'Cormorant Garamond', 'Cormorant Garamond Fallback', Georgia, serif;
+}
+
+/* Hero container - Fixed aspect ratio to prevent CLS and ensure fast LCP */
+.hero-container {
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
+  contain: layout style paint; /* CSS containment for rendering optimization */
+}
+
+/* ===========================================
+   ADMIN PANEL PERFORMANCE OPTIMIZATIONS
+   Reduces LCP/FCP by containing admin layout
+   =========================================== */
+
+/* Admin sidebar - CSS containment for fast rendering */
+.admin-sidebar {
+  contain: layout style;
+  /* Removed content-visibility: auto to prevent sidebar from not rendering on mobile */
+}
+
+/* Admin main content area - prevent layout shifts */
+.admin-main-content {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+}
+
+/* Admin cards use content-visibility for off-screen optimization */
+.admin-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* Admin table rows - lazy render for long lists */
+.admin-table-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+}
+
+/* Reduce paint on admin hover states */
+.admin-hover-optimized {
+  will-change: background-color;
+  transition: background-color 0.15s ease;
+}
+
+/* Admin skeleton loaders - prevent CLS */
+.admin-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Hero image placeholder - prevents flash of unstyled content */
+.hero-image-wrapper {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+}
+
+/* Hide Emergent badge */
+#emergent-badge,
+a[href*="emergent.sh"][style*="position: fixed"],
+a[href*="emergent-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Mobile viewport height fix - prevents blank screen on iOS/Android */
+html, body {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+}
+
+html {
+  height: -webkit-fill-available;
+}
+
+:root {
+  --primary: #2D2A2E;
+  --accent: #F8A5B8;
+  --bg-light: #FDF9F9;
+  --bg-dark: #1A1718;
+  --text-primary: #1A1A1A;
+  --text-secondary: #5A5A5A;
+  --text-muted: #888888;
+  --silver: #E2E2E2;
+  --clinical-rose: #FFF0F3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-    margin: 0;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-        sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #FFFFFF;
+  color: var(--text-primary);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.font-display {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-body {
+  font-family: 'Manrope', sans-serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
 }
 
 code {
-    font-family:
-        source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--accent);
+  color: var(--primary);
+}
+
+/* ===========================================
+   PERFORMANCE OPTIMIZATIONS
+   Content-visibility for below-fold sections
+   =========================================== */
+
+/* Optimize rendering for sections below the fold */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Product grid items - optimize rendering */
+.product-card-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 350px;
+}
+
+/* Footer and other below-fold sections */
+footer, 
+[data-section="below-fold"] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Optimize image containers */
+.image-container-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Will-change hints for smoother animations */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 0 0% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 3.9%;
-        --primary: 0 0% 9%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 0 0% 96.1%;
-        --secondary-foreground: 0 0% 9%;
-        --muted: 0 0% 96.1%;
-        --muted-foreground: 0 0% 45.1%;
-        --accent: 0 0% 96.1%;
-        --accent-foreground: 0 0% 9%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 89.8%;
-        --input: 0 0% 89.8%;
-        --ring: 0 0% 3.9%;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
-    }
-    .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
-        --ring: 0 0% 83.1%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-    }
+  :root {
+    --background: 0 33% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 340 8% 17%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 33% 98%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 20% 96%;
+    --muted-foreground: 0 0% 53%;
+    --accent: 347 85% 81%;
+    --accent-foreground: 340 8% 17%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 10% 89%;
+    --input: 0 10% 89%;
+    --ring: 340 8% 17%;
+    --radius: 0.5rem;
+  }
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-    }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
-@layer base {
-    [data-debug-wrapper="true"] {
-        display: contents !important;
-    }
-
-    [data-debug-wrapper="true"] > * {
-        margin-left: inherit;
-        margin-right: inherit;
-        margin-top: inherit;
-        margin-bottom: inherit;
-        padding-left: inherit;
-        padding-right: inherit;
-        padding-top: inherit;
-        padding-bottom: inherit;
-        column-gap: inherit;
-        row-gap: inherit;
-        gap: inherit;
-        border-left-width: inherit;
-        border-right-width: inherit;
-        border-top-width: inherit;
-        border-bottom-width: inherit;
-        border-left-style: inherit;
-        border-right-style: inherit;
-        border-top-style: inherit;
-        border-bottom-style: inherit;
-        border-left-color: inherit;
-        border-right-color: inherit;
-        border-top-color: inherit;
-        border-bottom-color: inherit;
-    }
+/* Glassmorphism */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Buttons */
+.btn-primary {
+  @apply bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] text-[#2D2A2E] hover:from-[#F4D03F] hover:via-[#D4AF37] hover:to-[#F4D03F] transition-all duration-300 rounded-full px-8 py-4 text-sm uppercase tracking-widest font-bold shadow-lg shadow-[#D4AF37]/20;
+}
+
+.btn-gold {
+  @apply bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] text-[#2D2A2E] hover:from-[#F4D03F] hover:via-[#D4AF37] hover:to-[#F4D03F] transition-all duration-300 rounded-full px-8 py-4 text-sm uppercase tracking-widest font-bold shadow-lg shadow-[#D4AF37]/30;
+}
+
+.btn-secondary {
+  @apply border border-[#2D2A2E] text-[#2D2A2E] hover:bg-[#2D2A2E] hover:text-white transition-colors duration-300 rounded-full px-8 py-4 text-sm uppercase tracking-widest font-semibold;
+}
+
+.btn-ghost {
+  @apply text-[#2D2A2E] hover:text-[#F8A5B8] underline-offset-4 hover:underline transition-colors duration-300;
+}
+
+/* Product card hover effect */
+.product-card {
+  @apply relative bg-transparent transition-transform duration-500;
+}
+
+.product-card:hover {
+  @apply z-10;
+  transform: translateY(-8px);
+}
+
+.product-card:hover .product-image {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
+}
+
+/* Input styles */
+.input-underline {
+  @apply bg-transparent border-0 border-b border-gray-300 focus:border-[#1A2F2A] rounded-none px-0 py-4 placeholder:text-gray-400 focus:ring-0 transition-colors duration-300;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
+/* Glow effect */
+.glow {
+  box-shadow: 0 0 20px rgba(248, 165, 184, 0.4);
+}
+
+/* Rose gradient */
+.bio-gradient {
+  background: linear-gradient(135deg, #F8A5B8 0%, #FFDDE5 100%);
+}
+
+/* Dark mist overlay */
+.dark-mist {
+  background: linear-gradient(to bottom, rgba(15, 18, 17, 0) 0%, rgba(15, 18, 17, 1) 100%);
+}
+
+/* Admin dashboard grid */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .admin-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Hide scrollbar for horizontal scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Toast customization */
+[data-sonner-toast] {
+  font-family: 'Manrope', sans-serif !important;
+}
+
+/* Print Styles for Financial Reports */
+@media print {
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Hide navigation and non-essential elements */
+  nav, header, footer, 
+  button:not(.print-show), 
+  .no-print,
+  [data-sonner-toast] {
+    display: none !important;
+  }
+  
+  /* Make cards print friendly */
+  .print-friendly {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  /* Ensure tables fit on page */
+  table {
+    font-size: 10pt !important;
+    width: 100% !important;
+  }
+  
+  /* Page margins */
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+  
+  /* Show colors in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Shimmer animation for CTA buttons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255,255,255,0.2) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Slow pulse for prominent sections */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
+/* ============ CUSTOMIZABLE DASHBOARD GRID STYLES ============ */
+
+/* React Grid Layout overrides */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.resizing {
+  z-index: 1;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.react-grid-item.dropping {
+  visibility: hidden;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: #F8A5B8;
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  border-radius: 12px;
+}
+
+/* Resize handle styling */
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+}
+
+.react-resizable-handle-se {
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+
+.react-resizable-handle-se::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(0, 0, 0, 0.3);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+/* Widget container styling */
+.widget-container {
+  height: 100%;
+}
+
+.widget-container .drag-handle:hover {
+  background-color: rgba(248, 165, 184, 0.2);
+}
+
+/* Dashboard specific styles */
+.layout {
+  min-height: 400px;
+}
+
+/* Smooth widget animations */
+.react-grid-item > .react-resizable-handle::after {
+  border-color: #F8A5B8;
+}
+
+/* Lock indicator pulse */
+@keyframes lock-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 165, 184, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(248, 165, 184, 0);
+  }
+}
+
+.dashboard-locked .widget-container {
+  pointer-events: none;
+}
+
+/* ============ END DASHBOARD STYLES ============ */

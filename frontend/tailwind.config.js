@@ -5,8 +5,23 @@ module.exports = {
     "./src/**/*.{js,jsx,ts,tsx}",
     "./public/index.html"
   ],
+  // Safelist only classes that are dynamically generated
+  safelist: [
+    'animate-pulse',
+    'animate-spin',
+    'animate-bounce',
+    // Dynamic colors that might be generated
+    { pattern: /bg-(pink|rose|gray|green|red|yellow|blue)-(50|100|200|300|400|500|600|700|800|900)/ },
+    { pattern: /text-(pink|rose|gray|green|red|yellow|blue)-(50|100|200|300|400|500|600|700|800|900)/ },
+    { pattern: /border-(pink|rose|gray|green|red|yellow|blue)-(50|100|200|300|400|500|600|700|800|900)/ },
+  ],
   theme: {
   	extend: {
+		fontFamily: {
+			heading: ["var(--font-heading)"],
+			body: ["var(--font-body)"],
+			clinical: ["var(--font-body)"],
+		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

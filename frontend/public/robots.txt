@@ -1,0 +1,130 @@
+# ReRoots Biotech Skincare & La Vela Bianca - robots.txt
+# Updated: March 7, 2026
+# Optimized for Google, Bing, and AI Crawlers (ChatGPT, Perplexity, Claude, Gemini)
+
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /products
+Allow: /about
+Allow: /science
+Allow: /waitlist
+Allow: /Bio-Age-Repair-Scan
+Allow: /blog
+Allow: /privacy
+Allow: /terms
+Allow: /faq
+Allow: /contact
+Allow: /pdrn-comparison-guide
+Allow: /science-glossary
+
+# Block admin and user-specific pages
+Disallow: /admin
+Disallow: /reroots-admin
+Disallow: /checkout
+Disallow: /account
+Disallow: /cart
+Disallow: /mission-control
+Disallow: /partner-login
+Disallow: /influencer-login
+Disallow: /api/
+
+# LA VELA BIANCA - Teen Skincare Brand (ALLOW for indexing)
+Allow: /lavela
+Allow: /lavela/*
+Allow: /la-vela-bianca
+Allow: /la-vela-bianca/*
+
+# Block unlaunched brand pages (OROÉ only)
+Disallow: /oroe
+Disallow: /oroe/*
+Disallow: /brands
+Disallow: /showcase
+Disallow: /ritual
+
+# Block query parameter pages to prevent duplicate content
+Disallow: /*?category=
+Disallow: /*?search=
+Disallow: /*?sort=
+Disallow: /*?filter=
+Disallow: /*?page=
+Disallow: /*?ref=
+
+# Google
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+# Google Images
+User-agent: Googlebot-Image
+Allow: /
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# ========== AI CRAWLERS - ALLOW FOR GEO (Generative Engine Optimization) ==========
+
+# OpenAI
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# Anthropic
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+# Google AI
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Gemini
+Allow: /
+
+# Common Crawl (for AI training)
+User-agent: CCBot
+Allow: /
+
+# Meta AI
+User-agent: FacebookBot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+# Apple
+User-agent: Applebot
+Allow: /
+
+# Microsoft AI
+User-agent: Bingbot
+Allow: /
+
+# Cohere
+User-agent: cohere-ai
+Allow: /
+
+# You.com
+User-agent: YouBot
+Allow: /
+
+# ========== SITEMAPS ==========
+Sitemap: https://reroots.ca/sitemap.xml
+Sitemap: https://lavelabianca.com/lavela-sitemap.xml
+
+# Host declarations
+Host: https://reroots.ca
+Host: https://lavelabianca.com

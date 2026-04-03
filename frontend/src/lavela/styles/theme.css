@@ -1,0 +1,73 @@
+/**
+ * La Vela Bianca Theme CSS Variables
+ * Apply .lavela-theme class to root element for brand theming
+ */
+
+.lavela-theme {
+  /* Primary palette */
+  --lavela-bg: #0D4D4D;
+  --lavela-surface: #1A6B6B;
+  --lavela-surface-alt: rgba(26, 107, 107, 0.25);
+  --lavela-surface-hover: rgba(26, 107, 107, 0.5);
+  
+  /* Borders */
+  --lavela-border: rgba(212, 165, 116, 0.25);
+  --lavela-border-light: rgba(212, 165, 116, 0.19);
+  --lavela-border-bright: rgba(212, 165, 116, 0.38);
+  
+  /* Accent - Gold/Champagne */
+  --lavela-gold: #D4A574;
+  --lavela-gold-dim: #E6BE8A;
+  --lavela-gold-faint: rgba(212, 165, 116, 0.15);
+  
+  /* Status colors */
+  --lavela-green: #72B08A;
+  --lavela-red: #E07070;
+  --lavela-amber: #E8A860;
+  --lavela-blue: #7AAEC8;
+  --lavela-purple: #9878D0;
+  --lavela-teal: #72B0B0;
+  
+  /* Text */
+  --lavela-text: #FDF8F5;
+  --lavela-text-dim: #D4A574;
+  --lavela-text-muted: #E8C4B8;
+  
+  /* Gradients */
+  --lavela-header-gradient: linear-gradient(180deg, #0A3C3C 0%, transparent 100%);
+  
+  /* Fonts */
+  --lavela-font-display: 'Cormorant Garamond', Georgia, serif;
+  --lavela-font-sans: 'Inter', system-ui, sans-serif;
+  --lavela-font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* Apply theme to body when La Vela is active */
+body.lavela-active {
+  background: var(--lavela-bg);
+  color: var(--lavela-text);
+}
+
+/* Admin panel overrides for La Vela */
+.admin-lavela .admin-header {
+  background: var(--lavela-header-gradient);
+}
+
+.admin-lavela .admin-sidebar {
+  background: var(--lavela-bg);
+  border-color: var(--lavela-border);
+}
+
+.admin-lavela .admin-card {
+  background: var(--lavela-surface);
+  border-color: var(--lavela-border);
+}
+
+.admin-lavela .admin-btn-primary {
+  background: var(--lavela-gold);
+  color: var(--lavela-bg);
+}
+
+.admin-lavela .admin-text-accent {
+  color: var(--lavela-gold);
+}
