@@ -571,25 +571,49 @@ const AuremDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] flex" data-testid="aurem-dashboard">
-      {/* Sidebar */}
-      <Sidebar 
-        activeItem={activeItem} 
-        onItemClick={handleNavClick}
-        user={user}
-        onLogout={handleLogout}
-      />
+    <div className="min-h-screen bg-[#050505] flex flex-col" data-testid="aurem-dashboard">
+      {/* System Status Bar */}
+      <SystemStatusBar token={token} />
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar 
+          activeItem={activeItem} 
+          onItemClick={handleNavClick}
+          user={user}
+          onLogout={handleLogout}
+        />
 
-      {/* Main Content */}
-      <ChatInterface user={user} token={token} />
+        {/* Main Content Area - Dynamic based on activeItem */}
+        {activeItem === 'circuit-breakers' ? (
+          <div className="flex-1 overflow-auto">
+            <CircuitBreakerDashboard token={token} />
+          </div>
+        ) : activeItem === 'ai-conversation' ? (
+          <>
+            {/* Chat Interface */}
+            <ChatInterface user={user} token={token} />
 
-      {/* Right Sidebar - Metrics */}
-      <aside className="w-64 border-l border-[#1A1A1A] bg-[#050505] p-4 space-y-4 overflow-y-auto">
-        <MetricsPanel metrics={metrics} />
-        <AgentSwarmStatus agents={agents} />
-        <CapabilitiesBadges />
-        <LiveActivityFeed activities={activities} />
-      </aside>
+            {/* Right Sidebar - Metrics */}
+            <aside className="w-64 border-l border-[#1A1A1A] bg-[#050505] p-4 space-y-4 overflow-y-auto">
+              <MetricsPanel metrics={metrics} />
+              <AgentSwarmStatus agents={agents} />
+              <CapabilitiesBadges />
+              <LiveActivityFeed activities={activities} />
+            </aside>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-6xl mb-4">🚧</div>
+              <h2 className="text-2xl font-semibold text-[#F4F4F4] mb-2">
+                {activeItem.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              </h2>
+              <p className="text-[#666]">Coming soon...</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

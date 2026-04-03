@@ -42605,6 +42605,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] System Routes not loaded: {e}", flush=True)
 
+# Daily Digest Routes (BOS Core Feature)
+try:
+    from routers.digest_routes import router as digest_router, set_db as set_digest_db
+    set_digest_db(db)
+    app.include_router(digest_router)
+    print("[STARTUP] Daily Digest Routes loaded (Orchestrator, Event Aggregation)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Digest Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
