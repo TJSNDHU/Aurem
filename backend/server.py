@@ -202,13 +202,16 @@ from services.orchestrator import orchestrator, set_db as set_orchestrator_db, s
 try:
     from routers.admin_mission_control_router import set_db as set_mission_control_db
     from routers.subscription_public_router import router as subscription_public_router, set_db as set_subscription_public_db
+    from routers.custom_subscription_router import router as custom_subscription_router, set_db as set_custom_subscription_db
     from services.toon_service import set_toon_service_db
 except ImportError as e:
     logging.warning(f"[STARTUP] Mission Control imports failed: {e}")
     set_mission_control_db = None
     set_subscription_public_db = None
+    set_custom_subscription_db = None
     set_toon_service_db = None
     subscription_public_router = None
+    custom_subscription_router = None
 
 # Crypto Signal Engine - Conditionally loaded (disabled for deployment)
 crypto_router = None
@@ -3939,6 +3942,8 @@ async def startup_event():
                 set_toon_service_db(db)
                 if set_subscription_public_db is not None:
                     set_subscription_public_db(db)
+                if set_custom_subscription_db is not None:
+                    set_custom_subscription_db(db)
                 logging.info(f"✅ Admin Mission Control (TOON) initialized ({time.time()-t0:.2f}s)")
             except Exception as e:
                 logging.warning(f"⚠️ Mission Control initialization error: {e}")
@@ -42237,6 +42242,8 @@ except ImportError as e:
 # AUREM Subscription Router (Customer-facing, TOON format)
 if subscription_public_router is not None:
     app.include_router(subscription_public_router)  # Public subscription plans
+if custom_subscription_router is not None:
+    app.include_router(custom_subscription_router)  # Custom/A-la-carte subscriptions
     logging.info("[STARTUP] Subscription Public router loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
