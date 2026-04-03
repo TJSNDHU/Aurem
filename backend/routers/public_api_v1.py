@@ -10,7 +10,7 @@ from typing import Optional
 from datetime import datetime
 import logging
 
-router = APIRouter(prefix="/api/v1", tags=["Public API v1"])
+router = APIRouter(tags=["Public API v1"])  # NO PREFIX - FastAPI will handle it
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -2853,6 +2853,21 @@ app.add_middleware(
     expose_headers=["Cache-Control", "ETag", "Content-Encoding"],
 )
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# PUBLIC API v1 - Client Integration Endpoints (MUST be registered early!)
+# ═══════════════════════════════════════════════════════════════════════════════
+try:
+    from routers.public_api_v1 import router as public_api_v1_router
+    app.include_router(public_api_v1_router, prefix="/api/v1")
+    print("[STARTUP] ✅ Public API v1 registered at /api/v1", flush=True)
+    logging.info("✅ Public API v1: /api/v1/chat, /api/v1/leads, /api/v1/health")
+except ImportError as e:
+    logging.error(f"❌ Public API v1 import failed: {e}")
+    print(f"[STARTUP] ❌ Public API v1 import error: {e}", flush=True)
+except Exception as e:
+    logging.error(f"❌ Public API v1 registration error: {e}")
+    print(f"[STARTUP] ❌ Public API v1 error: {e}", flush=True)
+
 # Add GZip compression for better performance (compress responses > 500 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
@@ -42227,17 +42242,8 @@ try:
 except ImportError as e:
     logging.warning(f"Biometric Secure router not loaded: {e}")
 
-try:
-    from routers.public_api_v1 import router as public_api_v1_router
-    app.include_router(public_api_v1_router)  # Public API for Client Integrations
-    print("[STARTUP] ✅ Public API v1 router loaded successfully", flush=True)
-    logging.info("✅ Public API v1 router loaded - /api/v1/chat, /api/v1/leads, /api/v1/health")
-except ImportError as e:
-    logging.warning(f"Public API v1 router not loaded: {e}")
-    print(f"[STARTUP] ❌ Public API v1 router import failed: {e}", flush=True)
-except Exception as e:
-    logging.error(f"Public API v1 router error: {e}")
-    print(f"[STARTUP] ❌ Public API v1 router error: {e}", flush=True)
+# Note: Public API v1 router is registered earlier in the file (after CORS middleware)
+# to ensure it's processed before other routers
 
 # PWA (Progressive Web App) Router for Luxury Mobile Experience
 try:
