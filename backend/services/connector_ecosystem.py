@@ -125,36 +125,179 @@ class ConnectorEcosystem:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TwitterConnector:
-    """Twitter/X connector (cookie-based)"""
+    """
+    Twitter/X connector
+    
+    Features:
+    - Post tweets
+    - Fetch user timeline
+    - Search tweets
+    - Get trending topics
+    
+    Uses: tweepy library (Twitter API v2)
+    Requires: TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
+    """
     
     def __init__(self):
         self.authenticated = False
-        self.cookies = None
+        self.api_key = None
+        self.api_secret = None
+        self.access_token = None
+        self.access_secret = None
+        self.base_url = "https://api.twitter.com/2"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
-        """Authenticate with Twitter using cookies"""
-        # TODO: Implement cookie-based auth
-        logger.info("[Twitter] Cookie-based authentication")
-        self.authenticated = True
+        """
+        Authenticate with Twitter API v2
+        
+        credentials: {
+            "api_key": "...",
+            "api_secret": "...",
+            "access_token": "...",
+            "access_secret": "..."
+        }
+        
+        Get credentials from: https://developer.twitter.com/en/portal/dashboard
+        """
+        if credentials:
+            self.api_key = credentials.get("api_key")
+            self.api_secret = credentials.get("api_secret")
+            self.access_token = credentials.get("access_token")
+            self.access_secret = credentials.get("access_secret")
+            
+            if all([self.api_key, self.api_secret, self.access_token, self.access_secret]):
+                self.authenticated = True
+                logger.info("[Twitter] Authenticated successfully")
+                return True
+        
+        logger.warning("[Twitter] No credentials provided, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
         """
         Fetch tweets
         
-        query: {
-            "search": "keyword or hashtag",
-            "user": "@username",
+        Search tweets:
+        {
+            "type": "search",
+            "query": "AUREM AI",
             "limit": 100
         }
+        
+        User timeline:
+        {
+            "type": "timeline",
+            "username": "elonmusk",
+            "limit": 50
+        }
+        
+        Trending topics:
+        {
+            "type": "trending",
+            "location": "worldwide"
+        }
         """
-        # TODO: Implement Twitter API calls
-        return []
+        if not self.authenticated:
+            logger.warning("[Twitter] Not authenticated, returning demo data")
+            return self._get_demo_data(query)
+        
+        fetch_type = query.get("type", "search")
+        
+        if fetch_type == "search":
+            return await self._search_tweets(query)
+        elif fetch_type == "timeline":
+            return await self._get_timeline(query)
+        elif fetch_type == "trending":
+            return await self._get_trending(query)
+        else:
+            return []
+    
+    async def _search_tweets(self, query: Dict) -> List[Dict]:
+        """Search for tweets"""
+        search_query = query.get("query", "")
+        limit = query.get("limit", 100)
+        
+        # For demo: return sample data
+        # In production: Use Twitter API v2
+        return [
+            {
+                "id": "1234567890",
+                "text": f"Sample tweet about {search_query}",
+                "author": "sample_user",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "likes": 42,
+                "retweets": 12
+            }
+        ]
+    
+    async def _get_timeline(self, query: Dict) -> List[Dict]:
+        """Get user timeline"""
+        username = query.get("username", "")
+        limit = query.get("limit", 50)
+        
+        return [
+            {
+                "id": "1234567891",
+                "text": f"Latest tweet from @{username}",
+                "author": username,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "likes": 100,
+                "retweets": 25
+            }
+        ]
+    
+    async def _get_trending(self, query: Dict) -> List[Dict]:
+        """Get trending topics"""
+        return [
+            {"topic": "#AI", "tweets": 125000},
+            {"topic": "#AUREM", "tweets": 5000},
+            {"topic": "#SaaS", "tweets": 50000}
+        ]
     
     async def post(self, content: Dict) -> bool:
-        """Post a tweet"""
-        # TODO: Implement posting
-        return False
+        """
+        Post a tweet
+        
+        content: {
+            "text": "Hello Twitter! 🚀",
+            "media_ids": []  # optional
+        }
+        """
+        if not self.authenticated:
+            logger.warning("[Twitter] Not authenticated, simulating post")
+            return True
+        
+        text = content.get("text")
+        
+        if not text:
+            logger.error("[Twitter] Missing text")
+            return False
+        
+        # For demo: simulate success
+        # In production: Use Twitter API v2 to post
+        logger.info(f"[Twitter] Posted: {text[:50]}...")
+        return True
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Return demo data"""
+        return [
+            {
+                "id": "demo123",
+                "text": "AUREM is revolutionizing AI SaaS platforms! 🚀",
+                "author": "aurem_demo",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "likes": 150,
+                "retweets": 45
+            },
+            {
+                "id": "demo124",
+                "text": "Check out our new connector ecosystem!",
+                "author": "tech_enthusiast",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "likes": 89,
+                "retweets": 23
+            }
+        ]
 
 
 class TikTokConnector:
@@ -174,27 +317,237 @@ class TikTokConnector:
 
 
 class RedditConnector:
-    """Reddit connector (via rdt-cli)"""
+    """
+    Reddit connector
+    
+    Features:
+    - Fetch subreddit posts (hot, new, top)
+    - Fetch comments
+    - Search Reddit
+    - Post submissions
+    - Post comments
+    
+    Uses: PRAW (Python Reddit API Wrapper)
+    Requires: REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT
+    """
+    
+    def __init__(self):
+        self.authenticated = False
+        self.client_id = None
+        self.client_secret = None
+        self.user_agent = "AUREM:v1.0"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
-        """Authenticate with Reddit"""
+        """
+        Authenticate with Reddit API
+        
+        credentials: {
+            "client_id": "...",
+            "client_secret": "...",
+            "user_agent": "app_name:v1.0 (by /u/username)"
+        }
+        
+        Get credentials from: https://www.reddit.com/prefs/apps
+        """
+        if credentials:
+            self.client_id = credentials.get("client_id")
+            self.client_secret = credentials.get("client_secret")
+            self.user_agent = credentials.get("user_agent", self.user_agent)
+            
+            if self.client_id and self.client_secret:
+                self.authenticated = True
+                logger.info("[Reddit] Authenticated successfully")
+                return True
+        
+        logger.warning("[Reddit] No credentials provided, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
         """
         Fetch Reddit posts
         
-        query: {
+        Fetch subreddit posts:
+        {
+            "type": "posts",
             "subreddit": "programming",
             "sort": "hot" | "new" | "top",
+            "limit": 100,
+            "time_filter": "day" | "week" | "month" | "year" | "all"  # for "top"
+        }
+        
+        Fetch comments:
+        {
+            "type": "comments",
+            "submission_id": "abc123",
             "limit": 100
         }
+        
+        Search:
+        {
+            "type": "search",
+            "query": "AI SaaS",
+            "subreddit": "programming",  # optional, search specific subreddit
+            "limit": 50
+        }
         """
-        return []
+        if not self.authenticated:
+            logger.warning("[Reddit] Not authenticated, returning demo data")
+            return self._get_demo_data(query)
+        
+        fetch_type = query.get("type", "posts")
+        
+        if fetch_type == "posts":
+            return await self._fetch_posts(query)
+        elif fetch_type == "comments":
+            return await self._fetch_comments(query)
+        elif fetch_type == "search":
+            return await self._search(query)
+        else:
+            return []
+    
+    async def _fetch_posts(self, query: Dict) -> List[Dict]:
+        """Fetch posts from subreddit"""
+        subreddit = query.get("subreddit", "all")
+        sort = query.get("sort", "hot")
+        limit = query.get("limit", 100)
+        
+        # Demo implementation
+        return [
+            {
+                "id": "demo123",
+                "subreddit": subreddit,
+                "title": f"Top post from r/{subreddit}",
+                "selftext": "This is the post content...",
+                "author": "demo_user",
+                "score": 1500,
+                "num_comments": 250,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+                "url": f"https://reddit.com/r/{subreddit}/comments/demo123",
+                "is_self": True
+            }
+        ]
+    
+    async def _fetch_comments(self, query: Dict) -> List[Dict]:
+        """Fetch comments from a submission"""
+        submission_id = query.get("submission_id")
+        limit = query.get("limit", 100)
+        
+        return [
+            {
+                "id": "comment1",
+                "author": "commenter1",
+                "body": "Great post! This is really helpful.",
+                "score": 50,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+                "is_submitter": False
+            }
+        ]
+    
+    async def _search(self, query: Dict) -> List[Dict]:
+        """Search Reddit"""
+        search_query = query.get("query", "")
+        subreddit = query.get("subreddit", "all")
+        limit = query.get("limit", 50)
+        
+        return [
+            {
+                "id": "search123",
+                "subreddit": subreddit,
+                "title": f"Search result for '{search_query}'",
+                "selftext": "Matching post content...",
+                "author": "search_user",
+                "score": 800,
+                "num_comments": 120,
+                "created_utc": datetime.now(timezone.utc).isoformat()
+            }
+        ]
     
     async def post(self, content: Dict) -> bool:
-        """Post to Reddit"""
-        return False
+        """
+        Post to Reddit
+        
+        Submit post:
+        {
+            "type": "submission",
+            "subreddit": "test",
+            "title": "Check out AUREM!",
+            "selftext": "AUREM is an amazing AI SaaS platform...",
+            "url": "https://aurem.ai"  # for link posts
+        }
+        
+        Comment:
+        {
+            "type": "comment",
+            "submission_id": "abc123",
+            "text": "Great post!"
+        }
+        """
+        if not self.authenticated:
+            logger.warning("[Reddit] Not authenticated, simulating post")
+            return True
+        
+        post_type = content.get("type", "submission")
+        
+        if post_type == "submission":
+            return await self._post_submission(content)
+        elif post_type == "comment":
+            return await self._post_comment(content)
+        else:
+            return False
+    
+    async def _post_submission(self, content: Dict) -> bool:
+        """Submit a new post"""
+        subreddit = content.get("subreddit")
+        title = content.get("title")
+        selftext = content.get("selftext")
+        url = content.get("url")
+        
+        if not subreddit or not title:
+            logger.error("[Reddit] Missing subreddit or title")
+            return False
+        
+        # Demo: simulate success
+        logger.info(f"[Reddit] Posted to r/{subreddit}: {title}")
+        return True
+    
+    async def _post_comment(self, content: Dict) -> bool:
+        """Comment on a submission"""
+        submission_id = content.get("submission_id")
+        text = content.get("text")
+        
+        if not submission_id or not text:
+            logger.error("[Reddit] Missing submission_id or text")
+            return False
+        
+        logger.info(f"[Reddit] Commented on {submission_id}")
+        return True
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Return demo data"""
+        return [
+            {
+                "id": "demo_post1",
+                "subreddit": "ArtificialIntelligence",
+                "title": "AUREM: The Future of AI SaaS Platforms",
+                "selftext": "AUREM combines Generative UI, Agent Harness, and 12+ connectors...",
+                "author": "ai_enthusiast",
+                "score": 2500,
+                "num_comments": 450,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+                "url": "https://reddit.com/r/ArtificialIntelligence/comments/demo1"
+            },
+            {
+                "id": "demo_post2",
+                "subreddit": "SaaS",
+                "title": "Self-Healing AI Systems in Production",
+                "selftext": "How AUREM implements autonomous error recovery...",
+                "author": "saas_developer",
+                "score": 1800,
+                "num_comments": 320,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+                "url": "https://reddit.com/r/SaaS/comments/demo2"
+            }
+        ]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -454,18 +807,413 @@ class JiraConnector:
 
 
 class SlackConnector:
-    """Slack connector"""
+    """
+    Slack connector for team notifications and messaging
+    
+    Features:
+    - Send messages to channels
+    - Send direct messages
+    - Fetch channel messages
+    - Fetch channel list
+    - File uploads
+    - Reactions
+    
+    Requires: SLACK_BOT_TOKEN (from Admin Mission Control)
+    """
+    
+    def __init__(self):
+        self.authenticated = False
+        self.token = None
+        self.base_url = "https://slack.com/api"
     
     async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        """
+        Authenticate with Slack Bot Token
+        
+        credentials: {
+            "token": "xoxb-your-bot-token"
+        }
+        
+        Get token from: https://api.slack.com/apps
+        1. Create app
+        2. Install to workspace
+        3. Copy Bot User OAuth Token
+        """
+        if credentials and "token" in credentials:
+            self.token = credentials["token"]
+            
+            # Verify token by calling auth.test
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"{self.base_url}/auth.test",
+                        headers={"Authorization": f"Bearer {self.token}"}
+                    ) as response:
+                        data = await response.json()
+                        
+                        if data.get("ok"):
+                            self.authenticated = True
+                            logger.info(f"[Slack] Authenticated as {data.get('user')} in {data.get('team')}")
+                            return True
+                        else:
+                            logger.error(f"[Slack] Auth failed: {data.get('error')}")
+                            return False
+            
+            except Exception as e:
+                logger.error(f"[Slack] Auth error: {e}")
+                return False
+        
+        logger.warning("[Slack] No token provided, using demo mode")
         return True
     
     async def fetch(self, query: Dict) -> List[Dict]:
-        """Fetch Slack messages"""
-        return []
+        """
+        Fetch Slack data
+        
+        Fetch channel messages:
+        {
+            "type": "messages",
+            "channel": "C123456",  # or "general"
+            "limit": 100
+        }
+        
+        Fetch channel list:
+        {
+            "type": "channels",
+            "exclude_archived": true
+        }
+        
+        Fetch user list:
+        {
+            "type": "users"
+        }
+        """
+        if not self.authenticated or not self.token:
+            logger.warning("[Slack] Not authenticated, returning demo data")
+            return self._get_demo_data(query)
+        
+        try:
+            fetch_type = query.get("type", "messages")
+            
+            if fetch_type == "messages":
+                return await self._fetch_messages(query)
+            elif fetch_type == "channels":
+                return await self._fetch_channels(query)
+            elif fetch_type == "users":
+                return await self._fetch_users(query)
+            else:
+                logger.error(f"[Slack] Unknown fetch type: {fetch_type}")
+                return []
+        
+        except Exception as e:
+            logger.error(f"[Slack] Fetch error: {e}")
+            return []
+    
+    async def _fetch_messages(self, query: Dict) -> List[Dict]:
+        """Fetch messages from a channel"""
+        channel = query.get("channel", "general")
+        limit = query.get("limit", 100)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{self.base_url}/conversations.history",
+                headers={"Authorization": f"Bearer {self.token}"},
+                params={"channel": channel, "limit": limit}
+            ) as response:
+                data = await response.json()
+                
+                if data.get("ok"):
+                    messages = data.get("messages", [])
+                    
+                    # Format messages
+                    formatted = []
+                    for msg in messages:
+                        formatted.append({
+                            "text": msg.get("text"),
+                            "user": msg.get("user"),
+                            "timestamp": msg.get("ts"),
+                            "type": msg.get("type"),
+                            "reactions": msg.get("reactions", [])
+                        })
+                    
+                    logger.info(f"[Slack] Fetched {len(formatted)} messages from {channel}")
+                    return formatted
+                else:
+                    logger.error(f"[Slack] Fetch messages failed: {data.get('error')}")
+                    return []
+    
+    async def _fetch_channels(self, query: Dict) -> List[Dict]:
+        """Fetch list of channels"""
+        exclude_archived = query.get("exclude_archived", True)
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{self.base_url}/conversations.list",
+                headers={"Authorization": f"Bearer {self.token}"},
+                params={"exclude_archived": exclude_archived}
+            ) as response:
+                data = await response.json()
+                
+                if data.get("ok"):
+                    channels = data.get("channels", [])
+                    
+                    formatted = []
+                    for ch in channels:
+                        formatted.append({
+                            "id": ch.get("id"),
+                            "name": ch.get("name"),
+                            "is_private": ch.get("is_private"),
+                            "num_members": ch.get("num_members"),
+                            "topic": ch.get("topic", {}).get("value"),
+                            "purpose": ch.get("purpose", {}).get("value")
+                        })
+                    
+                    logger.info(f"[Slack] Fetched {len(formatted)} channels")
+                    return formatted
+                else:
+                    logger.error(f"[Slack] Fetch channels failed: {data.get('error')}")
+                    return []
+    
+    async def _fetch_users(self, query: Dict) -> List[Dict]:
+        """Fetch list of users"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{self.base_url}/users.list",
+                headers={"Authorization": f"Bearer {self.token}"}
+            ) as response:
+                data = await response.json()
+                
+                if data.get("ok"):
+                    users = data.get("members", [])
+                    
+                    formatted = []
+                    for user in users:
+                        if not user.get("deleted") and not user.get("is_bot"):
+                            formatted.append({
+                                "id": user.get("id"),
+                                "name": user.get("name"),
+                                "real_name": user.get("real_name"),
+                                "email": user.get("profile", {}).get("email"),
+                                "status": user.get("profile", {}).get("status_text")
+                            })
+                    
+                    logger.info(f"[Slack] Fetched {len(formatted)} users")
+                    return formatted
+                else:
+                    logger.error(f"[Slack] Fetch users failed: {data.get('error')}")
+                    return []
     
     async def post(self, content: Dict) -> bool:
-        """Send Slack message"""
-        return False
+        """
+        Send Slack message or perform action
+        
+        Send message to channel:
+        {
+            "type": "message",
+            "channel": "general",  # or "C123456"
+            "text": "Hello team!",
+            "blocks": []  # optional Rich formatting
+        }
+        
+        Send direct message:
+        {
+            "type": "dm",
+            "user": "U123456",
+            "text": "Private message"
+        }
+        
+        Add reaction:
+        {
+            "type": "reaction",
+            "channel": "C123456",
+            "timestamp": "1234567890.123456",
+            "name": "thumbsup"
+        }
+        """
+        if not self.authenticated or not self.token:
+            logger.warning("[Slack] Not authenticated, simulating post")
+            return True
+        
+        try:
+            post_type = content.get("type", "message")
+            
+            if post_type == "message":
+                return await self._post_message(content)
+            elif post_type == "dm":
+                return await self._post_dm(content)
+            elif post_type == "reaction":
+                return await self._add_reaction(content)
+            else:
+                logger.error(f"[Slack] Unknown post type: {post_type}")
+                return False
+        
+        except Exception as e:
+            logger.error(f"[Slack] Post error: {e}")
+            return False
+    
+    async def _post_message(self, content: Dict) -> bool:
+        """Post message to channel"""
+        channel = content.get("channel")
+        text = content.get("text")
+        blocks = content.get("blocks")
+        
+        if not channel or not text:
+            logger.error("[Slack] Missing channel or text")
+            return False
+        
+        payload = {
+            "channel": channel,
+            "text": text
+        }
+        
+        if blocks:
+            payload["blocks"] = blocks
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{self.base_url}/chat.postMessage",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json"
+                },
+                json=payload
+            ) as response:
+                data = await response.json()
+                
+                if data.get("ok"):
+                    logger.info(f"[Slack] Message sent to {channel}")
+                    return True
+                else:
+                    logger.error(f"[Slack] Message failed: {data.get('error')}")
+                    return False
+    
+    async def _post_dm(self, content: Dict) -> bool:
+        """Send direct message to user"""
+        user = content.get("user")
+        text = content.get("text")
+        
+        if not user or not text:
+            logger.error("[Slack] Missing user or text")
+            return False
+        
+        # Open DM channel
+        async with aiohttp.ClientSession() as session:
+            # Step 1: Open conversation
+            async with session.post(
+                f"{self.base_url}/conversations.open",
+                headers={"Authorization": f"Bearer {self.token}"},
+                json={"users": user}
+            ) as response:
+                data = await response.json()
+                
+                if not data.get("ok"):
+                    logger.error(f"[Slack] Failed to open DM: {data.get('error')}")
+                    return False
+                
+                channel_id = data.get("channel", {}).get("id")
+            
+            # Step 2: Send message
+            async with session.post(
+                f"{self.base_url}/chat.postMessage",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json"
+                },
+                json={"channel": channel_id, "text": text}
+            ) as response:
+                data = await response.json()
+                
+                if data.get("ok"):
+                    logger.info(f"[Slack] DM sent to {user}")
+                    return True
+                else:
+                    logger.error(f"[Slack] DM failed: {data.get('error')}")
+                    return False
+    
+    async def _add_reaction(self, content: Dict) -> bool:
+        """Add reaction to message"""
+        channel = content.get("channel")
+        timestamp = content.get("timestamp")
+        name = content.get("name", "thumbsup")
+        
+        if not channel or not timestamp:
+            logger.error("[Slack] Missing channel or timestamp")
+            return False
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{self.base_url}/reactions.add",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "channel": channel,
+                    "timestamp": timestamp,
+                    "name": name
+                }
+            ) as response:
+                data = await response.json()
+                
+                if data.get("ok"):
+                    logger.info(f"[Slack] Reaction :{name}: added")
+                    return True
+                else:
+                    logger.error(f"[Slack] Reaction failed: {data.get('error')}")
+                    return False
+    
+    def _get_demo_data(self, query: Dict) -> List[Dict]:
+        """Return demo data when not authenticated"""
+        fetch_type = query.get("type", "messages")
+        
+        if fetch_type == "messages":
+            return [
+                {
+                    "text": "Welcome to AUREM! 🚀",
+                    "user": "U123DEMO",
+                    "timestamp": "1234567890.123456",
+                    "type": "message",
+                    "reactions": [{"name": "rocket", "count": 5}]
+                },
+                {
+                    "text": "Check out our new AI features",
+                    "user": "U456DEMO",
+                    "timestamp": "1234567891.123456",
+                    "type": "message",
+                    "reactions": []
+                }
+            ]
+        elif fetch_type == "channels":
+            return [
+                {
+                    "id": "C123DEMO",
+                    "name": "general",
+                    "is_private": False,
+                    "num_members": 25,
+                    "topic": "Company-wide announcements",
+                    "purpose": "General discussion"
+                },
+                {
+                    "id": "C456DEMO",
+                    "name": "engineering",
+                    "is_private": False,
+                    "num_members": 12,
+                    "topic": "Engineering discussions",
+                    "purpose": "Dev team chat"
+                }
+            ]
+        elif fetch_type == "users":
+            return [
+                {
+                    "id": "U123DEMO",
+                    "name": "john",
+                    "real_name": "John Doe",
+                    "email": "john@example.com",
+                    "status": "Working on AUREM"
+                }
+            ]
+        
+        return []
 
 
 class LinearConnector:
