@@ -42239,6 +42239,14 @@ if subscription_public_router is not None:
     app.include_router(subscription_public_router)  # Public subscription plans
     logging.info("[STARTUP] Subscription Public router loaded ✅")
 
+# AUREM Monitoring (Prometheus metrics)
+try:
+    from routers.monitoring_router import router as monitoring_router
+    app.include_router(monitoring_router)  # Prometheus metrics + health checks
+    logging.info("[STARTUP] Monitoring router loaded ✅")
+except ImportError as e:
+    logging.warning(f"Monitoring router not loaded: {e}")
+
 try:
     from routers.finance_ai_router import router as finance_router
     app.include_router(finance_router)  # Financial Insights AI
