@@ -19,6 +19,8 @@ import AuremVoice from '../components/AuremVoice';
 import SystemStatusBar from '../components/SystemStatusBar';
 // Circuit breaker dashboard
 import CircuitBreakerDashboard from '../components/CircuitBreakerDashboard';
+// ORA Voice Wake-Word (Floating)
+import VoiceWakeWord from '../components/VoiceWakeWord';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -574,6 +576,9 @@ const AuremDashboard = () => {
     <div className="min-h-screen bg-[#050505] flex flex-col" data-testid="aurem-dashboard">
       {/* System Status Bar */}
       <SystemStatusBar token={token} />
+      
+      {/* ORA Voice Wake-Word - Floating Button */}
+      <VoiceWakeWord token={token} />
       
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}

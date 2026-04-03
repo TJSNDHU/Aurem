@@ -268,7 +268,7 @@ async def send_expiry_notifications(user = Depends(get_current_user)):
 @router.get("/tiers")
 async def get_available_tiers():
     """Get all available subscription tiers and their features"""
-    from services.subscription_manager import SubscriptionTier, FeatureAccess
+    from services.subscription_manager import get_subscription_manager, SubscriptionTier, FeatureAccess
     
     manager = get_subscription_manager(db)
     

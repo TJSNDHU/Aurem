@@ -49,7 +49,7 @@ async def process_voice_command(
     user = Depends(get_current_user)
 ):
     """
-    Process "Hi Aurem" voice command
+    Process "Hi Ora" voice command
     
     Commands:
     - "what's the revenue today?"
@@ -87,7 +87,7 @@ async def list_available_commands():
     from services.voice_wake_word import VoiceCommand
     
     commands = {
-        "wake_word": "Hi Aurem",
+        "wake_word": "Hi Ora",
         "commands": [
             {
                 "command": VoiceCommand.REVENUE_TODAY.value,
@@ -159,4 +159,4 @@ async def list_available_commands():
     return commands
 
 
-print("[STARTUP] Voice Command Routes loaded (Hi Aurem)")
+print("[STARTUP] Voice Command Routes loaded (Hi Ora)")

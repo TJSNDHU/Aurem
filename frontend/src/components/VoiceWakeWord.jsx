@@ -34,13 +34,13 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
         
         setTranscript(transcriptText);
 
-        // Check for wake word
-        if (transcriptText.toLowerCase().includes('hi aurem') || 
-            transcriptText.toLowerCase().includes('hey aurem')) {
+        // Check for wake word "Hi Ora"
+        if (transcriptText.toLowerCase().includes('hi ora') || 
+            transcriptText.toLowerCase().includes('hey ora')) {
           setWakeWordActive(true);
           
           // Process command after wake word
-          const command = transcriptText.toLowerCase().replace(/hi aurem|hey aurem/gi, '').trim();
+          const command = transcriptText.toLowerCase().replace(/hi ora|hey ora/gi, '').trim();
           if (command.length > 3) {
             processCommand(command);
           }
@@ -149,7 +149,7 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
       position: 'fixed',
       bottom: 24,
       right: 24,
-      zIndex: 1000
+      zIndex: 9999
     }}>
       {/* Main Voice Button */}
       <button
@@ -244,7 +244,7 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
                 color: wakeWordActive ? '#4CAF50' : '#F4F4F4',
                 fontWeight: wakeWordActive ? 600 : 400
               }}>
-                {transcript || 'Say "Hi Aurem" to activate...'}
+                {transcript || 'Say "Hi Ora" to activate...'}
               </div>
             </div>
           )}
@@ -312,10 +312,10 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
                 Try saying:
               </div>
               <div style={{fontSize: 12, color: '#666', lineHeight: 1.6}}>
-                • "Hi Aurem, what's the revenue today?"<br />
-                • "Hi Aurem, show me the leads"<br />
-                • "Hi Aurem, sync the system"<br />
-                • "Hi Aurem, recover those carts"
+                • "Hi Ora, what's the revenue today?"<br />
+                • "Hi Ora, show me the leads"<br />
+                • "Hi Ora, sync the system"<br />
+                • "Hi Ora, recover those carts"
               </div>
             </div>
           )}
@@ -351,3 +351,4 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
 };
 
 export default VoiceWakeWord;
+;

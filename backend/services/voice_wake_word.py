@@ -1,6 +1,6 @@
 """
-AUREM Voice Wake-Word System
-"Hi Aurem" - Conversational Command Interface
+ORA Voice Wake-Word System
+"Hi Ora" - Optical/Omni Responsive Assistant
 Premium UX Layer
 """
 
@@ -30,16 +30,16 @@ class VoiceCommand(str, Enum):
 
 class VoiceCommandProcessor:
     """
-    Voice Command Processor for AUREM
+    Voice Command Processor for ORA
     
-    Activated by wake-word: "Hi Aurem"
+    Activated by wake-word: "Hi Ora"
     
     Commands:
-    - "Hi Aurem, what's the revenue today?"
-    - "Hi Aurem, recover those carts"
-    - "Hi Aurem, are there any bugs?"
-    - "Hi Aurem, show me the leads"
-    - "Hi Aurem, sync the system"
+    - "Hi Ora, what's the revenue today?"
+    - "Hi Ora, recover those carts"
+    - "Hi Ora, are there any bugs?"
+    - "Hi Ora, show me the leads"
+    - "Hi Ora, sync the system"
     
     Multi-Modal Response:
     - Speaks answer (TTS)
