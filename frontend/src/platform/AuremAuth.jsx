@@ -5,9 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Sparkles, Eye, EyeOff, AlertCircle, Check, ArrowRight, ArrowLeft, Scan } from 'lucide-react';
-import FaceIDLogin from '../components/FaceIDLogin';
-import FaceIDTrainer from '../components/FaceIDTrainer';
+import { Sparkles, Eye, EyeOff, AlertCircle, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -51,11 +49,6 @@ const LoginForm = ({ onSwitchToSignup }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [useFaceID, setUseFaceID] = useState(false);
-  const [setupFaceID, setSetupFaceID] = useState(false);
-  const [faceIDTrained, setFaceIDTrained] = useState(
-    localStorage.getItem('faceid_trained') === 'true'
-  );
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -137,60 +130,19 @@ const LoginForm = ({ onSwitchToSignup }) => {
           <p className="text-xs text-[#666] mt-1">BUSINESS AI PLATFORM</p>
         </div>
 
-        {/* FaceID Training Mode */}
-        {setupFaceID && (
-          <div className="bg-[#0A0A0A] border border-[#1A1A1A] rounded-xl overflow-hidden">
-            <FaceIDTrainer onComplete={handleFaceIDTrainingComplete} />
-          </div>
-        )}
+        {/* Login Card */}
+        <div className="bg-[#0A0A0A] border border-[#1A1A1A] rounded-xl p-8">
+          <h2 className="text-xl text-[#F4F4F4] mb-1">Sign In</h2>
+          <p className="text-sm text-[#666] mb-6">Access AUREM Command Center</p>
 
-        {/* FaceID Login Mode */}
-        {!setupFaceID && useFaceID && faceIDTrained && (
-          <div className="bg-[#0A0A0A] border border-[#1A1A1A] rounded-xl overflow-hidden">
-            <FaceIDLogin 
-              onSuccess={handleFaceIDSuccess}
-              onFallbackToPassword={() => setUseFaceID(false)}
-            />
-          </div>
-        )}
-
-        {/* Standard Login Form */}
-        {!setupFaceID && !useFaceID && (
-          <div className="bg-[#0A0A0A] border border-[#1A1A1A] rounded-xl p-8">
-            <h2 className="text-xl text-[#F4F4F4] mb-1">Sign In</h2>
-            <p className="text-sm text-[#666] mb-6">Access AUREM Command Center</p>
-            
-            {/* FaceID Option (if trained) */}
-            {faceIDTrained && (
-              <button
-                type="button"
-                onClick={() => setUseFaceID(true)}
-                className="w-full mb-4 p-4 bg-gradient-to-r from-[#1A2A1A] to-[#1A1A2A] border border-[#2A4A2A] rounded-lg flex items-center justify-center gap-3 text-[#4A4] hover:border-[#4A4] transition-all"
-              >
-                <Scan className="w-5 h-5" />
-                <span className="font-medium">Sign in with FaceID</span>
-              </button>
-            )}
-            
-            {faceIDTrained && (
-              <div className="relative mb-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#1A1A1A]"></div>
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-[#0A0A0A] text-[#666]">or use password</span>
-                </div>
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
               </div>
             )}
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs text-[#666] mb-2 uppercase tracking-wider">Email</label>
               <input
@@ -253,13 +205,6 @@ const LoginForm = ({ onSwitchToSignup }) => {
                 Deploy AUREM
               </button>
             </p>
-            
-            {/* Setup FaceID hint */}
-            {!faceIDTrained && (
-              <p className="text-xs text-[#888] mt-4">
-                Setup FaceID after your first login for enhanced security
-              </p>
-            )}
           </div>
         </div>
 
