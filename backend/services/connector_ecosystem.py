@@ -703,14 +703,45 @@ class NewsAggregator:
                 "pageSize": limit,
                 "sortBy": "publishedAt"
             }
-        return False
-
-
-                "q": search_query,
-                "language": language,
-                "pageSize": limit,
-                "sortBy": "publishedAt"
-            }
+            
+            if sources:
+                params["sources"] = ",".join(sources)
+            
+            if self.api_key:
+                params["apiKey"] = self.api_key
+            else:
+                # Fallback: Use RSS feeds for demo
+                return await self._fetch_from_rss(search_query, limit)
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(endpoint, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        articles = data.get("articles", [])
+                        
+                        results = []
+                        for article in articles[:limit]:
+                            results.append({
+                                "title": article.get("title"),
+                                "description": article.get("description"),
+                                "url": article.get("url"),
+                                "source": article.get("source", {}).get("name"),
+                                "published_at": article.get("publishedAt"),
+                                "author": article.get("author"),
+                                "image_url": article.get("urlToImage")
+                            })
+                        
+                        logger.info(f"[News] Fetched {len(results)} articles for '{search_query}'")
+                        return results
+                    else:
+                        logger.error(f"[News] API request failed: {response.status}")
+                        # Fallback to RSS
+                        return await self._fetch_from_rss(search_query, limit)
+        
+        except Exception as e:
+            logger.error(f"[News] Fetch error: {e}")
+            # Fallback to RSS feeds
+            return await self._fetch_from_rss(search_query, limit)
             
             if sources:
                 params["sources"] = ",".join(sources)
@@ -763,37 +794,6 @@ class NewsAggregator:
                     "title": "AI Breakthrough in Language Models",
                     "description": "New model achieves 95% accuracy in multilingual tasks",
                     "url": "https://techcrunch.com/ai-news",
-
-
-class DuckDuckGoConnector:
-    """DuckDuckGo search - Unlimited fallback when Google quota exceeded"""
-    
-    def __init__(self):
-        self.authenticated = True
-    
-    async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
-        return True
-    
-    async def fetch(self, query: Dict) -> List[Dict]:
-        """Fallback search when Google quota is exceeded"""
-        search_query = query.get("q", "")
-        limit = min(query.get("limit", 10), 25)
-        
-        if not search_query:
-            return []
-        
-        # Return basic fallback result
-        return [{
-            "title": f"Search: {search_query}",
-            "snippet": f"DuckDuckGo fallback results for '{search_query}'",
-            "url": f"https://duckduckgo.com/?q={search_query.replace(' ', '+')}",
-            "displayLink": "duckduckgo.com"
-        }]
-    
-    async def post(self, content: Dict) -> bool:
-        return False
-
-
                     "source": "TechCrunch",
                     "published_at": "2026-04-03T12:00:00Z"
                 },
@@ -828,15 +828,32 @@ class DuckDuckGoConnector:
         return False
 
 
-# Global instance
-_connector_ecosystem = ConnectorEcosystem()
+class DuckDuckGoConnector:
+    """DuckDuckGo search - Unlimited fallback when Google quota exceeded"""
+    
+    def __init__(self):
+        self.authenticated = True
+    
+    async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        return True
+    
+    async def fetch(self, query: Dict) -> List[Dict]:
+        """Fallback search when Google quota is exceeded"""
+        search_query = query.get("q", "")
+        limit = min(query.get("limit", 10), 25)
+        
+        if not search_query:
+            return []
+        
+        # Return basic fallback result
+        return [{
+            "title": f"Search: {search_query}",
+            "snippet": f"DuckDuckGo fallback results for '{search_query}'",
+            "url": f"https://duckduckgo.com/?q={search_query.replace(' ', '+')}",
+            "displayLink": "duckduckgo.com"
+        }]
+    
+    async def post(self, content: Dict) -> bool:
+        return False
 
 
-def get_connector_ecosystem() -> ConnectorEcosystem:
-    """Get global connector ecosystem instance"""
-    return _connector_ecosystem
-
-
-def set_connector_ecosystem_db(db):
-    """Set database for connector ecosystem"""
-    _connector_ecosystem.set_db(db)

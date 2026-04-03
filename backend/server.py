@@ -216,6 +216,22 @@ except ImportError as e:
     set_mission_control_db = None
     set_subscription_public_db = None
     set_custom_subscription_db = None
+    set_admin_plan_db = None
+    set_toon_service_db = None
+    set_self_healing_ai_db = None
+    set_connector_ecosystem_db = None
+    set_smart_search_db = None
+    subscription_public_router = None
+    custom_subscription_router = None
+    admin_plan_router = None
+    self_healing_router = None
+    connector_router = None
+    smart_search_router = None
+except ImportError as e:
+    logging.warning(f"[STARTUP] Mission Control imports failed: {e}")
+    set_mission_control_db = None
+    set_subscription_public_db = None
+    set_custom_subscription_db = None
     set_toon_service_db = None
     set_self_healing_ai_db = None
     set_connector_ecosystem_db = None
