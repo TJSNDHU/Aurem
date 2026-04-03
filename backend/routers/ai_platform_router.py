@@ -23,7 +23,7 @@ def set_db(database: AsyncIOMotorDatabase):
     global db
     db = database
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "reroots-ai-platform-secret-key")
+JWT_SECRET = os.environ.get("JWT_SECRET", "aurem-secure-jwt-secret-key-2026-production")
 JWT_ALGORITHM = "HS256"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -260,19 +260,37 @@ def create_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_platform_user(authorization: str = Header(None)):
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     token = authorization.split(" ")[1]
+    logger.info(f"[PLATFORM AUTH] Verifying token: {token[:30]}...")
+    logger.info(f"[PLATFORM AUTH] Using JWT_SECRET: {JWT_SECRET[:20]}...")
+    
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        logger.info(f"[PLATFORM AUTH] Decoded payload: {payload}")
         user = await db.platform_users.find_one({"_id": payload["user_id"]})
         if not user:
+            # For admin user, return from hardcoded credentials
+            if payload.get("user_id") == "admin":
+                return {
+                    "_id": "admin",
+                    "email": payload.get("email"),
+                    "full_name": "AUREM Admin",
+                    "company_name": "AUREM Platform",
+                    "tier": "enterprise",
+                    "role": "admin"
+                }
             raise HTTPException(status_code=401, detail="User not found")
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except:
+    except Exception as e:
+        logger.error(f"[PLATFORM AUTH] Token verification failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -347,13 +365,20 @@ async def register_platform_user(data: PlatformUserCreate):
 @router.post("/auth/login")
 async def login_platform_user(data: PlatformUserLogin):
     """Login platform customer"""
-    # Check default admin credentials first (hardcoded for development)
-    if data.email.lower() == "teji.ss1986@gmail.com" and data.password == "Admin123":
-        import hashlib
-        token = create_token("admin", data.email.lower())
+    import hashlib
+    
+    # Check default admin credentials
+    ADMIN_CREDENTIALS = {
+        "admin@aurem.live": "AuremAdmin2024!",
+        "admin@aurem.ai": "AuremAdmin2024!",
+    }
+    
+    email_lower = data.email.lower()
+    if email_lower in ADMIN_CREDENTIALS and data.password == ADMIN_CREDENTIALS[email_lower]:
+        token = create_token("admin", email_lower)
         return {
             "user_id": "admin",
-            "email": data.email.lower(),
+            "email": email_lower,
             "token": token,
             "company_name": "AUREM Platform",
             "full_name": "AUREM Admin",
@@ -393,18 +418,19 @@ async def get_current_user(authorization: str = Header(None)):
     """Get current user profile and usage"""
     user = await get_current_platform_user(authorization)
     
-    tier_config = PLATFORM_TIERS.get(user["tier"], PLATFORM_TIERS["starter"])
+    tier_name = user.get("tier", "enterprise")
+    tier_config = PLATFORM_TIERS.get(tier_name, PLATFORM_TIERS["starter"])
     usage = user.get("usage", {})
     
     return {
-        "user_id": user["_id"],
-        "email": user["email"],
-        "company_name": user["company_name"],
-        "full_name": user["full_name"],
-        "tier": user["tier"],
-        "tier_status": user["tier_status"],
+        "user_id": str(user.get("_id", user.get("user_id", "admin"))),
+        "email": user.get("email", "admin@aurem.live"),
+        "company_name": user.get("company_name", "AUREM Platform"),
+        "full_name": user.get("full_name", "AUREM Admin"),
+        "tier": tier_name,
+        "tier_status": user.get("tier_status", "active"),
         "trial_ends_at": user.get("trial_ends_at"),
-        "api_key": user["api_key"][:12] + "..." + user["api_key"][-4:],
+        "api_key": user.get("api_key", "aurem_admin_key")[:12] + "..." if user.get("api_key") else "aurem_admin...",
         "usage": {
             "crew_executions": usage.get("crew_executions", 0),
             "crew_limit": tier_config["crew_executions"],
@@ -415,7 +441,8 @@ async def get_current_user(authorization: str = Header(None)):
         },
         "tools_available": tier_config["tools"],
         "tool_connections": list(user.get("tool_connections", {}).keys()),
-        "features": tier_config["features"]
+        "features": tier_config["features"],
+        "role": user.get("role", "admin")
     }
 
 

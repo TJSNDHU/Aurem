@@ -53,7 +53,7 @@ const PlatformDashboard = () => {
 
   useEffect(() => {
     if (!token) {
-      navigate('/platform/login');
+      navigate('/auth');
       return;
     }
     fetchAllData();
@@ -85,7 +85,7 @@ const PlatformDashboard = () => {
       if (userRes.ok) setUser(await userRes.json());
       else if (userRes.status === 401) {
         localStorage.removeItem('platform_token');
-        navigate('/platform/login');
+        navigate('/auth');
         return;
       }
       
@@ -142,7 +142,7 @@ const PlatformDashboard = () => {
 
   const logout = () => {
     localStorage.removeItem('platform_token');
-    navigate('/platform');
+    navigate('/');
   };
 
   if (loading) {

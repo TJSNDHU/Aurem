@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 import jwt
 import hashlib
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/platform/auth", tags=["Platform Auth"])
 
@@ -83,9 +86,15 @@ async def login(request: LoginRequest):
     email = request.email.lower()
     password_hash = hash_password(request.password)
     
+    logger.info(f"[PLATFORM AUTH] Login attempt for: {email}")
+    logger.info(f"[PLATFORM AUTH] Password hash: {password_hash}")
+    logger.info(f"[PLATFORM AUTH] Admin users: {list(ADMIN_USERS.keys())}")
+    
     # Check in-memory admin users first
     if email in ADMIN_USERS:
         user = ADMIN_USERS[email]
+        logger.info(f"[PLATFORM AUTH] Found user, stored hash: {user['password_hash']}")
+        logger.info(f"[PLATFORM AUTH] Hash match: {user['password_hash'] == password_hash}")
         if user["password_hash"] == password_hash:
             token = create_token(email, user.get("role", "admin"))
             return TokenResponse(

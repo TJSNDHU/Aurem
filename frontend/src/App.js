@@ -81,20 +81,23 @@ const AuremAuthProvider = ({ children }) => {
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('aurem_token');
+    const token = localStorage.getItem('platform_token');
     if (!token) {
       setLoading(false);
       return;
     }
 
     try {
-      const response = await axios.get(`${API_URL}/api/aurem/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUser(response.data.user);
-      setWorkspace(response.data.workspace);
+      // Get user data from localStorage (set by PlatformAuth)
+      const userData = localStorage.getItem('platform_user');
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        setWorkspace({ name: parsedUser.company_name || 'AUREM Workspace' });
+      }
     } catch (error) {
-      localStorage.removeItem('aurem_token');
+      localStorage.removeItem('platform_token');
+      localStorage.removeItem('platform_user');
     } finally {
       setLoading(false);
     }
@@ -127,7 +130,8 @@ const AuremAuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('aurem_token');
+    localStorage.removeItem('platform_token');
+    localStorage.removeItem('platform_user');
     setUser(null);
     setWorkspace(null);
   };

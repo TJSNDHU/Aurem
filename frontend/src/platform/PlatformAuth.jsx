@@ -37,7 +37,7 @@ export const PlatformLogin = () => {
       if (res.ok) {
         localStorage.setItem('platform_token', data.token);
         localStorage.setItem('platform_user', JSON.stringify(data));
-        navigate('/aurem-ai');
+        navigate('/dashboard');
       } else {
         setError(data.detail || 'Authentication failed');
       }
@@ -243,7 +243,7 @@ export const PlatformSignup = () => {
       if (res.ok) {
         localStorage.setItem('platform_token', data.token);
         localStorage.setItem('platform_user', JSON.stringify(data));
-        navigate('/platform/dashboard');
+        navigate('/dashboard');
       } else {
         setError(data.detail || 'Registration failed');
       }
