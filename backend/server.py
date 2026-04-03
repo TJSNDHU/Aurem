@@ -3919,6 +3919,15 @@ async def startup_event():
         set_api_key_db(db)
         logging.info(f"✓ API Key Manager initialized ({time.time()-t0:.2f}s)")
         
+        # Initialize Admin Mission Control (TOON-based SaaS system)
+        t0 = time.time()
+        try:
+            set_mission_control_db(db)
+            set_toon_service_db(db)
+            logging.info(f"✅ Admin Mission Control (TOON) initialized ({time.time()-t0:.2f}s)")
+        except Exception as e:
+            logging.warning(f"⚠️ Mission Control initialization skipped: {e}")
+        
         # Initialize Crash Protection system
         t0 = time.time()
         set_crash_log_db(db)
@@ -42197,6 +42206,15 @@ except ImportError as e:
 try:
     from routers.churn_prediction_router import router as churn_router
     app.include_router(churn_router)  # Customer Churn Prediction
+except ImportError as e:
+    logging.warning(f"Churn prediction router not loaded: {e}")
+
+# AUREM TOON-Based SaaS System (Admin Mission Control)
+try:
+    from routers.admin_mission_control_router import router as mission_control_router, set_db as set_mission_control_db
+    from services.toon_service import set_toon_service_db
+    app.include_router(mission_control_router)  # Admin Mission Control (TOON format)
+    logging.info("[STARTUP] Admin Mission Control router loaded ✅")
 except ImportError as e:
     logging.warning(f"Churn router not loaded: {e}")
 
