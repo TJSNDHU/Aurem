@@ -42656,6 +42656,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Growth Routes not loaded: {e}", flush=True)
 
+# Voice Command Routes (Hi Aurem)
+try:
+    from routers.voice_command_routes import router as voice_cmd_router, set_db as set_voice_cmd_db
+    set_voice_cmd_db(db)
+    app.include_router(voice_cmd_router)
+    print("[STARTUP] Voice Command Routes loaded (Hi Aurem Wake-Word)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Voice Command Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
