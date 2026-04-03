@@ -42227,6 +42227,18 @@ try:
 except ImportError as e:
     logging.warning(f"Biometric Secure router not loaded: {e}")
 
+try:
+    from routers.public_api_v1 import router as public_api_v1_router
+    app.include_router(public_api_v1_router)  # Public API for Client Integrations
+    print("[STARTUP] ✅ Public API v1 router loaded successfully", flush=True)
+    logging.info("✅ Public API v1 router loaded - /api/v1/chat, /api/v1/leads, /api/v1/health")
+except ImportError as e:
+    logging.warning(f"Public API v1 router not loaded: {e}")
+    print(f"[STARTUP] ❌ Public API v1 router import failed: {e}", flush=True)
+except Exception as e:
+    logging.error(f"Public API v1 router error: {e}")
+    print(f"[STARTUP] ❌ Public API v1 router error: {e}", flush=True)
+
 # PWA (Progressive Web App) Router for Luxury Mobile Experience
 try:
     from routers.pwa_router import router as pwa_router
