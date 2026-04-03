@@ -230,6 +230,25 @@ const FaceIDTrainer = ({ onComplete }) => {
     }
   };
 
+  const skipFaceID = () => {
+    // User chose to skip biometric setup
+    console.log('[FaceID] User skipped biometric setup');
+    
+    // Stop camera if running
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    
+    // Mark as skipped in localStorage
+    localStorage.setItem('faceid_trained', 'skipped');
+    
+    // Proceed to dashboard
+    if (onComplete) {
+      onComplete();
+    }
+  };
+
   if (loading) {
     return (
       <div style={{
@@ -372,50 +391,94 @@ const FaceIDTrainer = ({ onComplete }) => {
 
       {/* Controls */}
       {!capturing && !captured && (
-        <button
-          onClick={startCamera}
-          disabled={!modelsLoaded}
-          data-testid="start-camera-button"
-          style={{
-            padding: '12px 32px',
-            background: 'linear-gradient(135deg, #D4AF37 0%, #8B7355 100%)',
-            border: 'none',
-            borderRadius: 8,
-            color: '#050505',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <Camera className="w-5 h-5" />
-          Start Camera
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            onClick={startCamera}
+            disabled={!modelsLoaded}
+            data-testid="start-camera-button"
+            style={{
+              padding: '12px 32px',
+              background: 'linear-gradient(135deg, #D4AF37 0%, #8B7355 100%)',
+              border: 'none',
+              borderRadius: 8,
+              color: '#050505',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            <Camera className="w-5 h-5" />
+            Start Camera
+          </button>
+          
+          <button
+            onClick={skipFaceID}
+            data-testid="skip-faceid-button"
+            style={{
+              padding: '12px 32px',
+              background: 'transparent',
+              border: '1px solid #444',
+              borderRadius: 8,
+              color: '#888',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            Skip for now
+          </button>
+        </div>
       )}
 
-      {capturing && faceDetected && !captured && (
-        <button
-          onClick={captureFace}
-          data-testid="capture-face-button"
-          style={{
-            padding: '12px 32px',
-            background: 'linear-gradient(135deg, #4A4 0%, #2A2 100%)',
-            border: 'none',
-            borderRadius: 8,
-            color: '#FFF',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <CheckCircle className="w-5 h-5" />
-          Capture Face
-        </button>
+      {capturing && !captured && (
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            onClick={captureFace}
+            data-testid="manual-capture-button"
+            style={{
+              padding: '12px 32px',
+              background: 'linear-gradient(135deg, #D4AF37 0%, #8B7355 100%)',
+              border: 'none',
+              borderRadius: 8,
+              color: '#050505',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            <CheckCircle className="w-5 h-5" />
+            Capture Now
+          </button>
+          
+          <button
+            onClick={skipFaceID}
+            data-testid="skip-faceid-button"
+            style={{
+              padding: '12px 32px',
+              background: 'transparent',
+              border: '1px solid #444',
+              borderRadius: 8,
+              color: '#888',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            Skip for now
+          </button>
+        </div>
       )}
 
       {captured && (

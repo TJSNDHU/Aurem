@@ -13,10 +13,10 @@ MONGO_URL = os.environ.get("MONGO_URL")
 if not MONGO_URL:
     logging.warning("MONGO_URL not set - database operations will fail until configured")
     
-DB_NAME = os.environ.get("DB_NAME", "reroots_db")
+DB_NAME = os.environ.get("DB_NAME")
 
 # JWT Configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "reroots-secret-key")
+JWT_SECRET = os.environ.get("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 
 # API Keys

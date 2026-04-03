@@ -275,7 +275,7 @@ def extract_db_from_url(url):
 # IMPORTANT: Client creation is deferred to startup event to avoid blocking port binding
 mongo_url = os.environ.get("MONGO_URL", "")
 # Priority: DB_NAME env var takes precedence over URL-embedded name (explicit > implicit)
-db_name = os.environ.get("DB_NAME") or extract_db_from_url(mongo_url) or "reroots"
+db_name = os.environ.get("DB_NAME") or extract_db_from_url(mongo_url)
 
 # These will be initialized in the startup event AFTER uvicorn binds to port
 client = None
