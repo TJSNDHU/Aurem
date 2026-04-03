@@ -23,6 +23,8 @@ import CircuitBreakerDashboard from '../components/CircuitBreakerDashboard';
 import VoiceWakeWord from '../components/VoiceWakeWord';
 // ORA Forensic Uploader (Floating)
 import ForensicUploader from '../components/ForensicUploader';
+// GitHub Lead Miner
+import GitHubLeadMiner from '../components/GitHubLeadMiner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -45,6 +47,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout }) => {
       title: 'SYSTEM',
       items: [
         { id: 'circuit-breakers', label: 'Circuit Breakers', icon: Shield },
+        { id: 'github-leads', label: 'Intelligence & Growth', icon: TrendingUp },
         { id: 'business-management', label: 'Business Management', icon: Building2 },
       ]
     },
@@ -598,6 +601,10 @@ const AuremDashboard = () => {
         {activeItem === 'circuit-breakers' ? (
           <div className="flex-1 overflow-auto">
             <CircuitBreakerDashboard token={token} />
+          </div>
+        ) : activeItem === 'github-leads' ? (
+          <div className="flex-1 overflow-auto">
+            <GitHubLeadMiner token={token} />
           </div>
         ) : activeItem === 'ai-conversation' ? (
           <>
