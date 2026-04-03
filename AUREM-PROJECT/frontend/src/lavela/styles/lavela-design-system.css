@@ -1,0 +1,396 @@
+/* LA VELA BIANCA - Luxury Midnight-to-Dawn Design System */
+/* Premium Celestial Skincare Aesthetic */
+
+/* ============================================
+   COLOR PALETTE - Midnight to Dawn
+   ============================================ */
+:root {
+  /* Primary - Deep Teal (from logo/packaging) */
+  --lavela-teal-deep: #0D4D4D;
+  --lavela-teal: #1A6B6B;
+  --lavela-teal-light: #2A8A8A;
+  
+  /* Secondary - Rose/Dawn */
+  --lavela-rose: #E8C4B8;
+  --lavela-rose-soft: #F5DED6;
+  --lavela-rose-deep: #D4A090;
+  --lavela-dawn: #F2E6E0;
+  
+  /* Accent - Rose Gold (buttons & headings) */
+  --lavela-rose-gold: #D4A574;
+  --lavela-rose-gold-light: #E6BE8A;
+  --lavela-rose-gold-dark: #B8956A;
+  
+  /* Deep Green (from logo tagline) */
+  --lavela-green-accent: #1A5C5C;
+  --lavela-green-dark: #0F3D3D;
+  
+  /* Neutrals */
+  --lavela-cream: #FDF8F5;
+  --lavela-white: #FFFFFF;
+  --lavela-charcoal: #2D2A2E;
+  
+  /* Celestial */
+  --lavela-star: #F0E6D3;
+  --lavela-star-bright: #FFFFFF;
+  --lavela-glow: rgba(230, 190, 138, 0.4);
+}
+
+/* ============================================
+   TYPOGRAPHY - Premium Serif (Self-Hosted Fonts)
+   Removed Google Fonts for better performance - now using @fontsource packages
+   ============================================ */
+
+.lavela-heading {
+  font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--lavela-rose-gold-light);
+}
+
+.lavela-heading-white {
+  font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--lavela-white);
+}
+
+/* Force scrolling for LA VELA pages */
+html:has(.lavela-body),
+body:has(.lavela-body) {
+  overflow: auto !important;
+  height: auto !important;
+  min-height: 100% !important;
+}
+
+.lavela-body {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 400;
+  color: var(--lavela-cream);
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  min-height: 100vh;
+  position: relative;
+}
+
+.lavela-accent-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  color: var(--lavela-rose-gold);
+}
+
+/* ============================================
+   MIDNIGHT-TO-DAWN GRADIENT BACKGROUNDS
+   ============================================ */
+.lavela-gradient-bg {
+  background: linear-gradient(
+    180deg,
+    var(--lavela-teal-deep) 0%,
+    var(--lavela-teal) 30%,
+    var(--lavela-rose-deep) 70%,
+    var(--lavela-rose) 100%
+  );
+}
+
+.lavela-gradient-hero {
+  background: linear-gradient(
+    135deg,
+    var(--lavela-teal-deep) 0%,
+    var(--lavela-teal) 40%,
+    var(--lavela-rose-deep) 80%,
+    var(--lavela-rose-soft) 100%
+  );
+}
+
+.lavela-gradient-section {
+  background: linear-gradient(
+    180deg,
+    var(--lavela-teal) 0%,
+    var(--lavela-green-accent) 100%
+  );
+}
+
+/* ============================================
+   CELESTIAL STARS BACKGROUND
+   ============================================ */
+.lavela-stars {
+  position: relative;
+  overflow: hidden;
+}
+
+.lavela-stars::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 40px 70px, var(--lavela-star-bright), transparent),
+    radial-gradient(1px 1px at 90px 40px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 130px 80px, var(--lavela-star), transparent),
+    radial-gradient(1px 1px at 160px 120px, var(--lavela-star-bright), transparent),
+    radial-gradient(2px 2px at 200px 50px, var(--lavela-star), transparent),
+    radial-gradient(1px 1px at 250px 160px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 300px 90px, var(--lavela-star-bright), transparent),
+    radial-gradient(1px 1px at 350px 200px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 400px 30px, var(--lavela-star), transparent),
+    radial-gradient(1px 1px at 450px 140px, var(--lavela-star-bright), transparent),
+    radial-gradient(2px 2px at 500px 180px, var(--lavela-star), transparent),
+    radial-gradient(1px 1px at 550px 60px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 600px 220px, var(--lavela-star-bright), transparent),
+    radial-gradient(1px 1px at 650px 100px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 700px 250px, var(--lavela-star), transparent),
+    radial-gradient(1px 1px at 750px 40px, var(--lavela-star-bright), transparent),
+    radial-gradient(2px 2px at 800px 170px, var(--lavela-star), transparent),
+    radial-gradient(1px 1px at 850px 80px, var(--lavela-star), transparent),
+    radial-gradient(2px 2px at 900px 200px, var(--lavela-star-bright), transparent);
+  background-repeat: repeat;
+  background-size: 1000px 300px;
+  animation: twinkle 8s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.9; }
+}
+
+/* Constellation lines effect */
+.lavela-constellation {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 400px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'%3E%3Cpath d='M50 100 L150 80 L200 150 L300 120 L350 200' stroke='%23E6BE8A' stroke-width='0.5' fill='none' opacity='0.3'/%3E%3Ccircle cx='50' cy='100' r='3' fill='%23F0E6D3'/%3E%3Ccircle cx='150' cy='80' r='2' fill='%23E6BE8A'/%3E%3Ccircle cx='200' cy='150' r='3' fill='%23F0E6D3'/%3E%3Ccircle cx='300' cy='120' r='2' fill='%23E6BE8A'/%3E%3Ccircle cx='350' cy='200' r='3' fill='%23F0E6D3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ============================================
+   GLASSMORPHISM - Luxury Glass Effect
+   ============================================ */
+.lavela-glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(230, 190, 138, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.lavela-glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(230, 190, 138, 0.15);
+  border-radius: 24px;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.lavela-glass-card-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(212, 165, 116, 0.3);
+  border-radius: 24px;
+  box-shadow: 0 4px 24px rgba(212, 165, 116, 0.1);
+}
+
+/* ============================================
+   THE "11" MOTIF - Master 11 Energy
+   ============================================ */
+.lavela-divider-11 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 0;
+}
+
+.lavela-divider-11::before,
+.lavela-divider-11::after {
+  content: '';
+  width: 3px;
+  height: 40px;
+  background: linear-gradient(180deg, var(--lavela-rose-gold) 0%, var(--lavela-rose-gold-dark) 100%);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--lavela-glow);
+}
+
+/* ============================================
+   BUTTONS - Rose Gold Luxury
+   ============================================ */
+.lavela-btn-primary {
+  background: linear-gradient(135deg, var(--lavela-rose-gold) 0%, var(--lavela-rose-gold-dark) 100%);
+  color: var(--lavela-white);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 16px 40px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(212, 165, 116, 0.4);
+}
+
+.lavela-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 30px rgba(212, 165, 116, 0.5);
+}
+
+.lavela-btn-outline {
+  background: transparent;
+  color: var(--lavela-rose-gold-light);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 14px 36px;
+  border: 1px solid var(--lavela-rose-gold);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.lavela-btn-outline:hover {
+  background: rgba(230, 190, 138, 0.1);
+  border-color: var(--lavela-rose-gold-light);
+}
+
+/* ============================================
+   SHIMMER EFFECT - Rose Gold Shimmer
+   ============================================ */
+.lavela-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--lavela-rose-gold) 0%,
+    var(--lavela-rose-gold-light) 25%,
+    var(--lavela-white) 50%,
+    var(--lavela-rose-gold-light) 75%,
+    var(--lavela-rose-gold) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* ============================================
+   LUXURY CARD STYLES
+   ============================================ */
+.lavela-product-card {
+  background: linear-gradient(
+    180deg,
+    rgba(26, 107, 107, 0.9) 0%,
+    rgba(13, 77, 77, 0.95) 100%
+  );
+  border: 1px solid rgba(230, 190, 138, 0.2);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.lavela-product-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-color: var(--lavela-rose-gold);
+}
+
+/* ============================================
+   SECTION STYLES
+   ============================================ */
+.lavela-section-dark {
+  background: var(--lavela-teal-deep);
+  color: var(--lavela-cream);
+}
+
+.lavela-section-light {
+  background: linear-gradient(
+    180deg,
+    var(--lavela-cream) 0%,
+    var(--lavela-rose-soft) 100%
+  );
+  color: var(--lavela-charcoal);
+}
+
+/* ============================================
+   NAV STYLES
+   ============================================ */
+.lavela-nav {
+  background: rgba(13, 77, 77, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(230, 190, 138, 0.2);
+}
+
+.lavela-nav-link {
+  color: var(--lavela-cream);
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  transition: color 0.3s ease;
+}
+
+.lavela-nav-link:hover {
+  color: var(--lavela-rose-gold-light);
+}
+
+/* ============================================
+   FOOTER STYLES
+   ============================================ */
+.lavela-footer {
+  background: var(--lavela-green-dark);
+  color: var(--lavela-cream);
+  border-top: 1px solid rgba(230, 190, 138, 0.2);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px var(--lavela-glow); }
+  50% { box-shadow: 0 0 40px var(--lavela-glow); }
+}
+
+.lavela-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.lavela-glow {
+  animation: glow 3s ease-in-out infinite;
+}
+
+/* ============================================
+   MARQUEE ANIMATION - Ingredients Ticker
+   ============================================ */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+
+.animate-marquee {
+  animation: marquee 25s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

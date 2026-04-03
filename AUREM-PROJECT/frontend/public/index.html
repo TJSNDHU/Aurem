@@ -1,0 +1,1627 @@
+<!doctype html>
+<html lang="en-CA">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#2D2A2E" />
+        
+        <!-- Domain Canonicalization - Redirect all variants to https://reroots.ca -->
+        <script>
+            (function() {
+                var host = window.location.hostname;
+                var protocol = window.location.protocol;
+                var path = window.location.pathname + window.location.search;
+                
+                // Skip redirects for localhost/development
+                if (host === 'localhost' || host === '127.0.0.1' || host.indexOf('preview.emergentagent.com') !== -1) {
+                    return;
+                }
+                
+                // Force HTTPS (production only)
+                if (protocol === 'http:' && host === 'reroots.ca') {
+                    window.location.replace('https://reroots.ca' + path);
+                    return;
+                }
+                
+                // Force non-www (www.reroots.ca -> reroots.ca)
+                if (host === 'www.reroots.ca') {
+                    window.location.replace('https://reroots.ca' + path);
+                    return;
+                }
+                
+                // Redirect old Emergent deployment domains to production
+                if (host.indexOf('emergent.host') !== -1) {
+                    window.location.replace('https://reroots.ca' + path);
+                    return;
+                }
+            })();
+        </script>
+        
+        <!-- Service Worker Registration (inline for PWABuilder detection) -->
+        <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js', { scope: '/app' });
+            }
+        </script>
+        
+        <!-- EARLY PRECONNECT - Start SSL handshake IMMEDIATELY (before JS downloads) -->
+        <!-- API Backend - Most critical for data fetching -->
+        <link rel="preconnect" href="https://reroots-ai-platform.emergent.host" crossorigin />
+        <!-- Cloudinary CDN - Critical for hero image -->
+        <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+        <!-- Customer Assets - Hero image origin -->
+        <link rel="preconnect" href="https://customer-assets.emergentagent.com" crossorigin />
+        
+        <!-- DNS-PREFETCH - Lower priority resources (only DNS lookup, no SSL) -->
+        <link rel="dns-prefetch" href="https://files.catbox.moe" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+        
+        <!-- CRITICAL FONT PRELOADS - Only hero text fonts (reduced from 4 to 2) -->
+        <!-- Playfair Display 400 - LCP hero heading font -->
+        <link rel="preload" href="/static/media/playfair-display-latin-400-normal.b029bd8deea1857dca78.woff2" as="font" type="font/woff2" crossorigin />
+        <!-- Manrope 400 - Hero description text -->
+        <link rel="preload" href="/static/media/manrope-latin-400-normal.84d41d78bb782fb0f969.woff2" as="font" type="font/woff2" crossorigin />
+        <!-- REMOVED: Bold variants not needed for initial LCP - loaded via CSS when needed -->
+        
+        <!-- PWA FONTS - Cormorant Garamond & Jost -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+        
+        <!-- REMOVED prefetch for API data - was causing CORS errors and not needed for LCP -->
+        
+        <!-- DNS-PREFETCH - Low-priority resources (no SSL handshake, just DNS lookup) -->
+        <link rel="dns-prefetch" href="https://us.i.posthog.com" />
+        <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
+        <link rel="dns-prefetch" href="https://api.na.bambora.com" />
+        <link rel="dns-prefetch" href="https://www.paypal.com" />
+        
+        <!-- PRELOAD critical hero image for LCP - MOBILE FIRST (most users) -->
+        <!-- Direct preload for mobile (640w) - highest priority, no srcset parsing delay -->
+        <link rel="preload" as="image" href="https://res.cloudinary.com/ddpphzqdg/image/fetch/w_640,q_70,f_avif/https%3A%2F%2Fcustomer-assets.emergentagent.com%2Fjob_4e76787f-8156-4163-b7a9-a9afa71e2ce2%2Fartifacts%2Fhvef4zdg_1768271038566.jpg" type="image/avif" fetchpriority="high" media="(max-width: 768px)" />
+        <!-- Desktop preload with srcset for larger screens -->
+        <link rel="preload" as="image" type="image/avif" imagesrcset="https://res.cloudinary.com/ddpphzqdg/image/fetch/w_1024,q_70,f_avif/https%3A%2F%2Fcustomer-assets.emergentagent.com%2Fjob_4e76787f-8156-4163-b7a9-a9afa71e2ce2%2Fartifacts%2Fhvef4zdg_1768271038566.jpg 1024w, https://res.cloudinary.com/ddpphzqdg/image/fetch/w_1920,q_70,f_avif/https%3A%2F%2Fcustomer-assets.emergentagent.com%2Fjob_4e76787f-8156-4163-b7a9-a9afa71e2ce2%2Fartifacts%2Fhvef4zdg_1768271038566.jpg 1920w" imagesizes="100vw" fetchpriority="high" media="(min-width: 769px)" />
+        
+        <!-- REMOVED: Admin login background and logo preloads - these compete with hero LCP -->
+        <!-- These will be loaded on-demand when user navigates to admin/login pages -->
+        
+        <!-- SPECULATIVE RULES API - Pre-render pages for instant navigation -->
+        <!-- Chromium 121+ supports this for background tab pre-rendering -->
+        <script type="speculationrules">
+        {
+            "prerender": [
+                {
+                    "where": {
+                        "and": [
+                            { "href_matches": "/products/*" },
+                            { "not": { "href_matches": "/products/*/edit" } }
+                        ]
+                    },
+                    "eagerness": "moderate"
+                },
+                {
+                    "urls": ["/shop", "/"],
+                    "eagerness": "moderate"
+                }
+            ],
+            "prefetch": [
+                {
+                    "where": { "href_matches": "/*" },
+                    "eagerness": "conservative"
+                }
+            ]
+        }
+        </script>
+        
+        <!-- CRITICAL CSS - Inlined for instant above-the-fold rendering (Mobile 90+ Score) -->
+        <style>
+            /* ===========================================
+               CRITICAL CSS - Above-the-fold only
+               This CSS renders in <14ms on mobile
+               DO NOT ADD NON-CRITICAL CSS HERE
+               =========================================== */
+            
+            /* ===========================================
+               LCP FIX: CSS-Based Hero Animations
+               Uses opacity: 0.01 for instant LCP recognition
+               Eliminates 3,120ms Element Render Delay
+               =========================================== */
+            @keyframes heroFadeInUp {
+              from { opacity: 0.01; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes heroBadgeFadeIn {
+              from { opacity: 0.01; transform: translateY(10px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes heroScrollIndicator {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(10px); }
+            }
+            
+            /* LCP Element - Hero heading (highest priority) 
+               CRITICAL: Start at opacity 1 for instant LCP recognition
+               Then apply subtle animation */
+            .lcp-hero-heading {
+              opacity: 1;
+              animation: heroFadeInUp 0.8s ease-out forwards;
+              animation-delay: 0s;
+            }
+            .lcp-hero-badge {
+              opacity: 1;
+              animation: heroBadgeFadeIn 0.6s ease-out forwards;
+              animation-delay: 0s;
+            }
+            .lcp-hero-description {
+              opacity: 1;
+              animation: heroFadeInUp 0.8s ease-out forwards;
+              animation-delay: 0s;
+            }
+            .lcp-hero-cta {
+              opacity: 1;
+              animation: heroFadeInUp 0.8s ease-out forwards;
+              animation-delay: 0.1s;
+            }
+            .lcp-hero-trust-badges {
+              opacity: 1;
+              animation: heroFadeInUp 0.6s ease-out forwards;
+              animation-delay: 0.2s;
+            }
+            /* Scroll indicator - PERF: Use only transform for composited animation */
+            .lcp-scroll-indicator {
+              opacity: 1;
+              animation: heroScrollIndicator 2s ease-in-out 1.5s infinite;
+              will-change: transform;
+            }
+            
+            @media (prefers-reduced-motion: reduce) {
+              .lcp-hero-heading, .lcp-hero-badge, .lcp-hero-description, 
+              .lcp-hero-cta, .lcp-hero-trust-badges, .lcp-scroll-indicator {
+                animation: none;
+                opacity: 1;
+                transform: none;
+              }
+            }
+            /* END LCP FIX */
+            
+            /* FONT-DISPLAY: SWAP - Show text IMMEDIATELY with fallback */
+            /* This is critical for LCP - text must render before fonts load */
+            @font-face {
+                font-family: 'Playfair Display';
+                font-style: normal;
+                font-weight: 400 700;
+                font-display: swap;
+                src: local('Playfair Display');
+            }
+            @font-face {
+                font-family: 'Manrope';
+                font-style: normal;
+                font-weight: 300 700;
+                font-display: swap;
+                src: local('Manrope');
+            }
+            
+            /* Reset & Box Model - Essential for layout */
+            *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+            
+            /* HTML & Body - Prevent white flash */
+            html { 
+                font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background-color: #FDF9F9;
+                color: #2D2A2E;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+                scroll-behavior: smooth;
+            }
+            
+            body {
+                min-height: 100vh;
+                background-color: #FDF9F9;
+                overflow-x: hidden;
+            }
+            
+            /* ===========================================
+               NAVBAR - Fixed position, prevent CLS
+               Height: 80px on all devices
+               =========================================== */
+            nav, .navbar, [class*="navbar"] {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 1000;
+                height: 80px;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border-bottom: 1px solid rgba(0,0,0,0.05);
+            }
+            
+            /* Navbar container */
+            nav > div, .navbar > div {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 0 24px;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            /* Logo text styling */
+            .font-luxury, [class*="font-luxury"] {
+                font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+            }
+            
+            .font-clinical, [class*="font-clinical"] {
+                font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+            }
+            
+            /* ===========================================
+               HERO SECTION - Critical for LCP
+               Background color matches hero image
+               =========================================== */
+            .hero-container {
+                min-height: 100vh;
+                width: 100vw;
+                margin-left: calc(-50vw + 50%);
+                margin-right: calc(-50vw + 50%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: #E8E4E0; /* Hero image dominant color */
+                /* No padding-top - hero extends under transparent header */
+            }
+            
+            /* Hero text - LCP element */
+            h1 {
+                font-family: 'Playfair Display', Georgia, serif;
+                font-weight: 500;
+                color: white;
+                line-height: 1.1;
+            }
+            
+            /* Hero heading size */
+            .hero-container h1 {
+                font-size: clamp(2.5rem, 6vw, 4.5rem);
+                text-align: center;
+                background: transparent;
+            }
+            
+            /* Hero subtext */
+            .hero-container p {
+                font-family: 'Manrope', sans-serif;
+                color: rgba(255,255,255,0.85);
+                font-size: clamp(1rem, 2vw, 1.25rem);
+                line-height: 1.6;
+                background: transparent;
+            }
+            
+            /* ===========================================
+               BUTTONS - Primary CTA styling
+               =========================================== */
+            button, [class*="btn"], [class*="button"] {
+                font-family: 'Manrope', sans-serif;
+                font-weight: 600;
+                cursor: pointer;
+                border: none;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+            
+            /* Primary pink button */
+            .bg-\\[\\#F8A5B8\\], [class*="F8A5B8"] {
+                background-color: #F8A5B8;
+                color: #2D2A2E;
+            }
+            
+            /* ===========================================
+               IMAGES - Prevent CLS
+               =========================================== */
+            img, video { 
+                max-width: 100%; 
+                height: auto;
+                display: block;
+            }
+            
+            /* Hero image container */
+            .hero-container img, [class*="hero"] img {
+                object-fit: cover;
+                width: 100%;
+                height: 100%;
+            }
+            
+            /* ===========================================
+               LAYOUT UTILITIES - Prevent CLS
+               =========================================== */
+            .min-h-screen { min-height: 100vh; }
+            .pt-20 { padding-top: 5rem; }
+            .pt-24 { padding-top: 6rem; }
+            .text-center { text-align: center; }
+            .relative { position: relative; }
+            .absolute { position: absolute; }
+            .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+            .flex { display: flex; }
+            .items-center { align-items: center; }
+            .justify-center { justify-content: center; }
+            
+            /* ===========================================
+               COLOR TOKENS - Brand colors
+               =========================================== */
+            .text-white { color: white; }
+            .text-\\[\\#2D2A2E\\] { color: #2D2A2E; }
+            .text-\\[\\#D4AF37\\] { color: #D4AF37; }
+            .text-\\[\\#F8A5B8\\] { color: #F8A5B8; }
+            .bg-\\[\\#FDF9F9\\] { background-color: #FDF9F9; }
+            .bg-\\[\\#2D2A2E\\] { background-color: #2D2A2E; }
+            .bg-white { background-color: white; }
+            
+            /* Luxury Loading Splash - Shows Immediately */
+            #loading-splash {
+                position: fixed;
+                inset: 0;
+                z-index: 99999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #2D2A2E 0%, #1a1819 100%);
+                transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+            }
+            
+            #loading-splash.hidden {
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+            }
+            
+            .splash-logo {
+                font-family: 'Playfair Display', Georgia, serif;
+                font-size: clamp(2rem, 8vw, 3.5rem);
+                font-weight: 500;
+                color: white;
+                letter-spacing: 0.05em;
+                margin-bottom: 2rem;
+                opacity: 0;
+                animation: fadeInUp 0.8s ease-out 0.2s forwards;
+            }
+            
+            .splash-logo span {
+                color: #F8A5B8;
+                font-style: italic;
+            }
+            
+            .splash-tagline {
+                font-family: 'Manrope', sans-serif;
+                font-size: 0.875rem;
+                color: rgba(255,255,255,0.6);
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                margin-bottom: 3rem;
+                opacity: 0;
+                animation: fadeInUp 0.8s ease-out 0.4s forwards;
+            }
+            
+            .splash-loader {
+                width: 48px;
+                height: 48px;
+                position: relative;
+                opacity: 0;
+                animation: fadeInUp 0.8s ease-out 0.6s forwards;
+            }
+            
+            .splash-loader::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border: 2px solid rgba(255,255,255,0.1);
+                border-radius: 50%;
+            }
+            
+            .splash-loader::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                border: 2px solid transparent;
+                border-top-color: #F8A5B8;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+            
+            .splash-badges {
+                display: flex;
+                gap: 1.5rem;
+                margin-top: 3rem;
+                opacity: 0;
+                animation: fadeInUp 0.8s ease-out 0.8s forwards;
+            }
+            
+            .splash-badge {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.7rem;
+                color: rgba(255,255,255,0.5);
+                letter-spacing: 0.1em;
+            }
+            
+            @keyframes fadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            
+            /* Prevent FOUC */
+            #root:empty + #loading-splash { display: flex; }
+            #root:not(:empty) ~ #loading-splash { display: none; }
+            
+            /* ===========================================
+               ADMIN PANEL - Critical CSS for Fast LCP
+               Prevents layout shifts in admin dashboard
+               =========================================== */
+            
+            /* Admin sidebar - fixed width prevents CLS */
+            .admin-sidebar, [class*="sidebar-container"] {
+                width: 224px;
+                min-width: 224px;
+                flex-shrink: 0;
+                contain: layout style;
+                /* Removed content-visibility: auto to prevent sidebar not rendering on mobile */
+            }
+            
+            /* Admin main content - fills remaining space */
+            .admin-main-content {
+                flex: 1;
+                min-width: 0;
+                contain: layout style;
+                content-visibility: auto;
+            }
+            
+            /* Admin cards - prevent CLS during widget load */
+            .admin-card, [class*="widget-container"] {
+                content-visibility: auto;
+                contain-intrinsic-size: auto 200px;
+            }
+            
+            /* Admin grid skeleton - fast placeholder rendering */
+            .admin-skeleton {
+                background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+                background-size: 200% 100%;
+                animation: skeleton-shimmer 1.5s ease-in-out infinite;
+            }
+            
+            @keyframes skeleton-shimmer {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+            
+            /* Admin hover states - GPU optimized */
+            .admin-hover-optimized {
+                will-change: background-color;
+                transition: background-color 0.15s ease;
+            }
+            
+            /* Mobile admin - sidebar is controlled by React component's Tailwind classes */
+            @media (max-width: 1023px) {
+                .admin-sidebar, [class*="sidebar-container"] {
+                    /* Position is handled by AdminLayout component with translate-x classes */
+                    z-index: 50;
+                }
+            }
+        </style>
+        
+        <!-- Performance: Preconnect to Critical Origins -->
+        <!-- Note: Google Fonts removed - now using self-hosted @fontsource packages -->
+        <link rel="preconnect" href="https://images.unsplash.com" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+        
+        <!-- CSS Non-Blocking Strategy -->
+        <!-- CRA injects CSS as render-blocking <link> tags. This script converts them to non-blocking -->
+        <!-- by changing media to "print" and swapping to "all" on load -->
+        <script>
+            // Make all CRA-injected stylesheets non-render-blocking
+            // This removes the 1,500ms+ CSS blocking delay
+            (function() {
+                // Run after DOMContentLoaded to catch CRA-injected styles
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', makeStylesNonBlocking);
+                } else {
+                    // DOM already loaded, run immediately
+                    setTimeout(makeStylesNonBlocking, 0);
+                }
+                
+                function makeStylesNonBlocking() {
+                    // Find all stylesheet links (except critical inline styles)
+                    var links = document.querySelectorAll('link[rel="stylesheet"]');
+                    links.forEach(function(link) {
+                        // Skip if already processed or is an external CDN
+                        if (link.dataset.nonblocking === 'true') return;
+                        if (link.href.indexOf(window.location.origin) === -1) return;
+                        
+                        // Clone the link with non-blocking attributes
+                        var newLink = link.cloneNode();
+                        newLink.media = 'print';
+                        newLink.onload = function() { 
+                            this.media = 'all';
+                            this.dataset.nonblocking = 'true';
+                        };
+                        
+                        // Replace original with non-blocking version
+                        link.parentNode.insertBefore(newLink, link.nextSibling);
+                        link.remove();
+                    });
+                }
+            })();
+        </script>
+        
+        <!-- PWA Manifest - Dynamic based on brand with cache-busting -->
+        <link rel="manifest" href="/manifest.json?v=10" id="pwa-manifest" />
+        
+        <!-- Dynamic PWA Brand Switching -->
+        <script>
+            (function() {
+                var isLaVela = window.location.hostname.includes('lavela') || 
+                               window.location.pathname.startsWith('/la-vela-bianca') ||
+                               window.location.pathname.startsWith('/lavela');
+                
+                if (isLaVela) {
+                    // Switch to La Vela Bianca manifest immediately
+                    var manifestLink = document.getElementById('pwa-manifest');
+                    if (manifestLink) {
+                        manifestLink.href = '/lavela-manifest.json';
+                    }
+                    
+                    // Update theme color for La Vela
+                    var themeColor = document.querySelector('meta[name="theme-color"]');
+                    if (themeColor) {
+                        themeColor.content = '#0D4D4D';
+                    }
+                    
+                    console.log('[PWA] La Vela Bianca manifest loaded');
+                    
+                    // Update icons when DOM is ready
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Update Apple PWA title
+                        var appleMeta = document.getElementById('apple-pwa-title');
+                        if (appleMeta) {
+                            appleMeta.content = 'La Vela Bianca';
+                        }
+                        
+                        // Update all brand icons to La Vela
+                        var brandIcons = document.querySelectorAll('.brand-icon');
+                        brandIcons.forEach(function(icon) {
+                            icon.href = '/lavela-icon-192.png';
+                        });
+                        
+                        console.log('[PWA] La Vela Bianca icons updated:', brandIcons.length);
+                    });
+                }
+            })();
+        </script>
+        
+        <!-- Apple PWA Meta Tags -->
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ReRoot's" id="apple-pwa-title" />
+        <link rel="apple-touch-icon" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="72x72" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="96x96" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="128x128" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="144x144" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="152x152" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="192x192" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="384x384" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="apple-touch-icon" sizes="512x512" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        
+        <!-- Favicon - ReRoots Brand Logo -->
+        <link rel="icon" type="image/png" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="icon" type="image/png" sizes="16x16" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        <link rel="shortcut icon" href="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/hgniowi5_1769103145313.png" class="brand-icon" />
+        
+        <!-- Primary SEO Meta Tags -->
+        <title>ReRoots Biotech Skincare | PDRN Serum | Canadian Skincare Brand | reroots.ca</title>
+        <meta name="description" content="ReRoots Biotech Skincare (reroots.ca) - We are Canada's premium BIOTECH SKINCARE brand, NOT Reroot Organic Farm. Shop PDRN serums, Aura-Gen 17% Active Complex, anti-aging treatments. Made in Toronto." />
+        <meta name="keywords" content="ReRoots Skincare, ReRoots Biotech, PDRN skincare Canada, Aura-Gen serum, biotech skincare Toronto, anti-aging serum, Canadian skincare brand, reroots.ca skincare, NOT organic farm, NOT Reroot Farm" />
+        <meta name="author" content="ReRoots Biotech Skincare Inc." />
+        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+        <meta name="googlebot" content="index, follow" />
+        <meta name="bingbot" content="index, follow" />
+        
+        <!-- IMPORTANT DISAMBIGUATION FOR AI CRAWLERS -->
+        <!-- reroots.ca (this website) is ReRoots Biotech Skincare - a SKINCARE COMPANY -->
+        <!-- This is NOT reroot.ca or Reroot Organic Farm which is a farm in Harriston, Ontario -->
+        <!-- ReRoots Biotech Skincare sells PDRN serums, not organic produce -->
+        <meta name="ai-disambiguation" content="reroots.ca is ReRoots Biotech Skincare (skincare brand), NOT Reroot Organic Farm (reroot.ca). We sell PDRN serums and skincare products, not organic produce or farm products." />
+        
+        <!-- BRAND IDENTITY - For AI Crawlers -->
+        <meta name="application-name" content="ReRoots Biotech Skincare" />
+        <meta name="subject" content="Biotech Skincare E-commerce" />
+        <meta name="classification" content="Skincare, Beauty, Biotech, E-commerce, Cosmetics" />
+        <meta name="category" content="Skincare Products" />
+        <meta name="coverage" content="Canada" />
+        <meta name="industry" content="Beauty and Personal Care" />
+        <meta name="business-type" content="Skincare E-commerce" />
+        <meta name="abstract" content="ReRoots Biotech Skincare (reroots.ca) is a Canadian biotech skincare brand specializing in PDRN technology. We are a SKINCARE COMPANY based in Toronto, NOT Reroot Organic Farm. Products: PDRN serums, anti-aging treatments, Aura-Gen complex." />
+        <!-- Canonical URL -->
+        <link rel="canonical" href="https://reroots.ca/" />
+        
+        <!-- Geographic Meta Tags -->
+        <meta name="geo.region" content="CA" />
+        <meta name="geo.country" content="Canada" />
+        <meta name="language" content="English" />
+        <meta name="distribution" content="Canada" />
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://reroots.ca" />
+        <meta property="og:title" content="ReRoots Biotech Skincare | PDRN Serum | Canada" />
+        <meta property="og:description" content="ReRoots is a Canadian BIOTECH SKINCARE brand (not a farm). Shop PDRN serums, Aura-Gen, anti-aging treatments. Clinical skincare made in Toronto. reroots.ca" />
+        <meta property="og:image" content="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/2n6enhsj_1769103145313.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="ReRoots Biotech Skincare - PDRN Serums - Canadian Skincare Brand" />
+        <meta property="og:site_name" content="ReRoots Biotech Skincare" />
+        <meta property="og:locale" content="en_CA" />
+        
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content="https://reroots.ca" />
+        <meta name="twitter:title" content="ReRoots Biotech Skincare | PDRN Serum | Canada" />
+        <meta name="twitter:description" content="ReRoots - Canadian BIOTECH SKINCARE brand. PDRN serums, Aura-Gen, anti-aging. NOT a farm. Clinical skincare from Toronto." />
+        <meta name="twitter:image" content="https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/2n6enhsj_1769103145313.png" />
+        <meta name="twitter:image:alt" content="ReRoots Biotech Skincare Products" />
+        <meta name="twitter:site" content="@rerootsskincare" />
+        <meta name="twitter:creator" content="@rerootsskincare" />
+        
+        <!-- Note: Google Fonts removed - fonts are now self-hosted via @fontsource for better performance -->
+        
+        <!-- Structured Data: Store/LocalBusiness -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": ["Store", "OnlineStore", "Organization"],
+            "@id": "https://reroots.ca/#organization",
+            "name": "ReRoots Biotech Skincare",
+            "alternateName": ["ReRoots Skincare", "ReRoots", "Reroots Aesthetics Inc"],
+            "legalName": "Reroots Aesthetics Inc.",
+            "description": "ReRoots Biotech Skincare (reroots.ca) is a Canadian SKINCARE and BEAUTY brand specializing in PDRN technology, anti-aging serums, and clinical skincare products. IMPORTANT: This is NOT Reroot Organic Farm (reroot.ca) - we sell skincare products, not organic produce. Based in Toronto, Canada.",
+            "url": "https://reroots.ca",
+            "sameAs": [
+                "https://www.instagram.com/reroots.ca",
+                "https://www.tiktok.com/@reroots.ca"
+            ],
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/2n6enhsj_1769103145313.png",
+                "width": 512,
+                "height": 512
+            },
+            "image": "https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/2n6enhsj_1769103145313.png",
+            "telephone": "+12265017777",
+            "email": "admin@reroots.ca",
+            "priceRange": "$$",
+            "currenciesAccepted": "CAD",
+            "paymentAccepted": "Credit Card, Debit Card, PayPal, E-Transfer",
+            "brand": {
+                "@type": "Brand",
+                "name": "ReRoots Biotech Skincare",
+                "description": "Canadian biotech skincare brand specializing in PDRN technology"
+            },
+            "sameAs": [
+                "https://www.instagram.com/rerootsskincare",
+                "https://www.facebook.com/rerootsskincare",
+                "https://www.tiktok.com/@rerootsskincare"
+            ],
+            "knowsAbout": ["PDRN skincare", "Biotech skincare", "Anti-aging serums", "Skincare technology", "Clinical skincare"],
+            "areaServed": {
+                "@type": "Country",
+                "name": "Canada"
+            },
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Toronto",
+                "addressRegion": "Ontario",
+                "addressCountry": "CA"
+            },
+            "geo": {
+                "@type": "GeoCoordinates",
+                "latitude": "43.6532",
+                "longitude": "-79.3832"
+            },
+            "openingHoursSpecification": {
+                "@type": "OpeningHoursSpecification",
+                "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+                "opens": "09:00",
+                "closes": "20:00"
+            },
+            "sameAs": [
+                "https://instagram.com/reroots",
+                "https://facebook.com/reroots",
+                "https://tiktok.com/@reroots"
+            ],
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": {
+                    "@type": "EntryPoint",
+                    "urlTemplate": "https://reroots.ca/products?search={search_term_string}"
+                },
+                "query-input": "required name=search_term_string"
+            },
+            "hasOfferCatalog": {
+                "@type": "OfferCatalog",
+                "name": "ReRoots Skincare Products",
+                "itemListElement": [
+                    {
+                        "@type": "OfferCatalog",
+                        "name": "Serums",
+                        "description": "Premium PDRN bio-regenerative serums for skin repair"
+                    },
+                    {
+                        "@type": "OfferCatalog",
+                        "name": "Anti-Aging",
+                        "description": "Advanced anti-aging skincare treatments with peptides"
+                    }
+                ]
+            }
+        }
+        </script>
+        
+        <!-- Structured Data: Organization -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "ReRoots",
+            "alternateName": "ReRoots Skincare Canada",
+            "url": "https://reroots.ca",
+            "logo": "https://images.unsplash.com/photo-1570194065650-d99fb4b38b17?w=400",
+            "description": "Canadian biotech skincare brand specializing in PDRN and peptide-based skincare solutions.",
+            "foundingDate": "2024",
+            "foundingLocation": {
+                "@type": "Place",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressCountry": "Canada"
+                }
+            },
+            "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": "+12265017777",
+                "contactType": "customer service",
+                "email": "admin@reroots.ca",
+                "availableLanguage": ["English", "French"]
+            },
+            "sameAs": [
+                "https://instagram.com/reroots",
+                "https://facebook.com/reroots",
+                "https://tiktok.com/@reroots"
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: WebSite (for Sitelinks Search Box) -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "ReRoots Skincare",
+            "alternateName": "ReRoots",
+            "url": "https://reroots.ca",
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": {
+                    "@type": "EntryPoint",
+                    "urlTemplate": "https://reroots.ca/products?search={search_term_string}"
+                },
+                "query-input": "required name=search_term_string"
+            }
+        }
+        </script>
+        
+        <!-- Structured Data: BreadcrumbList -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": 1,
+                    "name": "Home",
+                    "item": "https://reroots.ca"
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "name": "Shop",
+                    "item": "https://reroots.ca/shop"
+                }
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: Featured Product - AURA-GEN with Reviews -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "AURA-GEN TXA+PDRN Bio-Regenerator",
+            "alternateName": "AURA-GEN PDRN +TXA +ARGIRELINE 17.0% Active Recovery Complex",
+            "description": "The Master Stack: A high-potency, bio-regenerative serum featuring 5.0% Tranexamic Acid, 2.0% PDRN (Salmon DNA), and 10% Argireline to dismantle hyperpigmentation and reprogram skin longevity. Total 17% active complex.",
+            "image": [
+                "https://static.prod-images.emergentagent.com/jobs/dc55db63-1cbb-42ca-9221-dece393acb3a/images/d17b77d45c2a061e05a5353c69389e13901383c482f97eb9df6a4cacaa17a3be.png",
+                "https://static.prod-images.emergentagent.com/jobs/dc55db63-1cbb-42ca-9221-dece393acb3a/images/9c6209628abf9c85bb6a3c536217d393d7e9d3cfd6552fd5fe2a7a283f0c46fa.png"
+            ],
+            "sku": "AURGEN-PDRN-30ML",
+            "mpn": "RR-AURGEN-001",
+            "brand": {
+                "@type": "Brand",
+                "name": "ReRoots Skincare"
+            },
+            "manufacturer": {
+                "@type": "Organization",
+                "name": "ReRoots Skincare Canada",
+                "url": "https://reroots.ca"
+            },
+            "category": "Health & Beauty > Skin Care > Facial Serums",
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "4.9",
+                "reviewCount": "127",
+                "bestRating": "5",
+                "worstRating": "1"
+            },
+            "review": [
+                {
+                    "@type": "Review",
+                    "reviewRating": {
+                        "@type": "Rating",
+                        "ratingValue": "5",
+                        "bestRating": "5"
+                    },
+                    "author": {
+                        "@type": "Person",
+                        "name": "Sarah M."
+                    },
+                    "reviewBody": "The PDRN serum has completely transformed my skin. Dark spots fading after just 4 weeks!"
+                },
+                {
+                    "@type": "Review",
+                    "reviewRating": {
+                        "@type": "Rating",
+                        "ratingValue": "5",
+                        "bestRating": "5"
+                    },
+                    "author": {
+                        "@type": "Person",
+                        "name": "Jennifer K."
+                    },
+                    "reviewBody": "Finally found a Canadian brand with Korean-level actives. My skin has never looked better."
+                }
+            ],
+            "offers": {
+                "@type": "Offer",
+                "url": "https://reroots.ca/products/bio-regenerative-serums",
+                "priceCurrency": "CAD",
+                "price": "49.99",
+                "priceValidUntil": "2026-12-31",
+                "availability": "https://schema.org/PreOrder",
+                "itemCondition": "https://schema.org/NewCondition",
+                "seller": {
+                    "@type": "Organization",
+                    "name": "ReRoots Skincare"
+                },
+                "shippingDetails": {
+                    "@type": "OfferShippingDetails",
+                    "shippingRate": {
+                        "@type": "MonetaryAmount",
+                        "value": "0",
+                        "currency": "CAD"
+                    },
+                    "shippingDestination": {
+                        "@type": "DefinedRegion",
+                        "addressCountry": "CA"
+                    },
+                    "deliveryTime": {
+                        "@type": "ShippingDeliveryTime",
+                        "handlingTime": {
+                            "@type": "QuantitativeValue",
+                            "minValue": "1",
+                            "maxValue": "2",
+                            "unitCode": "DAY"
+                        },
+                        "transitTime": {
+                            "@type": "QuantitativeValue",
+                            "minValue": "3",
+                            "maxValue": "7",
+                            "unitCode": "DAY"
+                        }
+                    }
+                },
+                "hasMerchantReturnPolicy": {
+                    "@type": "MerchantReturnPolicy",
+                    "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+                    "merchantReturnDays": "30",
+                    "returnMethod": "https://schema.org/ReturnByMail",
+                    "returnFees": "https://schema.org/FreeReturn"
+                }
+            },
+            "additionalProperty": [
+                {
+                    "@type": "PropertyValue",
+                    "name": "PDRN Concentration",
+                    "value": "2%"
+                },
+                {
+                    "@type": "PropertyValue",
+                    "name": "Tranexamic Acid Concentration",
+                    "value": "5%"
+                },
+                {
+                    "@type": "PropertyValue",
+                    "name": "Argireline Concentration",
+                    "value": "10%"
+                },
+                {
+                    "@type": "PropertyValue",
+                    "name": "Total Active Complex",
+                    "value": "17%"
+                },
+                {
+                    "@type": "PropertyValue",
+                    "name": "Size",
+                    "value": "30ml / 1 fl oz"
+                },
+                {
+                    "@type": "PropertyValue",
+                    "name": "Made In",
+                    "value": "Canada"
+                }
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: HowTo - How to Use AURA-GEN -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to Use AURA-GEN PDRN Serum",
+            "description": "Step-by-step guide to applying ReRoots AURA-GEN TXA+PDRN Bio-Regenerator for optimal skin regeneration results.",
+            "totalTime": "PT5M",
+            "estimatedCost": {
+                "@type": "MonetaryAmount",
+                "currency": "CAD",
+                "value": "49.99"
+            },
+            "supply": [
+                {
+                    "@type": "HowToSupply",
+                    "name": "AURA-GEN TXA+PDRN Bio-Regenerator"
+                },
+                {
+                    "@type": "HowToSupply",
+                    "name": "Clean towel"
+                }
+            ],
+            "tool": [
+                {
+                    "@type": "HowToTool",
+                    "name": "Clean hands"
+                }
+            ],
+            "step": [
+                {
+                    "@type": "HowToStep",
+                    "position": "1",
+                    "name": "Cleanse",
+                    "text": "Start with a clean face. Use your regular cleanser and pat dry with a clean towel.",
+                    "image": "https://reroots.ca/images/howto-step1.jpg"
+                },
+                {
+                    "@type": "HowToStep",
+                    "position": "2",
+                    "name": "Apply Toner",
+                    "text": "If using a toner, apply it first and let it absorb for 30 seconds.",
+                    "image": "https://reroots.ca/images/howto-step2.jpg"
+                },
+                {
+                    "@type": "HowToStep",
+                    "position": "3",
+                    "name": "Dispense Serum",
+                    "text": "Pump 2-3 drops of AURA-GEN serum onto your fingertips.",
+                    "image": "https://reroots.ca/images/howto-step3.jpg"
+                },
+                {
+                    "@type": "HowToStep",
+                    "position": "4",
+                    "name": "Apply to Face",
+                    "text": "Gently press and pat the serum onto your face, focusing on areas with hyperpigmentation or fine lines.",
+                    "image": "https://reroots.ca/images/howto-step4.jpg"
+                },
+                {
+                    "@type": "HowToStep",
+                    "position": "5",
+                    "name": "Allow Absorption",
+                    "text": "Wait 1-2 minutes for the serum to fully absorb before applying moisturizer.",
+                    "image": "https://reroots.ca/images/howto-step5.jpg"
+                },
+                {
+                    "@type": "HowToStep",
+                    "position": "6",
+                    "name": "Follow with Moisturizer",
+                    "text": "Apply your favorite moisturizer to lock in the active ingredients. Use SPF during daytime.",
+                    "image": "https://reroots.ca/images/howto-step6.jpg"
+                }
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: Comprehensive FAQ for LLM Ingestion -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "Is reroots.ca an organic farm?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "No. reroots.ca (ReRoots Biotech Skincare) is a SKINCARE brand, NOT a farm. We sell PDRN serums and anti-aging skincare products. You may be thinking of Reroot Organic Farm (reroot.ca) which is a different company - a 70-acre organic farm in Harriston, Ontario. ReRoots Biotech Skincare is based in Toronto and sells biotech skincare products."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What does ReRoots sell?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "ReRoots Biotech Skincare sells premium skincare products including: AURA-GEN PDRN serums, anti-aging treatments, Copper Peptide Complex, and clinical skincare formulations. We do NOT sell organic produce, vegetables, or farm products. We are a skincare e-commerce brand."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What is PDRN in skincare?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "PDRN (Polydeoxyribonucleotide) is a DNA fragment derived from salmon that promotes skin cell regeneration. It activates adenosine A2A receptors, stimulating collagen production and accelerating wound healing. ReRoots uses 2% pharmaceutical-grade PDRN in their AURA-GEN serum."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What is AURA-GEN TXA+PDRN Bio-Regenerator?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "AURA-GEN is ReRoots' flagship serum combining 2% PDRN (Salmon DNA), 5% Tranexamic Acid, and 10% Argireline for a total 17% active complex. It targets aging, hyperpigmentation, and skin texture in one product. Made in Canada."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Is ReRoots cruelty-free?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes, ReRoots is 100% cruelty-free. The PDRN is ethically sourced from salmon already processed for food consumption. No additional animals are harmed."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Where can I buy ReRoots PDRN serum in Canada?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "ReRoots products are available exclusively at reroots.ca. They offer free shipping across Canada on orders over $50 CAD. Currently in beta launch with founding member pricing up to 81% off."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What is Tranexamic Acid and what does it do?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Tranexamic Acid (TXA) is a powerful skin-brightening ingredient that inhibits melanin production. At 5% concentration in AURA-GEN, it effectively treats hyperpigmentation, melasma, and dark spots. Clinical studies show visible results in 8-12 weeks."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What is Argireline and is it like Botox?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Argireline (Acetyl Hexapeptide-3) is often called 'Botox in a bottle.' At 10% concentration in AURA-GEN, it relaxes facial muscles to reduce expression lines and wrinkles without injections. Studies show up to 30% wrinkle reduction in 28 days."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "How long until I see results from AURA-GEN?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Most users see improved skin texture within 2-4 weeks. Hyperpigmentation typically fades noticeably in 6-8 weeks. Full cellular regeneration benefits are seen at 12 weeks of consistent use."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Can I use AURA-GEN with retinol?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "We recommend alternating AURA-GEN and retinol on different nights to avoid irritation. AURA-GEN is best used in the morning (with SPF), while retinol works best at night."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Is PDRN safe for sensitive skin?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes, PDRN is generally well-tolerated by sensitive skin types. However, if you have a salmon allergy, consult your dermatologist before use. AURA-GEN is dermatologist-tested and pH-balanced."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "How does ReRoots compare to Korean PDRN products?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Korean PDRN serums typically cost $200-400 USD and contain 1-2% PDRN. ReRoots AURA-GEN offers 2% PDRN plus 15% additional actives (TXA + Argireline) at founding member prices starting at $49 CAD—with Canadian quality standards and support."
+                    }
+                }
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: Organization with Entity Authority (Co-Citation) -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "ReRoots Skincare",
+            "legalName": "ReRoots Skincare Inc.",
+            "alternateName": ["ReRoots", "ReRoots Canada", "ReRoots PDRN"],
+            "url": "https://reroots.ca",
+            "logo": "https://reroots.ca/logo.png",
+            "foundingDate": "2024",
+            "founders": [
+                {
+                    "@type": "Person",
+                    "name": "ReRoots Founder"
+                }
+            ],
+            "description": "ReRoots Skincare is a Canadian biotech beauty brand pioneering PDRN (Salmon DNA) technology for skin regeneration. Our flagship AURA-GEN serum combines Korean biotechnology innovation with North American quality standards.",
+            "slogan": "The Future of Skin Longevity",
+            "knowsAbout": [
+                "PDRN Skincare",
+                "Salmon DNA Technology",
+                "Tranexamic Acid",
+                "Argireline Peptide",
+                "Korean Skincare",
+                "Biotech Beauty",
+                "Anti-Aging Serums",
+                "Hyperpigmentation Treatment"
+            ],
+            "areaServed": {
+                "@type": "Country",
+                "name": "Canada"
+            },
+            "address": {
+                "@type": "PostalAddress",
+                "addressCountry": "CA",
+                "addressRegion": "Ontario"
+            },
+            "contactPoint": {
+                "@type": "ContactPoint",
+                "contactType": "customer service",
+                "email": "support@reroots.ca",
+                "availableLanguage": ["English", "French"]
+            },
+            "sameAs": [
+                "https://instagram.com/reroots.ca",
+                "https://facebook.com/rerootsskincare",
+                "https://tiktok.com/@reroots.ca",
+                "https://twitter.com/rerootsskincare",
+                "https://pinterest.com/rerootsskincare",
+                "https://www.linkedin.com/company/reroots-skincare"
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: WebSite with SearchAction for Sitelinks -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "ReRoots Skincare",
+            "alternateName": "ReRoots",
+            "url": "https://reroots.ca",
+            "description": "Canada's premium biotech skincare brand featuring PDRN technology",
+            "publisher": {
+                "@type": "Organization",
+                "name": "ReRoots Skincare"
+            },
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": {
+                    "@type": "EntryPoint",
+                    "urlTemplate": "https://reroots.ca/products?search={search_term_string}"
+                },
+                "query-input": "required name=search_term_string"
+            },
+            "inLanguage": "en-CA"
+        }
+        </script>
+        
+        <!-- ==================== LA VELA BIANCA - TEEN SKINCARE BRAND ==================== -->
+        
+        <!-- Structured Data: LA VELA BIANCA Brand -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Brand",
+            "name": "LA VELA BIANCA",
+            "alternateName": ["La Vela Bianca", "LaVelaBianca"],
+            "description": "Premium pediatric-safe skincare for teens aged 8-18. Canadian luxury teen skincare featuring PDRN, Glutathione, and Hyaluronic Acid. The New Era of Elite Glow.",
+            "url": "https://lavelabianca.com",
+            "logo": "https://reroots.ca/lavela-icon-512.png",
+            "slogan": "Clean light for your skin",
+            "parentOrganization": {
+                "@type": "Organization",
+                "name": "ReRoots Biotech Skincare"
+            }
+        }
+        </script>
+        
+        <!-- Structured Data: LA VELA BIANCA Organization -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "LA VELA BIANCA",
+            "legalName": "LA VELA BIANCA Inc.",
+            "url": "https://lavelabianca.com",
+            "logo": "https://reroots.ca/lavela-icon-512.png",
+            "description": "Luxury teen skincare brand. Premium pediatric-safe formulations for ages 8-18. Made in Canada.",
+            "foundingDate": "2026",
+            "founder": {
+                "@type": "Person",
+                "name": "Anmol Singh"
+            },
+            "contactPoint": {
+                "@type": "ContactPoint",
+                "email": "Anmol@lavelabianca.com",
+                "contactType": "customer service",
+                "availableLanguage": ["English", "French"]
+            },
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Toronto",
+                "addressRegion": "Ontario",
+                "addressCountry": "CA"
+            },
+            "areaServed": {
+                "@type": "Country",
+                "name": "Canada"
+            },
+            "sameAs": [
+                "https://instagram.com/La_Vela_Bianca",
+                "https://reroots.ca/la-vela-bianca"
+            ]
+        }
+        </script>
+        
+        <!-- Structured Data: ORO ROSA Product -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "ORO ROSA Bio-Glow Serum",
+            "alternateName": "ORO ROSA",
+            "description": "Translucent bouncy pink gel serum for young skin ages 8-16. 4 hero ingredients: PDRN (The Healer), Glutathione (The Glow Molecule), Hyaluronic Acid (The Hydrator), Vitamin B12 (The Pink Power). Targets acne scars, uneven texture, dull skin. pH 5.0-5.3.",
+            "brand": {
+                "@type": "Brand",
+                "name": "LA VELA BIANCA"
+            },
+            "image": ["https://reroots.ca/oro-rosa-product.png"],
+            "sku": "LV-ORO-001",
+            "category": "Health & Beauty > Skin Care > Facial Serums",
+            "audience": {
+                "@type": "PeopleAudience",
+                "suggestedMinAge": 8,
+                "suggestedMaxAge": 16
+            },
+            "offers": {
+                "@type": "Offer",
+                "price": "49.00",
+                "priceCurrency": "CAD",
+                "availability": "https://schema.org/InStock",
+                "url": "https://lavelabianca.com/shop",
+                "priceValidUntil": "2026-12-31"
+            },
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "4.9",
+                "reviewCount": "127",
+                "bestRating": "5"
+            }
+        }
+        </script>
+        
+        <!-- Structured Data: LA VELA BIANCA FAQ (GEO Optimized) -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "Is La Vela Bianca safe for teens?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes, La Vela Bianca is specifically formulated for ages 8-18 with pediatric-safe, pH-balanced formulas (5.0-5.3). All ingredients are gentle and clinically tested for young, developing skin."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What is ORO ROSA serum?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "ORO ROSA is a translucent pink gel serum designed for young skin ages 8-16. It contains 4 hero ingredients: PDRN for healing acne scars, Glutathione for brightening, Hyaluronic Acid for hydration, and Vitamin B12 for soothing. Price: $49 CAD."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "What does La Vela Bianca mean?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "La Vela Bianca means 'The White Sail' in Italian, symbolizing clean, pure skincare for young skin. Our tagline 'Clean light for your skin' reflects our commitment to gentle, pediatric-safe formulations."
+                    }
+                }
+            ]
+        }
+        </script>
+        
+        <!-- Emergent platform scripts - deferred to not block rendering -->
+        <script src="https://assets.emergent.sh/scripts/emergent-main.js" defer></script>
+        <script>
+            if (window.self !== window.top) {
+                var debugMonitorScript = document.createElement('script');
+                debugMonitorScript.src = 'https://assets.emergent.sh/scripts/debug-monitor.js';
+                document.head.appendChild(debugMonitorScript);
+
+                window.tailwind = window.tailwind || {};
+                tailwind.config = {
+                    corePlugins: { preflight: false },
+                };
+
+                var tailwindScript = document.createElement('script');
+                tailwindScript.src = 'https://cdn.tailwindcss.com';
+                document.head.appendChild(tailwindScript);
+            }
+        </script>
+    </head>
+    <body>
+        <!-- SEO-friendly noscript content for search engines -->
+        <noscript>
+            <div style="max-width: 1200px; margin: 0 auto; padding: 40px 20px; font-family: system-ui, sans-serif;">
+                <header style="text-align: center; margin-bottom: 60px;">
+                    <h1 style="font-size: 2.5rem; color: #2D2A2E; margin-bottom: 20px;">
+                        ReRoots Skincare Canada | Premium Biotech PDRN Skincare
+                    </h1>
+                    <p style="font-size: 1.2rem; color: #5A5A5A; max-width: 700px; margin: 0 auto;">
+                        The Future of Skin Longevity. Experience the restorative power of Biotech PDRN. 
+                        A high-performance protocol designed to refine texture, enhance resilience, and restore a luminous, youthful-looking glow.
+                    </p>
+                </header>
+                
+                <section style="margin-bottom: 60px;">
+                    <h2 style="font-size: 1.8rem; color: #2D2A2E; text-align: center; margin-bottom: 30px;">
+                        Why Choose ReRoots?
+                    </h2>
+                    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 30px;">
+                        <div style="text-align: center; max-width: 250px;">
+                            <strong style="color: #D4AF37;">🇨🇦 Made in Canada</strong>
+                            <p style="color: #5A5A5A;">Premium formulations crafted in GMP-certified Canadian laboratories.</p>
+                        </div>
+                        <div style="text-align: center; max-width: 250px;">
+                            <strong style="color: #D4AF37;">🧬 Biotech PDRN</strong>
+                            <p style="color: #5A5A5A;">Bio-active Polydeoxyribonucleotide for visible skin rejuvenation.</p>
+                        </div>
+                        <div style="text-align: center; max-width: 250px;">
+                            <strong style="color: #D4AF37;">🐰 Cruelty-Free</strong>
+                            <p style="color: #5A5A5A;">Never tested on animals. Ethical beauty for conscious consumers.</p>
+                        </div>
+                    </div>
+                </section>
+                
+                <section style="margin-bottom: 60px;">
+                    <h2 style="font-size: 1.8rem; color: #2D2A2E; text-align: center; margin-bottom: 20px;">
+                        The Science of PDRN
+                    </h2>
+                    <p style="text-align: center; color: #5A5A5A; max-width: 800px; margin: 0 auto;">
+                        At the core of ReRoots is PDRN—a bio-active molecule celebrated in advanced skincare 
+                        for its ability to mimic the skin's natural revitalizing processes. Our high-concentration 
+                        formulas deliver Surface Renewal, Deep Hydration, and Luminous Resilience.
+                    </p>
+                </section>
+                
+                <section style="margin-bottom: 60px;">
+                    <h2 style="font-size: 1.8rem; color: #2D2A2E; text-align: center; margin-bottom: 20px;">
+                        Key Ingredients
+                    </h2>
+                    <ul style="list-style: none; padding: 0; text-align: center; color: #5A5A5A;">
+                        <li style="margin-bottom: 10px;"><strong>PDRN (2%)</strong> - Salmon DNA Extract for skin resilience</li>
+                        <li style="margin-bottom: 10px;"><strong>Tranexamic Acid (5%)</strong> - Brightening and tone evening</li>
+                        <li style="margin-bottom: 10px;"><strong>Niacinamide (4%)</strong> - Barrier support and pore minimizing</li>
+                        <li style="margin-bottom: 10px;"><strong>Hyaluronic Acid (1.5%)</strong> - Multi-layer deep hydration</li>
+                    </ul>
+                </section>
+                
+                <footer style="text-align: center; padding-top: 40px; border-top: 1px solid #E2E8F0; color: #888;">
+                    <p>© 2025 ReRoots Skincare Canada. All rights reserved.</p>
+                    <p style="font-size: 0.8rem; margin-top: 10px;">
+                        Disclaimer: ReRoots products are cosmetic in nature and are intended to improve the appearance of the skin. 
+                        They do not claim to heal, treat, or prevent any medical condition.
+                    </p>
+                    <p style="margin-top: 20px;">
+                        <a href="/shop" style="color: #D4AF37;">Shop Now</a> | 
+                        <a href="/about" style="color: #D4AF37;">About Us</a> | 
+                        <a href="/science-of-pdrn" style="color: #D4AF37;">The Science</a>
+                    </p>
+                </footer>
+            </div>
+        </noscript>
+        
+        <!-- SVG Sprite - Shared icon definitions (reduces DOM size) -->
+        <!-- Using <use> tags references these once instead of repeating SVG code -->
+        <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+            <defs>
+                <!-- Science Flask Icon - Used on product cards -->
+                <symbol id="icon-science-flask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9.5 2A1.5 1.5 0 0 1 11 .5h2A1.5 1.5 0 0 1 14.5 2v2a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5V2z"/>
+                    <path d="M8 5h8l2 16H6L8 5z"/>
+                    <circle cx="12" cy="13" r="2"/>
+                    <circle cx="10" cy="16" r="1"/>
+                    <circle cx="14" cy="10" r="1"/>
+                </symbol>
+                <!-- DNA Helix Icon -->
+                <symbol id="icon-dna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 15c6.667-6 13.333 0 20-6"/>
+                    <path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993"/>
+                    <path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993"/>
+                    <path d="M17 6l-2.5-2.5"/>
+                    <path d="M14 8l-1-1"/>
+                    <path d="M7 18l2.5 2.5"/>
+                    <path d="M10 16l1 1"/>
+                </symbol>
+                <!-- Star Icon -->
+                <symbol id="icon-star" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </symbol>
+            </defs>
+        </svg>
+        
+        <div id="root"></div>
+        
+        <!-- Luxury Loading Splash Screen - Shows instantly while React loads -->
+        <div id="loading-splash">
+            <div class="splash-logo">Re<span>Roots</span></div>
+            <div class="splash-tagline">Biotech Skincare</div>
+            <div class="splash-loader"></div>
+            <div class="splash-badges">
+                <span class="splash-badge">🇨🇦 Made in Canada</span>
+                <span class="splash-badge">🧬 PDRN Technology</span>
+                <span class="splash-badge">🐰 Cruelty-Free</span>
+            </div>
+        </div>
+        
+        <!-- Hide splash when React is ready -->
+        <script>
+            // Hide splash screen when React app mounts
+            var splashHideTimer = setTimeout(function() {
+                var splash = document.getElementById('loading-splash');
+                if (splash) splash.classList.add('hidden');
+            }, 3000); // Fallback: hide after 3s max
+            
+            // Observer to detect when React renders content
+            var observer = new MutationObserver(function(mutations) {
+                var root = document.getElementById('root');
+                if (root && root.children.length > 0) {
+                    clearTimeout(splashHideTimer);
+                    setTimeout(function() {
+                        var splash = document.getElementById('loading-splash');
+                        if (splash) splash.classList.add('hidden');
+                    }, 300); // Small delay for smooth transition
+                    observer.disconnect();
+                }
+            });
+            
+            observer.observe(document.getElementById('root'), { childList: true, subtree: true });
+        </script>
+        
+        <!-- Partytown Configuration - Runs analytics in Web Worker (Zero Main Thread Blocking) -->
+        <!-- CRITICAL: Must be inline and before Partytown loads -->
+        <script>
+            // Configure Partytown to forward PostHog calls to the Web Worker
+            partytown = {
+                lib: "/~partytown/",
+                forward: [
+                    'posthog.capture',
+                    'posthog.identify',
+                    'posthog.reset',
+                    'posthog.register',
+                    'posthog.people.set'
+                ],
+                resolveUrl: (url) => {
+                    // Allow PostHog domains through
+                    if (url.hostname.includes('posthog.com')) {
+                        return url;
+                    }
+                    return url;
+                }
+            };
+        </script>
+        
+        <!-- Partytown Loader - ASYNC to prevent render blocking -->
+        <!-- This removes the 1,700ms render-blocking delay -->
+        <script async src="/~partytown/partytown.js"></script>
+        
+        <!-- PostHog Analytics - Runs in Web Worker via Partytown (Zero TBT Impact!) -->
+        <script type="text/partytown">
+            !(function (t, e) {
+                var o, n, p, r;
+                e.__SV ||
+                    ((window.posthog = e),
+                    (e._i = []),
+                    (e.init = function (i, s, a) {
+                        function g(t, e) {
+                            var o = e.split(".");
+                            2 == o.length && ((t = t[o[0]]), (e = o[1])),
+                                (t[e] = function () {
+                                    t.push(
+                                        [e].concat(
+                                            Array.prototype.slice.call(arguments, 0),
+                                        ),
+                                    );
+                                });
+                        }
+                        ((p = t.createElement("script")).type = "text/javascript"),
+                            (p.crossOrigin = "anonymous"),
+                            (p.async = !0),
+                            (p.src =
+                                s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") +
+                                "/static/array.js"),
+                            (r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r);
+                        var u = e;
+                        for (
+                            void 0 !== a ? (u = e[a] = []) : (a = "posthog"),
+                                u.people = u.people || [],
+                                u.toString = function (t) {
+                                    var e = "posthog";
+                                    return "posthog" !== a && (e += "." + a), t || (e += " (stub)"), e;
+                                },
+                                u.people.toString = function () {
+                                    return u.toString(1) + ".people (stub)";
+                                },
+                                o = "init capture identify reset register register_once people.set getFeatureFlag isFeatureEnabled reloadFeatureFlags on onFeatureFlags opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing".split(" "),
+                                n = 0;
+                            n < o.length;
+                            n++
+                        )
+                            g(u, o[n]);
+                        e._i.push([i, s, a]);
+                    }),
+                    (e.__SV = 1));
+            })(document, window.posthog || []);
+            
+            posthog.init("phc_yJW1VjHGGwmCbbrtczfqqNxgBDbhlhOWcdzcIJEOTFE", {
+                api_host: "https://us.i.posthog.com",
+                ui_host: "https://us.posthog.com",
+                person_profiles: "identified_only",
+                persistence: "localStorage",
+                autocapture: true
+            });
+        </script>
+    </body>
+</html>

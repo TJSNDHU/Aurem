@@ -1,0 +1,62 @@
+{
+  "name": "ReRoots AI",
+  "short_name": "ReRoots",
+  "description": "Luxury Biotech Skincare — Your Encrypted Skin Intelligence",
+  "id": "ca.reroots.ai",
+  "start_url": "/pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait-primary",
+  "lang": "en-CA",
+  "prefer_related_applications": false,
+  "categories": ["shopping", "beauty", "lifestyle", "health"],
+  "icons": [
+    {"src": "/icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-128x128.png", "sizes": "128x128", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-144x144.png", "sizes": "144x144", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-152x152.png", "sizes": "152x152", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/icons/icon-384x384.png", "sizes": "384x384", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {
+      "name": "AI Skin Consultant",
+      "short_name": "Consult",
+      "description": "Voice-powered skincare advisor",
+      "url": "/pwa?tab=consult",
+      "icons": [{"src": "/icons/icon-96x96.png", "sizes": "96x96"}]
+    },
+    {
+      "name": "Skin Progress",
+      "short_name": "Progress",
+      "description": "Your encrypted skin journey",
+      "url": "/pwa?tab=progress",
+      "icons": [{"src": "/icons/icon-96x96.png", "sizes": "96x96"}]
+    },
+    {
+      "name": "Shop AURA-GEN",
+      "short_name": "Shop",
+      "description": "Browse the AURA-GEN skincare series",
+      "url": "/pwa?tab=shop",
+      "icons": [{"src": "/icons/icon-96x96.png", "sizes": "96x96"}]
+    }
+  ],
+  "launch_handler": {"client_mode": "navigate-existing"},
+  "handle_links": "preferred",
+  "edge_side_panel": {"preferred_width": 400},
+  "screenshots": [
+    {
+      "src": "/screenshots/pwa-home.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "ReRoots AI Home"
+    }
+  ]
+}

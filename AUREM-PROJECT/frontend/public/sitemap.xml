@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <!-- ==================== REROOTS BIOTECH SKINCARE SITEMAP ==================== -->
+  <!-- Canadian PDRN Skincare Brand - reroots.ca -->
+  <!-- Last Updated: March 7, 2026 -->
+  
+  <!-- ==================== MAIN PAGES ==================== -->
+  
+  <!-- Homepage -->
+  <url>
+    <loc>https://reroots.ca/</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://customer-assets.emergentagent.com/job_a381cf1d-579d-4c54-9ee9-c2aab86c5628/artifacts/2n6enhsj_1769103145313.png</image:loc>
+      <image:title>ReRoots Biotech Skincare - Canada's Premium PDRN Brand</image:title>
+      <image:caption>Canadian biotech skincare featuring PDRN technology for skin regeneration</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- Shop Page -->
+  <url>
+    <loc>https://reroots.ca/shop</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  
+  <!-- Products Listing -->
+  <url>
+    <loc>https://reroots.ca/products</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  
+  <!-- ==================== PRODUCT PAGES ==================== -->
+  
+  <!-- AURA-GEN (Flagship Product) -->
+  <url>
+    <loc>https://reroots.ca/products/prod-aura-gen</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://customer-assets.emergentagent.com/job_mission-control-84/artifacts/a4671ebm_1767158945864.jpg</image:loc>
+      <image:title>AURA-GEN PDRN + TXA + ARGIRELINE 17.0% Active Recovery Complex</image:title>
+      <image:caption>ReRoots AURA-GEN featuring 2% PDRN (Salmon DNA), 5% Tranexamic Acid, and 10% Argireline - $179 CAD</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- ==================== INFORMATIONAL PAGES ==================== -->
+  
+  <!-- About Page -->
+  <url>
+    <loc>https://reroots.ca/about</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Science Page -->
+  <url>
+    <loc>https://reroots.ca/science</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  
+  <!-- PDRN Comparison Guide (AI/GEO Optimized) -->
+  <url>
+    <loc>https://reroots.ca/pdrn-comparison-guide</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- Science Glossary (AEO Optimized) -->
+  <url>
+    <loc>https://reroots.ca/science-glossary</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  
+  <!-- FAQ Page -->
+  <url>
+    <loc>https://reroots.ca/faq</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Contact Page -->
+  <url>
+    <loc>https://reroots.ca/contact</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- Blog -->
+  <url>
+    <loc>https://reroots.ca/blog</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- ==================== MARKETING & CONVERSION PAGES ==================== -->
+  
+  <!-- Bio-Age Skin Quiz -->
+  <url>
+    <loc>https://reroots.ca/Bio-Age-Repair-Scan</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://static.prod-images.emergentagent.com/jobs/152b37c3-2aad-48f3-9f9e-f8d67e2eff9a/images/c3ac33107642e567d63840f95aab09e2d23094545b0c8e4c8da2b9e32fe1990c.png</image:loc>
+      <image:title>Bio-Age Skin Quiz - How Old Is Your Skin?</image:title>
+      <image:caption>Take this 60-second quiz to discover your skin's REAL biological age</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- Waitlist Page -->
+  <url>
+    <loc>https://reroots.ca/waitlist</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- Become Partner Page -->
+  <url>
+    <loc>https://reroots.ca/become-partner</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- Influencer Page -->
+  <url>
+    <loc>https://reroots.ca/influencer</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- ==================== POLICY & LEGAL PAGES ==================== -->
+  
+  <!-- Return Policy -->
+  <url>
+    <loc>https://reroots.ca/return-policy</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- Shipping Policy -->
+  <url>
+    <loc>https://reroots.ca/shipping-policy</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- Privacy Policy -->
+  <url>
+    <loc>https://reroots.ca/privacy</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  
+  <!-- Terms of Service -->
+  <url>
+    <loc>https://reroots.ca/terms</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- ==================== AURA-GEN 30-DAY PROTOCOL PAGES ==================== -->
+  <!-- Shareable product education pages for AURA-GEN line -->
+  
+  <!-- AURA-GEN Combo Protocol (Serum + Cream) -->
+  <url>
+    <loc>https://reroots.ca/aura-gen-protocol</loc>
+    <lastmod>2026-03-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://customer-assets.emergentagent.com/job_mission-control-84/artifacts/a4671ebm_1767158945864.jpg</image:loc>
+      <image:title>AURA-GEN 30-Day Combo Protocol - Serum + Cream Synergy</image:title>
+      <image:caption>Complete 30-day protocol for AURA-GEN Serum and Accelerator Cream combination - maximum results skincare routine</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- AURA-GEN Combo Protocol - Alternate URL -->
+  <url>
+    <loc>https://reroots.ca/combo-protocol</loc>
+    <lastmod>2026-03-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  
+  <!-- AURA-GEN Serum Protocol (Standalone) -->
+  <url>
+    <loc>https://reroots.ca/aura-gen-serum-protocol</loc>
+    <lastmod>2026-03-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://customer-assets.emergentagent.com/job_mission-control-84/artifacts/a4671ebm_1767158945864.jpg</image:loc>
+      <image:title>AURA-GEN Serum 30-Day Protocol - PDRN Recovery Complex</image:title>
+      <image:caption>Complete 30-day protocol for standalone AURA-GEN Serum with PDRN, TXA, and Argireline</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- AURA-GEN Serum Protocol - Alternate URL -->
+  <url>
+    <loc>https://reroots.ca/serum-protocol</loc>
+    <lastmod>2026-03-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  
+  <!-- AURA-GEN Cream Protocol (Standalone) -->
+  <url>
+    <loc>https://reroots.ca/aura-gen-cream-protocol</loc>
+    <lastmod>2026-03-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://customer-assets.emergentagent.com/job_mission-control-84/artifacts/a4671ebm_1767158945864.jpg</image:loc>
+      <image:title>AURA-GEN Accelerator Cream 30-Day Protocol - Triple Peptide Complex</image:title>
+      <image:caption>Complete 30-day protocol for AURA-GEN Accelerator Rich Cream with Mandelic, HPR, Bakuchiol, and Matrixyl 3000</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- AURA-GEN Cream Protocol - Alternate URL -->
+  <url>
+    <loc>https://reroots.ca/cream-protocol</loc>
+    <lastmod>2026-03-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- ==================== LA VELA BIANCA - TEEN SKINCARE BRAND ==================== -->
+  
+  <!-- La Vela Bianca Homepage (Primary Domain) -->
+  <url>
+    <loc>https://lavelabianca.com</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://reroots.ca/lavela-icon-512.png</image:loc>
+      <image:title>LA VELA BIANCA - Luxury Teen Skincare</image:title>
+      <image:caption>Premium pediatric-safe skincare for teens aged 8-18 - The New Era of Elite Glow</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- La Vela Bianca - Alternative URL -->
+  <url>
+    <loc>https://reroots.ca/la-vela-bianca</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- La Vela Bianca - ORO ROSA Product -->
+  <url>
+    <loc>https://lavelabianca.com/shop</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://reroots.ca/oro-rosa-product.png</image:loc>
+      <image:title>ORO ROSA Bio-Glow Serum - Teen Skincare</image:title>
+      <image:caption>Premium teen skincare serum with PDRN, Glutathione, Hyaluronic Acid - $49 CAD</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- La Vela Bianca - The Lab -->
+  <url>
+    <loc>https://lavelabianca.com/the-lab</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- La Vela Bianca - Glow Club -->
+  <url>
+    <loc>https://lavelabianca.com/glow-club</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- La Vela Bianca - About -->
+  <url>
+    <loc>https://lavelabianca.com/about</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+</urlset>

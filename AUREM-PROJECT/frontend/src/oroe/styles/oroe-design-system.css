@@ -1,0 +1,333 @@
+/**
+ * OROÉ Design System - CSS Variables
+ * ═══════════════════════════════════════════════════════════════════
+ * Luxury Biotech Skincare | Polaris Built Inc.
+ * Generated with ui-ux-pro-max design intelligence
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;500;600;700&family=Jost:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* ═══════════════════════════════════════════════════════════════════
+     BACKGROUNDS - Obsidian Black Scale
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-bg-deep: #020203;
+  --oroe-bg-base: #050506;
+  --oroe-bg-elevated: #0a0a0c;
+  --oroe-bg-card: #0f0f11;
+  --oroe-bg-hover: #141416;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     GOLD ACCENTS - Warm Gold Scale
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-gold-dark: #A16207;      /* WCAG compliant for text on dark */
+  --oroe-gold: #D4AF37;           /* Primary gold */
+  --oroe-gold-light: #F5DEB3;     /* Light gold / ivory */
+  --oroe-gold-glow: rgba(212, 175, 55, 0.15);
+  --oroe-gold-glow-strong: rgba(212, 175, 55, 0.25);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     TEXT COLORS
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-text-primary: #FFFFFF;
+  --oroe-text-secondary: #A3A3A3;
+  --oroe-text-muted: #6B6B6B;
+  --oroe-text-gold: #D4AF37;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     BORDERS
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-border-subtle: rgba(255, 255, 255, 0.08);
+  --oroe-border-medium: rgba(255, 255, 255, 0.12);
+  --oroe-border-gold: rgba(212, 175, 55, 0.3);
+  --oroe-border-gold-strong: rgba(212, 175, 55, 0.5);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PRODUCT ACCENTS
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-age-reversal: #D4AF37;   /* Gold */
+  --oroe-brightshield: #F5DEB3;   /* Ivory */
+  --oroe-cleartech: #C0C0C0;      /* Silver */
+
+  /* ═══════════════════════════════════════════════════════════════════
+     TYPOGRAPHY
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-font-display: 'Bodoni Moda', serif;
+  --oroe-font-body: 'Jost', sans-serif;
+
+  /* Font Sizes */
+  --oroe-text-xs: 0.75rem;     /* 12px */
+  --oroe-text-sm: 0.875rem;    /* 14px */
+  --oroe-text-base: 1.125rem;  /* 18px */
+  --oroe-text-lg: 1.25rem;     /* 20px */
+  --oroe-text-xl: 1.5rem;      /* 24px */
+  --oroe-text-2xl: 2rem;       /* 32px */
+  --oroe-text-3xl: 3rem;       /* 48px */
+  --oroe-text-4xl: 4.5rem;     /* 72px */
+
+  /* Font Weights */
+  --oroe-font-light: 300;
+  --oroe-font-regular: 400;
+  --oroe-font-medium: 500;
+  --oroe-font-semibold: 600;
+  --oroe-font-bold: 700;
+
+  /* Letter Spacing */
+  --oroe-tracking-tight: -0.02em;
+  --oroe-tracking-normal: 0;
+  --oroe-tracking-wide: 0.05em;
+  --oroe-tracking-wider: 0.1em;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     SPACING
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-space-xs: 0.5rem;     /* 8px */
+  --oroe-space-sm: 1rem;       /* 16px */
+  --oroe-space-md: 1.5rem;     /* 24px */
+  --oroe-space-lg: 2rem;       /* 32px */
+  --oroe-space-xl: 3rem;       /* 48px */
+  --oroe-space-2xl: 4rem;      /* 64px */
+  --oroe-space-3xl: 6rem;      /* 96px */
+  --oroe-space-4xl: 7.5rem;    /* 120px */
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LAYOUT
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-max-width: 1200px;
+  --oroe-max-width-narrow: 800px;
+  --oroe-max-width-wide: 1400px;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     EFFECTS
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-radius-sm: 4px;
+  --oroe-radius-md: 8px;
+  --oroe-radius-lg: 12px;
+
+  --oroe-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --oroe-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --oroe-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --oroe-shadow-gold: 0 0 30px var(--oroe-gold-glow);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     TRANSITIONS
+     ═══════════════════════════════════════════════════════════════════ */
+  --oroe-transition-fast: 150ms ease;
+  --oroe-transition-base: 300ms ease;
+  --oroe-transition-slow: 600ms ease;
+  --oroe-easing-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.oroe-page {
+  background: var(--oroe-bg-deep);
+  color: var(--oroe-text-primary);
+  font-family: var(--oroe-font-body);
+  font-size: var(--oroe-text-base);
+  font-weight: var(--oroe-font-light);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.oroe-h1 {
+  font-family: var(--oroe-font-display);
+  font-size: var(--oroe-text-4xl);
+  font-weight: var(--oroe-font-regular);
+  letter-spacing: var(--oroe-tracking-tight);
+  line-height: 1.1;
+}
+
+.oroe-h2 {
+  font-family: var(--oroe-font-display);
+  font-size: var(--oroe-text-3xl);
+  font-weight: var(--oroe-font-regular);
+  letter-spacing: var(--oroe-tracking-tight);
+  line-height: 1.2;
+}
+
+.oroe-h3 {
+  font-family: var(--oroe-font-display);
+  font-size: var(--oroe-text-2xl);
+  font-weight: var(--oroe-font-medium);
+  line-height: 1.3;
+}
+
+.oroe-body {
+  font-family: var(--oroe-font-body);
+  font-size: var(--oroe-text-base);
+  font-weight: var(--oroe-font-light);
+  line-height: 1.7;
+}
+
+.oroe-caption {
+  font-family: var(--oroe-font-body);
+  font-size: var(--oroe-text-sm);
+  font-weight: var(--oroe-font-regular);
+  letter-spacing: var(--oroe-tracking-wide);
+  text-transform: uppercase;
+  color: var(--oroe-text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUTTON STYLES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.oroe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 40px;
+  font-family: var(--oroe-font-body);
+  font-size: var(--oroe-text-sm);
+  font-weight: var(--oroe-font-medium);
+  letter-spacing: var(--oroe-tracking-wider);
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--oroe-transition-base) var(--oroe-easing-smooth);
+}
+
+.oroe-btn-primary {
+  border-color: var(--oroe-gold);
+  color: var(--oroe-gold);
+}
+
+.oroe-btn-primary:hover {
+  background: var(--oroe-gold-glow);
+  box-shadow: var(--oroe-shadow-gold);
+}
+
+.oroe-btn-secondary {
+  border-color: var(--oroe-border-subtle);
+  color: var(--oroe-text-secondary);
+}
+
+.oroe-btn-secondary:hover {
+  border-color: var(--oroe-border-medium);
+  color: var(--oroe-text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION LAYOUTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+.oroe-section {
+  padding: var(--oroe-space-4xl) var(--oroe-space-lg);
+}
+
+.oroe-container {
+  max-width: var(--oroe-max-width);
+  margin: 0 auto;
+}
+
+.oroe-hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.oroe-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(2, 2, 3, 0.4) 0%,
+    rgba(2, 2, 3, 0.8) 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CARD STYLES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.oroe-card {
+  background: var(--oroe-bg-card);
+  border: 1px solid var(--oroe-border-subtle);
+  border-radius: var(--oroe-radius-md);
+  padding: var(--oroe-space-lg);
+  transition: all var(--oroe-transition-base);
+}
+
+.oroe-card:hover {
+  border-color: var(--oroe-border-gold);
+  box-shadow: var(--oroe-shadow-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes oroe-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.oroe-fade-in {
+  animation: oroe-fade-in 600ms var(--oroe-easing-smooth) forwards;
+}
+
+@keyframes oroe-gold-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--oroe-gold-glow);
+  }
+  50% {
+    box-shadow: 0 0 40px var(--oroe-gold-glow-strong);
+  }
+}
+
+.oroe-gold-pulse {
+  animation: oroe-gold-pulse 3s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  :root {
+    --oroe-text-4xl: 3rem;
+    --oroe-text-3xl: 2rem;
+    --oroe-text-2xl: 1.5rem;
+    --oroe-space-4xl: 4rem;
+  }
+  
+  .oroe-btn {
+    padding: 14px 28px;
+    width: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,203 @@
+/* Multi-Tenant Brand Theming System */
+/* This file provides CSS custom properties for brand-specific styling */
+
+:root {
+  /* Default brand colors (ReRoots) */
+  --brand-primary: #F8A5B8;
+  --brand-secondary: #4a7c59;
+  --brand-accent: #E88DA0;
+  --brand-bg: #FDF9F9;
+  --brand-text: #2D2A2E;
+  --brand-text-muted: #5A5A5A;
+}
+
+/* ============================================
+   REROOTS THEME
+   ============================================ */
+.theme-reroots {
+  --brand-primary: #F8A5B8;
+  --brand-secondary: #4a7c59;
+  --brand-accent: #E88DA0;
+  --brand-bg: #FDF9F9;
+  --brand-text: #2D2A2E;
+  --brand-text-muted: #5A5A5A;
+  
+  /* Gradients */
+  --brand-gradient: linear-gradient(135deg, #F8A5B8 0%, #E88DA0 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #FDF9F9 0%, #FCE8EC 100%);
+  
+  /* Button styles */
+  --btn-primary-bg: #F8A5B8;
+  --btn-primary-hover: #E88DA0;
+  --btn-primary-text: white;
+  
+  /* Card styles */
+  --card-bg: white;
+  --card-border: rgba(248, 165, 184, 0.2);
+  --card-shadow: 0 4px 6px -1px rgba(248, 165, 184, 0.1);
+}
+
+/* ============================================
+   LA VELA BIANCA THEME
+   ============================================ */
+.theme-lavela {
+  --brand-primary: #0D4D4D;
+  --brand-secondary: #D4A574;
+  --brand-accent: #E8C4B8;
+  --brand-bg: #0D4D4D;
+  --brand-text: #FDF8F5;
+  --brand-text-muted: #E8C4B8;
+  
+  /* La Vela specific colors */
+  --lavela-teal-deep: #0D4D4D;
+  --lavela-teal: #1A6B6B;
+  --lavela-rose-gold: #D4A574;
+  --lavela-rose: #E8C4B8;
+  --lavela-cream: #FDF8F5;
+  
+  /* Gradients - Midnight to Dawn */
+  --brand-gradient: linear-gradient(135deg, #0D4D4D 0%, #1A6B6B 40%, #D4A090 80%, #E8C4B8 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #0D4D4D 0%, #1A6B6B 100%);
+  
+  /* Button styles - Rose Gold */
+  --btn-primary-bg: #D4A574;
+  --btn-primary-hover: #E6BE8A;
+  --btn-primary-text: #0D4D4D;
+  
+  /* Card styles */
+  --card-bg: rgba(26, 107, 107, 0.3);
+  --card-border: rgba(212, 165, 116, 0.3);
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   BRAND-AWARE UTILITY CLASSES
+   ============================================ */
+
+/* Backgrounds */
+.bg-brand {
+  background-color: var(--brand-bg);
+}
+
+.bg-brand-primary {
+  background-color: var(--brand-primary);
+}
+
+.bg-brand-gradient {
+  background: var(--brand-gradient);
+}
+
+/* Text */
+.text-brand {
+  color: var(--brand-text);
+}
+
+.text-brand-primary {
+  color: var(--brand-primary);
+}
+
+.text-brand-secondary {
+  color: var(--brand-secondary);
+}
+
+.text-brand-muted {
+  color: var(--brand-text-muted);
+}
+
+/* Borders */
+.border-brand {
+  border-color: var(--brand-primary);
+}
+
+.border-brand-secondary {
+  border-color: var(--brand-secondary);
+}
+
+/* Buttons */
+.btn-brand {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  transition: all 0.2s ease;
+}
+
+.btn-brand:hover {
+  background-color: var(--btn-primary-hover);
+}
+
+/* Cards */
+.card-brand {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+/* ============================================
+   LA VELA SPECIFIC OVERRIDES
+   ============================================ */
+.theme-lavela body,
+.theme-lavela .app-container {
+  background-color: var(--lavela-teal-deep);
+  color: var(--lavela-cream);
+}
+
+.theme-lavela .navbar {
+  background: linear-gradient(180deg, rgba(13, 77, 77, 0.95) 0%, rgba(13, 77, 77, 0.8) 100%);
+  backdrop-filter: blur(10px);
+}
+
+.theme-lavela .footer {
+  background-color: var(--lavela-teal-deep);
+  border-top: 1px solid rgba(212, 165, 116, 0.2);
+}
+
+/* La Vela button overrides */
+.theme-lavela .btn-primary,
+.theme-lavela button[data-brand="primary"] {
+  background-color: var(--lavela-rose-gold);
+  color: var(--lavela-teal-deep);
+  font-weight: 500;
+}
+
+.theme-lavela .btn-primary:hover {
+  background-color: var(--lavela-rose);
+}
+
+/* La Vela input overrides */
+.theme-lavela input,
+.theme-lavela textarea,
+.theme-lavela select {
+  background-color: rgba(26, 107, 107, 0.5);
+  border-color: rgba(212, 165, 116, 0.3);
+  color: var(--lavela-cream);
+}
+
+.theme-lavela input::placeholder,
+.theme-lavela textarea::placeholder {
+  color: rgba(253, 248, 245, 0.5);
+}
+
+.theme-lavela input:focus,
+.theme-lavela textarea:focus {
+  border-color: var(--lavela-rose-gold);
+  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.2);
+}
+
+/* ============================================
+   RESPONSIVE BRAND ADJUSTMENTS
+   ============================================ */
+@media (max-width: 768px) {
+  .theme-lavela .mobile-nav {
+    background: var(--lavela-teal-deep);
+  }
+}
+
+/* ============================================
+   TRANSITION ANIMATIONS BETWEEN BRANDS
+   ============================================ */
+html {
+  transition: background-color 0.3s ease;
+}
+
+body {
+  transition: color 0.3s ease, background-color 0.3s ease;
+}

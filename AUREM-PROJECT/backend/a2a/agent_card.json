@@ -1,0 +1,90 @@
+{
+  "name": "Reroots AI",
+  "description": "AI skincare advisor for beauty and skincare brands. Provides personalized product recommendations, skin analysis, order management, and customer support.",
+  "url": "https://reroots.ca/api/a2a",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Reroots Aesthetics Inc.",
+    "url": "https://reroots.ca"
+  },
+  "authentication": {
+    "schemes": ["Bearer", "API-Key"],
+    "instructions": "Contact Reroots Aesthetics to obtain API credentials"
+  },
+  "defaultInputModes": ["text", "text/plain"],
+  "defaultOutputModes": ["text", "text/plain"],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": true,
+    "stateTransitionHistory": true
+  },
+  "skills": [
+    {
+      "id": "skincare_advice",
+      "name": "Skincare Advice",
+      "description": "Provides personalized skincare recommendations based on skin type, concerns, and goals",
+      "tags": ["skincare", "beauty", "recommendations", "consultation"],
+      "examples": [
+        "What products do you recommend for dry, sensitive skin?",
+        "I have acne-prone skin with hyperpigmentation. What should I use?",
+        "Can you create a morning skincare routine for me?"
+      ]
+    },
+    {
+      "id": "skin_analysis",
+      "name": "Skin Analysis",
+      "description": "Analyzes skin photos to identify skin type, concerns, and recommend products",
+      "tags": ["analysis", "vision", "multimodal", "photo"],
+      "inputModes": ["image/jpeg", "image/png", "image/webp"],
+      "examples": [
+        "Analyze this photo of my skin",
+        "What skin concerns do you see in this image?"
+      ]
+    },
+    {
+      "id": "order_management",
+      "name": "Order Management",
+      "description": "Checks order status, shipping tracking, and handles order-related inquiries",
+      "tags": ["orders", "shipping", "tracking", "ecommerce"],
+      "examples": [
+        "Where is my order?",
+        "Can you check the status of order #12345?",
+        "When will my package arrive?"
+      ]
+    },
+    {
+      "id": "inventory_check",
+      "name": "Inventory Check",
+      "description": "Checks product availability and stock levels",
+      "tags": ["inventory", "stock", "availability"],
+      "examples": [
+        "Is AURA-GEN in stock?",
+        "Do you have the ARC Serum available?"
+      ]
+    },
+    {
+      "id": "product_info",
+      "name": "Product Information",
+      "description": "Provides detailed information about skincare products including ingredients, usage, and benefits",
+      "tags": ["products", "ingredients", "information"],
+      "examples": [
+        "What are the ingredients in AURA-GEN?",
+        "How do I use the TXA Serum?",
+        "What are the benefits of PDRN?"
+      ]
+    },
+    {
+      "id": "supplier_order",
+      "name": "Supplier Reorder",
+      "description": "Places reorder requests with suppliers when stock is low (B2B)",
+      "tags": ["b2b", "supplier", "reorder", "procurement"],
+      "authentication": {
+        "required": true,
+        "schemes": ["API-Key"]
+      }
+    }
+  ],
+  "supportedLanguages": ["en", "fr"],
+  "privacyPolicy": "https://reroots.ca/privacy",
+  "termsOfService": "https://reroots.ca/terms"
+}
