@@ -66,7 +66,7 @@ class ProactiveFollowUpEngine:
         timing: FollowUpTiming = FollowUpTiming.HOUR_24
     ) -> List[Dict[str, Any]]:
         """Find conversations that need follow-up based on timing"""
-        if not self.db:
+        if self.db is None:
             return []
         
         # Calculate time threshold
@@ -230,7 +230,7 @@ Guidelines:
         )
         
         # Update customer follow-up tracking
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_customers.update_one(
                 {"customer_id": customer_id},
                 {
@@ -323,7 +323,7 @@ Guidelines:
         notes: str = ""
     ) -> bool:
         """Update the follow-up status of a conversation"""
-        if not self.db:
+        if self.db is None:
             return False
         
         result = await self.db.aurem_customers.update_one(
@@ -347,6 +347,6 @@ def get_followup_engine(db=None):
     global _followup_engine
     if _followup_engine is None:
         _followup_engine = ProactiveFollowUpEngine(db)
-    elif db and _followup_engine.db is None:
+    elif db is not None and _followup_engine.db is None:
         _followup_engine.db = db
     return _followup_engine

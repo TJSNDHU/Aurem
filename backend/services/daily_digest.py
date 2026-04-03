@@ -100,7 +100,7 @@ class DailyDigestEngine:
         )
         
         # Store in database
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_digest_events.insert_one(event.dict())
         
         # If CRITICAL priority, send real-time alert
@@ -129,7 +129,7 @@ class DailyDigestEngine:
         
         # Get all events in time range
         events = []
-        if self.db:
+        if self.db is not None:
             cursor = self.db.aurem_digest_events.find({
                 "business_id": business_id,
                 "timestamp": {"$gte": start_time, "$lt": end_time}
@@ -308,7 +308,7 @@ Be specific and actionable. Focus on what matters."""
             "revenue_opportunities": 0
         }
         
-        if not self.db:
+        if self.db is None:
             return metrics
         
         try:
@@ -433,6 +433,6 @@ def get_digest_engine(db=None):
     global _digest_engine
     if _digest_engine is None:
         _digest_engine = DailyDigestEngine(db)
-    elif db and _digest_engine.db is None:
+    elif db is not None and _digest_engine.db is None:
         _digest_engine.db = db
     return _digest_engine

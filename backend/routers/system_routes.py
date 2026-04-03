@@ -50,7 +50,7 @@ async def get_system_status(user = Depends(get_current_user)):
     db_healthy = True
     db_collections = 0
     try:
-        if db:
+        if db is not None:
             await db.command('ping')
             collections = await db.list_collection_names()
             db_collections = len(collections)
@@ -62,7 +62,7 @@ async def get_system_status(user = Depends(get_current_user)):
     pending_followups = 0
     active_handoffs = 0
     
-    if db:
+    if db is not None:
         try:
             # Pending approvals (placeholder - implement when approval system is ready)
             pending_approvals = await db.pending_approvals.count_documents({"status": "pending"})
@@ -136,7 +136,7 @@ async def force_sync(user = Depends(get_current_user)):
     
     # 1. Database indexes
     try:
-        if db:
+        if db is not None:
             # Core indexes
             await db.aurem_users.create_index("email")
             await db.aurem_businesses.create_index("business_id")
@@ -204,7 +204,7 @@ async def force_sync(user = Depends(get_current_user)):
 async def health_check():
     """Simple health check endpoint (no auth required)"""
     try:
-        if db:
+        if db is not None:
             await db.command('ping')
         return {
             "status": "healthy",
@@ -269,7 +269,7 @@ async def get_automation_status(user = Depends(get_current_user)):
     }
     
     # Get business count
-    if db:
+    if db is not None:
         try:
             from services.aurem_business_agents import get_agent_manager
             manager = get_agent_manager(db)
@@ -296,7 +296,7 @@ async def get_pending_work(user = Depends(get_current_user)):
         "approvals": []
     }
     
-    if db:
+    if db is not None:
         # Get businesses
         try:
             businesses = await db.aurem_businesses.find({}, {"_id": 0, "business_id": 1, "name": 1}).to_list(10)

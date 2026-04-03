@@ -331,7 +331,7 @@ class AgentManager:
     
     async def save_to_db(self):
         """Persist configurations to database"""
-        if not self.db:
+        if self.db is None:
             return
         
         # Save businesses
@@ -352,7 +352,7 @@ class AgentManager:
     
     async def load_from_db(self):
         """Load configurations from database"""
-        if not self.db:
+        if self.db is None:
             return
         
         # Load businesses
@@ -467,7 +467,7 @@ def get_agent_manager(db=None) -> AgentManager:
     global _agent_manager
     if _agent_manager is None:
         _agent_manager = AgentManager(db)
-    elif db and _agent_manager.db is None:
+    elif db is not None and _agent_manager.db is None:
         _agent_manager.db = db
     return _agent_manager
 
@@ -475,6 +475,6 @@ def get_business_ai(db=None) -> BusinessAwareAI:
     global _business_ai
     if _business_ai is None:
         _business_ai = BusinessAwareAI(db)
-    elif db and _business_ai.db is None:
+    elif db is not None and _business_ai.db is None:
         _business_ai.db = db
     return _business_ai

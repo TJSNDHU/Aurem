@@ -84,7 +84,7 @@ class CoexistenceManager:
             return True
         
         # Check if sender is a staff member
-        if self.db:
+        if self.db is not None:
             staff = await self.db.aurem_staff.find_one({
                 "business_id": business_id,
                 "phone": sender_id
@@ -93,7 +93,7 @@ class CoexistenceManager:
                 return True
         
         # Check for business phone number match
-        if self.db:
+        if self.db is not None:
             business = await self.db.aurem_businesses.find_one({
                 "business_id": business_id
             })
@@ -107,7 +107,7 @@ class CoexistenceManager:
         customer_id: str
     ) -> ConversationState:
         """Get current conversation state"""
-        if not self.db:
+        if self.db is None:
             # Default state
             return ConversationState(
                 customer_id=customer_id,
@@ -137,7 +137,7 @@ class CoexistenceManager:
         updates: Dict[str, Any]
     ) -> bool:
         """Update conversation state"""
-        if not self.db:
+        if self.db is None:
             return False
         
         result = await self.db.aurem_conversation_states.update_one(
@@ -179,7 +179,7 @@ class CoexistenceManager:
         )
         
         # Log event
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_handoff_log.insert_one({
                 "customer_id": customer_id,
                 "business_id": business_id,
@@ -309,7 +309,7 @@ class CoexistenceManager:
         )
         
         # Log escalation
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_handoff_log.insert_one({
                 "customer_id": customer_id,
                 "business_id": business_id,
@@ -334,7 +334,7 @@ class CoexistenceManager:
         human_id: str = None
     ) -> List[Dict[str, Any]]:
         """Get list of conversations currently in human mode"""
-        if not self.db:
+        if self.db is None:
             return []
         
         query = {
@@ -357,6 +357,6 @@ def get_coexistence_manager(db=None):
     global _coexistence_manager
     if _coexistence_manager is None:
         _coexistence_manager = CoexistenceManager(db)
-    elif db and _coexistence_manager.db is None:
+    elif db is not None and _coexistence_manager.db is None:
         _coexistence_manager.db = db
     return _coexistence_manager

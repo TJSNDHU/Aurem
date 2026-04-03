@@ -4222,6 +4222,30 @@ async def startup_event():
             set_aurem_vanguard_db(db)
         except ImportError:
             pass
+        
+        # AUREM BOS (Business Operating System) routers
+        try:
+            from routers.business_routes import set_db as set_bos_business_db
+            set_bos_business_db(db)
+        except ImportError:
+            pass
+        try:
+            from routers.premium_routes import set_db as set_bos_premium_db
+            set_bos_premium_db(db)
+        except ImportError:
+            pass
+        try:
+            from routers.system_routes import set_db as set_bos_system_db
+            set_bos_system_db(db)
+        except ImportError:
+            pass
+        try:
+            from routers.digest_routes import set_db as set_bos_digest_db
+            set_bos_digest_db(db)
+        except ImportError:
+            pass
+        logging.info(f"✓ AUREM BOS routers initialized")
+        
         logging.info(f"✓ All AI services initialized ({time.time()-t0:.2f}s)")
         
         logging.info(f"✅ ReRoots API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")

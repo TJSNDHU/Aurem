@@ -276,7 +276,7 @@ async def get_chat_history(
     user = Depends(get_current_user)
 ):
     """Get chat history"""
-    if not db:
+    if db is None:
         return {"messages": []}
     
     query = {"user_id": str(user.get("_id"))}
@@ -355,7 +355,7 @@ async def create_automation(request: AutomationRequest, user = Depends(get_curre
 @router.get("/automations")
 async def list_automations(user = Depends(get_current_user)):
     """List user's automations"""
-    if not db:
+    if db is None:
         return {"automations": []}
     
     automations = await db.aurem_automations.find(

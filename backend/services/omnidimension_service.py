@@ -108,7 +108,7 @@ class OmniDimensionService:
             return self.customer_cache[cache_key]
         
         # Check database
-        if self.db:
+        if self.db is not None:
             customer_doc = await self.db.aurem_customers.find_one({
                 "business_id": business_id,
                 "$or": [
@@ -143,7 +143,7 @@ class OmniDimensionService:
                 customer.whatsapp = identifier
         
         # Save to database
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_customers.insert_one(customer.dict())
         
         self.customer_cache[cache_key] = customer
@@ -157,7 +157,7 @@ class OmniDimensionService:
         """Update customer profile"""
         updates["updated_at"] = datetime.now(timezone.utc)
         
-        if self.db:
+        if self.db is not None:
             result = await self.db.aurem_customers.find_one_and_update(
                 {"customer_id": customer_id},
                 {"$set": updates},
@@ -178,7 +178,7 @@ class OmniDimensionService:
     
     async def get_customer_360(self, customer_id: str) -> Dict[str, Any]:
         """Get 360-degree view of customer across all channels"""
-        if not self.db:
+        if self.db is None:
             return {"error": "Database not configured"}
         
         # Get customer profile
@@ -241,7 +241,7 @@ class OmniDimensionService:
                 "content": content,
                 "type": metadata.get("type", "text") if metadata else "text",
                 "media_url": metadata.get("media_url") if metadata else None,
-                **metadata if metadata else {}
+                **(metadata if metadata else {})
             },
             context={"business_id": business_id, "customer_id": customer.customer_id}
         )
@@ -272,7 +272,7 @@ class OmniDimensionService:
         )
         
         # Save message
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_messages.insert_one(message.dict())
         
         # Update customer stats
@@ -325,7 +325,7 @@ class OmniDimensionService:
         """Send an outbound message via any channel"""
         
         # Get customer
-        if self.db:
+        if self.db is not None:
             customer_doc = await self.db.aurem_customers.find_one({"customer_id": customer_id})
             if not customer_doc:
                 return {"error": "Customer not found"}
@@ -343,7 +343,7 @@ class OmniDimensionService:
         )
         
         # Save message
-        if self.db:
+        if self.db is not None:
             await self.db.aurem_messages.insert_one(message.dict())
         
         # Route to appropriate channel handler
@@ -455,7 +455,7 @@ class OmniDimensionService:
     
     async def get_channel_analytics(self, business_id: str) -> Dict[str, Any]:
         """Get analytics across all channels"""
-        if not self.db:
+        if self.db is None:
             return self._get_mock_analytics()
         
         analytics = {}
@@ -519,6 +519,6 @@ def get_omni_service(db=None) -> OmniDimensionService:
     global _omni_service
     if _omni_service is None:
         _omni_service = OmniDimensionService(db)
-    elif db and _omni_service.db is None:
+    elif db is not None and _omni_service.db is None:
         _omni_service.db = db
     return _omni_service

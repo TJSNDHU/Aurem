@@ -299,7 +299,7 @@ async def get_premium_dashboard(business_id: str, user = Depends(get_current_use
         "total_multimodal": 0
     }
     
-    if db:
+    if db is not None:
         # Count messages with multimodal metadata
         audio_count = await db.aurem_messages.count_documents({
             "business_id": business_id,

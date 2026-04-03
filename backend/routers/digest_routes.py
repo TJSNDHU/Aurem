@@ -152,7 +152,7 @@ async def get_events(
     user = Depends(get_current_user)
 ):
     """Get recent events for a business"""
-    if not db:
+    if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
     
     start_time = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -185,7 +185,7 @@ async def get_digest_stats(
     user = Depends(get_current_user)
 ):
     """Get digest statistics for a business"""
-    if not db:
+    if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
     
     start_time = datetime.now(timezone.utc) - timedelta(days=days)
@@ -229,7 +229,7 @@ async def clear_events(
     user = Depends(get_current_user)
 ):
     """Clear old events for a business"""
-    if not db:
+    if db is None:
         raise HTTPException(status_code=500, detail="Database not available")
     
     cutoff_time = datetime.now(timezone.utc) - timedelta(days=older_than_days)
