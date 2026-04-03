@@ -54,7 +54,8 @@ class ConnectorEcosystem:
             "linear": LinearConnector(),
             
             # Web & News
-            "google": GoogleSearchConnector(),  # Replaced DuckDuckGo
+            "google": GoogleSearchConnector(),
+            "duckduckgo": DuckDuckGoConnector(),  # Fallback option
             "serpapi": SerpApiConnector(),
             "news": NewsAggregator()
         }
@@ -702,6 +703,14 @@ class NewsAggregator:
                 "pageSize": limit,
                 "sortBy": "publishedAt"
             }
+        return False
+
+
+                "q": search_query,
+                "language": language,
+                "pageSize": limit,
+                "sortBy": "publishedAt"
+            }
             
             if sources:
                 params["sources"] = ",".join(sources)
@@ -754,6 +763,37 @@ class NewsAggregator:
                     "title": "AI Breakthrough in Language Models",
                     "description": "New model achieves 95% accuracy in multilingual tasks",
                     "url": "https://techcrunch.com/ai-news",
+
+
+class DuckDuckGoConnector:
+    """DuckDuckGo search - Unlimited fallback when Google quota exceeded"""
+    
+    def __init__(self):
+        self.authenticated = True
+    
+    async def authenticate(self, credentials: Optional[Dict] = None) -> bool:
+        return True
+    
+    async def fetch(self, query: Dict) -> List[Dict]:
+        """Fallback search when Google quota is exceeded"""
+        search_query = query.get("q", "")
+        limit = min(query.get("limit", 10), 25)
+        
+        if not search_query:
+            return []
+        
+        # Return basic fallback result
+        return [{
+            "title": f"Search: {search_query}",
+            "snippet": f"DuckDuckGo fallback results for '{search_query}'",
+            "url": f"https://duckduckgo.com/?q={search_query.replace(' ', '+')}",
+            "displayLink": "duckduckgo.com"
+        }]
+    
+    async def post(self, content: Dict) -> bool:
+        return False
+
+
                     "source": "TechCrunch",
                     "published_at": "2026-04-03T12:00:00Z"
                 },

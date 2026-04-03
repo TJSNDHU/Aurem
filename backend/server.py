@@ -206,9 +206,11 @@ try:
     from routers.admin_plan_management import router as admin_plan_router, set_db as set_admin_plan_db
     from routers.self_healing_router import router as self_healing_router
     from routers.connector_router import router as connector_router
+    from routers.smart_search_router import router as smart_search_router
     from services.toon_service import set_toon_service_db
     from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
     from services.connector_ecosystem import set_connector_ecosystem_db
+    from services.smart_search import set_smart_search_db
 except ImportError as e:
     logging.warning(f"[STARTUP] Mission Control imports failed: {e}")
     set_mission_control_db = None
@@ -42265,7 +42267,9 @@ if self_healing_router is not None:
     app.include_router(self_healing_router)  # Self-Healing AI
 if connector_router is not None:
     app.include_router(connector_router)  # Connector Ecosystem
-    logging.info("[STARTUP] Subscription + Self-Healing + Connectors loaded ✅")
+if smart_search_router is not None:
+    app.include_router(smart_search_router)  # Smart Search (Google → DuckDuckGo fallback)
+    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
 try:
