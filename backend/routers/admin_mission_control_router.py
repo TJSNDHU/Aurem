@@ -200,7 +200,7 @@ async def add_api_key(request: AddAPIKeyRequest, admin=Depends(verify_admin)):
       status: active
       added_at: 2026-01-15T10:30:00Z
     """
-    if not _db:
+    if _db is None:
         raise HTTPException(500, "Database not initialized")
     
     try:
@@ -271,7 +271,7 @@ async def remove_api_key(request: RemoveAPIKeyRequest, admin=Depends(verify_admi
       "message": "API key revoked for gpt-4o"
     }
     """
-    if not _db:
+    if _db is None:
         raise HTTPException(500, "Database not initialized")
     
     try:
@@ -342,7 +342,7 @@ async def get_all_subscriptions(
       sub_002, user_def, starter, active, 99, 2026-02-05, {tokens:8k/50k}
       ...
     """
-    if not _db:
+    if _db is None:
         raise HTTPException(500, "Database not initialized")
     
     try:
@@ -501,7 +501,7 @@ async def recharge_service(request: RechargeRequest, admin=Depends(verify_admin)
       purchased_by: admin_123
       purchase_date: 2026-01-15T10:30:00Z
     """
-    if not _db:
+    if _db is None:
         raise HTTPException(500, "Database not initialized")
     
     try:
@@ -569,7 +569,7 @@ async def toggle_service(request: ToggleServiceRequest, admin=Depends(verify_adm
       "message": "Service gpt-4o paused"
     }
     """
-    if not _db:
+    if _db is None:
         raise HTTPException(500, "Database not initialized")
     
     if request.action not in ["start", "stop", "pause"]:

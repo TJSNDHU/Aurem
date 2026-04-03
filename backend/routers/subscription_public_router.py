@@ -22,6 +22,7 @@ def set_db(database):
     global _db
     _db = database
     get_toon_service().set_db(database)
+    logger.info(f"[SaaS Plans] Database set: {_db is not None}")
 
 
 @router.get("")
@@ -58,6 +59,8 @@ async def get_plan_by_tier(tier: str):
     Args:
         tier: free, starter, professional, enterprise
     """
+    logger.info(f"[SaaS Plans] Getting plan for tier: {tier}, _db is None: {_db is None}")
+    
     if _db is None:
         raise HTTPException(500, "Database not initialized")
     
@@ -66,6 +69,8 @@ async def get_plan_by_tier(tier: str):
             {"tier": tier, "active": True},
             {"_id": 0}
         )
+        
+        logger.info(f"[SaaS Plans] Plan found: {plan is not None}")
         
         if not plan:
             raise HTTPException(404, f"Plan '{tier}' not found")

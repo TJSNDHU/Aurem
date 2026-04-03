@@ -4,11 +4,13 @@
 
 set -e
 
-API_URL="http://localhost:8001"
+# Use external URL for true E2E testing through K8s ingress
+API_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d '=' -f2)
 ADMIN_KEY="test_admin_key_12345"
 
 echo "🧪 AUREM SAAS SYSTEM - E2E TESTS"
 echo "================================"
+echo "Testing against: $API_URL"
 echo ""
 
 # Colors
@@ -26,15 +28,23 @@ test_endpoint() {
     local name=$1
     local method=$2
     local endpoint=$3
-    local headers=$4
+    local use_auth=$4
     local expected_status=$5
     
     echo -n "Testing: $name... "
     
-    if [ "$method" == "GET" ]; then
-        response=$(curl -s -w "\n%{http_code}" $headers "$API_URL$endpoint")
+    if [ "$use_auth" == "true" ]; then
+        if [ "$method" == "GET" ]; then
+            response=$(curl -s -w "\n%{http_code}" -H "X-Admin-Key: $ADMIN_KEY" "$API_URL$endpoint")
+        else
+            response=$(curl -s -w "\n%{http_code}" -X $method -H "X-Admin-Key: $ADMIN_KEY" "$API_URL$endpoint")
+        fi
     else
-        response=$(curl -s -w "\n%{http_code}" -X $method $headers "$API_URL$endpoint")
+        if [ "$method" == "GET" ]; then
+            response=$(curl -s -w "\n%{http_code}" "$API_URL$endpoint")
+        else
+            response=$(curl -s -w "\n%{http_code}" -X $method "$API_URL$endpoint")
+        fi
     fi
     
     http_code=$(echo "$response" | tail -n1)
@@ -85,25 +95,25 @@ test_endpoint_post() {
 
 echo "📡 1. HEALTH & READINESS CHECKS"
 echo "--------------------------------"
-test_endpoint "Health Check" "GET" "/health" "" "200"
-test_endpoint "Readiness Check" "GET" "/ready" "" "200"
+test_endpoint "Health Check" "GET" "/health" "false" "200"
+test_endpoint "Readiness Check" "GET" "/ready" "false" "200"
 echo ""
 
 echo "🔐 2. ADMIN MISSION CONTROL - AUTHENTICATION"
 echo "---------------------------------------------"
-test_endpoint "Dashboard (No Auth)" "GET" "/api/admin/mission-control/dashboard" "" "401"
-test_endpoint "Dashboard (With Auth)" "GET" "/api/admin/mission-control/dashboard" "-H 'X-Admin-Key: $ADMIN_KEY'" "200"
+test_endpoint "Dashboard (No Auth)" "GET" "/api/admin/mission-control/dashboard" "false" "401"
+test_endpoint "Dashboard (With Auth)" "GET" "/api/admin/mission-control/dashboard" "true" "200"
 echo ""
 
 echo "🗄️ 3. SERVICE REGISTRY"
 echo "----------------------"
-test_endpoint "Get Services" "GET" "/api/admin/mission-control/services" "-H 'X-Admin-Key: $ADMIN_KEY'" "200"
-test_endpoint "Health Check" "GET" "/api/admin/mission-control/health" "" "200"
+test_endpoint "Get Services" "GET" "/api/admin/mission-control/services" "true" "200"
+test_endpoint "Health Check" "GET" "/api/admin/mission-control/health" "false" "200"
 echo ""
 
 echo "🔑 4. API KEY MANAGEMENT"
 echo "-----------------------"
-test_endpoint "Get API Keys" "GET" "/api/admin/mission-control/api-keys" "-H 'X-Admin-Key: $ADMIN_KEY'" "200"
+test_endpoint "Get API Keys" "GET" "/api/admin/mission-control/api-keys" "true" "200"
 
 # Add a test API key
 echo -n "Testing: Add API Key (gpt-4o)... "
@@ -131,14 +141,14 @@ echo ""
 
 echo "👥 5. SUBSCRIPTIONS"
 echo "------------------"
-test_endpoint "Get All Subscriptions" "GET" "/api/admin/mission-control/subscriptions" "-H 'X-Admin-Key: $ADMIN_KEY'" "200"
-test_endpoint "Get Subscription Plans" "GET" "/api/saas/plans" "" "500" # Expected 500 due to MongoDB anti-pattern
-test_endpoint "Get Starter Plan" "GET" "/api/saas/plans/starter" "" "500" # Expected 500 due to MongoDB anti-pattern
+test_endpoint "Get All Subscriptions" "GET" "/api/admin/mission-control/subscriptions" "true" "200"
+test_endpoint "Get Subscription Plans" "GET" "/api/saas/plans" "false" "200"
+test_endpoint "Get Starter Plan" "GET" "/api/saas/plans/starter" "false" "200"
 echo ""
 
 echo "📊 6. USAGE ANALYTICS"
 echo "--------------------"
-test_endpoint "Get Usage Logs" "GET" "/api/admin/mission-control/usage" "-H 'X-Admin-Key: $ADMIN_KEY'" "200"
+test_endpoint "Get Usage Logs" "GET" "/api/admin/mission-control/usage" "true" "200"
 echo ""
 
 echo "💰 7. TOKEN RECHARGE"
@@ -209,7 +219,7 @@ echo ""
 
 echo "📈 9. MONITORING METRICS"
 echo "-----------------------"
-test_endpoint "Prometheus Metrics" "GET" "/metrics" "" "404" # Expected 404 - not fully implemented yet
+test_endpoint "Prometheus Metrics" "GET" "/api/monitoring/metrics" "false" "200"
 echo ""
 
 echo "🧬 10. TOON FORMAT VALIDATION"

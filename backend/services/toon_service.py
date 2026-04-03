@@ -59,7 +59,7 @@ class AuremToonService:
           professional, Professional, 399, 3830, {tokens:200k,formulas:50}, {ai_chat:T,voice:openai,multi_agent:T}
           enterprise, Enterprise, 999, 9590, {tokens:unlimited}, {ai_chat:T,voice:voxtral,all:T}
         """
-        if not self.db:
+        if self.db is None:
             return "Plan[0]:"
         
         plans = await self.db.subscription_plans.find(
@@ -251,7 +251,7 @@ class AuremToonService:
           stripe, sk_live_...789, active, 89, 125.50, 2026-01-15T09:15
           ...
         """
-        if not self.db:
+        if self.db is None:
             return "APIKey[0]:"
         
         keys = await self.db.api_keys_registry.find(

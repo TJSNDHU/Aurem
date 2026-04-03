@@ -18,7 +18,7 @@ from services.aurem_monitoring import (
     arr_usd
 )
 
-router = APIRouter(tags=["Monitoring"])
+router = APIRouter(prefix="/api/monitoring", tags=["Monitoring"])
 
 
 @router.get("/metrics")
