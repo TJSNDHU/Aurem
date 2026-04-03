@@ -208,6 +208,7 @@ try:
     from routers.connector_router import router as connector_router
     from routers.smart_search_router import router as smart_search_router
     from routers.agent_harness_router import router as agent_harness_router
+    from routers.skills_router import router as skills_router
     from services.toon_service import set_toon_service_db
     from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
     from services.connector_ecosystem import set_connector_ecosystem_db
@@ -229,6 +230,7 @@ except ImportError as e:
     connector_router = None
     smart_search_router = None
     agent_harness_router = None
+    skills_router = None
 except ImportError as e:
     logging.warning(f"[STARTUP] Mission Control imports failed: {e}")
     set_mission_control_db = None
@@ -42289,7 +42291,9 @@ if smart_search_router is not None:
     app.include_router(smart_search_router)  # Smart Search (Google → DuckDuckGo fallback)
 if agent_harness_router is not None:
     app.include_router(agent_harness_router)  # AUREM Agent Harness (ECC-inspired)
-    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness loaded ✅")
+if skills_router is not None:
+    app.include_router(skills_router)  # AUREM Skills Library
+    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
 try:
