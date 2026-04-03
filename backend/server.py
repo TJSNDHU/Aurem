@@ -42561,6 +42561,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] AUREM AI Routes not loaded: {e}", flush=True)
 
+# Business & OmniChannel Routes
+try:
+    from routers.business_routes import router as business_router, set_db as set_business_db
+    set_business_db(db)
+    app.include_router(business_router)
+    print("[STARTUP] Business & OmniChannel Routes loaded", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Business Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
