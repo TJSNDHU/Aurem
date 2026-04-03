@@ -261,6 +261,7 @@ const PasswordLoginForm = ({ onLogin, onSwitchToFaceID, faceIDAvailable }) => {
           <button
             type="button"
             onClick={onSwitchToFaceID}
+            data-testid="faceid-login-button"
             style={{
               width: '100%',
               padding: 16,
@@ -349,6 +350,7 @@ const PasswordLoginForm = ({ onLogin, onSwitchToFaceID, faceIDAvailable }) => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="operator@company.com"
             required
+            data-testid="email-input"
             style={{
               width: '100%',
               padding: '12px 16px',
@@ -380,6 +382,7 @@ const PasswordLoginForm = ({ onLogin, onSwitchToFaceID, faceIDAvailable }) => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              data-testid="password-input"
               style={{
                 width: '100%',
                 padding: '12px 16px',

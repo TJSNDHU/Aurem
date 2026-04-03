@@ -179,6 +179,7 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
         </p>
         <button
           onClick={onFallbackToPassword}
+          data-testid="use-password-fallback-button"
           style={{
             padding: '10px 24px',
             background: '#1A1A1A',
@@ -287,6 +288,7 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
 
       <button
         onClick={onFallbackToPassword}
+        data-testid="use-password-button"
         style={{
           padding: '8px 16px',
           background: 'none',

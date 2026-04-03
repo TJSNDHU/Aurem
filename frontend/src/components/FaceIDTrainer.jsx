@@ -311,6 +311,7 @@ const FaceIDTrainer = ({ onComplete }) => {
         <button
           onClick={startCamera}
           disabled={!modelsLoaded}
+          data-testid="start-camera-button"
           style={{
             padding: '12px 32px',
             background: 'linear-gradient(135deg, #D4AF37 0%, #8B7355 100%)',
@@ -333,6 +334,7 @@ const FaceIDTrainer = ({ onComplete }) => {
       {capturing && faceDetected && !captured && (
         <button
           onClick={captureFace}
+          data-testid="capture-face-button"
           style={{
             padding: '12px 32px',
             background: 'linear-gradient(135deg, #4A4 0%, #2A2 100%)',
