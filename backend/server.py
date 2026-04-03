@@ -211,6 +211,7 @@ try:
     from routers.skills_router import router as skills_router
     from routers.vector_search_router import router as vector_search_router
     from routers.hooks_router import router as hooks_router
+    from routers.crypto_treasury_router import router as crypto_treasury_router, set_db as set_crypto_treasury_db
     from services.toon_service import set_toon_service_db
     from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
     from services.connector_ecosystem import set_connector_ecosystem_db
@@ -4076,6 +4077,12 @@ async def startup_event():
             set_toon_db(db)
         except ImportError:
             pass
+        try:
+            from routers.crypto_treasury_router import set_db as set_crypto_treasury_db
+            set_crypto_treasury_db(db)
+            logging.info("[STARTUP] Crypto Treasury database initialized")
+        except ImportError as e:
+            logging.warning(f"[STARTUP] Crypto Treasury not loaded: {e}")
         # Initialize new commercial AI services
         try:
             from routers.subscription_router import set_db as set_subscription_db
@@ -42300,7 +42307,9 @@ if vector_search_router is not None:
     app.include_router(vector_search_router)  # Vector Search (Semantic Search)
 if hooks_router is not None:
     app.include_router(hooks_router)  # Automation Hooks System (8 hooks)
-    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills + Vector Search + Hooks loaded ✅")
+if crypto_treasury_router is not None:
+    app.include_router(crypto_treasury_router)  # Crypto Treasury Management
+    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills + Vector Search + Hooks + Crypto Treasury loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
 try:
