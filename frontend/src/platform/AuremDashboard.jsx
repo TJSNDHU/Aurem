@@ -10,11 +10,15 @@ import {
   Mail, MessageCircle, Globe, Send, Mic, MicOff,
   Sparkles, Activity, Brain, Rocket, Shield, Code, LogOut,
   ChevronRight, Plus, Play, Pause, RefreshCw, Check, X,
-  TrendingUp, Clock, Target, Phone, PhoneCall
+  TrendingUp, Clock, Target, Phone, PhoneCall, Building2
 } from 'lucide-react';
 
 // Voice component
 import AuremVoice from '../components/AuremVoice';
+// System status bar
+import SystemStatusBar from '../components/SystemStatusBar';
+// Circuit breaker dashboard
+import CircuitBreakerDashboard from '../components/CircuitBreakerDashboard';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -31,6 +35,13 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout }) => {
         { id: 'automation-engine', label: 'Automation Engine', icon: Zap },
         { id: 'analytics-hub', label: 'Analytics Hub', icon: BarChart3 },
         { id: 'agent-swarm', label: 'Agent Swarm', icon: Users },
+      ]
+    },
+    {
+      title: 'SYSTEM',
+      items: [
+        { id: 'circuit-breakers', label: 'Circuit Breakers', icon: Shield },
+        { id: 'business-management', label: 'Business Management', icon: Building2 },
       ]
     },
     {
