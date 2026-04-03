@@ -42215,6 +42215,12 @@ try:
 except ImportError as e:
     logging.warning(f"Orchestrator Brain router not loaded: {e}")
 
+try:
+    from routers.aurem_chat import router as aurem_chat_router
+    app.include_router(aurem_chat_router)  # AUREM AI Chat (Dashboard Intelligence)
+except ImportError as e:
+    logging.warning(f"AUREM Chat router not loaded: {e}")
+
 # PWA (Progressive Web App) Router for Luxury Mobile Experience
 try:
     from routers.pwa_router import router as pwa_router

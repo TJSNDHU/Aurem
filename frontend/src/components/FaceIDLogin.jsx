@@ -78,12 +78,16 @@ const FaceIDLogin = ({ onSuccess, onFallbackToPassword }) => {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         
+        setStatus('Camera ready. Scanning for face...');
+        console.log('[FaceID Login] Camera started successfully');
+        
         // Start authentication loop
         authenticateFace();
       }
     } catch (err) {
       console.error('Camera access denied:', err);
       setError('Camera access denied');
+      setStatus('Camera error');
     }
   };
 
