@@ -8,6 +8,9 @@ from typing import Dict, Any, Optional
 import logging
 
 from .build_fixer import AUREMBuildFixer
+from .code_reviewer import AUREMCodeReviewer
+from .security_scanner import AUREMSecurityScanner
+from .feature_planner import AUREMFeaturePlanner
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +29,10 @@ class AUREMAgentHarness:
     def __init__(self):
         self.agents = {
             "build-fixer": AUREMBuildFixer(),
-            # Future agents will be added here:
-            # "code-reviewer": AUREMCodeReviewer(),
-            # "security-scanner": AUREMSecurityScanner(),
-            # "planner": AUREMFeaturePlanner(),
+            "code-reviewer": AUREMCodeReviewer(),
+            "security-scanner": AUREMSecurityScanner(),
+            "planner": AUREMFeaturePlanner(),
+            # Future agents:
             # "tdd-guide": AUREMTDDGuide(),
             # "mongo-optimizer": AUREMMongoOptimizer(),
             # "refactor-agent": AUREMRefactorAgent(),
@@ -78,23 +81,39 @@ class AUREMAgentHarness:
             Agent execution result
         """
         problem = context.get("problem", "").lower()
+        feature_description = context.get("feature_description", "").lower()
         
         # Simple pattern matching for now
         # In future, use LLM to classify problem type
         
-        if any(keyword in problem for keyword in ["404", "import error", "build error", "cannot import"]):
+        # Build errors
+        if any(keyword in problem for keyword in ["404", "import error", "build error", "cannot import", "module not found"]):
             return await self.delegate("build-fixer", context)
         
+        # Security scans
+        elif any(keyword in problem for keyword in ["security", "vulnerability", "owasp", "audit", "penetration"]):
+            return await self.delegate("security-scanner", context)
+        
+        # Code review
+        elif any(keyword in problem for keyword in ["review", "code quality", "refactor", "improve code"]):
+            return await self.delegate("code-reviewer", context)
+        
+        # Feature planning
+        elif any(keyword in feature_description for keyword in ["plan", "design", "architect", "new feature"]) or \
+             "feature_description" in context:
+            return await self.delegate("planner", context)
+        
         # Add more patterns as agents are implemented
-        # elif "security" in problem or "vulnerability" in problem:
-        #     return await self.delegate("security-scanner", context)
         # elif "test" in problem or "tdd" in problem:
         #     return await self.delegate("tdd-guide", context)
+        # elif "mongo" in problem or "database" in problem:
+        #     return await self.delegate("mongo-optimizer", context)
         
         return {
             "success": False,
             "message": "Could not auto-detect appropriate agent",
-            "suggestion": "Please specify agent_name explicitly"
+            "suggestion": "Please specify agent_name explicitly",
+            "available_agents": list(self.agents.keys())
         }
     
     def list_agents(self) -> Dict[str, Any]:
