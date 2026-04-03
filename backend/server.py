@@ -42638,6 +42638,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Digest Routes not loaded: {e}", flush=True)
 
+# Subscription & Billing Routes (Revenue Layer)
+try:
+    from routers.subscription_routes import router as subscription_router, set_db as set_subscription_db
+    set_subscription_db(db)
+    app.include_router(subscription_router)
+    print("[STARTUP] Subscription & Billing Routes loaded (Revenue Layer)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Subscription Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
