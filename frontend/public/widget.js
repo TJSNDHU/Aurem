@@ -21,7 +21,7 @@
     apiKey: scriptTag.getAttribute('data-api-key'),
     position: scriptTag.getAttribute('data-position'),
     color: scriptTag.getAttribute('data-color'),
-    apiUrl: scriptTag.getAttribute('data-api-url') || 'https://aurem.live/api/v1'
+    apiUrl: scriptTag.getAttribute('data-api-url') || 'https://aurem.live/api/public'
   };
 
   // Validate API key

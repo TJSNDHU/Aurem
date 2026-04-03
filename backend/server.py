@@ -2854,19 +2854,19 @@ app.add_middleware(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PUBLIC API v1 - Client Integration Endpoints (MUST be registered early!)
+# PUBLIC API - Client Integration Endpoints (MUST be registered early!)
 # ═══════════════════════════════════════════════════════════════════════════════
 try:
-    from routers.public_api_v1 import router as public_api_v1_router
-    app.include_router(public_api_v1_router, prefix="/api/v1")
-    print("[STARTUP] ✅ Public API v1 registered at /api/v1", flush=True)
-    logging.info("✅ Public API v1: /api/v1/chat, /api/v1/leads, /api/v1/health")
+    from routers.public_api_v1 import router as public_api_router
+    app.include_router(public_api_router, prefix="/api/public")
+    print("[STARTUP] ✅ Public API registered at /api/public", flush=True)
+    logging.info("✅ Public API: /api/public/chat, /api/public/leads, /api/public/health")
 except ImportError as e:
-    logging.error(f"❌ Public API v1 import failed: {e}")
-    print(f"[STARTUP] ❌ Public API v1 import error: {e}", flush=True)
+    logging.error(f"❌ Public API import failed: {e}")
+    print(f"[STARTUP] ❌ Public API import error: {e}", flush=True)
 except Exception as e:
-    logging.error(f"❌ Public API v1 registration error: {e}")
-    print(f"[STARTUP] ❌ Public API v1 error: {e}", flush=True)
+    logging.error(f"❌ Public API registration error: {e}")
+    print(f"[STARTUP] ❌ Public API error: {e}", flush=True)
 
 # Add GZip compression for better performance (compress responses > 500 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=500)
