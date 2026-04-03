@@ -12,6 +12,7 @@ import "./App.css";
 const FaceIDAuthWrapper = lazy(() => import('./components/FaceIDAuthWrapper'));
 const AuremDashboard = lazy(() => import('./platform/AuremDashboard'));
 const PlatformLanding = lazy(() => import('./platform/PlatformLanding'));
+const AdminMissionControl = lazy(() => import('./platform/AdminMissionControl'));
 
 // Loading Spinner
 const LoadingSpinner = () => (
@@ -46,6 +47,9 @@ function App() {
             {/* Dashboard */}
             <Route path="/dashboard" element={<AuremDashboard />} />
             <Route path="/dashboard/*" element={<AuremDashboard />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/mission-control" element={<AdminMissionControl />} />
             
             {/* Catch-all redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
