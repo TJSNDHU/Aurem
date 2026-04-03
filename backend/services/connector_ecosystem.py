@@ -857,3 +857,17 @@ class DuckDuckGoConnector:
         return False
 
 
+
+
+# Global instance (singleton pattern)
+_connector_ecosystem = ConnectorEcosystem()
+
+
+def get_connector_ecosystem() -> ConnectorEcosystem:
+    """Get global connector ecosystem instance"""
+    return _connector_ecosystem
+
+
+def set_connector_ecosystem_db(db):
+    """Set database for connector ecosystem"""
+    _connector_ecosystem.set_db(db)
