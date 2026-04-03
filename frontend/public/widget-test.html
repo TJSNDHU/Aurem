@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AUREM Widget - Auto-Theme Test</title>
+  <style>
+    /* Test different themes by uncommenting one */
+    
+    /* THEME 1: Dark E-commerce */
+    :root {
+      --primary-color: #E63946;
+    }
+    body {
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      margin: 0;
+    }
+    
+    /* THEME 2: Light Corporate (Uncomment to test)
+    :root {
+      --primary-color: #0077B6;
+    }
+    body {
+      background: #FFFFFF;
+      color: #1A1A1A;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      margin: 0;
+    }
+    */
+    
+    /* THEME 3: Purple Startup (Uncomment to test)
+    :root {
+      --primary-color: #7209B7;
+    }
+    body {
+      background: #0A0A0A;
+      color: #F0F0F0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      margin: 0;
+    }
+    */
+    
+    h1 {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    
+    p {
+      font-size: 18px;
+      line-height: 1.6;
+      max-width: 600px;
+      opacity: 0.8;
+    }
+    
+    .cta-button {
+      background: var(--primary-color, #E63946);
+      color: white;
+      padding: 16px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 24px;
+      transition: transform 0.2s;
+    }
+    
+    .cta-button:hover {
+      transform: scale(1.05);
+    }
+    
+    a {
+      color: var(--primary-color, #E63946);
+      text-decoration: none;
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin-top: 48px;
+    }
+    
+    .feature-card {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .feature-card h3 {
+      margin-top: 0;
+      color: var(--primary-color, #E63946);
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to AUREM Test Site</h1>
+  <p>
+    This is a demo website to showcase AUREM's intelligent widget that automatically
+    adapts to your website's theme. Notice how the chat widget in the bottom-right
+    matches this site's colors without any configuration!
+  </p>
+  
+  <button class="cta-button">Get Started</button>
+  
+  <div class="features">
+    <div class="feature-card">
+      <h3>🎨 Auto-Theme Detection</h3>
+      <p>Widget automatically detects your site's colors and adapts</p>
+    </div>
+    
+    <div class="feature-card">
+      <h3>📱 Fully Responsive</h3>
+      <p>Adapts to mobile, tablet, and desktop screens perfectly</p>
+    </div>
+    
+    <div class="feature-card">
+      <h3>🤖 AI-Powered</h3>
+      <p>Powered by GPT-4o for intelligent business conversations</p>
+    </div>
+    
+    <div class="feature-card">
+      <h3>⚡ Zero Config</h3>
+      <p>One line of code - that's all you need to integrate</p>
+    </div>
+  </div>
+  
+  <div style="margin-top: 48px; padding: 24px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; border-left: 4px solid var(--primary-color, #E63946);">
+    <h2>Integration Code</h2>
+    <pre style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 8px; overflow-x: auto;"><code>&lt;script src="https://aurem.live/widget.js" 
+        data-api-key="sk_aurem_live_xxxxx"&gt;&lt;/script&gt;</code></pre>
+    <p style="margin: 0; font-size: 14px; opacity: 0.7;">
+      That's it! The widget will automatically match your site's theme.
+    </p>
+  </div>
+  
+  <!-- AUREM Widget - AUTO-THEME ENABLED -->
+  <script src="https://aurem.live/widget.js" 
+          data-api-key="sk_aurem_live_ee4befd0f507dd05fe5a9a09d956f552"></script>
+  
+  <script>
+    // Log theme detection for demo
+    setTimeout(() => {
+      console.log('%c🎨 AUREM Widget Theme Detection Demo', 'font-size: 16px; font-weight: bold; color: #E63946;');
+      console.log('Check the widget in the bottom-right corner!');
+      console.log('It automatically matched this site\'s theme colors.');
+    }, 1000);
+  </script>
+</body>
+</html>
