@@ -42665,6 +42665,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Voice Command Routes not loaded: {e}", flush=True)
 
+# ORA Forensic Suite
+try:
+    from routers.forensic_routes import router as forensic_router, set_db as set_forensic_db
+    set_forensic_db(db)
+    app.include_router(forensic_router)
+    print("[STARTUP] ORA Forensic Routes loaded (AI Root-Cause Analysis)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] ORA Forensic Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler

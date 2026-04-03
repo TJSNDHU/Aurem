@@ -21,6 +21,8 @@ import SystemStatusBar from '../components/SystemStatusBar';
 import CircuitBreakerDashboard from '../components/CircuitBreakerDashboard';
 // ORA Voice Wake-Word (Floating)
 import VoiceWakeWord from '../components/VoiceWakeWord';
+// ORA Forensic Uploader (Floating)
+import ForensicUploader from '../components/ForensicUploader';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -579,6 +581,9 @@ const AuremDashboard = () => {
       
       {/* ORA Voice Wake-Word - Floating Button */}
       <VoiceWakeWord token={token} />
+      
+      {/* ORA Forensic Uploader - Floating Button */}
+      <ForensicUploader token={token} />
       
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
