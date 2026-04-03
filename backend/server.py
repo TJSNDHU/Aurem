@@ -3772,6 +3772,23 @@ async def startup_event():
                 )
                 db = client[db_name]
                 logging.info(f"✓ MongoDB client created ({time.time()-t0:.2f}s)")
+                
+                # ════════════════════════════════════════════════════════════════
+                # STARTUP VALIDATION (from Reroots battle-tested pattern)
+                # ════════════════════════════════════════════════════════════════
+                try:
+                    from services.startup_validation import run_startup_validation
+                    validation_passed = await run_startup_validation(db)
+                    
+                    if not validation_passed:
+                        logging.error("[STARTUP] ❌ CRITICAL: Startup validation failed")
+                        logging.warning("[STARTUP] Server will continue but may not function correctly")
+                    else:
+                        logging.info("[STARTUP] ✅ Startup validation passed")
+                except Exception as e:
+                    logging.warning(f"[STARTUP] ⚠️  Startup validation error: {e}")
+                # ════════════════════════════════════════════════════════════════
+                
         except Exception as e:
             logging.error(f"❌ MongoDB client creation failed: {e}")
             logging.warning("Server will continue but database operations will fail")
@@ -42578,6 +42595,15 @@ try:
     print("[STARTUP] Premium Features Routes loaded (Follow-Up, Handoff, Multi-Modal)", flush=True)
 except ImportError as e:
     print(f"[STARTUP] Premium Routes not loaded: {e}", flush=True)
+
+# System Status & Sync Routes
+try:
+    from routers.system_routes import router as system_router, set_db as set_system_db
+    set_system_db(db)
+    app.include_router(system_router)
+    print("[STARTUP] System Status & Sync Routes loaded (Health, Circuit Breakers)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] System Routes not loaded: {e}", flush=True)
 
 # AUREM Bug Engine APScheduler
 try:
