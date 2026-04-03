@@ -42570,6 +42570,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Business Routes not loaded: {e}", flush=True)
 
+# Premium Features Routes (Tier 2/3)
+try:
+    from routers.premium_routes import router as premium_router, set_db as set_premium_db
+    set_premium_db(db)
+    app.include_router(premium_router)
+    print("[STARTUP] Premium Features Routes loaded (Follow-Up, Handoff, Multi-Modal)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Premium Routes not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler

@@ -222,14 +222,35 @@ class OmniDimensionService:
         content: str,
         metadata: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Process an inbound message from any channel"""
+        """Process an inbound message from any channel with multi-modal and coexistence support"""
         from services.aurem_business_agents import get_business_ai, AgentRole
+        from services.multimodal_processor import get_multimodal_processor
+        from services.whatsapp_coexistence import get_coexistence_manager
         
         # Get or create customer
         customer = await self.get_or_create_customer(business_id, sender_id, channel)
         
+        # Check if human is handling this conversation
+        coexistence = get_coexistence_manager(self.db)
+        should_respond = await coexistence.should_ai_respond(customer.customer_id, business_id)
+        
+        # Multi-modal processing
+        processor = get_multimodal_processor()
+        processed = await processor.process_message(
+            message_data={
+                "content": content,
+                "type": metadata.get("type", "text") if metadata else "text",
+                "media_url": metadata.get("media_url") if metadata else None,
+                **metadata if metadata else {}
+            },
+            context={"business_id": business_id, "customer_id": customer.customer_id}
+        )
+        
+        # Use processed text for analysis
+        text_content = processed.get("text", content)
+        
         # Analyze message
-        analysis = await self._analyze_message(content)
+        analysis = await self._analyze_message(text_content)
         
         # Create message record
         message = ChannelMessage(
@@ -238,8 +259,12 @@ class OmniDimensionService:
             business_id=business_id,
             customer_id=customer.customer_id,
             direction="inbound",
-            content=content,
-            metadata=metadata or {},
+            content=text_content,
+            metadata={
+                **(metadata or {}),
+                "multimodal": processed if processed.get("processed") else None,
+                "original_type": processed.get("type")
+            },
             priority=self._determine_priority(analysis),
             sentiment=analysis.get("sentiment"),
             intent=analysis.get("intent"),
@@ -257,14 +282,23 @@ class OmniDimensionService:
             "sentiment_score": analysis.get("sentiment", customer.sentiment_score)
         })
         
-        # Get AI response using business-specific agent
-        business_ai = get_business_ai(self.db)
-        ai_response = await business_ai.chat_with_context(
-            message=content,
-            business_id=business_id,
-            agent_role=AgentRole.ENVOY,
-            session_id=customer.customer_id
-        )
+        # Determine if AI should respond
+        ai_response_text = None
+        agent_name = None
+        
+        if should_respond.get("should_respond"):
+            # Get AI response using business-specific agent
+            business_ai = get_business_ai(self.db)
+            ai_response = await business_ai.chat_with_context(
+                message=text_content,
+                business_id=business_id,
+                agent_role=AgentRole.ENVOY,
+                session_id=customer.customer_id
+            )
+            ai_response_text = ai_response.get("response")
+            agent_name = ai_response.get("agent_name")
+        else:
+            ai_response_text = None  # Human handling
         
         return {
             "message_id": message.message_id,
@@ -272,9 +306,12 @@ class OmniDimensionService:
             "channel": channel.value,
             "analysis": analysis,
             "priority": message.priority.value,
-            "ai_response": ai_response.get("response"),
-            "agent_used": ai_response.get("agent_name"),
-            "suggested_action": self._get_suggested_action(analysis)
+            "ai_response": ai_response_text,
+            "agent_used": agent_name,
+            "suggested_action": self._get_suggested_action(analysis),
+            "conversation_mode": should_respond.get("mode"),
+            "ai_handling": should_respond.get("should_respond"),
+            "multimodal_processed": processed.get("processed", False)
         }
     
     async def send_outbound_message(
