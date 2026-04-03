@@ -239,3 +239,115 @@ async def get_stats():
     """Get vector search statistics"""
     vector_search = get_vector_search()
     return vector_search.get_stats()
+
+
+@router.post("/search/hybrid")
+async def hybrid_search(
+    query: str,
+    platforms: Optional[List[str]] = None,
+    limit: int = 10,
+    semantic_weight: float = 0.7
+):
+    """
+    Hybrid search: Combines real-time connector search + semantic vector search
+    
+    Args:
+        query: Search query
+        platforms: List of platforms to search (default: all)
+        limit: Results per platform
+        semantic_weight: Weight for semantic results (0.0-1.0, default 0.7)
+    
+    Example:
+    POST /api/vector/search/hybrid
+    {
+        "query": "AI automation tools",
+        "platforms": ["reddit", "twitter"],
+        "limit": 5,
+        "semantic_weight": 0.7
+    }
+    
+    Returns:
+    - Real-time results from connectors (30% weight)
+    - Semantic results from vector DB (70% weight)
+    - Combined and ranked by relevance
+    """
+    vector_search = get_vector_search()
+    
+    results = {
+        "query": query,
+        "real_time_results": [],
+        "semantic_results": [],
+        "combined_results": []
+    }
+    
+    try:
+        # 1. Get semantic results from vector DB
+        semantic_results = await vector_search.semantic_search(
+            query=query,
+            collection_name="connector_data",
+            limit=limit * 2  # Get more for better ranking
+        )
+        
+        results["semantic_results"] = semantic_results[:limit]
+        
+        # 2. If platforms specified, get real-time results
+        if platforms:
+            ecosystem = get_connector_ecosystem()
+            
+            for platform in platforms:
+                try:
+                    # Quick search on platform
+                    platform_data = await ecosystem.fetch_data(
+                        platform,
+                        {"type": "search", "query": query, "limit": limit}
+                    )
+                    
+                    results["real_time_results"].extend([
+                        {
+                            "platform": platform,
+                            "data": item,
+                            "source": "real_time"
+                        }
+                        for item in platform_data[:limit]
+                    ])
+                except Exception as e:
+                    logger.warning(f"[HybridSearch] {platform} search failed: {e}")
+        
+        # 3. Combine and rank results
+        # Semantic results get higher weight (default 70%)
+        combined = []
+        
+        for idx, result in enumerate(results["semantic_results"]):
+            combined.append({
+                **result,
+                "source": "semantic",
+                "rank_score": result.get("similarity", 0) * semantic_weight
+            })
+        
+        for idx, result in enumerate(results["real_time_results"]):
+            # Real-time results get lower weight but are fresher
+            combined.append({
+                **result,
+                "source": "real_time",
+                "rank_score": (1 - idx / max(len(results["real_time_results"]), 1)) * (1 - semantic_weight)
+            })
+        
+        # Sort by rank score
+        combined.sort(key=lambda x: x.get("rank_score", 0), reverse=True)
+        results["combined_results"] = combined[:limit]
+        
+        return {
+            "success": True,
+            "query": query,
+            "total_results": len(combined),
+            "results": results["combined_results"],
+            "metadata": {
+                "semantic_count": len(results["semantic_results"]),
+                "real_time_count": len(results["real_time_results"]),
+                "semantic_weight": semantic_weight
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"[HybridSearch] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

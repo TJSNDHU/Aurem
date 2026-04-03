@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from services.connector_ecosystem import get_connector_ecosystem
+from services.vector_search import get_vector_search
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class FetchRequest(BaseModel):
     """Fetch data from platform"""
     platform: str
     query: Dict[str, Any]
+    auto_index: bool = True  # Auto-index in vector DB for semantic search
 
 
 class PostRequest(BaseModel):
@@ -94,6 +96,11 @@ async def fetch_data(request: FetchRequest):
     """
     Fetch data from a platform
     
+    Features:
+    - Fetches data from connector
+    - Auto-indexes in vector DB for semantic search (if auto_index=true)
+    - Returns results with indexing status
+    
     Examples:
     
     GitHub Issues:
@@ -104,7 +111,8 @@ async def fetch_data(request: FetchRequest):
             "type": "issues",
             "state": "open",
             "limit": 10
-        }
+        },
+        "auto_index": true
     }
     
     YouTube Search:
@@ -126,15 +134,37 @@ async def fetch_data(request: FetchRequest):
     }
     """
     ecosystem = get_connector_ecosystem()
+    vector_search = get_vector_search()
     
     try:
+        # Fetch data from connector
         data = await ecosystem.fetch_data(request.platform, request.query)
+        
+        # Auto-index in vector DB if enabled
+        indexed = False
+        if request.auto_index and data:
+            try:
+                # Create query context for better semantic search
+                query_context = str(request.query)
+                indexed = await vector_search.index_connector_data(
+                    platform=request.platform,
+                    data=data,
+                    query_context=query_context
+                )
+                
+                if indexed:
+                    logger.info(f"[Connector] Auto-indexed {len(data)} items from {request.platform}")
+            except Exception as e:
+                logger.warning(f"[Connector] Auto-indexing failed: {e}")
+                # Don't fail the request if indexing fails
         
         return {
             "success": True,
             "platform": request.platform,
             "results": len(data),
-            "data": data
+            "data": data,
+            "indexed": indexed,
+            "semantic_search_enabled": indexed
         }
         
     except Exception as e:
