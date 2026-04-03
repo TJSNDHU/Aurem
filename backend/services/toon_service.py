@@ -106,7 +106,7 @@ class AuremToonService:
           usage: {tokens_used:15000, tokens_limit:200000, formulas:5/50}
           services: Service[3]{id, status, tokens}: gpt-4o, active, 15000; voxtral, active, 0; stripe, active, 0
         """
-        if not self.db:
+        if self.db is None:
             return f"Subscription: user {user_id} not found"
         
         sub = await self.db.subscriptions.find_one(
@@ -165,7 +165,7 @@ class AuremToonService:
           stripe-payments, payments, Stripe, 0.029/txn, active, [all]
           ...
         """
-        if not self.db:
+        if self.db is None:
             return "Service[0]:"
         
         services = await self.db.service_registry.find(
@@ -299,7 +299,7 @@ class AuremToonService:
           user_456, gpt-4o-mini, 500, 0.0001, /api/aurem/chat, 2026-01-15T10:32
           ...
         """
-        if not self.db:
+        if self.db is None:
             return "UsageLog[0]:"
         
         # Build query
@@ -349,7 +349,7 @@ class AuremToonService:
         - Top users by usage
         - Recent activity
         """
-        if not self.db:
+        if self.db is None:
             return "AdminDashboard: Database not connected"
         
         lines = ["AdminDashboard:"]

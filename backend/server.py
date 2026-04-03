@@ -198,6 +198,18 @@ from routes.auto_repair_routes import router as auto_repair_router, set_db as se
 from routes.orchestrator_routes import router as orchestrator_router, set_db as set_orchestrator_routes_db
 from services.orchestrator import orchestrator, set_db as set_orchestrator_db, send_daily_digest
 
+# TOON-based SaaS System imports
+try:
+    from routers.admin_mission_control_router import set_db as set_mission_control_db
+    from routers.subscription_public_router import router as subscription_public_router, set_db as set_subscription_public_db
+    from services.toon_service import set_toon_service_db
+except ImportError as e:
+    logging.warning(f"[STARTUP] Mission Control imports failed: {e}")
+    set_mission_control_db = None
+    set_subscription_public_db = None
+    set_toon_service_db = None
+    subscription_public_router = None
+
 # Crypto Signal Engine - Conditionally loaded (disabled for deployment)
 crypto_router = None
 start_crypto_tasks = None
@@ -3921,12 +3933,17 @@ async def startup_event():
         
         # Initialize Admin Mission Control (TOON-based SaaS system)
         t0 = time.time()
-        try:
-            set_mission_control_db(db)
-            set_toon_service_db(db)
-            logging.info(f"✅ Admin Mission Control (TOON) initialized ({time.time()-t0:.2f}s)")
-        except Exception as e:
-            logging.warning(f"⚠️ Mission Control initialization skipped: {e}")
+        if set_mission_control_db is not None and set_toon_service_db is not None:
+            try:
+                set_mission_control_db(db)
+                set_toon_service_db(db)
+                if set_subscription_public_db is not None:
+                    set_subscription_public_db(db)
+                logging.info(f"✅ Admin Mission Control (TOON) initialized ({time.time()-t0:.2f}s)")
+            except Exception as e:
+                logging.warning(f"⚠️ Mission Control initialization error: {e}")
+        else:
+            logging.warning("⚠️ Mission Control not available (imports failed)")
         
         # Initialize Crash Protection system
         t0 = time.time()
@@ -42211,12 +42228,22 @@ except ImportError as e:
 
 # AUREM TOON-Based SaaS System (Admin Mission Control)
 try:
-    from routers.admin_mission_control_router import router as mission_control_router, set_db as set_mission_control_db
-    from services.toon_service import set_toon_service_db
+    from routers.admin_mission_control_router import router as mission_control_router
     app.include_router(mission_control_router)  # Admin Mission Control (TOON format)
     logging.info("[STARTUP] Admin Mission Control router loaded ✅")
 except ImportError as e:
-    logging.warning(f"Churn router not loaded: {e}")
+    logging.warning(f"Mission Control router not loaded: {e}")
+
+# AUREM Subscription Router (Customer-facing, TOON format)
+if subscription_public_router is not None:
+    app.include_router(subscription_public_router)  # Public subscription plans
+    logging.info("[STARTUP] Subscription Public router loaded ✅")
+
+try:
+    from routers.finance_ai_router import router as finance_router
+    app.include_router(finance_router)  # Financial Insights AI
+except ImportError as e:
+    logging.warning(f"Finance router not loaded: {e}")
 
 try:
     from routers.document_scanner_router import router as doc_scanner_router

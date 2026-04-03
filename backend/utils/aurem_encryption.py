@@ -177,3 +177,23 @@ def mask_email(email: str) -> str:
     domain = parts[1]
     masked_user = username[0] + "***" if len(username) > 1 else "***"
     return f"{masked_user}@{domain}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# API KEY ENCRYPTION (for Admin Mission Control)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def encrypt_api_key(plain_key: str) -> str:
+    """
+    Encrypt an API key for secure storage
+    Uses same Fernet cipher as prospect encryption
+    """
+    return encrypt_value(plain_key)
+
+
+def decrypt_api_key(encrypted_key: str) -> str:
+    """
+    Decrypt an API key from secure storage
+    Uses same Fernet cipher as prospect encryption
+    """
+    return decrypt_value(encrypted_key)
