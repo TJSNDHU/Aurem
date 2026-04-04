@@ -192,16 +192,55 @@ frontend:
       - working: false
         agent: "testing"
         comment: "Minor issue: /api/scanner/calculate-pricing endpoint returns 400 Bad Request. Root cause: Parameter mismatch - backend expects query parameters (scan_id: str = None) but frontend sends JSON body ({ scan_id: scanId }). This is a non-critical issue as pricing display is optional and doesn't affect the main scanner functionality. Recommendation: Either change backend to accept body parameters using Pydantic model, or change frontend to send query parameters."
+  
+  - task: "Sales Pipeline Dashboard Integration"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/platform/SalesPipelineDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY - Sales Pipeline Dashboard fully integrated and working. All features verified: (1) SALES section in sidebar with 4 items visible, (2) Sales Pipeline navigation works, (3) 5-step pipeline visualization displayed correctly (Scan → Decision Maker → Proposal → Contract → Onboarding), (4) 'Select a Customer Scan' section visible with 4 customer scans displayed (emergent.io, github.com, stripe.com, example.com), (5) Dark theme with gold accents (#D4AF37) confirmed, (6) No critical console errors. Screenshots captured. Feature is production-ready."
+  
+  - task: "Voice Sales Agent Integration"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/platform/VoiceSalesAgent.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY - Voice Sales Agent fully integrated and working. All features verified: (1) Navigation from sidebar works, (2) All 3 tabs present and functional (Auto Calls, Voice Training, Call History), (3) Auto Calls tab: 'How Auto-Calls Work' info card visible, 'Select Customer to Call' section displays 4 scans, 3 scans have phone numbers with 'Start AI Call' buttons enabled, 1 scan shows 'No Phone Number' with disabled button, (4) Voice Training tab: 'Voice Profile Training' info card and 'Trained Voice Profiles' section visible, (5) Call History tab: 'Recent Calls' section visible with empty state message. All tabs switch correctly. Screenshots captured for all 3 tabs. Feature is production-ready."
+  
+  - task: "Invisible Coach Integration"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/platform/InvisibleCoach.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY - Invisible Coach fully integrated and working. All features verified: (1) Navigation from sidebar works, (2) Page title 'Invisible AI Sales Coach' visible, (3) 'How Invisible Coach Works' info card with 5 bullet points visible, (4) Privacy warning displayed (yellow box with 'Privacy Note: Always inform participants if recording is enabled'), (5) 'Select Customer Scan for Context' section visible with 4 customer scans displayed, (6) Each scan has 'Start Coach' button with purple-to-pink gradient. Screenshot captured. Feature is production-ready."
 
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
     - "Customer Scanner with Manual Enrichment - COMPLETED ✅"
+    - "Sales Pipeline Dashboard Integration - COMPLETED ✅"
+    - "Voice Sales Agent Integration - COMPLETED ✅"
+    - "Invisible Coach Integration - COMPLETED ✅"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -285,3 +324,62 @@ agent_communication:
       
       **RECOMMENDATION:**
       The Customer Scanner with Manual Enrichment feature is production-ready. The pricing calculator issue is minor and can be fixed later if needed.
+  
+  - agent: "testing"
+    message: |
+      ✅ 3 NEW SALES FEATURES - TESTING COMPLETE
+      
+      Tested all 3 new Sales features integrated into AUREM dashboard as requested.
+      
+      **WHAT WAS TESTED:**
+      1. Login with credentials (teji.ss1986@gmail.com / Admin123)
+      2. SALES section in sidebar with 4 items verification
+      3. Sales Pipeline Dashboard - Full flow and UI
+      4. Voice Sales Agent - All 3 tabs (Auto Calls, Voice Training, Call History)
+      5. Invisible Coach - Info card, scan selection, privacy warning
+      6. Visual verification (dark theme, gold accents)
+      7. Console error monitoring
+      
+      **TEST RESULTS - ALL FEATURES WORKING ✅:**
+      
+      **1. Sales Pipeline Dashboard:**
+      ✅ 5-step pipeline visualization (Scan → Decision Maker → Proposal → Contract → Onboarding)
+      ✅ "Select a Customer Scan" section with 4 scans displayed
+      ✅ Scan cards show scores, critical issues, and total issues
+      ✅ Dark theme with gold accents confirmed
+      
+      **2. Voice Sales Agent:**
+      ✅ All 3 tabs present and functional (Auto Calls, Voice Training, Call History)
+      ✅ Auto Calls: Info card, customer selection, 3 "Start AI Call" buttons (with phone validation)
+      ✅ Voice Training: Info card, "Trained Voice Profiles" section, "+ Train New Voice" button
+      ✅ Call History: "Recent Calls" section with empty state
+      
+      **3. Invisible Coach:**
+      ✅ "How Invisible Coach Works" info card with 5 bullet points
+      ✅ Privacy warning displayed (yellow box)
+      ✅ "Select Customer Scan for Context" section with 4 scans
+      ✅ "Start Coach" buttons with purple-to-pink gradient
+      
+      **SIDEBAR INTEGRATION:**
+      ✅ SALES section header visible
+      ✅ All 4 items present: Customer Scanner, Sales Pipeline, Voice Sales Agent, Invisible Coach
+      ✅ Navigation works smoothly between all features
+      
+      **VISUAL VERIFICATION:**
+      ✅ Dark theme confirmed (rgb(5, 5, 5) background)
+      ✅ Gold accents confirmed (13 elements with #D4AF37)
+      ✅ AUREM design system consistent across all pages
+      
+      **CONSOLE ERRORS:**
+      ✅ Only 1 minor React warning (non-boolean attribute) - not critical
+      ✅ No network errors
+      
+      **SCREENSHOTS CAPTURED:**
+      - sales_pipeline_dashboard.png
+      - voice_agent_auto_calls.png
+      - voice_agent_training.png
+      - voice_agent_history.png
+      - invisible_coach.png
+      
+      **RECOMMENDATION:**
+      All 3 Sales features are production-ready and fully integrated. No critical issues found.

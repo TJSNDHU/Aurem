@@ -31,6 +31,12 @@ import APIKeysManager from './APIKeysManager';
 import MissionControl from './MissionControl';
 // Customer Scanner
 import CustomerScanner from './CustomerScanner';
+// Voice Sales Agent
+import VoiceSalesAgent from './VoiceSalesAgent';
+// Invisible Coach
+import InvisibleCoach from './InvisibleCoach';
+// Sales Pipeline Dashboard
+import SalesPipelineDashboard from './SalesPipelineDashboard';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -50,9 +56,17 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout }) => {
       ]
     },
     {
-      title: 'SYSTEM',
+      title: 'SALES',
       items: [
         { id: 'customer-scanner', label: 'Customer Scanner', icon: Activity },
+        { id: 'sales-pipeline', label: 'Sales Pipeline', icon: TrendingUp },
+        { id: 'voice-sales-agent', label: 'Voice Sales Agent', icon: PhoneCall },
+        { id: 'invisible-coach', label: 'Invisible Coach', icon: Shield },
+      ]
+    },
+    {
+      title: 'SYSTEM',
+      items: [
         { id: 'circuit-breakers', label: 'Circuit Breakers', icon: Shield },
         { id: 'github-leads', label: 'Intelligence & Growth', icon: TrendingUp },
         { id: 'business-management', label: 'Business Management', icon: Building2 },
@@ -633,6 +647,18 @@ const AuremDashboard = () => {
         ) : activeItem === 'customer-scanner' ? (
           <div className="flex-1 overflow-auto">
             <CustomerScanner token={token} />
+          </div>
+        ) : activeItem === 'sales-pipeline' ? (
+          <div className="flex-1 overflow-auto">
+            <SalesPipelineDashboard token={token} />
+          </div>
+        ) : activeItem === 'voice-sales-agent' ? (
+          <div className="flex-1 overflow-auto">
+            <VoiceSalesAgent token={token} />
+          </div>
+        ) : activeItem === 'invisible-coach' ? (
+          <div className="flex-1 overflow-auto">
+            <InvisibleCoach token={token} />
           </div>
         ) : activeItem === 'circuit-breakers' ? (
           <div className="flex-1 overflow-auto">
