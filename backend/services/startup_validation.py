@@ -68,7 +68,8 @@ class StartupValidator:
         """Check MongoDB connection"""
         check_name = "MongoDB Connection"
         try:
-            if not self.db:
+            # IMPORTANT: Use `is None` instead of `not db` to avoid PyMongo NotImplementedError
+            if self.db is None:
                 self.errors.append(f"{check_name}: Database not initialized")
                 return
             

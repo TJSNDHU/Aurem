@@ -178,7 +178,9 @@ class AnalyticsAggregator:
                     {"_id": 0, "industry": 1, "country": 1, "interest": 1}
                 ).to_list(1000)
                 
-                logger.info(f"[AnalyticsAggregator] Found {len(leads)} leads in fallback query")
+                logger.info(f"[AnalyticsAggregator] FOUND {len(leads)} leads in database")
+                if leads:
+                    logger.info(f"[AnalyticsAggregator] SAMPLE LEAD: {leads[0]}")
                 
                 total_leads = len(leads)
                 for lead in leads:
@@ -192,7 +194,7 @@ class AnalyticsAggregator:
                     if interest:
                         all_topics.append(interest)
                 
-                logger.info(f"[AnalyticsAggregator] Aggregated: {total_leads} leads, {len(by_industry)} industries, {len(by_country)} countries")
+                logger.info(f"[AnalyticsAggregator] AGGREGATED: {total_leads} leads, Industries: {dict(by_industry)}, Countries: {dict(by_country)}")
             else:
                 logger.info(f"[AnalyticsAggregator] Using analytics_daily data: {len(daily_data)} days")
                 # Use pre-aggregated data from analytics_daily
@@ -332,6 +334,9 @@ _analytics_aggregator = None
 def get_analytics_aggregator(db=None) -> AnalyticsAggregator:
     """Get or create analytics aggregator instance"""
     global _analytics_aggregator
-    if _analytics_aggregator is None or db is not None:
+    # Always create new instance when db is provided to ensure fresh data
+    if db is not None:
+        _analytics_aggregator = AnalyticsAggregator(db)
+    elif _analytics_aggregator is None:
         _analytics_aggregator = AnalyticsAggregator(db)
     return _analytics_aggregator
