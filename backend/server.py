@@ -42993,6 +42993,11 @@ from routers.voice_sales_agent import router as voice_agent_router
 app.include_router(voice_agent_router)
 print("[STARTUP] AI Voice Sales Agent loaded (Auto-calls, Voice Training, Vapi Integration)")
 
+# Invisible AI Sales Coach
+from routers.invisible_coach import router as coach_router
+app.include_router(coach_router)
+print("[STARTUP] Invisible AI Sales Coach loaded (Secret In-Person Assistance)")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
