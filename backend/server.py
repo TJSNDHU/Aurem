@@ -42847,6 +42847,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] ORA Forensic Routes not loaded: {e}", flush=True)
 
+# ============ LEADS ROUTER (Phase A: Lead Capture) ============
+try:
+    from routers.leads_router import router as leads_router, set_db as set_leads_db
+    set_leads_db(db)
+    app.include_router(leads_router)
+    print("[STARTUP] ✓ Leads Router loaded (Lead Capture System)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Leads Router not loaded: {e}", flush=True)
+
 # AUREM Bug Engine APScheduler
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
