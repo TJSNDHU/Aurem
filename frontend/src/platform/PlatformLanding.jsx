@@ -418,7 +418,7 @@ const PlatformLanding = () => {
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/platform/signup')}
+                  onClick={() => navigate('/auth')}
                   className={`w-full py-3 rounded text-sm font-medium tracking-wide mb-6 transition-all ${
                     i === 2 
                       ? 'bg-[#D4AF37] text-[#050505]' 
