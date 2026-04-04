@@ -851,8 +851,29 @@ export default function AuremAI() {
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <div style={{ fontFamily: "monospace", fontSize: 9, color: MU, padding: "3px 8px", border: "1px solid rgba(201,168,76,.1)", borderRadius: 4 }}>{sessionId}</div>
-              <button onClick={toggleVoice} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: `1px solid ${voiceOn ? GOLD : "rgba(201,168,76,.2)"}`, borderRadius: 20, background: voiceOn ? "rgba(201,168,76,.1)" : "transparent", color: voiceOn ? GOLD : GOLD2, fontSize: 10, cursor: "pointer", letterSpacing: "0.08em" }}>
-                ◉ {voiceOn ? "VOICE ON" : "VOICE OFF"}
+              {/* Prominent Voice Toggle Button */}
+              <button 
+                onClick={toggleVoice} 
+                title={voiceOn ? "Click to disable voice responses" : "Click to enable voice responses"}
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 6, 
+                  padding: "7px 14px", 
+                  border: `2px solid ${voiceOn ? "#D4AF37" : "rgba(201,168,76,.25)"}`, 
+                  borderRadius: 20, 
+                  background: voiceOn ? "linear-gradient(135deg, #D4AF37 0%, #8B7355 100%)" : "rgba(201,168,76,.08)", 
+                  color: voiceOn ? "#050505" : GOLD2, 
+                  fontSize: 11, 
+                  fontWeight: 600,
+                  cursor: "pointer", 
+                  letterSpacing: "0.08em",
+                  transition: "all 0.3s",
+                  boxShadow: voiceOn ? "0 0 15px rgba(212,175,55,.3)" : "none"
+                }}
+              >
+                <span style={{ fontSize: 14 }}>{voiceOn ? "🔊" : "🔇"}</span>
+                {voiceOn ? "VOICE ON" : "VOICE OFF"}
               </button>
             </div>
           </div>
@@ -928,7 +949,13 @@ export default function AuremAI() {
                 </button>
               </div>
             </div>
-            <div style={{ fontSize: 9, color: MU, letterSpacing: "0.07em", marginTop: 6, textAlign: "center" }}>ENTER to send · SHIFT+ENTER new line · 🎤 voice input · ◉ enable spoken responses</div>
+            <div style={{ fontSize: 10, color: MU, letterSpacing: "0.05em", marginTop: 8, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+              <span>ENTER to send</span>
+              <span>•</span>
+              <span>🎤 Click mic to speak</span>
+              <span>•</span>
+              <span>🔊 Toggle voice for spoken responses</span>
+            </div>
           </div>
         </div>
       ) : (
