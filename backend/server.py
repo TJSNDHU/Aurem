@@ -211,7 +211,8 @@ try:
     from routers.skills_router import router as skills_router
     from routers.vector_search_router import router as vector_search_router
     from routers.hooks_router import router as hooks_router
-    from routers.crypto_treasury_router import router as crypto_treasury_router, set_db as set_crypto_treasury_db
+    # Crypto treasury disabled for deployment (blockchain dependencies removed)
+    crypto_treasury_router = None
     from routers.generative_ui_router import router as generative_ui_router, set_db as set_generative_ui_db
     from services.toon_service import set_toon_service_db
     from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
@@ -40109,22 +40110,53 @@ async def export_concern_report(request: Request):
     # Merge scans by email
     seen_emails = set()
     all_scans = []
+    all_emails = []
     for scan in scans + alt_scans:
         email = scan.get("email")
         if email and email not in seen_emails:
             seen_emails.add(email)
             all_scans.append(scan)
+            all_emails.append(email.lower())
+
+    # OPTIMIZED: Batch queries instead of N+1
+    # Get all waitlist entries in one query
+    waitlist_entries = await db.waitlist.find(
+        {"email": {"$in": all_emails}}, {"_id": 0}
+    ).to_list(10000)
+    waitlist_map = {entry.get("email", "").lower(): entry for entry in waitlist_entries}
+    
+    # Get all founding member entries in one query
+    founding_entries = await db.founding_members.find(
+        {"email": {"$in": all_emails}}, {"_id": 0}
+    ).to_list(10000)
+    founding_map = {entry.get("email", "").lower(): entry for entry in founding_entries}
+    
+    # Get all referral codes from scans and user entries
+    all_referral_codes = set()
+    for scan in all_scans:
+        if scan.get("referral_code"):
+            all_referral_codes.add(scan.get("referral_code"))
+    for entry in list(waitlist_map.values()) + list(founding_map.values()):
+        if entry.get("referral_code"):
+            all_referral_codes.add(entry.get("referral_code"))
+    
+    # Batch query for all referral counts
+    referral_counts = {}
+    if all_referral_codes:
+        for code in all_referral_codes:
+            count = await db.referrals.count_documents(
+                {"referrer_code": code, "verified": True}
+            )
+            referral_counts[code] = count
 
     # Enrich with waitlist/founding member data for phone and referral info
     enriched_data = []
     for scan in all_scans:
         email = scan.get("email", "").lower()
 
-        # Look up user in waitlist or founding members for phone verification
-        waitlist_entry = await db.waitlist.find_one({"email": email}, {"_id": 0})
-        founding_entry = await db.founding_members.find_one(
-            {"email": email}, {"_id": 0}
-        )
+        # Look up user in pre-fetched dictionaries (no database query)
+        waitlist_entry = waitlist_map.get(email)
+        founding_entry = founding_map.get(email)
         user_entry = waitlist_entry or founding_entry or {}
 
         # Get phone verification status
@@ -40139,15 +40171,11 @@ async def export_concern_report(request: Request):
             "whatsapp_verified", False
         )
 
-        # Get referral count
+        # Get referral count from pre-fetched dictionary (no database query)
         referral_code = (
             user_entry.get("referral_code") or scan.get("referral_code") or ""
         )
-        referral_count = 0
-        if referral_code:
-            referral_count = await db.referrals.count_documents(
-                {"referrer_code": referral_code, "verified": True}
-            )
+        referral_count = referral_counts.get(referral_code, 0) if referral_code else 0
 
         # Extract concerns from scan data
         concerns = scan.get("concerns", [])
