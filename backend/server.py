@@ -4379,6 +4379,16 @@ async def startup_event():
         except ImportError as e:
             logging.warning(f"[ADMIN] Cache Management not initialized: {e}")
         
+        # Panic Button System (Phase C)
+        try:
+            from routers.panic_settings_router import set_db as set_panic_settings_db
+            from routers.panic_takeover_router import set_db as set_panic_takeover_db
+            set_panic_settings_db(db)
+            set_panic_takeover_db(db)
+            logging.info("[AUREM] Panic Button System initialized (Phase C: Trust Layer)")
+        except ImportError as e:
+            logging.warning(f"[AUREM] Panic Button not initialized: {e}")
+        
         logging.info(f"✓ All AI services initialized ({time.time()-t0:.2f}s)")
         
         logging.info(f"✅ ReRoots API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")
@@ -42899,6 +42909,17 @@ try:
     print("[STARTUP] ✓ Admin Cache Router loaded (Cache Management)", flush=True)
 except ImportError as e:
     print(f"[STARTUP] Admin Cache Router not loaded: {e}", flush=True)
+
+# ============ PANIC BUTTON ROUTERS (Phase C: Trust Layer) ============
+try:
+    from routers.panic_settings_router import router as panic_settings_router, set_db as set_panic_settings_db
+    from routers.panic_takeover_router import router as panic_takeover_router, set_db as set_panic_takeover_db
+    # NOTE: set_db called in startup_event() after db is initialized
+    app.include_router(panic_settings_router)
+    app.include_router(panic_takeover_router)
+    print("[STARTUP] ✓ Panic Button Routers loaded (Phase C: Trust Layer)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Panic Button Routers not loaded: {e}", flush=True)
 
 # AUREM Bug Engine APScheduler
 try:

@@ -253,3 +253,185 @@ async def send_appointment_confirmation_email(
     except Exception as e:
         logger.error(f"[EmailNotification] Error sending confirmation: {e}")
         return False
+
+
+
+async def send_panic_alert_email(to_email: str, alert_data: Dict) -> bool:
+    """
+    Send URGENT panic alert email to business owner
+    
+    Args:
+        to_email: Business owner email
+        alert_data: Panic event information
+            {
+                "business_name": str,
+                "customer_name": str,
+                "customer_phone": str,
+                "customer_email": str,
+                "trigger_reason": str,
+                "sentiment_score": float,
+                "detected_keywords": List[str],
+                "last_message": str,
+                "conversation_id": str,
+                "event_id": str,
+                "dashboard_link": str
+            }
+    
+    Returns:
+        Success boolean
+    """
+    if not RESEND_AVAILABLE:
+        logger.warning("[EmailNotification] Resend not available, skipping panic alert email")
+        return False
+    
+    try:
+        resend_api_key = os.environ.get("RESEND_API_KEY")
+        
+        if not resend_api_key:
+            logger.warning("[EmailNotification] RESEND_API_KEY not set")
+            # For development: log the email
+            logger.info(f"[EmailNotification] 🚨 PANIC ALERT would send to {to_email}: Customer {alert_data['customer_name']} needs attention")
+            return True  # Return success in dev mode
+        
+        resend.api_key = resend_api_key
+        
+        # Create URGENT email content
+        subject = f"🚨 URGENT: Customer Needs Attention - {alert_data['customer_name']}"
+        
+        # Format keywords
+        keywords_html = ", ".join(alert_data.get("detected_keywords", [])[:5])
+        if not keywords_html:
+            keywords_html = "N/A"
+        
+        # Sentiment indicator
+        sentiment_score = alert_data.get("sentiment_score", 0.0)
+        if sentiment_score < -0.7:
+            sentiment_indicator = "🔴 Very Negative"
+            sentiment_color = "#dc2626"
+        elif sentiment_score < -0.3:
+            sentiment_indicator = "🟡 Concerned"
+            sentiment_color = "#f59e0b"
+        else:
+            sentiment_indicator = "🟢 Neutral"
+            sentiment_color = "#10b981"
+        
+        html_content = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .alert-header {{ background: #dc2626; color: white; padding: 30px; 
+                                 text-align: center; border-radius: 8px 8px 0 0; }}
+                .alert-header h1 {{ margin: 0; font-size: 28px; }}
+                .alert-icon {{ font-size: 48px; margin-bottom: 10px; }}
+                .content {{ background: #fff; padding: 30px; border: 3px solid #dc2626; 
+                           border-radius: 0 0 8px 8px; }}
+                .customer-info {{ background: #fef2f2; padding: 20px; border-radius: 8px; 
+                                 border-left: 4px solid #dc2626; margin: 20px 0; }}
+                .info-row {{ display: flex; margin: 12px 0; }}
+                .label {{ font-weight: bold; width: 150px; color: #dc2626; }}
+                .value {{ flex: 1; }}
+                .message-box {{ background: #f3f4f6; padding: 15px; border-radius: 6px; 
+                               margin: 20px 0; font-style: italic; border-left: 4px solid #dc2626; }}
+                .cta-button {{ background: #dc2626; color: white; padding: 15px 40px; 
+                              text-decoration: none; border-radius: 6px; display: inline-block; 
+                              margin: 20px 0; font-weight: bold; font-size: 16px; }}
+                .cta-button:hover {{ background: #b91c1c; }}
+                .urgent-banner {{ background: #fef2f2; padding: 15px; border-radius: 6px; 
+                                 text-align: center; font-weight: bold; color: #dc2626; 
+                                 border: 2px solid #dc2626; margin-bottom: 20px; }}
+                .sentiment-badge {{ display: inline-block; padding: 8px 16px; border-radius: 20px; 
+                                   font-size: 14px; font-weight: bold; color: white; }}
+                .footer {{ text-align: center; color: #888; font-size: 12px; margin-top: 30px; 
+                          padding-top: 20px; border-top: 1px solid #ddd; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="alert-header">
+                    <div class="alert-icon">🚨</div>
+                    <h1>Customer Needs Immediate Attention</h1>
+                    <p style="margin: 10px 0 0 0; font-size: 16px;">AI detected potential issue requiring human intervention</p>
+                </div>
+                
+                <div class="content">
+                    <div class="urgent-banner">
+                        ⚡ ACTION REQUIRED: This customer may need immediate support
+                    </div>
+                    
+                    <div class="customer-info">
+                        <h2 style="margin-top: 0; color: #dc2626;">Customer Information</h2>
+                        <div class="info-row">
+                            <span class="label">Name:</span>
+                            <span class="value">{alert_data['customer_name']}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Phone:</span>
+                            <span class="value">{alert_data['customer_phone']}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Email:</span>
+                            <span class="value">{alert_data['customer_email']}</span>
+                        </div>
+                    </div>
+                    
+                    <h3>Alert Details</h3>
+                    <div class="info-row">
+                        <span class="label">Trigger Reason:</span>
+                        <span class="value">{alert_data['trigger_reason']}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Sentiment:</span>
+                        <span class="value">
+                            <span class="sentiment-badge" style="background: {sentiment_color};">
+                                {sentiment_indicator} ({sentiment_score:.2f})
+                            </span>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Detected Keywords:</span>
+                        <span class="value">{keywords_html}</span>
+                    </div>
+                    
+                    <h3>Last Customer Message</h3>
+                    <div class="message-box">
+                        "{alert_data['last_message']}"
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{alert_data['dashboard_link']}" class="cta-button">
+                            🎯 View Conversation & Take Over
+                        </a>
+                    </div>
+                    
+                    <div style="background: #f9fafb; padding: 15px; border-radius: 6px; font-size: 14px;">
+                        <p style="margin: 0;"><strong>What happens next?</strong></p>
+                        <p style="margin: 10px 0 0 0;">The AI has automatically paused responses for this conversation. 
+                        Click the button above to view the full chat history and take manual control.</p>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <p>This is an automated alert from AUREM AI Business Platform</p>
+                    <p>Event ID: {alert_data['event_id']} | Conversation ID: {alert_data['conversation_id']}</p>
+                    <p>&copy; 2026 {alert_data['business_name']}. Powered by AUREM.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        response = resend.Emails.send({
+            "from": f"AUREM Alerts <alerts@aurem.ai>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content
+        })
+        
+        logger.info(f"[EmailNotification] 🚨 PANIC ALERT sent to {to_email}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"[EmailNotification] Error sending panic alert: {e}")
+        return False
