@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Scan, Lock } from 'lucide-react';
 import FaceIDLogin from './FaceIDLogin';
-import FaceIDTrainer from './FaceIDTrainer';
+import FastBiometricSetup from './FastBiometricSetup';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -160,7 +160,7 @@ const FaceIDAuthWrapper = () => {
           </p>
         </div>
 
-        {/* FaceID Training Mode */}
+        {/* Fast Biometric Training Mode */}
         {mode === 'training' && (
           <div style={{
             background: '#0A0A0A',
@@ -168,7 +168,11 @@ const FaceIDAuthWrapper = () => {
             borderRadius: 16,
             overflow: 'hidden'
           }}>
-            <FaceIDTrainer onComplete={handleTrainingComplete} />
+            <FastBiometricSetup 
+              email={localStorage.getItem('faceid_email') || 'user@aurem.ai'}
+              onComplete={handleTrainingComplete}
+              onSkip={handleTrainingComplete}
+            />
           </div>
         )}
 
