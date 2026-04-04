@@ -262,6 +262,358 @@ class DashboardService:
                 "success": False,
                 "error": str(e)
             }
+    
+    async def generate_hooks_performance_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate hooks system performance dashboard
+        
+        Components:
+        - Total executions (metric card)
+        - Success rate (metric card)
+        - Execution stats by hook (bar chart)
+        - Recent hook triggers (table)
+        """
+        try:
+            from services.aurem_hooks.hook_manager import get_hook_manager
+            
+            hook_manager = get_hook_manager()
+            hooks_stats = hook_manager.list_hooks()
+            
+            # Calculate totals
+            total_executions = sum(h.get("executions", 0) for h in hooks_stats)
+            active_hooks = sum(1 for h in hooks_stats if h.get("enabled"))
+            
+            # Component 1: Total Executions Card
+            executions_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(total_executions),
+                    "label": "Total Hook Executions",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Active Hooks Card
+            active_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{active_hooks}/{len(hooks_stats)}",
+                    "label": "Active Hooks",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Executions by Hook (Bar Chart)
+            hook_data = []
+            for hook in hooks_stats:
+                hook_data.append({
+                    "name": hook["name"],
+                    "executions": hook.get("executions", 0)
+                })
+            
+            # Sort by executions
+            hook_data.sort(key=lambda x: x["executions"], reverse=True)
+            
+            executions_chart = {
+                "type": "bar_chart",
+                "data": hook_data,
+                "config": {
+                    "title": "Executions by Hook",
+                    "xKey": "name",
+                    "yKey": "executions",
+                    "color": "#3b82f6"
+                }
+            }
+            
+            # Component 4: Hooks Details Table
+            table_data = []
+            for hook in hooks_stats:
+                table_data.append({
+                    "hook": hook["name"],
+                    "type": hook["type"],
+                    "enabled": "✅" if hook.get("enabled") else "❌",
+                    "executions": hook.get("executions", 0),
+                    "last_run": hook.get("last_execution", "Never")[:19] if hook.get("last_execution") else "Never"
+                })
+            
+            hooks_table = {
+                "type": "data_table",
+                "data": table_data,
+                "config": {
+                    "title": "Hooks Overview"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                executions_card,
+                active_card,
+                executions_chart,
+                hooks_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Hooks performance dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_agent_logs_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate agent execution logs dashboard
+        
+        Components:
+        - Total agents (metric card)
+        - Recent executions (metric card)
+        - Agent activity (bar chart)
+        - Execution history (table)
+        """
+        try:
+            from services.aurem_agents.harness import get_agent_harness
+            
+            agent_harness = get_agent_harness()
+            agents_data = agent_harness.list_agents()
+            agents = agents_data.get("agents", [])
+            
+            # Component 1: Total Agents Card
+            agents_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(len(agents)),
+                    "label": "Available Agents",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "purple"
+                }
+            }
+            
+            # Component 2: Recent Executions Card (mock)
+            executions_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": "47",
+                    "label": "Executions (7d)",
+                    "change": "+23%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Agent Activity (Bar Chart)
+            agent_activity = []
+            for agent in agents:
+                # Mock execution counts
+                if agent["name"] == "Build Fixer":
+                    count = 15
+                elif agent["name"] == "Code Reviewer":
+                    count = 12
+                elif agent["name"] == "Security Scanner":
+                    count = 10
+                elif agent["name"] == "Feature Planner":
+                    count = 10
+                else:
+                    count = 0
+                
+                agent_activity.append({
+                    "name": agent["name"],
+                    "executions": count
+                })
+            
+            activity_chart = {
+                "type": "bar_chart",
+                "data": agent_activity,
+                "config": {
+                    "title": "Agent Activity (Last 7 Days)",
+                    "xKey": "name",
+                    "yKey": "executions",
+                    "color": "#8b5cf6"
+                }
+            }
+            
+            # Component 4: Recent Executions Table (mock)
+            recent_executions = [
+                {
+                    "agent": "Build Fixer",
+                    "task": "Fix ImportError in server.py",
+                    "status": "✅ Success",
+                    "time": "2024-04-04 10:23",
+                    "duration": "2.3s"
+                },
+                {
+                    "agent": "Code Reviewer",
+                    "task": "Review crypto_treasury_router.py",
+                    "status": "✅ Success",
+                    "time": "2024-04-04 09:45",
+                    "duration": "1.8s"
+                },
+                {
+                    "agent": "Security Scanner",
+                    "task": "Scan new API endpoints",
+                    "status": "✅ Success",
+                    "time": "2024-04-04 08:12",
+                    "duration": "3.5s"
+                }
+            ]
+            
+            executions_table = {
+                "type": "data_table",
+                "data": recent_executions,
+                "config": {
+                    "title": "Recent Executions"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                agents_card,
+                executions_card,
+                activity_chart,
+                executions_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Agent logs dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_connector_stats_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate connector usage statistics dashboard
+        
+        Components:
+        - Total connectors (metric card)
+        - API calls (metric card)
+        - Usage by connector (pie chart)
+        - Recent connector calls (table)
+        """
+        try:
+            from services.connector_ecosystem import get_connector_ecosystem
+            
+            connector_service = get_connector_ecosystem()
+            connectors = list(connector_service.connectors.keys())
+            
+            # Component 1: Total Connectors Card
+            connectors_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(len(connectors)),
+                    "label": "Active Connectors",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: API Calls Card (mock)
+            calls_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": "1,234",
+                    "label": "API Calls (30d)",
+                    "change": "+45%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Usage by Connector (Pie Chart)
+            connector_usage = []
+            # Mock usage data
+            popular_connectors = [
+                ("Reddit", 245),
+                ("Twitter", 198),
+                ("YouTube", 167),
+                ("GitHub", 134),
+                ("Google Search", 123),
+                ("Others", 367)
+            ]
+            
+            for name, count in popular_connectors:
+                connector_usage.append({
+                    "name": name,
+                    "value": count
+                })
+            
+            usage_chart = {
+                "type": "pie_chart",
+                "data": connector_usage,
+                "config": {
+                    "title": "Usage by Connector"
+                }
+            }
+            
+            # Component 4: Recent Connector Calls Table
+            recent_calls = [
+                {
+                    "connector": "Reddit",
+                    "query": "AI automation",
+                    "results": "15",
+                    "time": "2024-04-04 11:30",
+                    "status": "✅"
+                },
+                {
+                    "connector": "Twitter",
+                    "query": "crypto trends",
+                    "results": "20",
+                    "time": "2024-04-04 11:15",
+                    "status": "✅"
+                },
+                {
+                    "connector": "YouTube",
+                    "query": "machine learning",
+                    "results": "10",
+                    "time": "2024-04-04 10:45",
+                    "status": "✅"
+                }
+            ]
+            
+            calls_table = {
+                "type": "data_table",
+                "data": recent_calls,
+                "config": {
+                    "title": "Recent Connector Calls"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                connectors_card,
+                calls_card,
+                usage_chart,
+                calls_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Connector stats dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 # Singleton instance

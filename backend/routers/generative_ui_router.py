@@ -107,6 +107,125 @@ async def get_crypto_treasury_dashboard():
         raise HTTPException(500, str(e))
 
 
+@router.get("/dashboards/hooks-performance")
+async def get_hooks_performance_dashboard():
+    """
+    Generate hooks system performance dashboard
+    
+    Returns:
+    - Total executions (metric card)
+    - Active hooks (metric card)
+    - Executions by hook (bar chart)
+    - Hooks overview (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_hooks_performance_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Hooks performance dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/dashboards/agent-logs")
+async def get_agent_logs_dashboard():
+    """
+    Generate agent execution logs dashboard
+    
+    Returns:
+    - Total agents (metric card)
+    - Recent executions (metric card)
+    - Agent activity (bar chart)
+    - Execution history (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_agent_logs_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Agent logs dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/dashboards/connector-stats")
+async def get_connector_stats_dashboard():
+    """
+    Generate connector usage statistics dashboard
+    
+    Returns:
+    - Total connectors (metric card)
+    - API calls (metric card)
+    - Usage by connector (pie chart)
+    - Recent calls (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_connector_stats_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Connector stats dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_crypto_treasury_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Crypto treasury dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
 @router.post("/component/generate")
 async def generate_component(request: ComponentRequest):
     """
