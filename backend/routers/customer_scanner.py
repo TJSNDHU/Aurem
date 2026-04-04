@@ -367,9 +367,11 @@ def calculate_aurem_impact(all_issues: List[Dict]) -> Dict[str, Any]:
 async def scan_customer_system(request: ScanRequest, authorization: str = Header(None)):
     """
     Scan a customer's website/system and generate comprehensive report
+    NOW WITH DEEP SCANNING - Discovers entire tech ecosystem!
     """
     try:
         from server import db
+        from utils.deep_scanner import deep_scan_website
         import secrets
         
         # Get current user from token (if authenticated)
@@ -396,7 +398,11 @@ async def scan_customer_system(request: ScanRequest, authorization: str = Header
         except Exception as e:
             print(f"[Scanner] Failed to fetch content: {e}")
         
-        # Run scans in parallel
+        # Run DEEP SCAN to discover everything
+        print(f"[Scanner] Running deep scan on {request.website_url}...")
+        deep_scan_results = await deep_scan_website(str(request.website_url))
+        
+        # Run traditional scans in parallel
         results = await asyncio.gather(
             scan_performance(str(request.website_url)) if request.include_performance else asyncio.sleep(0, result={"score": 100, "issues": []}),
             scan_security(str(request.website_url), html_content) if request.include_security else asyncio.sleep(0, result={"score": 100, "issues": []}),
@@ -443,7 +449,7 @@ async def scan_customer_system(request: ScanRequest, authorization: str = Header
                 "solution": issue['aurem_solution']
             })
         
-        # Create scan result
+        # Create scan result WITH deep scan data
         scan_result = {
             "scan_id": scan_id,
             "website_url": str(request.website_url),
@@ -456,7 +462,10 @@ async def scan_customer_system(request: ScanRequest, authorization: str = Header
             "seo": seo_result,
             "accessibility": acc_result,
             "recommendations": recommendations,
-            "aurem_impact": aurem_impact
+            "aurem_impact": aurem_impact,
+            
+            # NEW: Deep scan discoveries
+            "deep_scan": deep_scan_results
         }
         
         # Save scan to database
