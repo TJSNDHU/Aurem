@@ -42963,6 +42963,12 @@ try:
     # Initial scan after 30 seconds delay (let services initialize)
     async def initial_bug_scan():
         import asyncio
+
+    # External Integration API (Chat Widget, Lead Capture, Webhooks)
+    from routers.integration_api import router as integration_router
+    app.include_router(integration_router)
+    print("[STARTUP] External Integration API loaded (Chat Widget, Lead Capture, Webhooks)")
+
         await asyncio.sleep(30)
         print("[AUREM] Running initial bug scan...", flush=True)
         await scheduled_bug_scan()
