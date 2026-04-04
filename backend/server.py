@@ -42988,6 +42988,11 @@ from routers.customer_scanner import router as scanner_router
 app.include_router(scanner_router)
 print("[STARTUP] Customer System Scanner loaded (System Analysis & Reports)")
 
+# AI Voice Sales Agent
+from routers.voice_sales_agent import router as voice_agent_router
+app.include_router(voice_agent_router)
+print("[STARTUP] AI Voice Sales Agent loaded (Auto-calls, Voice Training, Vapi Integration)")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
