@@ -121,6 +121,9 @@ class PanicHook:
                 "sentiment_label": sentiment_result["sentiment_label"],
                 "emotion": sentiment_result["emotion"],
                 "detected_keywords": sentiment_result["detected_keywords"],
+                "detected_language": sentiment_result.get("detected_language", "en"),
+                "original_message": latest_user_message,
+                "english_translation": sentiment_result.get("english_translation", latest_user_message),
                 "last_message": latest_user_message,
                 "conversation_history": conversation_history[-5:],  # Last 5 messages
                 "status": "triggered",

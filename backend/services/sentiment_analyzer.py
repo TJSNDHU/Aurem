@@ -122,7 +122,7 @@ class SentimentAnalyzer:
         message: str, 
         conversation_history: Optional[List[Dict]] = None
     ) -> Dict:
-        """Use GPT-4o to analyze sentiment"""
+        """Use GPT-4o to analyze sentiment with language detection"""
         
         # Build context from conversation history
         context = ""
@@ -133,7 +133,7 @@ class SentimentAnalyzer:
                 for msg in recent
             ])
         
-        prompt = f"""You are a sentiment analysis expert. Analyze the following customer message and classify the emotion.
+        prompt = f"""You are a multilingual sentiment analysis expert. Analyze the following customer message and classify the emotion.
 
 Context (recent conversation):
 {context if context else "No prior context"}
@@ -146,14 +146,16 @@ Analyze and respond with JSON:
   "sentiment_score": <float between -1.0 (very negative) and 1.0 (very positive)>,
   "emotion": "<happy|satisfied|neutral|concerned|frustrated|angry>",
   "needs_human": <true if customer explicitly or implicitly wants human help>,
+  "detected_language": "<ISO 639-1 code: en, fr, es, zh, de, etc.>",
+  "english_translation": "<English translation if not English, otherwise same as original>",
   "reasoning": "<brief explanation>"
 }}
 
-Focus on:
-- Tone and word choice
-- Explicit requests for human assistance
-- Frustration or anger indicators
-- Problem severity
+CRITICAL: 
+- Detect the language of the customer message
+- If not English, provide accurate English translation
+- Sentiment analysis works regardless of language
+- Focus on emotional tone, not just words
 
 Respond ONLY with valid JSON, no other text."""
 
@@ -175,6 +177,8 @@ Respond ONLY with valid JSON, no other text."""
             sentiment_score = result.get("sentiment_score", 0.0)
             emotion = result.get("emotion", "neutral")
             needs_human = result.get("needs_human", False)
+            detected_language = result.get("detected_language", "en")
+            english_translation = result.get("english_translation", message)
             
             # Determine panic state
             is_panic = sentiment_score < -0.7 or needs_human
@@ -204,7 +208,9 @@ Respond ONLY with valid JSON, no other text."""
                 "detected_keywords": [],
                 "needs_human": needs_human,
                 "confidence": 0.85,
-                "reasoning": result.get("reasoning", "")
+                "reasoning": result.get("reasoning", ""),
+                "detected_language": detected_language,
+                "english_translation": english_translation
             }
         
         except Exception as e:
@@ -216,9 +222,22 @@ Respond ONLY with valid JSON, no other text."""
         message: str, 
         custom_keywords: Optional[List[str]] = None
     ) -> Dict:
-        """Fast keyword-based panic detection"""
+        """Fast keyword-based panic detection with basic language detection"""
         
         message_lower = message.lower()
+        
+        # Basic language detection (simple heuristic)
+        detected_language = "en"  # Default to English
+        
+        # French indicators
+        if any(word in message_lower for word in ["je", "vous", "suis", "très", "merci"]):
+            detected_language = "fr"
+        # Spanish indicators
+        elif any(word in message_lower for word in ["estoy", "muy", "por favor", "gracias"]):
+            detected_language = "es"
+        # German indicators
+        elif any(word in message_lower for word in ["ich", "bin", "sehr", "danke"]):
+            detected_language = "de"
         
         # Combine universal and custom keywords
         all_keywords = UNIVERSAL_PANIC_KEYWORDS.copy()
@@ -252,7 +271,9 @@ Respond ONLY with valid JSON, no other text."""
             "panic_triggers": panic_triggers,
             "detected_keywords": detected,
             "needs_human": has_human_request,
-            "confidence": confidence
+            "confidence": confidence,
+            "detected_language": detected_language,
+            "english_translation": message  # Fallback doesn't translate
         }
     
     def _fallback_analysis(

@@ -130,7 +130,9 @@ class ToneSyncService:
                 "recommended_tone": recommended_tone,
                 "vapi_metadata": vapi_metadata,
                 "should_alert": should_alert,
-                "detected_keywords": sentiment_result.get("detected_keywords", [])
+                "detected_keywords": sentiment_result.get("detected_keywords", []),
+                "detected_language": sentiment_result.get("detected_language", "en"),
+                "english_translation": sentiment_result.get("english_translation", transcript)
             }
         
         except Exception as e:
