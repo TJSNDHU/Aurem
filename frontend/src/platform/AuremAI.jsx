@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef, useCallback } from "react";
 import GmailIntegration from "./GmailIntegration";
 import DeveloperPortal from "./DeveloperPortal";
 import UnifiedInbox from "./UnifiedInbox";
@@ -6,6 +5,12 @@ import WhatsAppIntegration from "./WhatsAppIntegration";
 import VoiceCommand from "./VoiceCommand";
 import VoiceAnalytics from "./VoiceAnalytics";
 import OmniLive from "./OmniLive";
+import ORAJarvis from "./ORAJarvis";
+
+export default function AuremAI() {
+  // Render the new JARVIS-style interface
+  return <ORAJarvis />;
+}
 
 const RESPONSES = {
   automation: `Outstanding. Here's how AUREM's automation architecture works:
