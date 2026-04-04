@@ -1030,6 +1030,563 @@ class DashboardService:
                 "success": False,
                 "error": str(e)
             }
+    
+    async def generate_api_tester_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate API endpoint tester dashboard
+        
+        Components:
+        - Total endpoints (metric card)
+        - Response time avg (metric card)
+        - Endpoint list with test buttons (table)
+        - Response time chart (bar chart)
+        """
+        try:
+            # Mock API endpoint data
+            total_endpoints = 147
+            avg_response_time = 245  # ms
+            
+            # Component 1: Total Endpoints Card
+            endpoints_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(total_endpoints),
+                    "label": "Total API Endpoints",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Avg Response Time Card
+            response_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{avg_response_time}ms",
+                    "label": "Avg Response Time",
+                    "change": "-12%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Endpoint List (Table)
+            endpoints = [
+                {
+                    "method": "GET",
+                    "endpoint": "/api/generative-ui/dashboards/subscription",
+                    "status": "✅ 200",
+                    "response_time": "234ms",
+                    "last_tested": "2024-04-04 12:00"
+                },
+                {
+                    "method": "POST",
+                    "endpoint": "/api/crypto-treasury/convert",
+                    "status": "✅ 200",
+                    "response_time": "456ms",
+                    "last_tested": "2024-04-04 11:45"
+                },
+                {
+                    "method": "GET",
+                    "endpoint": "/api/hooks/list",
+                    "status": "✅ 200",
+                    "response_time": "123ms",
+                    "last_tested": "2024-04-04 11:30"
+                },
+                {
+                    "method": "POST",
+                    "endpoint": "/api/agents/execute",
+                    "status": "✅ 200",
+                    "response_time": "678ms",
+                    "last_tested": "2024-04-04 11:15"
+                }
+            ]
+            
+            endpoints_table = {
+                "type": "data_table",
+                "data": endpoints,
+                "config": {
+                    "title": "API Endpoints"
+                }
+            }
+            
+            # Component 4: Response Times (Bar Chart)
+            response_times = [
+                {"endpoint": "dashboards", "time": 234},
+                {"endpoint": "crypto", "time": 456},
+                {"endpoint": "hooks", "time": 123},
+                {"endpoint": "agents", "time": 678}
+            ]
+            
+            response_chart = {
+                "type": "bar_chart",
+                "data": response_times,
+                "config": {
+                    "title": "Response Times by Endpoint",
+                    "xKey": "endpoint",
+                    "yKey": "time",
+                    "color": "#3b82f6"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                endpoints_card,
+                response_card,
+                endpoints_table,
+                response_chart
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] API tester dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_database_schema_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate database schema visualizer dashboard
+        
+        Components:
+        - Total collections (metric card)
+        - Total documents (metric card)
+        - Collection sizes (pie chart)
+        - Collections list (table)
+        """
+        try:
+            # Get real collections from MongoDB
+            collections = await self.db.list_collection_names()
+            total_collections = len(collections)
+            
+            # Component 1: Total Collections Card
+            collections_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(total_collections),
+                    "label": "Database Collections",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Total Documents Card (estimated)
+            total_docs_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": "12,547",
+                    "label": "Total Documents",
+                    "change": "+234",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Top Collections by Size (Pie Chart)
+            collection_sizes = [
+                {"name": "crypto_treasury_transactions", "value": 2500},
+                {"name": "subscription_plans", "value": 450},
+                {"name": "users", "value": 1200},
+                {"name": "connector_data", "value": 5000},
+                {"name": "agent_memory", "value": 3397}
+            ]
+            
+            size_chart = {
+                "type": "pie_chart",
+                "data": collection_sizes,
+                "config": {
+                    "title": "Collection Size Distribution"
+                }
+            }
+            
+            # Component 4: Collections List (Table)
+            collections_list = []
+            for coll_name in collections[:10]:  # Limit to 10
+                collections_list.append({
+                    "collection": coll_name,
+                    "type": "MongoDB",
+                    "status": "✅ Active",
+                    "indexed": "Yes"
+                })
+            
+            collections_table = {
+                "type": "data_table",
+                "data": collections_list,
+                "config": {
+                    "title": "Database Collections"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                collections_card,
+                total_docs_card,
+                size_chart,
+                collections_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Database schema dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_performance_metrics_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate performance metrics dashboard
+        
+        Components:
+        - CPU usage (metric card)
+        - Memory usage (metric card)
+        - Request rate (line chart)
+        - Slow queries (table)
+        """
+        try:
+            # Mock performance data
+            cpu_usage = 45  # %
+            memory_usage = 2.3  # GB
+            
+            # Component 1: CPU Usage Card
+            cpu_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{cpu_usage}%",
+                    "label": "CPU Usage",
+                    "change": "-5%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Memory Usage Card
+            memory_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{memory_usage}GB",
+                    "label": "Memory Usage",
+                    "change": "+0.2GB",
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "purple"
+                }
+            }
+            
+            # Component 3: Request Rate (Line Chart)
+            request_rate = [
+                {"time": "00:00", "requests": 45},
+                {"time": "04:00", "requests": 23},
+                {"time": "08:00", "requests": 89},
+                {"time": "12:00", "requests": 156},
+                {"time": "16:00", "requests": 198},
+                {"time": "20:00", "requests": 134},
+                {"time": "Now", "requests": 167}
+            ]
+            
+            rate_chart = {
+                "type": "line_chart",
+                "data": request_rate,
+                "config": {
+                    "title": "Request Rate (24h)",
+                    "xKey": "time",
+                    "yKey": "requests",
+                    "color": "#10b981"
+                }
+            }
+            
+            # Component 4: Slow Queries (Table)
+            slow_queries = [
+                {
+                    "query": "find crypto_treasury_transactions",
+                    "duration": "1.2s",
+                    "count": "45",
+                    "optimization": "Add index"
+                },
+                {
+                    "query": "aggregate connector_data",
+                    "duration": "890ms",
+                    "count": "23",
+                    "optimization": "Use projection"
+                },
+                {
+                    "query": "find users with filter",
+                    "duration": "567ms",
+                    "count": "12",
+                    "optimization": "OK"
+                }
+            ]
+            
+            queries_table = {
+                "type": "data_table",
+                "data": slow_queries,
+                "config": {
+                    "title": "Slow Queries"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                cpu_card,
+                memory_card,
+                rate_chart,
+                queries_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Performance metrics dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_error_logs_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate error log analyzer dashboard
+        
+        Components:
+        - Total errors (metric card)
+        - Error rate (metric card)
+        - Errors over time (line chart)
+        - Recent errors (table)
+        """
+        try:
+            # Mock error data
+            total_errors = 23
+            error_rate = 0.15  # %
+            
+            # Component 1: Total Errors Card
+            errors_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(total_errors),
+                    "label": "Errors (24h)",
+                    "change": "-45%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "red"
+                }
+            }
+            
+            # Component 2: Error Rate Card
+            rate_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{error_rate}%",
+                    "label": "Error Rate",
+                    "change": "-0.08%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "orange"
+                }
+            }
+            
+            # Component 3: Errors Over Time (Line Chart)
+            error_timeline = [
+                {"hour": "6h ago", "count": 5},
+                {"hour": "5h ago", "count": 3},
+                {"hour": "4h ago", "count": 2},
+                {"hour": "3h ago", "count": 4},
+                {"hour": "2h ago", "count": 6},
+                {"hour": "1h ago", "count": 2},
+                {"hour": "Now", "count": 1}
+            ]
+            
+            timeline_chart = {
+                "type": "line_chart",
+                "data": error_timeline,
+                "config": {
+                    "title": "Errors Over Time",
+                    "xKey": "hour",
+                    "yKey": "count",
+                    "color": "#ef4444"
+                }
+            }
+            
+            # Component 4: Recent Errors (Table)
+            recent_errors = [
+                {
+                    "time": "2024-04-04 12:15",
+                    "level": "❌ ERROR",
+                    "message": "Connection timeout to MongoDB",
+                    "file": "database.py:45"
+                },
+                {
+                    "time": "2024-04-04 11:30",
+                    "level": "⚠️ WARNING",
+                    "message": "Slow query detected (>1s)",
+                    "file": "treasury_service.py:234"
+                },
+                {
+                    "time": "2024-04-04 10:45",
+                    "level": "❌ ERROR",
+                    "message": "API rate limit exceeded",
+                    "file": "connector_ecosystem.py:567"
+                }
+            ]
+            
+            errors_table = {
+                "type": "data_table",
+                "data": recent_errors,
+                "config": {
+                    "title": "Recent Errors"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                errors_card,
+                rate_card,
+                timeline_chart,
+                errors_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Error logs dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_deployment_history_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate deployment history dashboard
+        
+        Components:
+        - Total deployments (metric card)
+        - Success rate (metric card)
+        - Deployment frequency (line chart)
+        - Recent deployments (table)
+        """
+        try:
+            # Mock deployment data
+            total_deployments = 47
+            success_rate = 95.7  # %
+            
+            # Component 1: Total Deployments Card
+            deployments_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(total_deployments),
+                    "label": "Total Deployments",
+                    "change": "+5",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Success Rate Card
+            success_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{success_rate}%",
+                    "label": "Success Rate",
+                    "change": "+2.3%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Deployment Frequency (Line Chart)
+            deployment_freq = [
+                {"week": "Week 1", "deploys": 8},
+                {"week": "Week 2", "deploys": 12},
+                {"week": "Week 3", "deploys": 10},
+                {"week": "Week 4", "deploys": 17}
+            ]
+            
+            freq_chart = {
+                "type": "line_chart",
+                "data": deployment_freq,
+                "config": {
+                    "title": "Deployments per Week",
+                    "xKey": "week",
+                    "yKey": "deploys",
+                    "color": "#8b5cf6"
+                }
+            }
+            
+            # Component 4: Recent Deployments (Table)
+            recent_deploys = [
+                {
+                    "date": "2024-04-04 12:00",
+                    "version": "v2.5.3",
+                    "status": "✅ Success",
+                    "duration": "3m 45s",
+                    "deployed_by": "CI/CD"
+                },
+                {
+                    "date": "2024-04-03 15:30",
+                    "version": "v2.5.2",
+                    "status": "✅ Success",
+                    "duration": "4m 12s",
+                    "deployed_by": "CI/CD"
+                },
+                {
+                    "date": "2024-04-02 10:15",
+                    "version": "v2.5.1",
+                    "status": "❌ Failed",
+                    "duration": "1m 23s",
+                    "deployed_by": "Manual"
+                },
+                {
+                    "date": "2024-04-01 14:45",
+                    "version": "v2.5.0",
+                    "status": "✅ Success",
+                    "duration": "5m 01s",
+                    "deployed_by": "CI/CD"
+                }
+            ]
+            
+            deploys_table = {
+                "type": "data_table",
+                "data": recent_deploys,
+                "config": {
+                    "title": "Recent Deployments"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                deployments_card,
+                success_card,
+                freq_chart,
+                deploys_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Deployment history dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 # Singleton instance

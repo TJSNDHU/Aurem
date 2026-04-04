@@ -387,6 +387,174 @@ async def get_billing_history_dashboard(user_id: str = "demo_user"):
         }
     
     except HTTPException:
+
+
+# Developer Tools Dashboards
+
+@router.get("/dashboards/api-tester")
+async def get_api_tester_dashboard():
+    """
+    Generate API endpoint tester dashboard
+    
+    Returns:
+    - Total endpoints (metric card)
+    - Avg response time (metric card)
+    - Endpoint list (table)
+    - Response times chart (bar chart)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_api_tester_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] API tester dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/dashboards/database-schema")
+async def get_database_schema_dashboard():
+    """
+    Generate database schema visualizer dashboard
+    
+    Returns:
+    - Total collections (metric card)
+    - Total documents (metric card)
+    - Collection sizes (pie chart)
+    - Collections list (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_database_schema_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Database schema dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/dashboards/performance-metrics")
+async def get_performance_metrics_dashboard():
+    """
+    Generate performance metrics dashboard
+    
+    Returns:
+    - CPU usage (metric card)
+    - Memory usage (metric card)
+    - Request rate (line chart)
+    - Slow queries (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_performance_metrics_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Performance metrics dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/dashboards/error-logs")
+async def get_error_logs_dashboard():
+    """
+    Generate error log analyzer dashboard
+    
+    Returns:
+    - Total errors (metric card)
+    - Error rate (metric card)
+    - Errors over time (line chart)
+    - Recent errors (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_error_logs_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Error logs dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/dashboards/deployment-history")
+async def get_deployment_history_dashboard():
+    """
+    Generate deployment history dashboard
+    
+    Returns:
+    - Total deployments (metric card)
+    - Success rate (metric card)
+    - Deployment frequency (line chart)
+    - Recent deployments (table)
+    """
+    if _db is None:
+        raise HTTPException(500, "Database not initialized")
+    
+    try:
+        dashboard_service = get_dashboard_service(_db)
+        dashboard = await dashboard_service.generate_deployment_history_dashboard()
+        
+        if not dashboard.get("success"):
+            raise HTTPException(500, dashboard.get("error", "Dashboard generation failed"))
+        
+        return {
+            "success": True,
+            "dashboard": dashboard["dashboard"]
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Deployment history dashboard error: {e}")
+        raise HTTPException(500, str(e))
+
         raise
     except Exception as e:
         logger.error(f"[GenUI] Billing history dashboard error: {e}")
