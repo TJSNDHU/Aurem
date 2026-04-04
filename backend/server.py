@@ -4384,12 +4384,14 @@ async def startup_event():
             from routers.panic_settings_router import set_db as set_panic_settings_db
             from routers.panic_takeover_router import set_db as set_panic_takeover_db
             from routers.vapi_voice_router import set_db as set_vapi_db
+            from routers.super_admin_analytics_router import set_db as set_analytics_db
             set_panic_settings_db(db)
             set_panic_takeover_db(db)
             set_vapi_db(db)
-            logging.info("[AUREM] Panic Button & Tone Sync initialized (Phase C: Trust Layer)")
+            set_analytics_db(db)
+            logging.info("[AUREM] Panic Button, Tone Sync & Analytics initialized (Phase C: Trust Layer)")
         except ImportError as e:
-            logging.warning(f"[AUREM] Panic Button/Tone Sync not initialized: {e}")
+            logging.warning(f"[AUREM] Phase C components not initialized: {e}")
         
         logging.info(f"✓ All AI services initialized ({time.time()-t0:.2f}s)")
         
@@ -42931,6 +42933,15 @@ try:
     print("[STARTUP] ✓ Vapi Voice Router loaded (Phase C: Tone Sync)", flush=True)
 except ImportError as e:
     print(f"[STARTUP] Vapi Voice Router not loaded: {e}", flush=True)
+
+# ============ SUPER ADMIN ANALYTICS (The Luxe Way - Anonymized) ============
+try:
+    from routers.super_admin_analytics_router import router as super_admin_analytics_router, set_db as set_analytics_db
+    # NOTE: set_analytics_db(db) is called in startup_event() after db is initialized
+    app.include_router(super_admin_analytics_router)
+    print("[STARTUP] ✓ Super Admin Analytics loaded (Anonymized Intelligence)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Super Admin Analytics not loaded: {e}", flush=True)
 
 # AUREM Bug Engine APScheduler
 try:
