@@ -51,13 +51,24 @@ class SentimentAnalyzer:
     def _init_openai(self):
         """Initialize OpenAI client with Emergent LLM key"""
         try:
-            from openai import OpenAI
-            self.openai_client = OpenAI(api_key=EMERGENT_LLM_KEY)
-            logger.info("[SentimentAnalyzer] Initialized with Emergent LLM Key")
+            # Use emergentintegrations for Emergent LLM Key
+            from emergentintegrations.llm.chat import LlmChat
+            # Create a client instance with required parameters
+            self.openai_client = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id="sentiment_analyzer",
+                system_message="You are a sentiment analysis expert. Respond only with valid JSON."
+            )
+            self.using_emergent = True
+            logger.info("[SentimentAnalyzer] Initialized with Emergent LLM Key (emergentintegrations)")
         except ImportError:
-            logger.error("[SentimentAnalyzer] OpenAI library not installed")
+            logger.warning("[SentimentAnalyzer] emergentintegrations not available, using fallback")
+            self.openai_client = None
+            self.using_emergent = False
         except Exception as e:
             logger.error(f"[SentimentAnalyzer] Init error: {e}")
+            self.openai_client = None
+            self.using_emergent = False
     
     async def analyze_message(
         self, 
@@ -160,18 +171,29 @@ CRITICAL:
 Respond ONLY with valid JSON, no other text."""
 
         try:
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a sentiment analysis expert. Respond only with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=200
-            )
-            
-            import json
-            result = json.loads(response.choices[0].message.content)
+            # Use emergentintegrations LlmChat if available
+            if hasattr(self, 'using_emergent') and self.using_emergent:
+                from emergentintegrations.llm.chat import UserMessage
+                response = await self.openai_client.with_model(
+                    provider="openai",
+                    model="gpt-4o"
+                ).send_message(user_message=UserMessage(text=prompt))
+                # Extract content from emergentintegrations response (returns string directly)
+                import json
+                result = json.loads(response)
+            else:
+                # Fallback to standard OpenAI (if configured)
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": "You are a sentiment analysis expert. Respond only with valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3,
+                    max_tokens=200
+                )
+                import json
+                result = json.loads(response.choices[0].message.content)
             
             # Map to our format
             sentiment_score = result.get("sentiment_score", 0.0)
