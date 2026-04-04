@@ -212,6 +212,7 @@ try:
     from routers.vector_search_router import router as vector_search_router
     from routers.hooks_router import router as hooks_router
     from routers.crypto_treasury_router import router as crypto_treasury_router, set_db as set_crypto_treasury_db
+    from routers.generative_ui_router import router as generative_ui_router, set_db as set_generative_ui_db
     from services.toon_service import set_toon_service_db
     from services.self_healing_ai import set_self_healing_ai_db, get_self_healing_ai
     from services.connector_ecosystem import set_connector_ecosystem_db
@@ -4083,6 +4084,12 @@ async def startup_event():
             logging.info("[STARTUP] Crypto Treasury database initialized")
         except ImportError as e:
             logging.warning(f"[STARTUP] Crypto Treasury not loaded: {e}")
+        try:
+            from routers.generative_ui_router import set_db as set_generative_ui_db
+            set_generative_ui_db(db)
+            logging.info("[STARTUP] Generative UI database initialized")
+        except ImportError as e:
+            logging.warning(f"[STARTUP] Generative UI not loaded: {e}")
         # Initialize new commercial AI services
         try:
             from routers.subscription_router import set_db as set_subscription_db
@@ -42309,7 +42316,9 @@ if hooks_router is not None:
     app.include_router(hooks_router)  # Automation Hooks System (8 hooks)
 if crypto_treasury_router is not None:
     app.include_router(crypto_treasury_router)  # Crypto Treasury Management
-    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills + Vector Search + Hooks + Crypto Treasury loaded ✅")
+if generative_ui_router is not None:
+    app.include_router(generative_ui_router)  # Generative UI System
+    logging.info("[STARTUP] Subscription + Self-Healing + Connectors + Smart Search + Agent Harness + Skills + Vector Search + Hooks + Crypto Treasury + Generative UI loaded ✅")
 
 # AUREM Monitoring (Prometheus metrics)
 try:
