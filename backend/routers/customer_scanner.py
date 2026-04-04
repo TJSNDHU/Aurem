@@ -684,8 +684,13 @@ async def download_pdf_report(scan_id: str):
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
 
 
+class PricingRequest(BaseModel):
+    scan_id: Optional[str] = None
+    issues_count: Optional[int] = None
+    critical_count: Optional[int] = None
+
 @router.post("/api/scanner/calculate-pricing")
-async def calculate_pricing(scan_id: str = None, issues_count: int = None, critical_count: int = None):
+async def calculate_pricing(request: PricingRequest):
     """
     Calculate suggested pricing based on scan results
     Returns tiered pricing recommendations
@@ -694,8 +699,8 @@ async def calculate_pricing(scan_id: str = None, issues_count: int = None, criti
         from server import db
         
         # If scan_id provided, get data from scan
-        if scan_id:
-            scan = await db.system_scans.find_one({"_id": scan_id}, {"_id": 0})
+        if request.scan_id:
+            scan = await db.system_scans.find_one({"_id": request.scan_id}, {"_id": 0})
             if not scan:
                 raise HTTPException(status_code=404, detail="Scan not found")
             
@@ -706,9 +711,11 @@ async def calculate_pricing(scan_id: str = None, issues_count: int = None, criti
             cost_savings = impact.get('estimated_cost_savings_monthly', '$1,500')
         else:
             # Use provided counts
-            if issues_count is None or critical_count is None:
+            if request.issues_count is None or request.critical_count is None:
                 raise HTTPException(status_code=400, detail="Provide scan_id or issues_count + critical_count")
             
+            issues_count = request.issues_count
+            critical_count = request.critical_count
             time_saved = f"{40 + issues_count * 2}-{80 + issues_count * 3} hours"
             cost_savings = f"${500 + (critical_count * 200)}"
         
