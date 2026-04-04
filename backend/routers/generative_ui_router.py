@@ -387,6 +387,10 @@ async def get_billing_history_dashboard(user_id: str = "demo_user"):
         }
     
     except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[GenUI] Subscription analytics dashboard error: {e}")
+        raise HTTPException(500, str(e))
 
 
 # Developer Tools Dashboards
@@ -553,63 +557,6 @@ async def get_deployment_history_dashboard():
         raise
     except Exception as e:
         logger.error(f"[GenUI] Deployment history dashboard error: {e}")
-        raise HTTPException(500, str(e))
-
-        raise
-    except Exception as e:
-        logger.error(f"[GenUI] Billing history dashboard error: {e}")
-        raise HTTPException(500, str(e))
-
-        }
-    }
-    
-    Example - Metric Card:
-    {
-        "component_type": "metric_card",
-        "data": {
-            "value": "$12,345",
-            "label": "Total Revenue",
-            "change": "+15%",
-            "trend": "up"
-        },
-        "config": {
-            "color": "green"
-        }
-    }
-    
-    Example - Pie Chart:
-    {
-        "component_type": "pie_chart",
-        "data": [
-            {"name": "Free", "value": 100},
-            {"name": "Starter", "value": 50}
-        ],
-        "config": {
-            "title": "User Distribution"
-        }
-    }
-    """
-    try:
-        generator = get_component_generator()
-        
-        result = generator.generate_component(
-            component_type=request.component_type,
-            data=request.data,
-            config=request.config
-        )
-        
-        if not result.get("success"):
-            raise HTTPException(400, result.get("error", "Component generation failed"))
-        
-        return {
-            "success": True,
-            "component": result["spec"]
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[GenUI] Component generation error: {e}")
         raise HTTPException(500, str(e))
 
 
