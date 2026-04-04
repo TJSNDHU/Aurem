@@ -18,6 +18,7 @@ const AdminPlanManager = lazy(() => import('./platform/AdminPlanManager'));
 const LeadsDashboard = lazy(() => import('./platform/LeadsDashboard'));
 const PanicSettings = lazy(() => import('./platform/PanicSettings'));
 const AnalyticsDashboard = lazy(() => import('./platform/AnalyticsDashboard'));
+const PanicAlerts = lazy(() => import('./platform/PanicAlerts'));
 
 // Loading Spinner
 const LoadingSpinner = () => (
@@ -62,6 +63,7 @@ function App() {
             <Route path="/leads" element={<LeadsDashboard />} />
             <Route path="/settings/panic" element={<PanicSettings />} />
             <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
+            <Route path="/alerts/panic" element={<PanicAlerts />} />
             
             {/* Catch-all redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
