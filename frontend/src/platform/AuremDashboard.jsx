@@ -10,7 +10,7 @@ import {
   Mail, MessageCircle, Globe, Send, Mic, MicOff,
   Sparkles, Activity, Brain, Rocket, Shield, Code, LogOut,
   ChevronRight, Plus, Play, Pause, RefreshCw, Check, X,
-  TrendingUp, Clock, Target, Phone, PhoneCall, Building2
+  TrendingUp, Clock, Target, Phone, PhoneCall, Building2, Key
 } from 'lucide-react';
 
 // Voice component
@@ -25,6 +25,8 @@ import VoiceWakeWord from '../components/VoiceWakeWord';
 import ForensicUploader from '../components/ForensicUploader';
 // GitHub Lead Miner
 import GitHubLeadMiner from '../components/GitHubLeadMiner';
+// API Keys Manager
+import APIKeysManager from './APIKeysManager';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -54,6 +56,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout }) => {
     {
       title: 'INTEGRATIONS',
       items: [
+        { id: 'api-keys', label: 'API Keys', icon: Key },
         { id: 'gmail-channel', label: 'Gmail Channel', icon: Mail },
         { id: 'crm-connect', label: 'CRM Connect', icon: Globe },
         { id: 'whatsapp-flows', label: 'WhatsApp Flows', icon: MessageCircle },
@@ -605,6 +608,10 @@ const AuremDashboard = () => {
         ) : activeItem === 'github-leads' ? (
           <div className="flex-1 overflow-auto">
             <GitHubLeadMiner token={token} />
+          </div>
+        ) : activeItem === 'api-keys' ? (
+          <div className="flex-1 overflow-auto">
+            <APIKeysManager token={token} user={user} />
           </div>
         ) : activeItem === 'ai-conversation' ? (
           <>

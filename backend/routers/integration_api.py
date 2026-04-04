@@ -9,6 +9,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import secrets
 import hashlib
+import jwt
+import os
 
 router = APIRouter()
 
@@ -282,50 +284,205 @@ async def process_webhook_event(event: dict):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# BUSINESS ID GENERATOR
+# API KEY MANAGEMENT (Tenant-Based)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.post("/api/integration/generate-key")
-async def generate_integration_key(email: str):
+def get_current_user(authorization: str = Header(None)):
+    """Extract user from JWT token and fetch full user details from database"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing authentication token")
+    
+    token = authorization.replace("Bearer ", "")
+    try:
+        import jwt
+        import os
+        payload = jwt.decode(token, os.getenv("JWT_SECRET", "aurem-secret-key"), algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token - no user_id")
+        
+        return {"user_id": user_id, "payload": payload}
+    except Exception as e:
+        print(f"[Auth Error] {e}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_user_from_db(user_id: str):
+    """Fetch user details from database"""
+    from server import db
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@router.post("/api/integration/keys")
+async def generate_api_key(authorization: str = Header(None)):
     """
-    Generate business ID and API key for integration
+    Generate new API key for current tenant
     """
     try:
+        auth = get_current_user(authorization)
+        user_id = auth["user_id"]
+        
+        # Fetch full user details from database
+        user = await get_user_from_db(user_id)
+        
+        tenant_id = user.get("tenant_id")
+        email = user.get("email", "unknown")
+        
+        if not tenant_id:
+            raise HTTPException(status_code=400, detail="Tenant ID not found for user")
+        
         from server import db
         
-        # Generate unique business ID
-        business_id = f"biz_{secrets.token_urlsafe(12)}"
+        # Generate unique API key
+        key_id = f"key_{secrets.token_urlsafe(12)}"
         api_key = f"sk_aurem_{secrets.token_urlsafe(32)}"
         api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         
-        # Store integration credentials
-        integration_doc = {
-            "business_id": business_id,
+        # Store API key
+        key_doc = {
+            "key_id": key_id,
+            "tenant_id": tenant_id,
             "email": email,
             "api_key_hash": api_key_hash,
+            "key_preview": f"sk_aurem_{'•' * 20}{api_key[-8:]}",
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_used": None,
             "active": True,
-            "features": {
-                "chat_widget": True,
-                "lead_capture": True,
-                "booking": True,
-                "webhooks": True,
-                "whatsapp": True
-            }
+            "usage_count": 0
         }
         
-        await db.integrations.insert_one(integration_doc)
+        await db.api_keys.insert_one(key_doc)
         
         return {
             "success": True,
-            "business_id": business_id,
+            "key_id": key_id,
             "api_key": api_key,  # Only shown once!
             "message": "Save this API key securely - it won't be shown again."
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[Generate Key] Error: {e}")
+        print(f"[Generate API Key] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/integration/keys")
+async def list_api_keys(authorization: str = Header(None)):
+    """
+    List all API keys for current tenant
+    """
+    try:
+        auth = get_current_user(authorization)
+        user_id = auth["user_id"]
+        
+        # Fetch full user details from database
+        user = await get_user_from_db(user_id)
+        
+        tenant_id = user.get("tenant_id")
+        
+        if not tenant_id:
+            raise HTTPException(status_code=400, detail="Tenant ID not found for user")
+        
+        from server import db
+        
+        keys = await db.api_keys.find(
+            {"tenant_id": tenant_id},
+            {"_id": 0, "api_key_hash": 0}
+        ).sort("created_at", -1).to_list(100)
+        
+        return {
+            "success": True,
+            "keys": keys,
+            "count": len(keys)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[List API Keys] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/integration/keys/{key_id}")
+async def revoke_api_key(key_id: str, authorization: str = Header(None)):
+    """
+    Revoke an API key
+    """
+    try:
+        auth = get_current_user(authorization)
+        user_id = auth["user_id"]
+        
+        # Fetch full user details from database
+        user = await get_user_from_db(user_id)
+        
+        tenant_id = user.get("tenant_id")
+        
+        if not tenant_id:
+            raise HTTPException(status_code=400, detail="Tenant ID not found for user")
+        
+        from server import db
+        
+        # Verify key belongs to tenant
+        key = await db.api_keys.find_one({"key_id": key_id, "tenant_id": tenant_id})
+        if not key:
+            raise HTTPException(status_code=404, detail="API key not found")
+        
+        # Mark as inactive
+        await db.api_keys.update_one(
+            {"key_id": key_id},
+            {"$set": {"active": False, "revoked_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        return {
+            "success": True,
+            "message": "API key revoked successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Revoke API Key] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# API KEY VALIDATION (for widget requests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def validate_api_key(api_key: str) -> dict:
+    """Validate API key and return tenant info"""
+    try:
+        from server import db
+        
+        api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        
+        key_doc = await db.api_keys.find_one(
+            {"api_key_hash": api_key_hash, "active": True},
+            {"_id": 0}
+        )
+        
+        if not key_doc:
+            return None
+        
+        # Update last used timestamp
+        await db.api_keys.update_one(
+            {"key_id": key_doc["key_id"]},
+            {
+                "$set": {"last_used": datetime.now(timezone.utc).isoformat()},
+                "$inc": {"usage_count": 1}
+            }
+        )
+        
+        return key_doc
+        
+    except Exception as e:
+        print(f"[Validate API Key] Error: {e}")
+        return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
