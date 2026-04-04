@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Scan, Lock } from 'lucide-react';
-import FaceIDLogin from './FaceIDLogin';
+import FastBiometricLogin from './FastBiometricLogin';
 import FastBiometricSetup from './FastBiometricSetup';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
@@ -176,7 +176,7 @@ const FaceIDAuthWrapper = () => {
           </div>
         )}
 
-        {/* FaceID Login Mode */}
+        {/* Fast Biometric Login Mode */}
         {mode === 'faceid' && (
           <div style={{
             background: '#0A0A0A',
@@ -184,7 +184,7 @@ const FaceIDAuthWrapper = () => {
             borderRadius: 16,
             overflow: 'hidden'
           }}>
-            <FaceIDLogin 
+            <FastBiometricLogin 
               onSuccess={handleFaceIDSuccess}
               onFallbackToPassword={() => setMode('password')}
             />
