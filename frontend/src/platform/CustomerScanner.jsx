@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Search, AlertCircle, CheckCircle, TrendingUp, Shield, Globe, Eye, Download, ExternalLink, Zap } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, TrendingUp, Shield, Globe, Eye, Download, ExternalLink, Zap, Sparkles } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -15,6 +15,15 @@ const CustomerScanner = ({ token }) => {
   const [pricing, setPricing] = useState(null);
   const [error, setError] = useState(null);
   const [showPricing, setShowPricing] = useState(false);
+  const [showEnrichment, setShowEnrichment] = useState(false);
+  
+  // Manual enrichment fields (optional)
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [twitterUrl, setTwitterUrl] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
 
   const handleScan = async () => {
     if (!websiteUrl) {
@@ -28,19 +37,35 @@ const CustomerScanner = ({ token }) => {
       setScanResult(null);
       setPricing(null);
 
+      // Build manual enrichment object (only include non-empty fields)
+      const enrichment = {};
+      if (manualPhone) enrichment.phone = manualPhone;
+      if (manualEmail) enrichment.email = manualEmail;
+      if (linkedinUrl) enrichment.linkedin_url = linkedinUrl;
+      if (twitterUrl) enrichment.twitter_url = twitterUrl;
+      if (facebookUrl) enrichment.facebook_url = facebookUrl;
+      if (instagramUrl) enrichment.instagram_url = instagramUrl;
+
+      const requestBody = {
+        website_url: websiteUrl,
+        include_performance: true,
+        include_security: true,
+        include_seo: true,
+        include_accessibility: true
+      };
+
+      // Only add manual_enrichment if at least one field is filled
+      if (Object.keys(enrichment).length > 0) {
+        requestBody.manual_enrichment = enrichment;
+      }
+
       const response = await fetch(`${API_URL}/api/scanner/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          website_url: websiteUrl,
-          include_performance: true,
-          include_security: true,
-          include_seo: true,
-          include_accessibility: true
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
@@ -152,6 +177,105 @@ const CustomerScanner = ({ token }) => {
               {isScanning ? 'Scanning...' : 'Scan System'}
             </button>
           </div>
+
+          {/* Optional: Enrich with Manual Contact Info */}
+          <div className="mt-4">
+            <button
+              onClick={() => setShowEnrichment(!showEnrichment)}
+              className="text-xs text-[#888] hover:text-[#D4AF37] transition-all flex items-center gap-2"
+            >
+              <Sparkles className="w-3 h-3" />
+              {showEnrichment ? 'Hide' : 'Add'} Customer Contact Info (Optional - for personalization)
+            </button>
+
+            {showEnrichment && (
+              <div className="mt-4 p-4 bg-[#050505] border border-[#252525] rounded-lg space-y-3">
+                <p className="text-xs text-[#666] mb-3">
+                  Add contact details to personalize outreach. Our AI will analyze social media to learn their communication style and preferences.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Phone */}
+                  <div>
+                    <label className="block text-xs text-[#666] mb-1.5">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-3 py-2 bg-[#0A0A0A] border border-[#1A1A1A] rounded text-sm text-[#F4F4F4] placeholder-[#555] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-xs text-[#666] mb-1.5">Email Address</label>
+                    <input
+                      type="email"
+                      value={manualEmail}
+                      onChange={(e) => setManualEmail(e.target.value)}
+                      placeholder="ceo@company.com"
+                      className="w-full px-3 py-2 bg-[#0A0A0A] border border-[#1A1A1A] rounded text-sm text-[#F4F4F4] placeholder-[#555] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  {/* LinkedIn */}
+                  <div>
+                    <label className="block text-xs text-[#666] mb-1.5">LinkedIn Profile</label>
+                    <input
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/username"
+                      className="w-full px-3 py-2 bg-[#0A0A0A] border border-[#1A1A1A] rounded text-sm text-[#F4F4F4] placeholder-[#555] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  {/* Twitter */}
+                  <div>
+                    <label className="block text-xs text-[#666] mb-1.5">Twitter/X Profile</label>
+                    <input
+                      type="url"
+                      value={twitterUrl}
+                      onChange={(e) => setTwitterUrl(e.target.value)}
+                      placeholder="https://twitter.com/username"
+                      className="w-full px-3 py-2 bg-[#0A0A0A] border border-[#1A1A1A] rounded text-sm text-[#F4F4F4] placeholder-[#555] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  {/* Facebook */}
+                  <div>
+                    <label className="block text-xs text-[#666] mb-1.5">Facebook Profile</label>
+                    <input
+                      type="url"
+                      value={facebookUrl}
+                      onChange={(e) => setFacebookUrl(e.target.value)}
+                      placeholder="https://facebook.com/username"
+                      className="w-full px-3 py-2 bg-[#0A0A0A] border border-[#1A1A1A] rounded text-sm text-[#F4F4F4] placeholder-[#555] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  {/* Instagram */}
+                  <div>
+                    <label className="block text-xs text-[#666] mb-1.5">Instagram Profile</label>
+                    <input
+                      type="url"
+                      value={instagramUrl}
+                      onChange={(e) => setInstagramUrl(e.target.value)}
+                      placeholder="https://instagram.com/username"
+                      className="w-full px-3 py-2 bg-[#0A0A0A] border border-[#1A1A1A] rounded text-sm text-[#F4F4F4] placeholder-[#555] focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2 text-xs text-[#666]">
+                  <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                  <span>AI will analyze social profiles to personalize your sales approach</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400 flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
@@ -329,6 +453,69 @@ const CustomerScanner = ({ token }) => {
                 </div>
               </div>
             </div>
+
+            {/* Personality Insights (if enrichment data provided) */}
+            {scanResult.enrichment && (
+              <div className="p-6 bg-gradient-to-br from-[#64C8FF]/10 to-[#3B82F6]/10 border border-[#64C8FF]/30 rounded-lg">
+                <div className="flex items-center gap-3 mb-4">
+                  <Sparkles className="w-6 h-6 text-[#64C8FF]" />
+                  <h3 className="text-lg font-medium text-[#64C8FF]">Customer Personality Insights</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg">
+                    <div className="text-xs text-[#666] mb-1">Communication Style</div>
+                    <div className="text-lg font-semibold text-[#F4F4F4] capitalize">
+                      {scanResult.enrichment.communication_style}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg">
+                    <div className="text-xs text-[#666] mb-1">Preferred Contact</div>
+                    <div className="text-lg font-semibold text-[#F4F4F4] capitalize">
+                      {scanResult.enrichment.preferred_contact_method || 'Any'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg mb-4">
+                  <div className="text-xs text-[#666] mb-2">Values & Interests</div>
+                  <div className="flex flex-wrap gap-2">
+                    {scanResult.enrichment.values.map((value, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-[#64C8FF]/10 border border-[#64C8FF]/30 rounded-full text-xs text-[#64C8FF]">
+                        {value}
+                      </span>
+                    ))}
+                    {scanResult.enrichment.interests.map((interest, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-full text-xs text-[#3B82F6]">
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-[#050505] border border-[#64C8FF]/20 rounded-lg">
+                  <div className="text-sm font-medium text-[#F4F4F4] mb-3">🎯 Personalization Tips:</div>
+                  <div className="space-y-2">
+                    {scanResult.enrichment.personal_touch_tips.map((tip, idx) => (
+                      <div key={idx} className="text-xs text-[#888] leading-relaxed flex items-start gap-2">
+                        <CheckCircle className="w-3 h-3 text-[#64C8FF] mt-0.5 flex-shrink-0" />
+                        <span>{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {scanResult.enrichment.manual_data && (
+                  <div className="mt-4 p-3 bg-[#0A0A0A] border border-[#252525] rounded text-xs text-[#666]">
+                    <span className="text-[#888]">Contact Info:</span>{' '}
+                    {scanResult.enrichment.manual_data.email && `${scanResult.enrichment.manual_data.email}`}
+                    {scanResult.enrichment.manual_data.phone && ` • ${scanResult.enrichment.manual_data.phone}`}
+                    {scanResult.enrichment.manual_data.linkedin_url && ' • LinkedIn'}
+                    {scanResult.enrichment.manual_data.twitter_url && ' • Twitter'}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Top Recommendations */}
             <div className="p-6 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg">

@@ -29,6 +29,8 @@ import GitHubLeadMiner from '../components/GitHubLeadMiner';
 import APIKeysManager from './APIKeysManager';
 // Mission Control Dashboard
 import MissionControl from './MissionControl';
+// Customer Scanner
+import CustomerScanner from './CustomerScanner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 

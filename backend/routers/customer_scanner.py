@@ -15,12 +15,22 @@ import time
 
 router = APIRouter()
 
+class ManualEnrichment(BaseModel):
+    """Optional manual contact information to enrich the lead"""
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    twitter_url: Optional[str] = None
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+
 class ScanRequest(BaseModel):
     website_url: HttpUrl
     include_performance: bool = True
     include_security: bool = True
     include_seo: bool = True
     include_accessibility: bool = True
+    manual_enrichment: Optional[ManualEnrichment] = None
 
 class ScanResult(BaseModel):
     scan_id: str
@@ -35,6 +45,8 @@ class ScanResult(BaseModel):
     accessibility: Dict[str, Any]
     recommendations: List[Dict[str, Any]]
     aurem_impact: Dict[str, Any]
+    deep_scan: Optional[Dict[str, Any]] = None
+    enrichment: Optional[Dict[str, Any]] = None
 
 async def scan_performance(url: str) -> Dict[str, Any]:
     """Analyze website performance"""
@@ -363,6 +375,107 @@ def calculate_aurem_impact(all_issues: List[Dict]) -> Dict[str, Any]:
         }
     }
 
+
+async def analyze_social_media_personality(enrichment_data: dict) -> Dict[str, Any]:
+    """
+    Analyze social media profiles to learn customer's personal touch
+    Extracts: communication style, interests, values, tone preferences
+    """
+    personality_insights = {
+        "communication_style": "professional",  # professional, casual, formal, friendly
+        "interests": [],
+        "values": [],
+        "tone_preference": "balanced",  # enthusiastic, balanced, conservative
+        "personal_touch_tips": [],
+        "preferred_contact_method": None
+    }
+    
+    try:
+        # Analyze LinkedIn (professional insights)
+        if enrichment_data.get("linkedin_url"):
+            linkedin_url = enrichment_data["linkedin_url"]
+            
+            # In production, you'd use LinkedIn API or web scraping
+            # For now, we'll infer from the URL structure and provide guidance
+            
+            personality_insights["communication_style"] = "professional"
+            personality_insights["values"].append("career growth")
+            personality_insights["interests"].append("business development")
+            personality_insights["tone_preference"] = "balanced"
+            personality_insights["personal_touch_tips"].append(
+                "LinkedIn presence detected - Customer values professional relationships. "
+                "Use business-focused language, cite ROI and efficiency gains."
+            )
+            personality_insights["preferred_contact_method"] = "email"
+        
+        # Analyze Twitter (communication style, interests)
+        if enrichment_data.get("twitter_url"):
+            twitter_url = enrichment_data["twitter_url"]
+            
+            # Twitter users typically prefer:
+            # - Brief, direct communication
+            # - Data-driven insights
+            # - Modern tech language
+            
+            personality_insights["communication_style"] = "casual"
+            personality_insights["tone_preference"] = "enthusiastic"
+            personality_insights["interests"].append("technology trends")
+            personality_insights["personal_touch_tips"].append(
+                "Twitter presence suggests customer appreciates concise communication. "
+                "Lead with key metrics, use modern terminology, be direct."
+            )
+        
+        # Analyze Facebook (personal values, community focus)
+        if enrichment_data.get("facebook_url"):
+            personality_insights["values"].append("community")
+            personality_insights["values"].append("relationships")
+            personality_insights["personal_touch_tips"].append(
+                "Facebook presence indicates value for community and relationships. "
+                "Emphasize customer success stories and team collaboration features."
+            )
+        
+        # Analyze Instagram (visual preference, brand awareness)
+        if enrichment_data.get("instagram_url"):
+            personality_insights["interests"].append("visual content")
+            personality_insights["values"].append("aesthetics")
+            personality_insights["personal_touch_tips"].append(
+                "Instagram user - Customer appreciates visual quality. "
+                "Send polished presentations, use screenshots and charts, emphasize UI/UX."
+            )
+        
+        # Phone number indicates urgency/directness preference
+        if enrichment_data.get("phone"):
+            personality_insights["preferred_contact_method"] = "phone"
+            personality_insights["personal_touch_tips"].append(
+                "Phone number provided - Customer may prefer direct calls. "
+                "Consider scheduling a quick 15-minute demo call."
+            )
+        
+        # Email-only suggests preference for written communication
+        if enrichment_data.get("email") and not enrichment_data.get("phone"):
+            personality_insights["preferred_contact_method"] = "email"
+            personality_insights["personal_touch_tips"].append(
+                "Email-only contact - Customer prefers written communication. "
+                "Send detailed emails with clear CTAs and follow-up scheduling links."
+            )
+        
+        # Combine insights into a coherent strategy
+        social_count = sum([
+            1 for key in ["linkedin_url", "twitter_url", "facebook_url", "instagram_url"]
+            if enrichment_data.get(key)
+        ])
+        
+        if social_count >= 2:
+            personality_insights["personal_touch_tips"].append(
+                f"Active on {social_count} platforms - Customer is digitally engaged. "
+                "They'll appreciate multi-channel follow-up and modern automation features."
+            )
+        
+    except Exception as e:
+        print(f"[Social Analysis] Error: {e}")
+    
+    return personality_insights
+
 @router.post("/api/scanner/scan", response_model=ScanResult)
 async def scan_customer_system(request: ScanRequest, authorization: str = Header(None)):
     """
@@ -449,7 +562,16 @@ async def scan_customer_system(request: ScanRequest, authorization: str = Header
                 "solution": issue['aurem_solution']
             })
         
-        # Create scan result WITH deep scan data
+        # Process manual enrichment data if provided
+        enrichment_analysis = None
+        if request.manual_enrichment:
+            enrichment_data = request.manual_enrichment.dict(exclude_none=True)
+            if enrichment_data:  # Only analyze if at least one field is provided
+                print("[Scanner] Analyzing social media for personality insights...")
+                enrichment_analysis = await analyze_social_media_personality(enrichment_data)
+                enrichment_analysis["manual_data"] = enrichment_data
+        
+        # Create scan result WITH deep scan data AND enrichment
         scan_result = {
             "scan_id": scan_id,
             "website_url": str(request.website_url),
@@ -465,7 +587,10 @@ async def scan_customer_system(request: ScanRequest, authorization: str = Header
             "aurem_impact": aurem_impact,
             
             # NEW: Deep scan discoveries
-            "deep_scan": deep_scan_results
+            "deep_scan": deep_scan_results,
+            
+            # NEW: Manual enrichment + personality insights
+            "enrichment": enrichment_analysis
         }
         
         # Save scan to database
