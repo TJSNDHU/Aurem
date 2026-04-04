@@ -168,23 +168,51 @@ class AnalyticsAggregator:
             by_source = defaultdict(int)
             all_topics = []
             
-            for day in daily_data:
-                total_leads += day.get("total_leads", 0)
+            # FALLBACK: If analytics_daily is empty, query leads collection directly
+            if not daily_data:
+                logger.info("[AnalyticsAggregator] analytics_daily empty, querying leads directly")
                 
-                # Industry breakdown
-                for industry, count in day.get("by_industry", {}).items():
-                    by_industry[industry] += count
+                # Query all leads (created_at is full ISO timestamp, can't filter by date easily)
+                leads = await self.db.leads.find(
+                    {},
+                    {"_id": 0, "industry": 1, "country": 1, "interest": 1}
+                ).to_list(1000)
                 
-                # Geography breakdown
-                for country, count in day.get("by_country", {}).items():
-                    by_country[country] += count
+                logger.info(f"[AnalyticsAggregator] Found {len(leads)} leads in fallback query")
                 
-                # Source breakdown
-                for source, count in day.get("by_source", {}).items():
-                    by_source[source] += count
+                total_leads = len(leads)
+                for lead in leads:
+                    industry = lead.get("industry", "Unknown")
+                    country = lead.get("country", "Unknown")
+                    interest = lead.get("interest", "General")
+                    
+                    by_industry[industry] += 1
+                    by_country[country] += 1
+                    by_source["Direct"] += 1  # Default source
+                    if interest:
+                        all_topics.append(interest)
                 
-                # Topics
-                all_topics.extend(day.get("topics", []))
+                logger.info(f"[AnalyticsAggregator] Aggregated: {total_leads} leads, {len(by_industry)} industries, {len(by_country)} countries")
+            else:
+                logger.info(f"[AnalyticsAggregator] Using analytics_daily data: {len(daily_data)} days")
+                # Use pre-aggregated data from analytics_daily
+                for day in daily_data:
+                    total_leads += day.get("total_leads", 0)
+                    
+                    # Industry breakdown
+                    for industry, count in day.get("by_industry", {}).items():
+                        by_industry[industry] += count
+                    
+                    # Geography breakdown
+                    for country, count in day.get("by_country", {}).items():
+                        by_country[country] += count
+                    
+                    # Source breakdown
+                    for source, count in day.get("by_source", {}).items():
+                        by_source[source] += count
+                    
+                    # Topics
+                    all_topics.extend(day.get("topics", []))
             
             # Calculate growth rate (compare to previous period)
             previous_start = start_date - timedelta(days=date_range_days)
@@ -203,7 +231,9 @@ class AnalyticsAggregator:
             
             # Get trending topics (frequency count)
             from collections import Counter
-            topic_counts = Counter(all_topics)
+            # Filter to ensure only strings (in case of mixed data)
+            string_topics = [t for t in all_topics if isinstance(t, str)]
+            topic_counts = Counter(string_topics)
             trending_topics = [
                 {"topic": topic, "count": count}
                 for topic, count in topic_counts.most_common(10)

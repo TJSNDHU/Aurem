@@ -127,7 +127,7 @@ const PanicAlerts = () => {
               className="panic-active bg-white rounded-lg border-2 overflow-hidden"
               style={{
                 borderColor: '#E2B19D',
-                animation: 'panic-pulse 2s infinite'
+                animation: 'panic-pulse 2.5s ease-in-out infinite'
               }}
             >
               {/* Alert Header */}
@@ -252,15 +252,19 @@ const PanicAlerts = () => {
         })}
       </div>
 
-      {/* CSS for pulsing animation */}
-      <style jsx>{`
+      {/* CSS for subtle "breathing" animation - Scientific-Luxe aesthetic */}
+      <style>{`
         @keyframes panic-pulse {
           0%, 100% {
-            box-shadow: 0 0 20px rgba(226, 177, 157, 0.4);
+            box-shadow: 0 0 12px rgba(226, 177, 157, 0.4), 0 0 24px rgba(226, 177, 157, 0.2);
           }
           50% {
-            box-shadow: 0 0 30px rgba(226, 177, 157, 0.8);
+            box-shadow: 0 0 24px rgba(226, 177, 157, 0.7), 0 0 40px rgba(226, 177, 157, 0.4);
           }
+        }
+        
+        .panic-active {
+          position: relative;
         }
       `}</style>
     </div>
