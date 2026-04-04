@@ -614,6 +614,422 @@ class DashboardService:
                 "success": False,
                 "error": str(e)
             }
+    
+    async def generate_personal_analytics_dashboard(self, user_id: str) -> Dict[str, Any]:
+        """
+        Generate personal analytics dashboard for a user
+        
+        Components:
+        - Account age (metric card)
+        - Total API calls (metric card)
+        - Usage over time (line chart)
+        - Feature usage (pie chart)
+        """
+        try:
+            # Mock user data (replace with real user queries)
+            account_created = "2024-01-15"
+            total_api_calls = 547
+            
+            # Component 1: Account Age Card
+            age_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": "79 days",
+                    "label": "Account Age",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Total API Calls Card
+            calls_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": str(total_api_calls),
+                    "label": "Total API Calls",
+                    "change": "+32%",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Usage Over Time (Line Chart)
+            usage_data = [
+                {"week": "Week 1", "calls": 45},
+                {"week": "Week 2", "calls": 67},
+                {"week": "Week 3", "calls": 89},
+                {"week": "Week 4", "calls": 102},
+                {"week": "This Week", "calls": 244}
+            ]
+            
+            usage_chart = {
+                "type": "line_chart",
+                "data": usage_data,
+                "config": {
+                    "title": "API Usage Trend",
+                    "xKey": "week",
+                    "yKey": "calls",
+                    "color": "#3b82f6"
+                }
+            }
+            
+            # Component 4: Feature Usage (Pie Chart)
+            feature_usage = [
+                {"name": "Connectors", "value": 245},
+                {"name": "AI Agents", "value": 167},
+                {"name": "Vector Search", "value": 89},
+                {"name": "Hooks", "value": 46}
+            ]
+            
+            feature_chart = {
+                "type": "pie_chart",
+                "data": feature_usage,
+                "config": {
+                    "title": "Feature Usage Breakdown"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                age_card,
+                calls_card,
+                usage_chart,
+                feature_chart
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Personal analytics dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_pricing_comparison_dashboard(self) -> Dict[str, Any]:
+        """
+        Generate pricing comparison dashboard
+        
+        Components:
+        - Current plan (metric card)
+        - Plan comparison (table)
+        - Feature comparison (data visualization)
+        - Upgrade savings (metric card)
+        """
+        try:
+            # Get plans
+            plans = await self.db.subscription_plans.find(
+                {"active": True},
+                {"_id": 0}
+            ).sort("price_monthly", 1).to_list(10)
+            
+            # Component 1: Current Plan Card
+            current_plan_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": "Starter",
+                    "label": "Current Plan",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Upgrade Savings Card
+            savings_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": "$190",
+                    "label": "Annual Savings (Pro Plan)",
+                    "change": "20% off",
+                    "trend": "up"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Plan Comparison Table
+            comparison_data = []
+            for plan in plans:
+                comparison_data.append({
+                    "plan": plan["name"],
+                    "monthly": f"${plan['price_monthly']}",
+                    "annual": f"${plan['price_annual']}",
+                    "api_calls": plan.get("api_requests_per_month", "Unlimited"),
+                    "features": str(len(plan.get("features", [])))
+                })
+            
+            comparison_table = {
+                "type": "data_table",
+                "data": comparison_data,
+                "config": {
+                    "title": "Plan Comparison"
+                }
+            }
+            
+            # Component 4: Price Comparison (Bar Chart)
+            price_chart_data = []
+            for plan in plans:
+                if plan["price_monthly"] > 0:
+                    price_chart_data.append({
+                        "plan": plan["name"],
+                        "monthly": plan["price_monthly"],
+                        "annual_monthly": round(plan["price_annual"] / 12, 2)
+                    })
+            
+            price_chart = {
+                "type": "bar_chart",
+                "data": price_chart_data,
+                "config": {
+                    "title": "Monthly vs Annual Pricing",
+                    "xKey": "plan",
+                    "yKey": "monthly",
+                    "color": "#10b981"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                current_plan_card,
+                savings_card,
+                comparison_table,
+                price_chart
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Pricing comparison dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_usage_metrics_dashboard(self, user_id: str) -> Dict[str, Any]:
+        """
+        Generate usage metrics dashboard for a user
+        
+        Components:
+        - Quota usage (metric card)
+        - Remaining quota (metric card)
+        - Daily usage (line chart)
+        - Top features (bar chart)
+        """
+        try:
+            # Mock usage data
+            quota_limit = 10000
+            quota_used = 547
+            quota_remaining = quota_limit - quota_used
+            
+            # Component 1: Quota Used Card
+            used_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{quota_used:,}",
+                    "label": "API Calls Used",
+                    "change": f"{(quota_used/quota_limit*100):.1f}% of quota",
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Quota Remaining Card
+            remaining_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"{quota_remaining:,}",
+                    "label": "Calls Remaining",
+                    "change": f"{(quota_remaining/quota_limit*100):.1f}% left",
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "green"
+                }
+            }
+            
+            # Component 3: Daily Usage (Line Chart)
+            daily_usage = [
+                {"day": "Mon", "calls": 67},
+                {"day": "Tue", "calls": 89},
+                {"day": "Wed", "calls": 102},
+                {"day": "Thu", "calls": 134},
+                {"day": "Fri", "calls": 155},
+                {"day": "Sat", "calls": 0},
+                {"day": "Sun", "calls": 0}
+            ]
+            
+            daily_chart = {
+                "type": "line_chart",
+                "data": daily_usage,
+                "config": {
+                    "title": "Daily API Usage (This Week)",
+                    "xKey": "day",
+                    "yKey": "calls",
+                    "color": "#8b5cf6"
+                }
+            }
+            
+            # Component 4: Top Features (Bar Chart)
+            top_features = [
+                {"feature": "Connectors", "calls": 245},
+                {"feature": "AI Agents", "calls": 167},
+                {"feature": "Vector Search", "calls": 89},
+                {"feature": "Hooks", "calls": 46}
+            ]
+            
+            features_chart = {
+                "type": "bar_chart",
+                "data": top_features,
+                "config": {
+                    "title": "Top Features by Usage",
+                    "xKey": "feature",
+                    "yKey": "calls",
+                    "color": "#f59e0b"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                used_card,
+                remaining_card,
+                daily_chart,
+                features_chart
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Usage metrics dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def generate_billing_history_dashboard(self, user_id: str) -> Dict[str, Any]:
+        """
+        Generate billing history dashboard for a user
+        
+        Components:
+        - Total spent (metric card)
+        - Next billing (metric card)
+        - Spending over time (line chart)
+        - Invoice history (table)
+        """
+        try:
+            # Mock billing data
+            total_spent = 537.00
+            next_billing_date = "2024-05-01"
+            next_billing_amount = 99.00
+            
+            # Component 1: Total Spent Card
+            spent_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"${total_spent:,.2f}",
+                    "label": "Total Spent",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "blue"
+                }
+            }
+            
+            # Component 2: Next Billing Card
+            next_card = {
+                "type": "metric_card",
+                "data": {
+                    "value": f"${next_billing_amount:.2f}",
+                    "label": f"Next Billing ({next_billing_date})",
+                    "change": None,
+                    "trend": "neutral"
+                },
+                "config": {
+                    "color": "orange"
+                }
+            }
+            
+            # Component 3: Spending Over Time (Line Chart)
+            spending_history = [
+                {"month": "Jan", "amount": 99},
+                {"month": "Feb", "amount": 99},
+                {"month": "Mar", "amount": 99},
+                {"month": "Apr", "amount": 240}
+            ]
+            
+            spending_chart = {
+                "type": "line_chart",
+                "data": spending_history,
+                "config": {
+                    "title": "Monthly Spending",
+                    "xKey": "month",
+                    "yKey": "amount",
+                    "color": "#ef4444"
+                }
+            }
+            
+            # Component 4: Invoice History (Table)
+            invoices = [
+                {
+                    "date": "2024-04-01",
+                    "description": "Starter Plan (Monthly)",
+                    "amount": "$99.00",
+                    "status": "✅ Paid"
+                },
+                {
+                    "date": "2024-03-01",
+                    "description": "Starter Plan (Monthly)",
+                    "amount": "$99.00",
+                    "status": "✅ Paid"
+                },
+                {
+                    "date": "2024-02-01",
+                    "description": "Starter Plan (Monthly)",
+                    "amount": "$99.00",
+                    "status": "✅ Paid"
+                },
+                {
+                    "date": "2024-01-15",
+                    "description": "Setup Fee",
+                    "amount": "$240.00",
+                    "status": "✅ Paid"
+                }
+            ]
+            
+            invoice_table = {
+                "type": "data_table",
+                "data": invoices,
+                "config": {
+                    "title": "Invoice History"
+                }
+            }
+            
+            # Generate dashboard
+            dashboard = self.generator.generate_dashboard([
+                spent_card,
+                next_card,
+                spending_chart,
+                invoice_table
+            ])
+            
+            return dashboard
+        
+        except Exception as e:
+            logger.error(f"[GenUI] Billing history dashboard error: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 # Singleton instance
