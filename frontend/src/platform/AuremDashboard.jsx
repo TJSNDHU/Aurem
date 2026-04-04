@@ -273,13 +273,6 @@ const ChatInterface = ({ user, token }) => {
   const [sessionId, setSessionId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const quickActions = [
-    { icon: Zap, label: 'Automation Strategy', desc: 'Build systems that run 24/7' },
-    { icon: BarChart3, label: 'Business Intelligence', desc: 'Data-driven decisions' },
-    { icon: Users, label: 'Customer Engagement', desc: 'AI-powered CRM flows' },
-    { icon: Rocket, label: 'Deploy Agent Swarm', desc: 'Scout · Architect · Closer' },
-  ];
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -332,10 +325,6 @@ const ChatInterface = ({ user, token }) => {
     }
   };
 
-  const handleQuickAction = (action) => {
-    setInput(`Tell me about ${action.label.toLowerCase()} - ${action.desc}`);
-  };
-
   return (
     <div className="flex-1 flex flex-col bg-[#050505]" data-testid="chat-interface">
       {/* Header */}
@@ -375,27 +364,60 @@ const ChatInterface = ({ user, token }) => {
             </div>
             <h2 className="text-3xl font-light text-[#F4F4F4] tracking-wider mb-2">AUREM</h2>
             <p className="text-xs text-[#555] tracking-widest mb-8">BUSINESS INTELLIGENCE PLATFORM</p>
-            <p className="text-sm text-[#888] max-w-lg mb-8">
+            <p className="text-sm text-[#888] max-w-lg mb-12">
               Your intelligent business partner. I automate operations, accelerate growth, and deploy AI systems that work while you sleep.
             </p>
 
-            {/* Quick Actions Grid */}
-            <div className="grid grid-cols-2 gap-3 max-w-lg">
-              {quickActions.map((action, idx) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => handleQuickAction(action)}
-                    data-testid={`quick-action-${idx}`}
-                    className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg text-left hover:border-[#D4AF37]/30 transition-all group"
-                  >
-                    <Icon className="w-5 h-5 text-[#D4AF37] mb-2" />
-                    <h3 className="text-sm text-[#F4F4F4] mb-1">{action.label}</h3>
-                    <p className="text-xs text-[#666]">{action.desc}</p>
-                  </button>
-                );
-              })}
+            {/* Voice-to-Voice AI Section */}
+            <div className="max-w-2xl w-full">
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-[#D4AF37] mb-2">🎤 AI Voice-to-Voice Communication</h3>
+                <p className="text-sm text-[#888]">
+                  Speak naturally with AUREM. Advanced voice recognition and human-like responses.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                {/* Voice Call Button */}
+                <button
+                  onClick={() => setShowVoiceModal(true)}
+                  className="group p-6 bg-gradient-to-br from-[#D4AF37]/20 to-[#8B7355]/20 border border-[#D4AF37]/30 rounded-xl hover:scale-105 transition-all"
+                >
+                  <div className="w-14 h-14 rounded-full bg-[#D4AF37]/20 flex items-center justify-center mx-auto mb-4 group-hover:bg-[#D4AF37]/30 transition-all">
+                    <PhoneCall className="w-7 h-7 text-[#D4AF37]" />
+                  </div>
+                  <h4 className="text-base font-medium text-[#F4F4F4] mb-2">Start Voice Call</h4>
+                  <p className="text-xs text-[#888]">Real-time AI conversation</p>
+                </button>
+
+                {/* Voice Commands */}
+                <button
+                  onClick={() => setShowVoiceModal(true)}
+                  className="group p-6 bg-gradient-to-br from-[#64C8FF]/20 to-[#3B82F6]/20 border border-[#64C8FF]/30 rounded-xl hover:scale-105 transition-all"
+                >
+                  <div className="w-14 h-14 rounded-full bg-[#64C8FF]/20 flex items-center justify-center mx-auto mb-4 group-hover:bg-[#64C8FF]/30 transition-all">
+                    <Mic className="w-7 h-7 text-[#64C8FF]" />
+                  </div>
+                  <h4 className="text-base font-medium text-[#F4F4F4] mb-2">Voice Commands</h4>
+                  <p className="text-xs text-[#888]">Quick voice instructions</p>
+                </button>
+              </div>
+
+              {/* Features */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg text-center">
+                  <div className="text-2xl mb-2">🗣️</div>
+                  <p className="text-xs text-[#888]">Natural Speech</p>
+                </div>
+                <div className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg text-center">
+                  <div className="text-2xl mb-2">🌍</div>
+                  <p className="text-xs text-[#888]">Multi-Language</p>
+                </div>
+                <div className="p-4 bg-[#0A0A0A] border border-[#1A1A1A] rounded-lg text-center">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <p className="text-xs text-[#888]">Instant Response</p>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
