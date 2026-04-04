@@ -12,7 +12,9 @@ const CustomerScanner = ({ token }) => {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [pricing, setPricing] = useState(null);
   const [error, setError] = useState(null);
+  const [showPricing, setShowPricing] = useState(false);
 
   const handleScan = async () => {
     if (!websiteUrl) {
@@ -24,6 +26,7 @@ const CustomerScanner = ({ token }) => {
       setIsScanning(true);
       setError(null);
       setScanResult(null);
+      setPricing(null);
 
       const response = await fetch(`${API_URL}/api/scanner/scan`, {
         method: 'POST',
@@ -43,6 +46,9 @@ const CustomerScanner = ({ token }) => {
       if (response.ok) {
         const data = await response.json();
         setScanResult(data);
+        
+        // Automatically calculate pricing
+        calculatePricing(data.scan_id);
       } else {
         const error = await response.json();
         throw new Error(error.detail || 'Scan failed');
@@ -52,6 +58,53 @@ const CustomerScanner = ({ token }) => {
       setError(err.message || 'Failed to scan website');
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  const calculatePricing = async (scanId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/scanner/calculate-pricing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ scan_id: scanId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPricing(data);
+      }
+    } catch (err) {
+      console.error('Pricing calculation error:', err);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!scanResult) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/scanner/scans/${scanResult.scan_id}/pdf`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `aurem-scan-report-${scanResult.scan_id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (err) {
+      console.error('PDF download error:', err);
+      setError('Failed to download PDF');
     }
   };
 
@@ -126,10 +179,22 @@ const CustomerScanner = ({ token }) => {
                   <h2 className="text-xl font-medium text-[#F4F4F4] mb-1">Scan Complete</h2>
                   <p className="text-xs text-[#666]">{scanResult.website_url}</p>
                 </div>
-                <button className="px-4 py-2 bg-[#1A1A1A] border border-[#252525] rounded-lg text-sm text-[#888] hover:text-[#D4AF37] hover:border-[#D4AF37]/30 transition-all flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Export Report
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowPricing(!showPricing)}
+                    className="px-4 py-2 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    {showPricing ? 'Hide' : 'Show'} Pricing
+                  </button>
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="px-4 py-2 bg-[#1A1A1A] border border-[#252525] rounded-lg text-sm text-[#888] hover:text-[#D4AF37] hover:border-[#D4AF37]/30 transition-all flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export PDF
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-4 gap-4">
@@ -309,10 +374,113 @@ const CustomerScanner = ({ token }) => {
               <p className="text-sm text-[#888] mb-4">
                 AUREM can automate and fix {scanResult.issues_found} issues, saving {scanResult.aurem_impact.estimated_time_saved_monthly} monthly
               </p>
-              <button className="px-8 py-3 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded-lg font-medium hover:opacity-90 transition-all">
+              <button
+                onClick={() => setShowPricing(true)}
+                className="px-8 py-3 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded-lg font-medium hover:opacity-90 transition-all"
+              >
                 Deploy AUREM for This Customer
               </button>
             </div>
+
+            {/* Pricing Calculator */}
+            {showPricing && pricing && (
+              <div className="mt-6 p-6 bg-[#0A0A0A] border border-[#D4AF37]/50 rounded-lg">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-medium text-[#D4AF37]">💰 Recommended Pricing</h3>
+                  <span className="px-3 py-1 bg-[#D4AF37]/20 text-[#D4AF37] rounded-lg text-sm font-medium uppercase">
+                    {pricing.recommended_tier} Tier
+                  </span>
+                </div>
+
+                {/* Pricing Cards */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-gradient-to-br from-[#D4AF37]/10 to-[#8B7355]/10 border border-[#D4AF37]/30 rounded-lg text-center">
+                    <div className="text-xs text-[#888] mb-1">Monthly Fee</div>
+                    <div className="text-2xl font-bold text-[#D4AF37]">${pricing.pricing.monthly_fee}</div>
+                  </div>
+                  <div className="p-4 bg-[#050505] border border-[#1A1A1A] rounded-lg text-center">
+                    <div className="text-xs text-[#888] mb-1">Setup Fee</div>
+                    <div className="text-2xl font-bold text-[#F4F4F4]">${pricing.pricing.setup_fee}</div>
+                  </div>
+                  <div className="p-4 bg-[#050505] border border-[#1A1A1A] rounded-lg text-center">
+                    <div className="text-xs text-[#888] mb-1">Year One Total</div>
+                    <div className="text-2xl font-bold text-[#F4F4F4]">${pricing.pricing.total_year_one.toLocaleString()}</div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-[#4CAF50]/10 to-[#2E7D32]/10 border border-[#4CAF50]/30 rounded-lg text-center">
+                    <div className="text-xs text-[#888] mb-1">Annual Savings</div>
+                    <div className="text-2xl font-bold text-[#4CAF50]">{pricing.value_proposition.annual_savings_estimate}</div>
+                  </div>
+                </div>
+
+                {/* Value Proposition */}
+                <div className="p-4 bg-[#050505] border border-[#1A1A1A] rounded-lg mb-4">
+                  <h4 className="text-sm font-medium text-[#F4F4F4] mb-3">Value Proposition</h4>
+                  <div className="grid grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <div className="text-[#666]">Customer Saves</div>
+                      <div className="text-[#4CAF50] font-bold text-lg">{pricing.comparison.customer_saves}</div>
+                    </div>
+                    <div>
+                      <div className="text-[#666]">Value Multiple</div>
+                      <div className="text-[#D4AF37] font-bold text-lg">{pricing.comparison.value_multiple}</div>
+                    </div>
+                    <div>
+                      <div className="text-[#666]">Break-Even</div>
+                      <div className="text-[#FFB74D] font-bold text-lg">Month {pricing.value_proposition.break_even_month}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* All Tiers */}
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(pricing.tier_details).map(([key, tier]) => (
+                    <div
+                      key={key}
+                      className={`p-4 rounded-lg border ${
+                        key === pricing.recommended_tier
+                          ? 'bg-gradient-to-br from-[#D4AF37]/20 to-[#8B7355]/20 border-[#D4AF37]/50'
+                          : 'bg-[#050505] border-[#1A1A1A]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="text-sm font-bold text-[#F4F4F4]">{tier.name}</h5>
+                        {key === pricing.recommended_tier && (
+                          <span className="px-2 py-0.5 bg-[#D4AF37] text-[#050505] text-[9px] rounded uppercase font-bold">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xl font-bold text-[#D4AF37] mb-1">${tier.monthly}/mo</div>
+                      <div className="text-[10px] text-[#666] mb-3">{tier.suitable_for}</div>
+                      <div className="space-y-1">
+                        {tier.features.slice(0, 3).map((feature, idx) => (
+                          <div key={idx} className="text-[10px] text-[#888] flex items-start gap-1">
+                            <CheckCircle className="w-3 h-3 text-[#4CAF50] flex-shrink-0 mt-0.5" />
+                            {feature}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quote Generator */}
+                <div className="mt-4 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/30 rounded-lg">
+                  <h5 className="text-sm font-medium text-[#D4AF37] mb-2">📋 Sample Quote</h5>
+                  <div className="text-xs text-[#888] leading-relaxed">
+                    <p className="mb-2">
+                      "Based on our analysis, your system has <strong className="text-[#FF6B6B]">{scanResult.issues_found} issues</strong> ({scanResult.critical_issues} critical) that are costing you approximately <strong className="text-[#F4F4F4]">{pricing.value_proposition.cost_savings_monthly}/month</strong> in lost productivity and inefficiencies."
+                    </p>
+                    <p className="mb-2">
+                      "With AUREM's <strong className="text-[#D4AF37]">{pricing.tier_details[pricing.recommended_tier].name}</strong> plan at <strong className="text-[#F4F4F4]">${pricing.pricing.monthly_fee}/month</strong>, we'll automate these fixes and save you <strong className="text-[#4CAF50]">{pricing.value_proposition.time_saved_monthly}</strong> every month."
+                    </p>
+                    <p>
+                      "Your ROI: <strong className="text-[#4CAF50]">{pricing.comparison.customer_saves}</strong> in Year 1, with break-even in Month {pricing.value_proposition.break_even_month}."
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

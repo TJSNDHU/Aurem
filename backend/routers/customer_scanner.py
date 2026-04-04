@@ -516,3 +516,178 @@ async def list_scans(authorization: str = Header(None)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/scanner/scans/{scan_id}/pdf")
+async def download_pdf_report(scan_id: str):
+    """Download PDF report for a scan"""
+    try:
+        from server import db
+        from utils.pdf_generator import generate_pdf_report
+        from fastapi.responses import StreamingResponse
+        
+        # Get scan data
+        scan = await db.system_scans.find_one({"_id": scan_id}, {"_id": 0})
+        if not scan:
+            raise HTTPException(status_code=404, detail="Scan not found")
+        
+        # Generate PDF
+        pdf_buffer = generate_pdf_report(scan)
+        
+        # Return as downloadable file
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=aurem-scan-report-{scan_id}.pdf"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[PDF Export] Error: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+
+@router.post("/api/scanner/calculate-pricing")
+async def calculate_pricing(scan_id: str = None, issues_count: int = None, critical_count: int = None):
+    """
+    Calculate suggested pricing based on scan results
+    Returns tiered pricing recommendations
+    """
+    try:
+        from server import db
+        
+        # If scan_id provided, get data from scan
+        if scan_id:
+            scan = await db.system_scans.find_one({"_id": scan_id}, {"_id": 0})
+            if not scan:
+                raise HTTPException(status_code=404, detail="Scan not found")
+            
+            issues_count = scan['issues_found']
+            critical_count = scan['critical_issues']
+            impact = scan['aurem_impact']
+            time_saved = impact.get('estimated_time_saved_monthly', '60 hours')
+            cost_savings = impact.get('estimated_cost_savings_monthly', '$1,500')
+        else:
+            # Use provided counts
+            if issues_count is None or critical_count is None:
+                raise HTTPException(status_code=400, detail="Provide scan_id or issues_count + critical_count")
+            
+            time_saved = f"{40 + issues_count * 2}-{80 + issues_count * 3} hours"
+            cost_savings = f"${500 + (critical_count * 200)}"
+        
+        # Calculate pricing tiers
+        base_price = 299
+        
+        # Pricing logic
+        if critical_count == 0 and issues_count < 10:
+            tier = "basic"
+            monthly_price = base_price
+            setup_fee = 0
+        elif critical_count <= 2 and issues_count < 25:
+            tier = "professional"
+            monthly_price = 599
+            setup_fee = 500
+        elif critical_count <= 5 and issues_count < 50:
+            tier = "business"
+            monthly_price = 999
+            setup_fee = 1000
+        else:
+            tier = "enterprise"
+            monthly_price = 1999
+            setup_fee = 2500
+        
+        # Calculate value metrics
+        annual_savings_low = int(cost_savings.replace('$', '').replace(',', '').split('-')[0]) * 12
+        monthly_cost = monthly_price + (setup_fee / 12)
+        roi_months = round(setup_fee / (annual_savings_low / 12), 1)
+        
+        pricing_result = {
+            "recommended_tier": tier,
+            "pricing": {
+                "monthly_fee": monthly_price,
+                "setup_fee": setup_fee,
+                "annual_contract": monthly_price * 12,
+                "total_year_one": (monthly_price * 12) + setup_fee
+            },
+            "value_proposition": {
+                "issues_fixed": issues_count,
+                "critical_issues_resolved": critical_count,
+                "time_saved_monthly": time_saved,
+                "cost_savings_monthly": cost_savings,
+                "annual_savings_estimate": f"${annual_savings_low:,}",
+                "roi_timeline": f"{roi_months} months" if roi_months > 0 else "Immediate",
+                "break_even_month": int(roi_months) + 1 if roi_months > 0 else 1
+            },
+            "tier_details": {
+                "basic": {
+                    "name": "Basic",
+                    "monthly": 299,
+                    "setup": 0,
+                    "suitable_for": "0-2 critical issues, <10 total issues",
+                    "features": [
+                        "Automated monitoring",
+                        "Basic issue resolution",
+                        "Email support",
+                        "Monthly reports"
+                    ]
+                },
+                "professional": {
+                    "name": "Professional",
+                    "monthly": 599,
+                    "setup": 500,
+                    "suitable_for": "3-5 critical issues, 10-25 total issues",
+                    "features": [
+                        "Everything in Basic",
+                        "Priority support",
+                        "Advanced automation",
+                        "Weekly reports",
+                        "Custom integrations"
+                    ]
+                },
+                "business": {
+                    "name": "Business",
+                    "monthly": 999,
+                    "setup": 1000,
+                    "suitable_for": "6-10 critical issues, 25-50 total issues",
+                    "features": [
+                        "Everything in Professional",
+                        "Dedicated account manager",
+                        "24/7 monitoring",
+                        "Daily reports",
+                        "Custom workflows",
+                        "API access"
+                    ]
+                },
+                "enterprise": {
+                    "name": "Enterprise",
+                    "monthly": 1999,
+                    "setup": 2500,
+                    "suitable_for": "10+ critical issues, 50+ total issues",
+                    "features": [
+                        "Everything in Business",
+                        "White-label option",
+                        "Multi-site support",
+                        "Custom SLA",
+                        "Dedicated infrastructure",
+                        "Priority development"
+                    ]
+                }
+            },
+            "comparison": {
+                "customer_saves": f"${annual_savings_low - ((monthly_price * 12) + setup_fee):,}/year",
+                "value_multiple": f"{round(annual_savings_low / ((monthly_price * 12) + setup_fee), 1)}x",
+                "cost_as_percent_of_savings": f"{round((((monthly_price * 12) + setup_fee) / annual_savings_low) * 100, 1)}%"
+            }
+        }
+        
+        return pricing_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Pricing Calculator] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
