@@ -4371,6 +4371,14 @@ async def startup_event():
         except ImportError as e:
             logging.warning(f"[AUREM] Shopify Live Sync not initialized: {e}")
         
+        # Admin Cache Management
+        try:
+            from routers.admin_cache_router import set_db as set_cache_db
+            set_cache_db(db)
+            logging.info("[ADMIN] Cache Management Router initialized")
+        except ImportError as e:
+            logging.warning(f"[ADMIN] Cache Management not initialized: {e}")
+        
         logging.info(f"✓ All AI services initialized ({time.time()-t0:.2f}s)")
         
         logging.info(f"✅ ReRoots API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")
@@ -42882,6 +42890,15 @@ try:
     print("[STARTUP] ✓ Shopify Webhook Router loaded (Live Inventory Sync)", flush=True)
 except ImportError as e:
     print(f"[STARTUP] Shopify Router not loaded: {e}", flush=True)
+
+# ============ ADMIN CACHE ROUTER (Cache Management) ============
+try:
+    from routers.admin_cache_router import router as admin_cache_router, set_db as set_cache_db
+    # NOTE: set_cache_db(db) is called in startup_event() after db is initialized
+    app.include_router(admin_cache_router)
+    print("[STARTUP] ✓ Admin Cache Router loaded (Cache Management)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Admin Cache Router not loaded: {e}", flush=True)
 
 # AUREM Bug Engine APScheduler
 try:

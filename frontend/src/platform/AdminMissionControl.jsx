@@ -204,6 +204,57 @@ const AdminMissionControl = () => {
     }
   };
 
+  // Clear cache and refresh system
+  const clearCacheAndRefresh = async () => {
+    if (!window.confirm('⚠️ This will clear all caches and refresh the vector database. Continue?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const response = await fetch(`${API_URL}/api/admin/cache/clear`, {
+        method: 'POST',
+        headers: {
+          'X-Admin-Key': adminKey
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to clear cache');
+      }
+      
+      const result = await response.json();
+      
+      alert(`✅ Cache cleared successfully!\n\nCleared:\n- Vector DB collections: ${result.vector_collections_cleared}\n- MongoDB cache: ${result.mongodb_cache_cleared}\n- Browser cache will be cleared on reload`);
+      
+      // Reload current data
+      switch (activeTab) {
+        case 'dashboard':
+          await loadDashboard();
+          break;
+        case 'services':
+          await loadServices();
+          break;
+        case 'api-keys':
+          await loadApiKeys();
+          break;
+        case 'subscriptions':
+          await loadSubscriptions();
+          break;
+      }
+      
+      // Clear browser cache
+      window.location.reload(true);
+      
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+      alert('❌ Failed to clear cache: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Status badge color
   const getStatusColor = (status) => {
     switch (status) {
@@ -287,15 +338,26 @@ const AdminMissionControl = () => {
               Manage services, API keys, subscriptions & usage
             </p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              localStorage.removeItem('admin_key');
-              setAdminKey('');
-            }}
-          >
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={clearCacheAndRefresh}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <Database className="w-4 h-4" />
+              {loading ? 'Clearing...' : 'Clear Cache & Refresh'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                localStorage.removeItem('admin_key');
+                setAdminKey('');
+              }}
+            >
+              Logout
+            </Button>
+          </div>
         </div>
 
         {/* Tabs */}

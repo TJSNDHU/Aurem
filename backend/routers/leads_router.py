@@ -41,7 +41,7 @@ class TestLeadCaptureRequest(BaseModel):
     conversation_history: Optional[List[Dict]] = None
 
 
-@router.get("/")
+@router.get("")
 async def get_leads(
     status: Optional[str] = None,
     limit: int = 50,
