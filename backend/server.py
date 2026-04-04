@@ -42998,6 +42998,11 @@ from routers.invisible_coach import router as coach_router
 app.include_router(coach_router)
 print("[STARTUP] Invisible AI Sales Coach loaded (Secret In-Person Assistance)")
 
+# Complete Sales Pipeline
+from routers.sales_pipeline import router as pipeline_router
+app.include_router(pipeline_router)
+print("[STARTUP] Complete Sales Pipeline loaded (Decision Maker → Proposal → Contract → Onboarding)")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
