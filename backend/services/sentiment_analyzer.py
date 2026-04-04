@@ -178,9 +178,24 @@ Respond ONLY with valid JSON, no other text."""
                     provider="openai",
                     model="gpt-4o"
                 ).send_message(user_message=UserMessage(text=prompt))
-                # Extract content from emergentintegrations response (returns string directly)
+                
+                # Extract JSON from response (may be wrapped in markdown code blocks)
                 import json
-                result = json.loads(response)
+                import re
+                
+                # Remove markdown code blocks if present
+                response_clean = response.strip()
+                if response_clean.startswith('```'):
+                    # Extract content between ```json and ``` or ``` and ```
+                    match = re.search(r'```(?:json)?\s*\n(.*?)\n```', response_clean, re.DOTALL)
+                    if match:
+                        response_clean = match.group(1)
+                    else:
+                        # Fallback: remove first and last line
+                        lines = response_clean.split('\n')
+                        response_clean = '\n'.join(lines[1:-1])
+                
+                result = json.loads(response_clean)
             else:
                 # Fallback to standard OpenAI (if configured)
                 response = self.openai_client.chat.completions.create(
