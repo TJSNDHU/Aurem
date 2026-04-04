@@ -1,13 +1,15 @@
 """
 AUREM AI Chat API
 Handles conversational AI for the dashboard
+INTEGRATED: Lead Capture System (Phase A)
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import uuid
+import logging
 
 # Import OpenAI from emergentintegrations if available
 try:
@@ -18,6 +20,14 @@ except ImportError:
     client = None
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Database connection (set by server.py)
+db = None
+
+def set_db(database):
+    global db
+    db = database
 
 class ChatRequest(BaseModel):
     message: str
@@ -97,11 +107,49 @@ Be concise, helpful, and business-focused. Use data-driven insights when possibl
         # Detect intent (simple keyword matching)
         intent = detect_intent(request.message.lower())
         
+        # ========== PHASE A: LEAD CAPTURE INTEGRATION ==========
+        # Automatically capture leads from conversations
+        lead_captured = False
+        lead_id = None
+        
+        if db is not None:
+            try:
+                from services.aurem_hooks.lead_capture_hook import get_lead_capture_hook
+                from services.multi_tenancy_service import TenantContext
+                
+                # Get tenant_id from context (set by TenantMiddleware)
+                tenant_id = TenantContext.get_tenant() or "aurem_platform"
+                
+                # Execute lead capture hook
+                lead_hook = get_lead_capture_hook(db)
+                hook_result = await lead_hook.execute(
+                    tenant_id=tenant_id,
+                    conversation_id=session_id,
+                    conversation_history=chat_sessions[session_id],
+                    latest_user_message=request.message,
+                    latest_ai_response=ai_response,
+                    metadata={
+                        "source": "aurem_chat",
+                        "intent": intent
+                    }
+                )
+                
+                lead_captured = hook_result.get("lead_captured", False)
+                lead_id = hook_result.get("lead_id")
+                
+                if lead_captured:
+                    logger.info(f"[AUREM Chat] ✓ Lead captured: {lead_id}")
+                
+            except Exception as lead_error:
+                logger.error(f"[AUREM Chat] Lead capture error: {lead_error}")
+                # Don't fail the chat if lead capture fails
+        # ======================================================
+        
         return ChatResponse(
             response=ai_response,
             session_id=session_id,
             intent=intent,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(timezone.utc).isoformat()
         )
         
     except Exception as e:

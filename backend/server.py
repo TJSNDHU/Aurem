@@ -4363,6 +4363,14 @@ async def startup_event():
         except ImportError as e:
             logging.warning(f"[AUREM] Lead Capture not initialized: {e}")
         
+        # AUREM Shopify Live Sync (Phase B)
+        try:
+            from routers.shopify_webhook_router import set_db as set_shopify_db
+            set_shopify_db(db)
+            logging.info("[AUREM] Shopify Live Sync initialized (Phase B)")
+        except ImportError as e:
+            logging.warning(f"[AUREM] Shopify Live Sync not initialized: {e}")
+        
         logging.info(f"✓ All AI services initialized ({time.time()-t0:.2f}s)")
         
         logging.info(f"✅ ReRoots API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")
@@ -42382,8 +42390,10 @@ except ImportError as e:
     logging.warning(f"Orchestrator Brain router not loaded: {e}")
 
 try:
-    from routers.aurem_chat import router as aurem_chat_router
+    from routers.aurem_chat import router as aurem_chat_router, set_db as set_aurem_chat_db
+    set_aurem_chat_db(db)
     app.include_router(aurem_chat_router)  # AUREM AI Chat (Dashboard Intelligence)
+    logging.info("[STARTUP] ✓ AUREM Chat router loaded (with Lead Capture integration)")
 except ImportError as e:
     logging.warning(f"AUREM Chat router not loaded: {e}")
 
@@ -42863,6 +42873,15 @@ try:
     print("[STARTUP] ✓ Leads Router loaded (Lead Capture System)", flush=True)
 except ImportError as e:
     print(f"[STARTUP] Leads Router not loaded: {e}", flush=True)
+
+# ============ SHOPIFY WEBHOOK ROUTER (Phase B: Live Sync) ============
+try:
+    from routers.shopify_webhook_router import router as shopify_router, set_db as set_shopify_db
+    # NOTE: set_shopify_db(db) is called in startup_event() after db is initialized
+    app.include_router(shopify_router)
+    print("[STARTUP] ✓ Shopify Webhook Router loaded (Live Inventory Sync)", flush=True)
+except ImportError as e:
+    print(f"[STARTUP] Shopify Router not loaded: {e}", flush=True)
 
 # AUREM Bug Engine APScheduler
 try:

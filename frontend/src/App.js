@@ -15,6 +15,7 @@ const PlatformLanding = lazy(() => import('./platform/PlatformLanding'));
 const AdminMissionControl = lazy(() => import('./platform/AdminMissionControl'));
 const CustomSubscriptionBuilder = lazy(() => import('./platform/CustomSubscriptionBuilder'));
 const AdminPlanManager = lazy(() => import('./platform/AdminPlanManager'));
+const LeadsDashboard = lazy(() => import('./platform/LeadsDashboard'));
 
 // Loading Spinner
 const LoadingSpinner = () => (
@@ -54,6 +55,9 @@ function App() {
             <Route path="/admin/mission-control" element={<AdminMissionControl />} />
             <Route path="/admin/plans" element={<AdminPlanManager />} />
             <Route path="/subscriptions/custom" element={<CustomSubscriptionBuilder />} />
+            
+            {/* Leads Dashboard (Phase A) */}
+            <Route path="/leads" element={<LeadsDashboard />} />
             
             {/* Catch-all redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
