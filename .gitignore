@@ -106,3 +106,7 @@ frontend/node_modules/.cache/default-development/6.pack
 *.env
 *.env.*
 frontend/node_modules/.cache/default-development/0.pack
+-e 
+# Environment files
+*.env
+*.env.*
