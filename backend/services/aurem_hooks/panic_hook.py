@@ -56,7 +56,7 @@ class PanicHook:
                 "action_taken": str
             }
         """
-        if not self.db:
+        if self.db is None:
             logger.error("[PanicHook] Database not initialized")
             return {"panic_triggered": False, "error": "Database not initialized"}
         
