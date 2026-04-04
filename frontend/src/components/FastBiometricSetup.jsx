@@ -25,7 +25,18 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
 
   const checkBiometricSupport = async () => {
     try {
-      // Check if WebAuthn is supported
+      // For mobile browsers, WebAuthn support is limited
+      // Skip biometric check and go straight to PIN choice for better UX
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // On mobile, offer PIN only (WebAuthn has compatibility issues)
+        setBiometricSupported(false);
+        setStep('choice');
+        return;
+      }
+      
+      // Check if WebAuthn is supported (desktop browsers)
       const supported = window.PublicKeyCredential !== undefined;
       
       if (supported) {

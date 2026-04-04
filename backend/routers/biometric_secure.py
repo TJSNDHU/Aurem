@@ -56,9 +56,10 @@ async def setup_biometric(request: BiometricSetupRequest):
         if not request.pin.isdigit() or len(request.pin) < 4 or len(request.pin) > 6:
             raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
         
-        # Validate face descriptor
-        if len(request.face_descriptor) != 128:
-            raise HTTPException(status_code=400, detail="Invalid face descriptor")
+        # Validate face descriptor (allow empty array for PIN-only mode)
+        if request.face_descriptor and len(request.face_descriptor) > 0:
+            if len(request.face_descriptor) != 128:
+                raise HTTPException(status_code=400, detail="Invalid face descriptor length")
         
         # Hash the PIN
         pin_hash = bcrypt.hashpw(request.pin.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -251,6 +252,12 @@ async def webauthn_register_start(request: WebAuthnRegisterStartRequest):
     """
     try:
         from server import db
+        import os
+        
+        # Get domain from environment or use default
+        # For mobile/local: use 'localhost', for production: use actual domain
+        rp_id = os.getenv("WEBAUTHN_RP_ID", "localhost")
+        rp_name = os.getenv("WEBAUTHN_RP_NAME", "AUREM Platform")
         
         # Generate random challenge
         challenge = secrets.token_urlsafe(32)
@@ -268,8 +275,8 @@ async def webauthn_register_start(request: WebAuthnRegisterStartRequest):
         options = {
             "challenge": challenge,
             "rp": {
-                "name": "AUREM Platform",
-                "id": "emergentagent.com"  # Must match domain
+                "name": rp_name,
+                "id": rp_id
             },
             "user": {
                 "id": base64.urlsafe_b64encode(request.user_id.encode()).decode().rstrip('='),
