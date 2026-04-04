@@ -8,10 +8,14 @@ import os
 from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 from uuid import uuid4
+from dotenv import load_dotenv
+
+# Load backend .env to get correct DB_NAME
+load_dotenv('/app/backend/.env')
 
 # MongoDB connection
 MONGO_URL = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
-DB_NAME = os.getenv('DB_NAME', 'aurem_ai')
+DB_NAME = os.getenv('DB_NAME')  # Use exact value from .env (aurem_db)
 
 async def seed_panic_events():
     """Create multilingual panic event samples"""

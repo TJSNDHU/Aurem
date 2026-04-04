@@ -8,10 +8,14 @@ from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 from uuid import uuid4
 import random
+from dotenv import load_dotenv
+
+# Load backend .env to get correct DB_NAME
+load_dotenv('/app/backend/.env')
 
 # MongoDB connection
 MONGO_URL = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
-DB_NAME = os.getenv('DB_NAME', 'aurem_ai')
+DB_NAME = os.getenv('DB_NAME')  # Use exact value from .env (aurem_db)
 
 def seed_analytics_leads():
     """Create sample leads for analytics testing"""
