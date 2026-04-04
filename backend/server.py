@@ -2894,6 +2894,15 @@ class BrandDetectionMiddleware:
 
 app.add_middleware(BrandDetectionMiddleware)
 
+# ============= TENANT MIDDLEWARE (Multi-Tenancy) =============
+# Extracts tenant_id from JWT and sets TenantContext for data isolation
+try:
+    from middleware.tenant_middleware import TenantMiddleware
+    app.add_middleware(TenantMiddleware)
+    logging.info("[STARTUP] ✓ Tenant Middleware registered for multi-tenancy")
+except Exception as e:
+    logging.warning(f"[STARTUP] Tenant Middleware not registered: {e}")
+
 # CORS middleware - MUST be added early, before routes
 app.add_middleware(
     CORSMiddleware,

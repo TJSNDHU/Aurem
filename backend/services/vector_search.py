@@ -18,6 +18,16 @@ import chromadb
 from chromadb.config import Settings
 from openai import OpenAI
 
+# Import TenantContext for multi-tenancy support
+try:
+    from services.multi_tenancy_service import TenantContext
+except ImportError:
+    # Fallback if multi_tenancy_service not available
+    class TenantContext:
+        @classmethod
+        def get_tenant(cls):
+            return None
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,7 +136,8 @@ class VectorSearchService:
         self,
         platform: str,
         data: List[Dict],
-        query_context: str = ""
+        query_context: str = "",
+        tenant_id: Optional[str] = None
     ) -> bool:
         """
         Index connector data for semantic search
@@ -135,6 +146,7 @@ class VectorSearchService:
             platform: Connector platform (e.g., "reddit", "twitter")
             data: List of data items from connector
             query_context: Original query that fetched this data
+            tenant_id: Tenant ID for multi-tenancy isolation (auto-detected if not provided)
         
         Returns:
             Success status
@@ -145,6 +157,14 @@ class VectorSearchService:
             logger.warning("[VectorSearch] Not initialized, skipping indexing")
             return False
         
+        # MULTI-TENANCY: Get tenant_id from context
+        if tenant_id is None:
+            tenant_id = TenantContext.get_tenant()
+        
+        if not tenant_id:
+            logger.warning("[VectorSearch] No tenant_id - skipping indexing for safety")
+            return False
+        
         try:
             collection = self.collections["connector_data"]
             
@@ -153,17 +173,18 @@ class VectorSearchService:
                 text = self._create_searchable_text(item, platform)
                 
                 # Generate unique ID
-                doc_id = f"{platform}_{datetime.now(timezone.utc).timestamp()}_{idx}"
+                doc_id = f"{tenant_id}_{platform}_{datetime.now(timezone.utc).timestamp()}_{idx}"
                 
                 # Get embedding
                 embedding = self._get_embedding(text)
                 
-                # Store in ChromaDB
+                # Store in ChromaDB with tenant_id in metadata
                 collection.add(
                     ids=[doc_id],
                     embeddings=[embedding],
                     documents=[text],
                     metadatas=[{
+                        "tenant_id": tenant_id,  # CRITICAL: Multi-tenancy isolation
                         "platform": platform,
                         "query_context": query_context,
                         "indexed_at": datetime.now(timezone.utc).isoformat(),
@@ -203,7 +224,8 @@ class VectorSearchService:
         query: str,
         collection_name: str = "connector_data",
         limit: int = 10,
-        filter_platform: Optional[str] = None
+        filter_platform: Optional[str] = None,
+        tenant_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Perform semantic search
@@ -213,6 +235,7 @@ class VectorSearchService:
             collection_name: Collection to search
             limit: Number of results
             filter_platform: Optional platform filter
+            tenant_id: Tenant ID for multi-tenancy (auto-detected if not provided)
         
         Returns:
             List of matching documents with scores
@@ -223,6 +246,14 @@ class VectorSearchService:
             logger.warning("[VectorSearch] Not initialized, returning empty results")
             return []
         
+        # MULTI-TENANCY: Get tenant_id from context
+        if tenant_id is None:
+            tenant_id = TenantContext.get_tenant()
+        
+        if not tenant_id:
+            logger.warning("[VectorSearch] No tenant_id - returning empty results for safety")
+            return []
+        
         try:
             collection = self.collections[collection_name]
             
@@ -230,9 +261,12 @@ class VectorSearchService:
             query_embedding = self._get_embedding(query)
             
             # Build where clause for filtering
-            where_clause = None
+            # CRITICAL: Always filter by tenant_id for data isolation
+            where_clause = {"tenant_id": tenant_id}
+            
+            # Add platform filter if provided
             if filter_platform:
-                where_clause = {"platform": filter_platform}
+                where_clause["platform"] = filter_platform
             
             # Search
             results = collection.query(
@@ -267,7 +301,8 @@ class VectorSearchService:
         task: str,
         solution: str,
         success: bool,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
+        tenant_id: Optional[str] = None
     ) -> bool:
         """
         Index agent execution for memory/RAG
@@ -278,6 +313,7 @@ class VectorSearchService:
             solution: Solution applied
             success: Whether it was successful
             metadata: Additional metadata
+            tenant_id: Tenant ID for multi-tenancy (auto-detected if not provided)
         
         Returns:
             Success status
@@ -285,6 +321,14 @@ class VectorSearchService:
         self._initialize()
         
         if not self.client or "agent_memory" not in self.collections:
+            return False
+        
+        # MULTI-TENANCY: Get tenant_id from context
+        if tenant_id is None:
+            tenant_id = TenantContext.get_tenant()
+        
+        if not tenant_id:
+            logger.warning("[VectorSearch] No tenant_id - skipping agent memory indexing")
             return False
         
         try:
@@ -297,10 +341,11 @@ class VectorSearchService:
             embedding = self._get_embedding(text)
             
             # Generate ID
-            doc_id = f"agent_{agent_name}_{datetime.now(timezone.utc).timestamp()}"
+            doc_id = f"{tenant_id}_agent_{agent_name}_{datetime.now(timezone.utc).timestamp()}"
             
             # Metadata
             meta = {
+                "tenant_id": tenant_id,  # CRITICAL: Multi-tenancy isolation
                 "agent_name": agent_name,
                 "task": task,
                 "solution": solution,
