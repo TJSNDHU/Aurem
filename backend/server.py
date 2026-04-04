@@ -42983,6 +42983,11 @@ from routers.integration_api import router as integration_router
 app.include_router(integration_router)
 print("[STARTUP] External Integration API loaded (Chat Widget, Lead Capture, Webhooks)")
 
+# Customer System Scanner
+from routers.customer_scanner import router as scanner_router
+app.include_router(scanner_router)
+print("[STARTUP] Customer System Scanner loaded (System Analysis & Reports)")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

@@ -50,6 +50,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout }) => {
     {
       title: 'SYSTEM',
       items: [
+        { id: 'customer-scanner', label: 'Customer Scanner', icon: Activity },
         { id: 'circuit-breakers', label: 'Circuit Breakers', icon: Shield },
         { id: 'github-leads', label: 'Intelligence & Growth', icon: TrendingUp },
         { id: 'business-management', label: 'Business Management', icon: Building2 },
@@ -627,6 +628,10 @@ const AuremDashboard = () => {
         {/* Main Content Area - Dynamic based on activeItem */}
         {activeItem === 'mission-control' ? (
           <MissionControl onNavigate={handleNavClick} token={token} />
+        ) : activeItem === 'customer-scanner' ? (
+          <div className="flex-1 overflow-auto">
+            <CustomerScanner token={token} />
+          </div>
         ) : activeItem === 'circuit-breakers' ? (
           <div className="flex-1 overflow-auto">
             <CircuitBreakerDashboard token={token} />
