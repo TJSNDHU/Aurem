@@ -114,7 +114,7 @@ const PlatformLanding = () => {
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/platform/signup')}
+              onClick={() => navigate('/auth')}
               className="px-6 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded text-sm font-medium tracking-wide"
             >
               Deploy AUREM
@@ -470,7 +470,7 @@ const PlatformLanding = () => {
               <motion.button 
                 whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(212, 175, 55, 0.4)' }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/platform/signup')}
+                onClick={() => navigate('/auth')}
                 className="px-10 py-4 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded text-sm font-semibold inline-flex items-center gap-3 tracking-wide"
               >
                 Initialize Vanguard Swarm
