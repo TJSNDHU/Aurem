@@ -4355,6 +4355,14 @@ async def startup_event():
             pass
         logging.info(f"✓ AUREM BOS routers initialized")
         
+        # AUREM Lead Capture System (Phase A)
+        try:
+            from routers.leads_router import set_db as set_leads_db
+            set_leads_db(db)
+            logging.info("[AUREM] Lead Capture System initialized (Phase A)")
+        except ImportError as e:
+            logging.warning(f"[AUREM] Lead Capture not initialized: {e}")
+        
         logging.info(f"✓ All AI services initialized ({time.time()-t0:.2f}s)")
         
         logging.info(f"✅ ReRoots API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")
@@ -42850,7 +42858,7 @@ except ImportError as e:
 # ============ LEADS ROUTER (Phase A: Lead Capture) ============
 try:
     from routers.leads_router import router as leads_router, set_db as set_leads_db
-    set_leads_db(db)
+    # NOTE: set_leads_db(db) is called in startup_event() after db is initialized
     app.include_router(leads_router)
     print("[STARTUP] ✓ Leads Router loaded (Lead Capture System)", flush=True)
 except ImportError as e:
