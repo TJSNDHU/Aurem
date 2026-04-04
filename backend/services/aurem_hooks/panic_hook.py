@@ -104,8 +104,24 @@ class PanicHook:
             # PANIC TRIGGERED - Create event and send alerts
             event_id = f"panic_{uuid.uuid4().hex[:12]}"
             
-            # Extract customer info from metadata
+            # Extract customer info from metadata OR get from lead database
             customer_info = metadata.get("customer", {}) if metadata else {}
+            
+            # Try to get lead data for this conversation
+            try:
+                from services.enhanced_lead_capture import get_lead_by_conversation
+                lead_data = await get_lead_by_conversation(self.db, conversation_id)
+                
+                if lead_data:
+                    # Use lead data for customer info
+                    if not customer_info.get("name"):
+                        customer_info["name"] = lead_data.get("name", "Unknown")
+                    if not customer_info.get("email"):
+                        customer_info["email"] = lead_data.get("email", "N/A")
+                    if not customer_info.get("phone"):
+                        customer_info["phone"] = lead_data.get("phone", "N/A")
+            except Exception as e:
+                logger.warning(f"[PanicHook] Could not fetch lead data: {e}")
             
             panic_event = {
                 "event_id": event_id,
