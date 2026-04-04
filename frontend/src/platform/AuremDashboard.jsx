@@ -27,6 +27,8 @@ import ForensicUploader from '../components/ForensicUploader';
 import GitHubLeadMiner from '../components/GitHubLeadMiner';
 // API Keys Manager
 import APIKeysManager from './APIKeysManager';
+// Mission Control Dashboard
+import MissionControl from './MissionControl';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -475,7 +477,7 @@ const ChatInterface = ({ user, token }) => {
 const AuremDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeItem, setActiveItem] = useState('ai-conversation');
+  const [activeItem, setActiveItem] = useState('mission-control');
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -601,7 +603,9 @@ const AuremDashboard = () => {
         />
 
         {/* Main Content Area - Dynamic based on activeItem */}
-        {activeItem === 'circuit-breakers' ? (
+        {activeItem === 'mission-control' ? (
+          <MissionControl onNavigate={handleNavClick} token={token} />
+        ) : activeItem === 'circuit-breakers' ? (
           <div className="flex-1 overflow-auto">
             <CircuitBreakerDashboard token={token} />
           </div>
