@@ -875,6 +875,63 @@ async def process_google_session(data: dict, response: Response):
 
 # ============= PASSWORD RESET =============
 
+
+@router.post("/google/callback")
+async def process_google_callback(data: dict, response: Response):
+    """
+    Unified Google OAuth callback — entrypoint hit by GoogleAuthCallback.jsx
+    after Emergent's OAuth gateway redirects back with a session_id.
+
+    Routes intelligently:
+      • Email in ADMIN_EMAIL_WHITELIST or active team_member → admin-session flow
+      • Anyone else → regular customer session flow
+
+    The frontend then inspects the returned JWT's `is_admin` claim to redirect
+    to /admin/console vs /my.
+    """
+    session_id = data.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+
+    # First verify the Google session via Emergent's auth gateway so we can
+    # peek at the email and decide which flow to use.
+    try:
+        auth_service_url = os.environ.get(
+            "AUTH_SERVICE_URL", "https://demobackend.emergentagent.com"
+        )
+        async with httpx.AsyncClient() as client:
+            auth_response = await client.get(
+                f"{auth_service_url}/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": session_id},
+            )
+            if auth_response.status_code != 200:
+                raise HTTPException(status_code=401, detail="Invalid session")
+            google_user = auth_response.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Google callback verify error: {e}")
+        raise HTTPException(status_code=401, detail="Failed to verify Google session")
+
+    email = (google_user.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Google session missing email")
+
+    is_whitelisted = email in [e.lower() for e in ADMIN_EMAIL_WHITELIST]
+    team_member = await get_auth_db().team_members.find_one(
+        {"email": email, "status": "active"}, {"_id": 0}
+    )
+
+    if is_whitelisted or team_member:
+        # Admin / team-member flow — delegate to the existing admin handler.
+        logging.info(f"[GOOGLE-CALLBACK] admin route for {email}")
+        return await process_admin_google_session(data, response)
+
+    # Regular customer flow.
+    logging.info(f"[GOOGLE-CALLBACK] customer route for {email}")
+    return await process_google_session(data, response)
+
+
 @router.post("/forgot-password")
 async def forgot_password(request_data: PasswordResetRequest, request: Request):
     """Send password reset email"""
