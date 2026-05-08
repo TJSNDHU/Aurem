@@ -26,6 +26,17 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Scout agent ImportError fixed (production ORA chat) ✅**
+  - Production ORA chat showed "Scout agent unavailable: ImportError" — root cause: `services/agents/__init__.py` was importing all agents but NOT re-exporting `AuremAgent` base class, so `hunter_ora`/`followup_ora`/`closer_ora` failed `from services.agents import AuremAgent`
+  - Fix: added `from shared.agents import AuremAgent` re-export at top of `services/agents/__init__.py`
+  - Verified: HunterORA/FollowupORA/CloserORA all instantiate correctly
+- **2026-02-08 — Settings change-password now syncs ALL 3 collections + weak-password gate ✅**
+  - `routers/settings_router.py` change-password was only updating `users.password` — left stale hash in `users.password_hash` + `platform_users` + `aurem_users` causing future logins to drift
+  - Now syncs all 3 + adds weak-password block (`admin`, `admin123`, `password`, `12345678`, etc.)
+  - Lookup also accepts email-based JWT subjects (was failing if `users.id` field was missing)
+- **2026-02-08 — Scheduler coroutine leaks fully eliminated ✅**
+  - Fixed 6 more `lambda: <async_fn>(db)` patterns in `services/nightly_cycle.py` (day_close, next_day_prep, auto_learn, evening_brief, evolver_review, postiz_daily) — all wrapped in proper `async def` closures
+  - Zero `RuntimeWarning: coroutine never awaited` since boot
 - **2026-02-08 — Pixel Heartbeat coroutine leak fix ✅**
   - `routers/registry.py` was passing `lambda: run_pixel_heartbeat(_db)` to APScheduler — returned a coroutine but the lambda's caller never awaited it → `RuntimeWarning: coroutine 'run_pixel_heartbeat' was never awaited` on every scheduled run, leaking memory + CPU
   - Wrapped in proper `async def _pixel_heartbeat_job():` so AsyncIOScheduler awaits cleanly
