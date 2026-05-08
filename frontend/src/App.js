@@ -375,8 +375,8 @@ function AppRouter() {
       <Route path="/app" element={<SentinelErrorBoundary><OraPWA /></SentinelErrorBoundary>} />
 
       {/* Customer Portal — 8-item dedicated experience (isolated from /dashboard admin) */}
-      <Route path="/my" element={<CustomerPortal />} />
-      <Route path="/my/*" element={<CustomerPortal />} />
+      <Route path="/my" element={<LuxeDashboardPreview />} />
+      <Route path="/my/*" element={<LuxeDashboardPreview />} />
       
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
