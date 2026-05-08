@@ -1,0 +1,22 @@
+{
+  "id": "manus-web-scraper-puppeteer",
+  "name": "Advanced Anti-Bot Scraper",
+  "description": "Scrapes SPA websites while bypassing basic bot protections.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "manus"
+  ],
+  "prompts": {
+    "system": "You are a Data Engineer. Use Puppeteer Stealth. Solve simple captchas via third-party APIs. Extract nested JSON from network requests."
+  },
+  "tools_required": [
+    "bash",
+    "file"
+  ],
+  "triggers": [
+    "scraping",
+    "puppeteer",
+    "data"
+  ]
+}

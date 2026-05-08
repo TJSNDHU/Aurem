@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <!-- ==================== LA VELA BIANCA SITEMAP ==================== -->
+  <!-- Premium Teen Skincare - Clean Light for Your Skin -->
+  <!-- Domain: lavelabianca.com -->
+  <!-- Last Updated: March 7, 2026 -->
+  
+  <!-- Homepage -->
+  <url>
+    <loc>https://lavelabianca.com</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en-ca" href="https://lavelabianca.com"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://lavelabianca.com"/>
+    <image:image>
+      <image:loc>https://reroots.ca/lavela-icon-512.png</image:loc>
+      <image:title>LA VELA BIANCA - Luxury Teen Skincare</image:title>
+      <image:caption>Premium pediatric-safe skincare for teens aged 8-18. The New Era of Elite Glow. Made in Canada.</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- Shop / Products -->
+  <url>
+    <loc>https://lavelabianca.com/shop</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://reroots.ca/oro-rosa-product.png</image:loc>
+      <image:title>ORO ROSA Bio-Glow Serum - Teen Skincare</image:title>
+      <image:caption>Premium teen skincare serum with PDRN, Glutathione, Hyaluronic Acid, Vitamin B12. $49 CAD. Ages 8-16.</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- ORO ROSA Product Page -->
+  <url>
+    <loc>https://lavelabianca.com/products/oro-rosa</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://reroots.ca/oro-rosa-product.png</image:loc>
+      <image:title>ORO ROSA Bio-Glow Serum</image:title>
+      <image:caption>Translucent bouncy pink gel serum for young skin ages 8-16. 4 hero ingredients: PDRN, Glutathione, Hyaluronic Acid, Vitamin B12.</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- The Lab - Science Education -->
+  <url>
+    <loc>https://lavelabianca.com/the-lab</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- Glow Club - Loyalty Program -->
+  <url>
+    <loc>https://lavelabianca.com/glow-club</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- About / Founder Story -->
+  <url>
+    <loc>https://lavelabianca.com/about</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- Contact -->
+  <url>
+    <loc>https://lavelabianca.com/contact</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- FAQ -->
+  <url>
+    <loc>https://lavelabianca.com/faq</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- Skincare Quiz for Teens -->
+  <url>
+    <loc>https://lavelabianca.com/skin-quiz</loc>
+    <lastmod>2026-03-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+</urlset>

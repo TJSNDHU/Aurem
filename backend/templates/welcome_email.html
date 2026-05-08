@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome to AUREM</title>
+</head>
+<body style="margin:0;padding:0;background:#050507;font-family:'Helvetica Neue',Arial,sans-serif;color:#F2F2F2;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#050507;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+<!-- Logo -->
+<tr><td align="center" style="padding:20px 0 30px;">
+<div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#F97316,#EA580C);display:inline-block;line-height:48px;text-align:center;font-size:20px;font-weight:900;color:#1A3026;">A</div>
+<div style="font-size:16px;font-weight:700;letter-spacing:4px;color:#F2F2F2;margin-top:8px;">AUREM</div>
+</td></tr>
+
+<!-- Greeting -->
+<tr><td style="padding:0 30px 24px;">
+<p style="font-size:18px;color:#F2F2F2;margin:0 0 8px;">Hi {{first_name}},</p>
+<p style="font-size:14px;color:#9A9490;margin:0;line-height:1.6;">Your AUREM system is live and ready. <strong style="color:#F97316;">{{business_name}}</strong> is now connected.</p>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 30px;"><hr style="border:none;border-top:1px solid rgba(201,168,76,0.2);margin:0;"></td></tr>
+
+<!-- Business ID -->
+<tr><td style="padding:24px 30px;">
+<p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 12px;text-transform:uppercase;">YOUR BUSINESS ID</p>
+<div style="display:inline-block;padding:14px 28px;border-radius:10px;background:rgba(255,107,0,0.06);border:1px solid rgba(255,107,0,0.2);">
+<span style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:#F97316;letter-spacing:4px;">{{business_id}}</span>
+</div>
+<p style="font-size:12px;color:#8A8070;margin:12px 0 0;line-height:1.5;">Keep this code safe. Share it with your team to give them ORA access.</p>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 30px;"><hr style="border:none;border-top:1px solid rgba(201,168,76,0.2);margin:0;"></td></tr>
+
+<!-- API Key + Pixel install -->
+<tr><td style="padding:24px 30px;">
+<p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 12px;text-transform:uppercase;">YOUR AUREM API KEY</p>
+<div style="padding:14px 16px;border-radius:10px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);margin-bottom:14px;">
+<code style="font-family:'Courier New',monospace;font-size:13px;color:#F97316;word-break:break-all;">{{api_key}}</code>
+</div>
+<p style="font-size:12px;color:#9A9490;margin:0 0 10px;line-height:1.5;">Paste this 1-line script on your website to activate AUREM's live intelligence + auto-fixes:</p>
+<div style="padding:12px 14px;border-radius:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);">
+<code style="font-family:'Courier New',monospace;font-size:11px;color:#8A8070;word-break:break-all;line-height:1.5;">{{pixel_snippet}}</code>
+</div>
+<p style="font-size:11px;color:#6A6070;margin:10px 0 0;line-height:1.5;">Forward this to your developer — 2-minute setup, auto-heals SEO, meta tags, and schema issues.</p>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 30px;"><hr style="border:none;border-top:1px solid rgba(201,168,76,0.2);margin:0;"></td></tr>
+
+<!-- QR Code -->
+<tr><td style="padding:24px 30px;text-align:center;">
+<p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 16px;text-transform:uppercase;">CONNECT ORA TO YOUR PHONE</p>
+<img src="cid:qr_code" alt="QR Code" width="200" height="200" style="border-radius:8px;display:block;margin:0 auto 12px;">
+<p style="font-size:12px;color:#9A9490;margin:0 0 8px;">Point your phone camera at this code.</p>
+<p style="font-size:12px;color:#9A9490;margin:0;">ORA opens pre-connected to <strong style="color:#F97316;">{{business_name}}</strong>.</p>
+<p style="font-size:11px;color:#6A6070;margin:12px 0 0;font-family:'Courier New',monospace;">Or type: aurem.live/ora?id={{business_id}}</p>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 30px;"><hr style="border:none;border-top:1px solid rgba(201,168,76,0.2);margin:0;"></td></tr>
+
+<!-- Watch Section -->
+<tr><td style="padding:24px 30px;">
+<p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 12px;text-transform:uppercase;">CONNECT YOUR SMARTWATCH</p>
+<p style="font-size:13px;color:#9A9490;margin:0 0 12px;line-height:1.6;">Your watch receives AUREM notifications automatically &mdash; no setup needed.</p>
+<p style="font-size:12px;color:#8A8070;margin:0 0 4px;">Once ORA is installed on your phone:</p>
+<ul style="margin:8px 0;padding-left:20px;color:#8A8070;font-size:12px;line-height:1.8;">
+<li><strong style="color:#F2F2F2;">Apple Watch:</strong> notifications appear automatically</li>
+<li><strong style="color:#F2F2F2;">Samsung/Android Watch:</strong> open Galaxy Wearable app &rarr; Notifications &rarr; enable AUREM</li>
+</ul>
+<p style="font-size:12px;color:#9A9490;margin:8px 0 0;">You can approve or reject AUREM actions directly from your watch.</p>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 30px;"><hr style="border:none;border-top:1px solid rgba(201,168,76,0.2);margin:0;"></td></tr>
+
+<!-- Three things -->
+<tr><td style="padding:24px 30px;">
+<p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 16px;text-transform:uppercase;">THREE THINGS TO DO NOW</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="padding:8px 0;"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:rgba(255,107,0,0.12);text-align:center;line-height:24px;font-size:11px;font-weight:700;color:#F97316;margin-right:12px;">1</span><span style="font-size:13px;color:#F2F2F2;">Scan the QR code above on your phone</span></td></tr>
+<tr><td style="padding:8px 0;"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:rgba(255,107,0,0.12);text-align:center;line-height:24px;font-size:11px;font-weight:700;color:#F97316;margin-right:12px;">2</span><span style="font-size:13px;color:#F2F2F2;">Tap "Add to Home Screen" when prompted</span></td></tr>
+<tr><td style="padding:8px 0;"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:rgba(255,107,0,0.12);text-align:center;line-height:24px;font-size:11px;font-weight:700;color:#F97316;margin-right:12px;">3</span><span style="font-size:13px;color:#F2F2F2;">Allow notifications when asked</span></td></tr>
+</table>
+<p style="font-size:13px;color:#F97316;margin:16px 0 0;font-style:italic;">Then ask ORA: "What's my morning brief?"</p>
+</td></tr>
+
+<!-- CTA Buttons -->
+<tr><td style="padding:24px 30px;text-align:center;">
+<a href="{{dashboard_url}}" style="display:inline-block;padding:12px 28px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#F2F2F2;text-decoration:none;font-size:13px;font-weight:600;margin-right:12px;">Open Dashboard</a>
+<a href="{{ora_url}}" style="display:inline-block;padding:12px 28px;border-radius:8px;background:#F97316;color:#FFF;text-decoration:none;font-size:13px;font-weight:600;">Open ORA</a>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="padding:32px 30px 20px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
+<p style="font-size:10px;color:#5A5468;margin:0;">&copy; 2026 Polaris Built Inc. &middot; Mississauga, Ontario, Canada</p>
+<p style="font-size:10px;color:#5A5468;margin:4px 0 0;">
+<a href="https://aurem.live/legal/terms-of-service" style="color:#6A6070;text-decoration:none;">Terms</a> &middot;
+<a href="https://aurem.live/legal/privacy-policy" style="color:#6A6070;text-decoration:none;">Privacy</a> &middot;
+<span style="color:#6A6070;">Not Financial Advice</span>
+</p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+l>

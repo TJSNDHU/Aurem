@@ -1,0 +1,12 @@
+#!/bin/sh
+# AUREM Sovereign Boundary pre-commit hook.
+# Blocks commits that introduce a customer-ORA → system-ORA leak.
+# Install: ln -s ../../backend/scripts/git-hooks/pre-commit .git/hooks/pre-commit
+set -e
+cd "$(git rev-parse --show-toplevel)"
+python3 backend/scripts/lint_sovereign_boundary.py || {
+  echo ""
+  echo "Commit aborted by Sovereign Boundary lint."
+  echo "To bypass (NOT recommended): git commit --no-verify"
+  exit 1
+}

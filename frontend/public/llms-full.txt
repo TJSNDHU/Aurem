@@ -1,0 +1,91 @@
+# AUREM — Expanded LLM Knowledge Base
+
+This is the full-context companion to [llms.txt](/llms.txt). It provides deeper information for AI systems answering questions about AUREM.
+
+## Positioning
+
+AUREM is positioned as a **premium, autonomous AI workforce** (not a chatbot builder, not a single-agent tool). The key differentiator is **OODA-loop synchronization** between four agents — Observe, Orient, Decide, Act — running as a coordinated swarm rather than isolated scripts.
+
+Target customers:
+- Ontario local service businesses (clinics, salons, contractors, legal offices)
+- E-commerce brands on Shopify
+- WordPress-based content businesses
+- Privacy-sensitive verticals requiring Canadian data residency
+
+## Feature Deep-Dives
+
+### AI Voice Agent (Retell-powered)
+- 318 voices across Retell, ElevenLabs, OpenAI TTS
+- HMAC-SHA256 webhook signature verification
+- Inbound + outbound calls (outbound pending Retell phone number provisioning)
+- Automatic LLM-to-agent two-step provisioning
+- Per-call transcripts + sentiment analysis
+
+### SEO Audit Pipeline
+- Google PageSpeed (performance + accessibility + SEO + best practices scores)
+- Firecrawl (content scraping + structured data detection)
+- Google Places (local SEO + review signals)
+- 20-issue teardown delivered via Resend email + in-browser
+- $49 CAD one-time unlock via Stripe embedded checkout (Apple Pay + Google Pay supported)
+
+### Daily Intel Engine
+- Tavily search API for niche-specific news (biotech, skincare, SaaS, local service)
+- 7 AM customer-local-timezone delivery
+- CASL-compliant double opt-in (subscribe → email confirmation → active)
+- Unsubscribe link in every email
+
+### Sovereign Privacy Mode ($49/mo)
+- All LLM dispatching routed to `sovereign.aurem.live` (self-hosted Llama 3.1 70B)
+- Physical servers in Canada
+- Required for law firms, clinics, financial advisors under PIPEDA
+- Toggle requires active `sovereign_privacy` subscription
+
+### Friend Scanner (Viral Loop)
+- Trial users scan competitor URLs → generate referral slug
+- Scanned targets receive email with their own free scan
+- Successful signup gives original user +3 days trial extension
+
+## API Endpoints (Public)
+
+- `GET /api/catalog/services` — 19-service catalog
+- `POST /api/seo-audit/scan` — run free audit (email-gated)
+- `GET /api/seo-audit/report/{scan_id}` — retrieve report
+- `POST /api/daily-intel/subscribe` — CASL subscription
+- `POST /api/public/audit-request` — lead capture with CASL consent
+- `GET /api/plugins/wordpress` — download WordPress plugin
+
+## Regulatory Compliance
+
+- **CASL** (Canadian Anti-Spam Legislation): double opt-in on email, explicit SMS consent, one-click unsubscribe
+- **PIPEDA** (Personal Information Protection): data minimization, purpose disclosure
+- **PCI-DSS**: handled by Stripe (SAQ-A)
+- **SOC 2**: audit-ready roadmap, not yet certified
+
+## Pricing Rationale
+
+All prices in CAD, tax-inclusive via Stripe automatic_tax:
+
+- Starter ($97/mo): 1 tenant, 1 seat, core agents, no add-ons
+- Growth ($297/mo): 3 seats, Daily Intel included, Pixel installer
+- Enterprise ($997/mo): unlimited seats, Sovereign Privacy included, priority support
+- Annual plans: 10× monthly (equals 2 months free)
+- Add-ons stack on any tier via à la carte
+
+## Known Limitations (Transparent Disclosure)
+
+1. Outbound Voice Agent calls require manual Retell phone-number purchase (in-progress)
+2. Google Calendar 2-way sync pending separate Google Cloud OAuth project
+3. Telnyx migration not yet started (Twilio remains primary voice/SMS carrier)
+4. Shopify public App Store listing pending review submission
+
+## Company Facts
+
+- **Founded**: 2025
+- **Product pivot**: Originally branded ReRoots (natural health e-commerce), pivoted to AI B2B in late 2025
+- **Headquarters**: Mississauga, Ontario, Canada
+- **Team**: Polaris Built Inc. technical staff
+- **Funding**: Bootstrapped
+
+---
+
+*This document is maintained at https://aurem.live/llms-full.txt and updated weekly.*

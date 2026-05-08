@@ -1,0 +1,32 @@
+# AUREM Legion — Cloudflare Tunnel Config
+# Place at: C:\Users\tejis\.cloudflared\config.yml on your Legion laptop
+#
+# Setup:
+#   1. cloudflared tunnel create aurem-sovereign (already done)
+#   2. Copy this file to C:\Users\tejis\.cloudflared\config.yml
+#   3. cloudflared tunnel route dns aurem-sovereign sovereign.aurem.live
+#   4. cloudflared tunnel route dns aurem-sovereign voice.aurem.live
+#   5. cloudflared tunnel route dns aurem-sovereign social.aurem.live
+#   6. cloudflared tunnel run aurem-sovereign
+
+tunnel: aurem-sovereign
+credentials-file: C:\Users\tejis\.cloudflared\aurem-sovereign.json
+
+ingress:
+  # Ollama — Local LLM inference (sovereign node)
+  - hostname: sovereign.aurem.live
+    service: http://localhost:11434
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: localhost
+
+  # Voice — TTS/STT service
+  - hostname: voice.aurem.live
+    service: http://localhost:8001
+
+  # Brightbean — Social media scheduler
+  - hostname: social.aurem.live
+    service: http://localhost:8000
+
+  # Catch-all
+  - service: http_status:404

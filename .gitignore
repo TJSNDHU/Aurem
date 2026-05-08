@@ -1,0 +1,188 @@
+# ─────────────────────────────────────────────────────────────
+# AUREM Platform — .gitignore
+# ─────────────────────────────────────────────────────────────
+# DO NOT add `.env`-style entries multiple times. The deploy
+# pipeline injects secrets via Emergent's secret manager.
+# ─────────────────────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual envs
+venv/
+.venv/
+env/
+
+# Environment files — NEVER commit secrets to git.
+# Production secrets are injected via Emergent's secret manager.
+.env
+.env.*
+!.env.example
+
+# Sensitive identity / memory files (founder profile, internal notes)
+ORA_MEMORY.md
+backend/identity/
+memory/test_credentials.md
+memory/ORA_MEMORY.md
+
+# Runtime artifacts (NOT code) — these bloat the repo
+.screenshots/
+test_reports/
+htmlcov/
+.coverage
+.pytest_cache/
+backend/data/lightrag_store/
+backend/uploads/
+backend/graphify-out/
+backend/.chromadb/
+backend/chromadb/
+backend/.chroma/
+backend/static/admin/
+
+# Legacy / dead code archives
+backup_original/
+
+# Internal Emergent build / job metadata
+.emergent/emergent.yml
+
+# Generic credential files
+credentials.json
+*.pem
+*.key
+*.crt
+.credentials
+
+# Logs
+*.log
+logs/
+
+# Database dumps
+*.bson
+*.json.gz
+dump/
+
+# Webpack / CRA caches
+frontend/node_modules/
+frontend/build/
+frontend/.cache/
+**/.cache/
+**/node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+frontend/node_modules/.cache/default-development/2.pack
+frontend/node_modules/.cache/default-development/19.pack
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+frontend/node_modules/.cache/default-development/12.pack
+frontend/node_modules/.cache/default-development/24.pack
+frontend/node_modules/.cache/default-development/23.pack
+frontend/node_modules/.cache/default-development/25.pack
+frontend/node_modules/.cache/default-development/26.pack
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+frontend/node_modules/.cache/default-development/6.pack

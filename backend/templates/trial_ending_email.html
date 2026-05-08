@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Your AUREM Trial Ends Tomorrow</title>
+</head>
+<body style="margin:0;padding:0;background:#0A0A0A;font-family:'Helvetica Neue',Arial,sans-serif;color:#F2F2F2;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;background:#0F0F0F;border:1px solid rgba(249,115,22,0.18);border-radius:14px;overflow:hidden;">
+
+        <!-- Brand -->
+        <tr><td align="center" style="padding:32px 32px 8px;">
+          <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#F97316,#EA580C);display:inline-block;line-height:44px;text-align:center;font-size:18px;font-weight:900;color:#0A0A00;">A</div>
+          <div style="font-family:'Cinzel','Trajan Pro',serif;font-size:16px;font-weight:700;letter-spacing:6px;color:#F2F2F2;margin-top:10px;">AUREM</div>
+        </td></tr>
+
+        <!-- Headline -->
+        <tr><td style="padding:24px 32px 8px;">
+          <p style="font-family:'Cinzel',serif;font-size:22px;color:#F97316;margin:0 0 6px;letter-spacing:1px;">24 hours left</p>
+          <p style="font-size:15px;color:#F2F2F2;margin:0 0 4px;">Hi {{first_name}},</p>
+          <p style="font-size:14px;color:#9A9490;margin:0;line-height:1.6;">Your AUREM trial for <strong style="color:#F97316;">{{business_name}}</strong> ends tomorrow. Here's what ORA did for you this week.</p>
+        </td></tr>
+
+        <!-- This Week Stats -->
+        <tr><td style="padding:24px 32px;">
+          <div style="background:#0A0A0A;border:1px solid rgba(249,115,22,0.18);border-radius:10px;padding:20px;">
+            <p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 16px;text-transform:uppercase;">THIS WEEK</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid rgba(249,115,22,0.08);">
+                  <span style="font-size:13px;color:#9A9490;">Issues auto-fixed</span>
+                </td>
+                <td align="right" style="padding:8px 0;border-bottom:1px solid rgba(249,115,22,0.08);">
+                  <span style="font-family:'Cinzel',serif;font-size:20px;color:#F97316;font-weight:700;">{{issues_fixed}}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid rgba(249,115,22,0.08);">
+                  <span style="font-size:13px;color:#9A9490;">Score improvement</span>
+                </td>
+                <td align="right" style="padding:8px 0;border-bottom:1px solid rgba(249,115,22,0.08);">
+                  <span style="font-family:'Cinzel',serif;font-size:20px;color:#F97316;font-weight:700;">+{{score_delta}} pts</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;">
+                  <span style="font-size:13px;color:#9A9490;">Site uptime</span>
+                </td>
+                <td align="right" style="padding:8px 0;">
+                  <span style="font-family:'Cinzel',serif;font-size:20px;color:#F97316;font-weight:700;">{{uptime_pct}}%</span>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </td></tr>
+
+        <!-- Urgency -->
+        <tr><td style="padding:0 32px 20px;">
+          <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:16px;">
+            <p style="font-size:13px;color:#FDBA74;margin:0;line-height:1.6;"><strong>If your trial expires</strong>, these fixes will roll back within 48 hours. Keep them permanent — upgrade to a paid plan and ORA keeps working.</p>
+          </div>
+        </td></tr>
+
+        <!-- CTA -->
+        <tr><td align="center" style="padding:8px 32px 32px;">
+          <a href="{{upgrade_url}}" style="background:#F97316;color:#0A0A00;text-decoration:none;display:inline-block;padding:14px 36px;border-radius:8px;font-weight:700;letter-spacing:1.5px;font-size:13px;text-transform:uppercase;">Keep My Fixes →</a>
+          <p style="font-size:11px;color:#6A6070;margin:16px 0 0;">Plans from $97/mo. Cancel anytime.</p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#050505;border-top:1px solid rgba(249,115,22,0.1);padding:20px 32px;text-align:center;">
+          <p style="font-size:11px;color:#6A6070;margin:0;line-height:1.7;">AUREM · Polaris Built Inc.<br>Mississauga, Ontario, Canada</p>
+          <p style="font-size:10px;color:#5A5060;margin:10px 0 0;">
+            <a href="{{unsubscribe_url}}" style="color:#6A6070;text-decoration:underline;">Unsubscribe</a> ·
+            <a href="https://aurem.live/my/settings" style="color:#6A6070;text-decoration:underline;">Preferences</a>
+          </p>
+        </td></tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

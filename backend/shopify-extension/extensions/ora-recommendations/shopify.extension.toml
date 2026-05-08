@@ -1,0 +1,10 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "ora-recommendations"
+type = "theme"
+
+  [[extensions.blocks]]
+  name = "AUREM Recommended For You"
+  target = "section"
+  template = "blocks/ora-recommendations.liquid"

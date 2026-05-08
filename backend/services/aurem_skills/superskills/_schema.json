@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SuperSkill",
+  "description": "Definition of a high-performance AI Agent skill",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "category": { 
+      "type": "string",
+      "enum": ["development", "devops", "research", "productivity", "automation", "specialist", "ripple"]
+    },
+    "compatibility": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["claude", "codex", "kimi", "manus", "antigravity", "cursor", "ripple", "all"]
+      }
+    },
+    "prompts": {
+      "type": "object",
+      "properties": {
+        "system": { "type": "string" },
+        "heuristic_escape": { "type": "string" },
+        "performance_hints": { "type": "string" }
+      },
+      "required": ["system"]
+    },
+    "tools_required": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "mcp_requirements": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "triggers": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["id", "name", "description", "category", "compatibility", "prompts"]
+}

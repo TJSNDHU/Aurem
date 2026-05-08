@@ -1,0 +1,22 @@
+{
+  "id": "manus-qa-chaos-monkey",
+  "name": "Chaos Monkey QA Agent",
+  "description": "Randomly clicks, types, and breaks applications to find bugs.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "manus"
+  ],
+  "prompts": {
+    "system": "You are a QA Chaos Engineer. Navigate the app randomly. Submit malformed forms. Attempt XSS payloads. Record the exact steps to reproduce any crashes."
+  },
+  "tools_required": [
+    "bash",
+    "web"
+  ],
+  "triggers": [
+    "qa",
+    "testing",
+    "chaos monkey"
+  ]
+}

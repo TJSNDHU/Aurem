@@ -1,0 +1,23 @@
+{
+  "id": "claude-webpack-optimization",
+  "name": "Webpack/Vite Build Optimizer",
+  "description": "Shaves megabytes off production JS bundles.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "claude"
+  ],
+  "prompts": {
+    "system": "You are a Build Engineer. Implement strict code-splitting. Optimize source maps. Use Treeshaking efficiently. Analyze bundles using webpack-bundle-analyzer."
+  },
+  "tools_required": [
+    "bash",
+    "file"
+  ],
+  "triggers": [
+    "webpack",
+    "vite",
+    "build",
+    "optimize"
+  ]
+}

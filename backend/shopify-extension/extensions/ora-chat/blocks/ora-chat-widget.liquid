@@ -1,0 +1,353 @@
+{% comment %}
+  ORA Chat Widget — AUREM AI Shopping Assistant
+  App Embed Block: Floating glassmorphism bubble with voice + text chat
+  Connects to AUREM V2V WebSocket engine for voice, HTTP for text
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "ORA Chat Widget",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "aurem_backend_url",
+      "label": "AUREM Backend URL",
+      "default": "https://your-aurem-instance.com"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent Color",
+      "default": "#D4AF37"
+    },
+    {
+      "type": "text",
+      "id": "welcome_message",
+      "label": "Welcome Message",
+      "default": "Hi! I'm ORA, your AI shopping assistant. How can I help?"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_voice",
+      "label": "Enable Voice Chat",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
+
+<style>
+  .ora-chat-trigger {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 99999;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(15, 15, 15, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 2px solid {{ block.settings.accent_color }};
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 20px {{ block.settings.accent_color }}33;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: ora-pulse 3s infinite;
+  }
+  .ora-chat-trigger:hover {
+    transform: scale(1.08);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 30px {{ block.settings.accent_color }}55;
+  }
+  .ora-chat-trigger svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: {{ block.settings.accent_color }};
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  @keyframes ora-pulse {
+    0%, 100% { border-color: {{ block.settings.accent_color }}; }
+    50% { border-color: {{ block.settings.accent_color }}88; }
+  }
+
+  .ora-chat-panel {
+    position: fixed;
+    bottom: 96px;
+    right: 24px;
+    z-index: 99998;
+    width: 380px;
+    max-height: 520px;
+    border-radius: 20px;
+    background: rgba(10, 10, 20, 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(212, 175, 55, 0.15);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ora-chat-panel.ora-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+  }
+
+  .ora-chat-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .ora-chat-header-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade8066;
+    animation: ora-dot-pulse 2s infinite;
+  }
+  @keyframes ora-dot-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .ora-chat-header-text { flex: 1; }
+  .ora-chat-header-title { font-size: 13px; font-weight: 700; color: #E8E4DE; letter-spacing: 0.5px; }
+  .ora-chat-header-sub { font-size: 10px; color: #888; }
+
+  .ora-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 200px;
+    max-height: 320px;
+  }
+  .ora-msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .ora-msg-bot {
+    background: rgba(255,255,255,0.06);
+    color: #E8E4DE;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+  .ora-msg-user {
+    background: {{ block.settings.accent_color }};
+    color: #0A0A14;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    font-weight: 600;
+  }
+
+  .ora-chat-input-area {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ora-chat-input {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    color: #E8E4DE;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .ora-chat-input:focus {
+    border-color: {{ block.settings.accent_color }}55;
+  }
+  .ora-chat-input::placeholder { color: #666; }
+
+  .ora-chat-send, .ora-chat-mic {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .ora-chat-send {
+    background: {{ block.settings.accent_color }};
+  }
+  .ora-chat-send:hover { transform: scale(1.08); }
+  .ora-chat-send svg { width: 16px; height: 16px; stroke: #0A0A14; fill: none; stroke-width: 2; }
+  .ora-chat-mic {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .ora-chat-mic svg { width: 16px; height: 16px; stroke: {{ block.settings.accent_color }}; fill: none; stroke-width: 2; }
+  .ora-chat-mic.ora-recording {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    animation: ora-mic-pulse 1s infinite;
+  }
+  .ora-chat-mic.ora-recording svg { stroke: #ef4444; }
+  @keyframes ora-mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
+    50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+  }
+
+  @media (max-width: 480px) {
+    .ora-chat-panel {
+      width: calc(100vw - 32px);
+      right: 16px;
+      bottom: 88px;
+      max-height: 70vh;
+    }
+  }
+</style>
+
+<!-- Chat Trigger Button -->
+<button class="ora-chat-trigger" id="ora-trigger" aria-label="Open ORA Chat">
+  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+
+<!-- Chat Panel -->
+<div class="ora-chat-panel" id="ora-panel">
+  <div class="ora-chat-header">
+    <div class="ora-chat-header-dot"></div>
+    <div class="ora-chat-header-text">
+      <div class="ora-chat-header-title">ORA</div>
+      <div class="ora-chat-header-sub">AUREM AI Assistant</div>
+    </div>
+    <button id="ora-close" style="background:none;border:none;cursor:pointer;padding:4px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="ora-chat-messages" id="ora-messages">
+    <div class="ora-msg ora-msg-bot">{{ block.settings.welcome_message }}</div>
+  </div>
+  <div class="ora-chat-input-area">
+    {% if block.settings.enable_voice %}
+    <button class="ora-chat-mic" id="ora-mic" aria-label="Voice input">
+      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    {% endif %}
+    <input class="ora-chat-input" id="ora-input" type="text" placeholder="Ask ORA anything..." autocomplete="off" />
+    <button class="ora-chat-send" id="ora-send" aria-label="Send">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var AUREM_URL = {{ block.settings.aurem_backend_url | json }};
+  var panel = document.getElementById('ora-panel');
+  var trigger = document.getElementById('ora-trigger');
+  var closeBtn = document.getElementById('ora-close');
+  var input = document.getElementById('ora-input');
+  var sendBtn = document.getElementById('ora-send');
+  var messages = document.getElementById('ora-messages');
+  var micBtn = document.getElementById('ora-mic');
+  var sessionId = 'ora_' + Math.random().toString(36).substr(2, 12);
+  var isOpen = false;
+  var isRecording = false;
+  var mediaRecorder = null;
+
+  function toggle() {
+    isOpen = !isOpen;
+    panel.classList.toggle('ora-open', isOpen);
+    if (isOpen) input.focus();
+  }
+
+  trigger.addEventListener('click', toggle);
+  closeBtn.addEventListener('click', toggle);
+
+  function addMessage(text, isUser) {
+    var div = document.createElement('div');
+    div.className = 'ora-msg ' + (isUser ? 'ora-msg-user' : 'ora-msg-bot');
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function sendMessage() {
+    var text = input.value.trim();
+    if (!text) return;
+    addMessage(text, true);
+    input.value = '';
+
+    fetch(AUREM_URL + '/api/shopify-app/proxy/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        shop_domain: window.Shopify ? window.Shopify.shop : '',
+        session_id: sessionId
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { addMessage(d.reply || 'Sorry, I could not process that.', false); })
+    .catch(function() { addMessage('Connection error. Please try again.', false); });
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendMessage(); });
+
+  // Voice input via Web Speech API or MediaRecorder
+  if (micBtn) {
+    micBtn.addEventListener('click', function() {
+      if (isRecording) {
+        isRecording = false;
+        micBtn.classList.remove('ora-recording');
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        if (window._oraSpeechRecognition) window._oraSpeechRecognition.stop();
+        return;
+      }
+
+      // Try Web Speech API first (Chrome/Edge)
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        var recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        window._oraSpeechRecognition = recognition;
+
+        recognition.onresult = function(event) {
+          var transcript = event.results[0][0].transcript;
+          input.value = transcript;
+          sendMessage();
+          isRecording = false;
+          micBtn.classList.remove('ora-recording');
+        };
+        recognition.onerror = function() {
+          isRecording = false;
+          micBtn.classList.remove('ora-recording');
+        };
+        recognition.onend = function() {
+          isRecording = false;
+          micBtn.classList.remove('ora-recording');
+        };
+
+        recognition.start();
+        isRecording = true;
+        micBtn.classList.add('ora-recording');
+      }
+    });
+  }
+})();
+</script>

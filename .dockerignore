@@ -1,0 +1,50 @@
+# Slim Docker build context — Cloud Build performance critical.
+# Anything matched here is NOT sent to Docker daemon during build.
+
+# Python caches & venvs
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+.venv/
+venv/
+
+# Node / frontend build artefacts (rebuilt during deploy)
+frontend/node_modules/
+frontend/build/
+frontend/.cache/
+**/.cache/
+
+# Local-only heavy artefacts
+backend/uploads/
+backend/graphify-out/
+backend/.chromadb/
+backend/chromadb/
+backend/.chroma/
+
+# Memory / scratch
+memory/
+test_reports/
+.emergent/
+.git/
+.github/
+.idea/
+.vscode/
+
+# Logs
+**/*.log
+**/logs/
+
+# Tests (do not deploy)
+backend/tests/
+**/test_*.py
+
+# Misc
+*.swp
+*.swo
+*.bak
+*.orig
+.DS_Store
+Thumbs.db

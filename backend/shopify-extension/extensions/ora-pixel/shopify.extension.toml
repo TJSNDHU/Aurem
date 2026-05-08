@@ -1,0 +1,14 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "ora-pixel"
+type = "web_pixel"
+
+  [extensions.settings]
+  type = "object"
+
+    [extensions.settings.fields.aurem_backend_url]
+    name = "AUREM Backend URL"
+    description = "Your AUREM platform URL for receiving pixel events"
+    type = "single_line_text_field"
+    required = true

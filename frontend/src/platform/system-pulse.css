@@ -1,0 +1,105 @@
+/* ═══════════════════════════════════════════════════════════════
+   SYSTEM PULSE HUD — Dark Command Center Styles
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tilt Card base */
+.pulse-tilt-card {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Tooltip */
+.pulse-tooltip {
+  background: rgba(10, 14, 20, 0.95);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Scrollbar */
+.pulse-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.pulse-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pulse-scroll::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.15);
+  border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RED GLITCH — triggered on has_breach=true
+   Chromatic aberration + scanlines + subtle shake
+   ═══════════════════════════════════════════════════════════════ */
+
+.pulse-glitch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  animation: pulseGlitchFlash 2s ease-out forwards;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(239, 68, 68, 0.03) 2px,
+    rgba(239, 68, 68, 0.03) 4px
+  );
+}
+
+.pulse-glitch-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(239, 68, 68, 0.05);
+  animation: pulseGlitchScanline 0.1s steps(1) infinite;
+}
+
+.pulse-hud.pulse-glitch {
+  animation: pulseGlitchShake 0.3s ease 3;
+}
+
+.pulse-hud.pulse-glitch * {
+  animation-duration: 0.3s !important;
+}
+
+/* Chromatic aberration on text during glitch */
+.pulse-hud.pulse-glitch h1,
+.pulse-hud.pulse-glitch [data-testid="breach-indicator"] span {
+  text-shadow:
+    -2px 0 rgba(239, 68, 68, 0.7),
+    2px 0 rgba(56, 189, 248, 0.5);
+  animation: pulseGlitchText 0.15s steps(2) 6;
+}
+
+@keyframes pulseGlitchFlash {
+  0% { opacity: 0.8; }
+  10% { opacity: 1; }
+  20% { opacity: 0.6; }
+  30% { opacity: 0.9; }
+  50% { opacity: 0.4; }
+  100% { opacity: 0; }
+}
+
+@keyframes pulseGlitchScanline {
+  0% { transform: translateY(0); }
+  25% { transform: translateY(-33vh); }
+  50% { transform: translateY(15vh); }
+  75% { transform: translateY(-50vh); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pulseGlitchShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px) skewX(-0.5deg); }
+  75% { transform: translateX(3px) skewX(0.5deg); }
+}
+
+@keyframes pulseGlitchText {
+  0% { text-shadow: -2px 0 rgba(239,68,68,0.7), 2px 0 rgba(56,189,248,0.5); }
+  50% { text-shadow: 3px 0 rgba(239,68,68,0.5), -3px 0 rgba(56,189,248,0.7); }
+  100% { text-shadow: -1px 0 rgba(239,68,68,0.3), 1px 0 rgba(56,189,248,0.3); }
+}

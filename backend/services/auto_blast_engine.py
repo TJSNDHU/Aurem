@@ -1,0 +1,374 @@
+"""
+Auto-Blast Engine
+─────────────────
+Background worker that automatically picks freshly-scraped leads,
+verifies them via Accurate-Scout, and fires the 4-channel AUREM blast
+(Email + SMS + WhatsApp + Voice) — respecting channel gates, DNC list,
+and per-tenant toggles.
+
+Persistence:
+- `auto_blast_config` — {tenant_id, enabled, max_per_cycle, interval_minutes, last_run_at, last_run_processed, last_run_sent}
+
+A lead is eligible for auto-blast when:
+  - `last_blast_at` is missing (never blasted)
+  - lead has email OR phone
+  - lead is NOT in `do_not_contact`
+  - lead.status not in {'signed_up', 'not_interested'}
+
+The engine caps a cycle to max_per_cycle leads (default 10) to avoid
+burst sending / budget burn.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
+
+logger = logging.getLogger(__name__)
+
+_db = None
+
+
+def set_db(database):
+    global _db
+    _db = database
+
+
+def _get_db():
+    global _db
+    if _db is not None:
+        return _db
+    try:
+        import server
+        if hasattr(server, "db") and server.db is not None:
+            _db = server.db
+    except Exception:
+        pass
+    return _db
+
+
+# ─────────────────────────────────────────────────────────────
+# Lead verification (uses existing Accurate-Scout helpers)
+# ─────────────────────────────────────────────────────────────
+async def _auto_verify_lead(db, lead: Dict[str, Any]) -> Dict[str, Any]:
+    """Run Accurate-Scout verification + persist. Returns the fresh lead doc.
+
+    Wrapped with a hard timeout — scout sometimes hangs on bad websites
+    which would otherwise stall the entire auto-blast cycle.
+    """
+    lead_id = lead.get("lead_id")
+    try:
+        from services.accurate_scout import full_business_verify, save_verified_profile
+        name = lead.get("business_name") or ""
+        city = lead.get("city") or ""
+        addr = lead.get("address") or ""
+        country = "ca" if ("ON" in addr or city.lower() in (
+            "toronto", "brampton", "mississauga", "ottawa", "vancouver",
+            "calgary", "edmonton", "montreal", "quebec"
+        )) else "us"
+        website = lead.get("website_url") or lead.get("website") or ""
+        # Hard 8s timeout per lead — prevents indefinite hangs (was 15s; tighter
+        # bound to reduce event-loop pressure when bulk leads have stale URLs).
+        result = await asyncio.wait_for(
+            full_business_verify(name, city, country=country, website_url=website),
+            timeout=8.0,
+        )
+        await save_verified_profile(db, lead_id, result)
+    except asyncio.TimeoutError:
+        logger.warning(f"[auto-blast] verify TIMEOUT for {lead_id} — proceeding without verification")
+    except Exception as e:
+        logger.warning(f"[auto-blast] verify failed for {lead_id}: {e}")
+
+    fresh = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    return fresh or lead
+
+
+# ─────────────────────────────────────────────────────────────
+# Eligibility filter
+# ─────────────────────────────────────────────────────────────
+async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
+    """Fetch leads that have never been blasted, are contactable, AND are not
+    noise-domain residue from the pre-iter-282u scout. Applies the same
+    `BLOCKED_DOMAINS` + `is_valid_lead` gate used by `google_places_scout`
+    so stale Reddit/Yelp-search/Wikipedia/domain-sale rows never enter the
+    pipeline.
+    """
+    # DNC set
+    dnc_phones, dnc_emails = set(), set()
+    async for d in db.do_not_contact.find({}, {"_id": 0, "phone": 1, "email": 1}):
+        if d.get("phone"):
+            dnc_phones.add(d["phone"])
+        if d.get("email"):
+            dnc_emails.add(d["email"].lower())
+
+    # Noise filter — same blocklist as the scout
+    try:
+        from services.google_places_scout import (
+            BLOCKED_DOMAINS,
+            _is_blocked_url,
+        )
+    except Exception:
+        BLOCKED_DOMAINS = ()
+        _is_blocked_url = lambda _u: False  # noqa: E731
+
+    _NOISE_NAME_SUBSTR = (
+        "the best 10 ", " - wikipedia", " - reddit",
+        "nail salons for sale", "businesses for sale",
+        "yelp.com/search", "r/",
+    )
+    _GENERIC_EMAIL_USERS = {
+        "yelp.guest", "hello", "info", "admin", "webmaster",
+        "noreply", "no-reply", "postmaster",
+    }
+
+    def _is_noise(lead: Dict[str, Any]) -> bool:
+        name = (lead.get("business_name") or "").lower()
+        if any(s in name for s in _NOISE_NAME_SUBSTR):
+            return True
+        site = (lead.get("website_url") or lead.get("website") or "").lower()
+        if site and _is_blocked_url(site):
+            return True
+        email = (lead.get("email") or "").lower()
+        if email:
+            # Block generic@wikipedia.org, yelp.guest@yelp.com, info@autozone.com, etc.
+            if "@" in email:
+                user, _, domain = email.partition("@")
+                if any(d in domain for d in BLOCKED_DOMAINS):
+                    return True
+                # Big-box retailer / national-chain domains are not SMB prospects
+                if domain in {"autozone.com", "walmart.com", "amazon.com",
+                              "homedepot.com", "lowes.com", "costco.com",
+                              "findbusinesses4sale.com", "bizbuysell.com"}:
+                    return True
+                if user in _GENERIC_EMAIL_USERS and not (lead.get("phone") or "").strip():
+                    # no phone + generic email = almost always low-intent page scrape
+                    return True
+        return False
+
+    q = {
+        "last_blast_at": {"$exists": False},
+        "blast_chain": {"$exists": False},
+        "status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]},
+        "$or": [
+            {"email": {"$nin": ["", None]}},
+            {"phone": {"$nin": ["", None]}},
+        ],
+    }
+    out: List[Dict[str, Any]] = []
+    scanned = 0
+    # Sample 5× the cap so we can skip noise and still reach the limit.
+    # iter 282aa — Sort prefers Yelp Fusion leads (real SMB phones) first;
+    # within source, newest-created comes first.
+    async for lead in db.campaign_leads.find(q, {"_id": 0}).sort([
+        ("source", -1),       # "yelp_fusion" > "osm_overpass" > "google_places" alphabetically; -1 puts yelp_fusion first
+        ("created_at", -1),
+    ]).limit(limit * 5):
+        scanned += 1
+        if (lead.get("phone") or "") in dnc_phones:
+            continue
+        if (lead.get("email") or "").lower() in dnc_emails:
+            continue
+        if _is_noise(lead):
+            # Mark it so future cycles skip instantly.
+            try:
+                await db.campaign_leads.update_one(
+                    {"lead_id": lead.get("lead_id")},
+                    {"$set": {"status": "not_interested",
+                              "noise_filtered_at": datetime.now(timezone.utc).isoformat(),
+                              "noise_reason": "pre-282u-scrape-residue"}},
+                )
+            except Exception:
+                pass
+            continue
+        out.append(lead)
+        if len(out) >= limit:
+            break
+    if scanned and not out:
+        logger.info(f"[auto-blast] _eligible_leads scanned={scanned} but all noise-filtered")
+    return out
+
+
+# ─────────────────────────────────────────────────────────────
+# Main cycle
+# ─────────────────────────────────────────────────────────────
+async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
+    """Execute one auto-blast cycle across all tenants that opted in.
+
+    When force=True (admin /run-now), runs regardless of global tenant toggle
+    using the 'global' config max_per_cycle.
+    """
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not ready"}
+
+    # Load ALL configs; iterate only the enabled ones (or 'global' if forced)
+    configs = await db.auto_blast_config.find({}, {"_id": 0}).to_list(100)
+    if force and not any(c.get("tenant_id") == "global" for c in configs):
+        configs.append({"tenant_id": "global", "enabled": True, "max_per_cycle": 10})
+
+    total_processed = 0
+    total_sent = 0
+    summaries: List[Dict[str, Any]] = []
+    ran_at_iso = datetime.now(timezone.utc).isoformat()
+
+    for cfg in configs:
+        if not force and not cfg.get("enabled"):
+            continue
+        tenant_id = cfg.get("tenant_id") or "global"
+        cap = int(cfg.get("max_per_cycle", 10))
+
+        leads = await _eligible_leads(db, cap)
+        note = None
+        if not leads:
+            note = "no-eligible-leads"
+            # Count WHY: this surfaces "scraper is producing contactless leads"
+            no_contact_count = await db.campaign_leads.count_documents({
+                "last_blast_at": {"$exists": False},
+                "email": {"$in": ["", None]},
+                "phone": {"$in": ["", None]},
+            })
+            total_queued = await db.campaign_leads.count_documents({"last_blast_at": {"$exists": False}})
+            summaries.append({
+                "tenant_id": tenant_id,
+                "processed": 0,
+                "sent": 0,
+                "note": note,
+                "queued_but_contactless": no_contact_count,
+                "total_queued": total_queued,
+            })
+            # CRITICAL: update last_run_at even on no-op runs so UI sees heartbeat
+            await db.auto_blast_config.update_one(
+                {"tenant_id": tenant_id},
+                {"$set": {
+                    "last_run_at": ran_at_iso,
+                    "last_run_processed": 0,
+                    "last_run_sent": 0,
+                    "last_run_note": note,
+                    "last_run_queued_but_contactless": no_contact_count,
+                }, "$setOnInsert": {"tenant_id": tenant_id, "enabled": bool(cfg.get("enabled"))}},
+                upsert=True,
+            )
+            continue
+
+        from services.council import council
+        from services.ora_learning import ora
+
+        cycle_sent = 0
+        for lead in leads:
+            lead_id = lead.get("lead_id")
+            try:
+                # 1) verify (so channel_gating is populated)
+                verified = await _auto_verify_lead(db, lead)
+
+                # iter 296 — Council pre-action gate
+                decision = await council.deliberate(
+                    action_kind="outreach_blast",
+                    payload={"lead_id": lead_id, "verification": verified.get("verification") or {}},
+                    cost_usd=0.005,  # ~Resend send + Twilio attempt
+                )
+                if decision["decision"] != "approve":
+                    logger.info(f"[auto-blast] council {decision['decision']} for {lead_id} — {decision['reason'][:80]}")
+                    if decision["decision"] == "veto":
+                        await ora.log_action(
+                            agent="envoy", action="outreach_blast",
+                            input_data={"lead_id": lead_id},
+                            output_data={"success": False, "vetoed_by_council": True, "reason": decision["reason"][:120]},
+                        )
+                    continue
+
+                # 2) blast — start a 4-touch chain (Section 7).
+                # The chain manager fires touch #1 immediately and schedules
+                # touches #2–#4 at Day 2 / Day 5 / Day 9 from now. The
+                # `chain_advance_scheduler` loop picks up due touches.
+                from services.blast_chain import start_chain
+                chain_res = await start_chain(db, verified, source="auto")
+                res = (chain_res.get("fire") or {})
+                total_processed += 1
+                sent = int(res.get("sent_count") or 0)
+                cycle_sent += sent
+                total_sent += sent
+
+                # iter 296 — log to ORA Learning so agent_feed populates + outcomes track
+                aid = await ora.log_action(
+                    agent="envoy", action="outreach_blast",
+                    input_data={"lead_id": lead_id, "channels_open": (verified.get("verification") or {}).get("channel_gating", {})},
+                    output_data={"success": sent > 0, "sent_count": sent, "results": res.get("results", {})},
+                    cost_usd=0.005 if sent > 0 else 0.0,
+                )
+                # Initial outcome — webhooks/replies will update later
+                await ora.update_outcome(aid, "success" if sent > 0 else "no_reply")
+
+                logger.info(f"[auto-blast] {tenant_id} · {lead_id} · sent {sent}/4")
+            except Exception as e:
+                logger.warning(f"[auto-blast] lead {lead_id} failed: {e}")
+
+        # Update cfg stats
+        await db.auto_blast_config.update_one(
+            {"tenant_id": tenant_id},
+            {"$set": {
+                "last_run_at": ran_at_iso,
+                "last_run_processed": len(leads),
+                "last_run_sent": cycle_sent,
+                "last_run_note": None,
+            }, "$setOnInsert": {"tenant_id": tenant_id, "enabled": bool(cfg.get("enabled"))}},
+            upsert=True,
+        )
+        summaries.append({
+            "tenant_id": tenant_id,
+            "processed": len(leads),
+            "sent": cycle_sent,
+        })
+
+    return {
+        "ok": True,
+        "ran_at": ran_at_iso,
+        "tenants_run": len(summaries),
+        "total_processed": total_processed,
+        "total_sent": total_sent,
+        "summaries": summaries,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Long-running scheduler (wired from startup_init.py)
+# ─────────────────────────────────────────────────────────────
+async def auto_blast_scheduler():
+    """Loop forever — sleep, then run one cycle if any tenant is enabled."""
+    # brief startup delay so app can bind
+    print("[auto-blast] scheduler task alive — 30s grace before first cycle", flush=True)
+    await asyncio.sleep(30)
+    heartbeat_count = 0
+    while True:
+        try:
+            db = _get_db()
+            if db is None:
+                print("[auto-blast] db not ready yet, retrying in 60s", flush=True)
+                await asyncio.sleep(60)
+                continue
+
+            # Compute minimum interval across enabled configs (default 5 min)
+            cfgs = await db.auto_blast_config.find({"enabled": True}, {"_id": 0}).to_list(50)
+            if not cfgs:
+                # Log every 5th idle heartbeat so deploy logs confirm scheduler is alive
+                heartbeat_count += 1
+                if heartbeat_count % 5 == 1:
+                    print(f"[auto-blast] idle heartbeat #{heartbeat_count} — no tenant has enabled auto-blast yet", flush=True)
+                await asyncio.sleep(120)  # nobody enabled → check again in 2m
+                continue
+
+            interval = min(int(c.get("interval_minutes", 5)) for c in cfgs) * 60
+            print(f"[auto-blast] cycle starting — {len(cfgs)} enabled tenant(s)", flush=True)
+            result = await run_auto_blast_cycle(force=False)
+            print(
+                f"[auto-blast] cycle done: processed={result.get('total_processed')} "
+                f"sent={result.get('total_sent')} summaries={result.get('summaries')}",
+                flush=True,
+            )
+            await asyncio.sleep(max(60, interval))
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"[auto-blast] scheduler error (will retry in 120s): {e}", flush=True)
+            logger.error(f"[auto-blast] scheduler error: {e}", exc_info=True)
+            await asyncio.sleep(120)

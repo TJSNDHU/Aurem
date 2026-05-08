@@ -1,0 +1,1385 @@
+/* 
+ * Self-hosted fonts for better performance (no third-party dependency)
+ * Using @fontsource packages for optimized, subset WOFF2 fonts
+ */
+
+/* Import self-hosted fonts - Latin subset only (~15KB vs 100KB+ from Google) */
+@import '@fontsource/playfair-display/400.css';
+@import '@fontsource/playfair-display/500.css';
+@import '@fontsource/playfair-display/600.css';
+@import '@fontsource/playfair-display/700.css';
+@import '@fontsource/manrope/300.css';
+@import '@fontsource/manrope/400.css';
+@import '@fontsource/manrope/500.css';
+@import '@fontsource/manrope/600.css';
+@import '@fontsource/manrope/700.css';
+
+/* LaVela secondary brand fonts - self-hosted for performance */
+@import '@fontsource/cormorant-garamond/300.css';
+@import '@fontsource/cormorant-garamond/400.css';
+@import '@fontsource/cormorant-garamond/500.css';
+@import '@fontsource/cormorant-garamond/600.css';
+@import '@fontsource/cormorant-garamond/700.css';
+@import '@fontsource/montserrat/300.css';
+@import '@fontsource/montserrat/400.css';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+
+/* OROÉ brand font - luxury display face */
+@import '@fontsource/cinzel/400.css';
+@import '@fontsource/cinzel/500.css';
+@import '@fontsource/cinzel/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+ * Font Fallback System with size-adjust
+ * Prevents CLS (Cumulative Layout Shift) by matching fallback font metrics
+ * to custom font metrics. Text won't "jump" when fonts load.
+ */
+
+/* Playfair Display fallback - matches Georgia metrics */
+@font-face {
+  font-family: 'Playfair Display Fallback';
+  src: local('Georgia'), local('Times New Roman');
+  size-adjust: 105%; /* Playfair is slightly larger than Georgia */
+  ascent-override: 95%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+/* Manrope fallback - matches system sans-serif metrics */
+@font-face {
+  font-family: 'Manrope Fallback';
+  src: local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  size-adjust: 100%;
+  ascent-override: 92%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+/* Cinzel Fallback - for OROÉ luxury display (prevent CLS) */
+@font-face {
+  font-family: 'Cinzel Fallback';
+  src: local('Times New Roman'), local('Georgia'), local('serif');
+  size-adjust: 104%;
+  ascent-override: 90%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
+/* Cormorant Garamond Fallback - for LaVela brand (prevent CLS) */
+@font-face {
+  font-family: 'Cormorant Garamond Fallback';
+  src: local('Georgia'), local('Times New Roman'), local('serif');
+  size-adjust: 98%;
+  ascent-override: 94%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+/* Apply fallback fonts with smooth transition */
+:root {
+  --font-heading: 'Playfair Display', 'Playfair Display Fallback', Georgia, serif;
+  --font-body: 'Manrope', 'Manrope Fallback', system-ui, sans-serif;
+  --font-cinzel: 'Cinzel', 'Cinzel Fallback', 'Times New Roman', serif;
+  --font-cormorant: 'Cormorant Garamond', 'Cormorant Garamond Fallback', Georgia, serif;
+}
+
+/* Hero container - Fixed aspect ratio to prevent CLS and ensure fast LCP */
+.hero-container {
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
+  contain: layout style paint; /* CSS containment for rendering optimization */
+}
+
+/* ===========================================
+   ADMIN PANEL PERFORMANCE OPTIMIZATIONS
+   Reduces LCP/FCP by containing admin layout
+   =========================================== */
+
+/* Admin sidebar - CSS containment for fast rendering */
+.admin-sidebar {
+  contain: layout style;
+  /* Removed content-visibility: auto to prevent sidebar from not rendering on mobile */
+}
+
+/* Admin main content area - prevent layout shifts */
+.admin-main-content {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+}
+
+/* Admin cards use content-visibility for off-screen optimization */
+.admin-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* Admin table rows - lazy render for long lists */
+.admin-table-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+}
+
+/* Reduce paint on admin hover states */
+.admin-hover-optimized {
+  will-change: background-color;
+  transition: background-color 0.15s ease;
+}
+
+/* Admin skeleton loaders - prevent CLS */
+.admin-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Hero image placeholder - prevents flash of unstyled content */
+.hero-image-wrapper {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+}
+
+/* Hide Emergent badge */
+#emergent-badge,
+a[href*="emergent.sh"][style*="position: fixed"],
+a[href*="emergent-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Mobile viewport height fix - prevents blank screen on iOS/Android */
+html, body {
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+}
+
+html {
+  height: -webkit-fill-available;
+}
+
+:root {
+  --primary: #2D2A2E;
+  --accent: #F8A5B8;
+  --bg-light: #FDF9F9;
+  --bg-dark: #1A1718;
+  --text-primary: #1A1A1A;
+  --text-secondary: #5A5A5A;
+  --text-muted: #888888;
+  --silver: #E2E2E2;
+  --clinical-rose: #FFF0F3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #050505;
+  color: var(--text-primary);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.font-display {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-body {
+  font-family: 'Manrope', sans-serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--accent);
+  color: var(--primary);
+}
+
+/* ===========================================
+   PERFORMANCE OPTIMIZATIONS
+   Content-visibility for below-fold sections
+   =========================================== */
+
+/* Optimize rendering for sections below the fold */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Product grid items - optimize rendering */
+.product-card-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 350px;
+}
+
+/* Footer and other below-fold sections */
+footer, 
+[data-section="below-fold"] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Optimize image containers */
+.image-container-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Will-change hints for smoother animations */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 33% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 340 8% 17%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 33% 98%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 20% 96%;
+    --muted-foreground: 0 0% 53%;
+    --accent: 347 85% 81%;
+    --accent-foreground: 340 8% 17%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 10% 89%;
+    --input: 0 10% 89%;
+    --ring: 340 8% 17%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Glassmorphism */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Buttons */
+.btn-primary {
+  @apply bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] text-[#2D2A2E] hover:from-[#F4D03F] hover:via-[#D4AF37] hover:to-[#F4D03F] transition-all duration-300 rounded-full px-8 py-4 text-sm uppercase tracking-widest font-bold shadow-lg shadow-[#D4AF37]/20;
+}
+
+.btn-gold {
+  @apply bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] text-[#2D2A2E] hover:from-[#F4D03F] hover:via-[#D4AF37] hover:to-[#F4D03F] transition-all duration-300 rounded-full px-8 py-4 text-sm uppercase tracking-widest font-bold shadow-lg shadow-[#D4AF37]/30;
+}
+
+.btn-secondary {
+  @apply border border-[#2D2A2E] text-[#2D2A2E] hover:bg-[#2D2A2E] hover:text-white transition-colors duration-300 rounded-full px-8 py-4 text-sm uppercase tracking-widest font-semibold;
+}
+
+.btn-ghost {
+  @apply text-[#2D2A2E] hover:text-[#F8A5B8] underline-offset-4 hover:underline transition-colors duration-300;
+}
+
+/* Product card hover effect */
+.product-card {
+  @apply relative bg-transparent transition-transform duration-500;
+}
+
+.product-card:hover {
+  @apply z-10;
+  transform: translateY(-8px);
+}
+
+.product-card:hover .product-image {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
+}
+
+/* Input styles */
+.input-underline {
+  @apply bg-transparent border-0 border-b border-gray-300 focus:border-[#1A2F2A] rounded-none px-0 py-4 placeholder:text-gray-400 focus:ring-0 transition-colors duration-300;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
+/* Glow effect */
+.glow {
+  box-shadow: 0 0 20px rgba(248, 165, 184, 0.4);
+}
+
+/* Rose gradient */
+.bio-gradient {
+  background: linear-gradient(135deg, #F8A5B8 0%, #FFDDE5 100%);
+}
+
+/* Dark mist overlay */
+.dark-mist {
+  background: linear-gradient(to bottom, rgba(15, 18, 17, 0) 0%, rgba(15, 18, 17, 1) 100%);
+}
+
+/* Admin dashboard grid */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .admin-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Hide scrollbar for horizontal scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Toast customization */
+[data-sonner-toast] {
+  font-family: 'Manrope', sans-serif !important;
+}
+
+/* Print Styles for Financial Reports */
+@media print {
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Hide navigation and non-essential elements */
+  nav, header, footer, 
+  button:not(.print-show), 
+  .no-print,
+  [data-sonner-toast] {
+    display: none !important;
+  }
+  
+  /* Make cards print friendly */
+  .print-friendly {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  /* Ensure tables fit on page */
+  table {
+    font-size: 10pt !important;
+    width: 100% !important;
+  }
+  
+  /* Page margins */
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+  
+  /* Show colors in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Shimmer animation for CTA buttons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255,255,255,0.2) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Slow pulse for prominent sections */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
+/* Sentinel Guard heartbeat dot — red-error pulse */
+@keyframes sentinelPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.3); }
+}
+
+/* ============ CUSTOMIZABLE DASHBOARD GRID STYLES ============ */
+
+/* React Grid Layout overrides */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.resizing {
+  z-index: 1;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.react-grid-item.dropping {
+  visibility: hidden;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: #F8A5B8;
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  border-radius: 12px;
+}
+
+/* Resize handle styling */
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+}
+
+.react-resizable-handle-se {
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+
+.react-resizable-handle-se::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(0, 0, 0, 0.3);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+/* Widget container styling */
+.widget-container {
+  height: 100%;
+}
+
+.widget-container .drag-handle:hover {
+  background-color: rgba(248, 165, 184, 0.2);
+}
+
+/* Dashboard specific styles */
+.layout {
+  min-height: 400px;
+}
+
+/* Smooth widget animations */
+.react-grid-item > .react-resizable-handle::after {
+  border-color: #F8A5B8;
+}
+
+/* Lock indicator pulse */
+@keyframes lock-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 165, 184, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(248, 165, 184, 0);
+  }
+}
+
+.dashboard-locked .widget-container {
+  pointer-events: none;
+}
+
+/* ============ END DASHBOARD STYLES ============ */
+
+/* ════════════════════════════════════════════════════════════
+   AUREM Client Dashboard — Futuristic Spatial UI (iter 239)
+   ════════════════════════════════════════════════════════════ */
+.spatial-glass {
+  background: rgba(18, 18, 22, 0.62);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(212, 185, 119, 0.22);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  border-radius: 24px;
+  transition:
+    transform .35s cubic-bezier(.25,.8,.25,1),
+    box-shadow .35s cubic-bezier(.25,.8,.25,1),
+    border-color .35s ease;
+  will-change: transform;
+}
+.spatial-glass:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 36px 68px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(212, 185, 119, 0.28);
+  border-top-color: rgba(212, 185, 119, 0.45);
+}
+.spatial-glass-flat {
+  background: rgba(18, 18, 22, 0.55);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+}
+.text-glow-gold { text-shadow: 0 0 20px rgba(212, 185, 119, 0.38); }
+.spatial-bg {
+  background:
+    radial-gradient(1100px 800px at 92% -10%, rgba(212, 185, 119, 0.12), transparent 55%),
+    radial-gradient(900px 700px at -10% 110%, rgba(255, 107, 0, 0.07), transparent 50%),
+    #050505;
+}
+@keyframes spatialLevitate {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.levitate { animation: spatialLevitate 4s ease-in-out infinite; }
+
+/* Floating Tab Rail */
+.tab-rail {
+  background: rgba(18, 18, 22, 0.72);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+.tab-rail-btn {
+  position: relative;
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all .28s cubic-bezier(.25,.8,.25,1);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.tab-rail-btn:hover {
+  color: #D4B977;
+  background: rgba(212, 185, 119, 0.08);
+  border-color: rgba(212, 185, 119, 0.2);
+  transform: translateX(2px);
+}
+.tab-rail-btn.active {
+  color: #0A0A00;
+  background: linear-gradient(135deg, #D4B977, #B19A5E);
+  box-shadow: 0 6px 22px rgba(212, 185, 119, 0.45);
+  border-color: rgba(212, 185, 119, 0.6);
+}
+.tab-rail-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute; left: 56px; top: 50%; transform: translateY(-50%);
+  background: rgba(18, 18, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #D4B977;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: 8px;
+  opacity: 0; pointer-events: none;
+  white-space: nowrap;
+  transition: opacity .2s ease;
+}
+.tab-rail-btn:hover[data-tooltip]::after { opacity: 1; }
+
+/* ════════════════════════════════════════════════════════════
+   AUREM Lightning Accents (iter 239)
+   ════════════════════════════════════════════════════════════ */
+@keyframes lightningSweep {
+  0%   { transform: translateX(-110%) skewX(-22deg); opacity: 0; }
+  40%  { opacity: 0.85; }
+  60%  { opacity: 0.85; }
+  100% { transform: translateX(220%) skewX(-22deg); opacity: 0; }
+}
+@keyframes lightningFlash {
+  0%, 92%, 100% { opacity: 0; }
+  94%, 97%      { opacity: 0.45; }
+  95%           { opacity: 0.75; }
+}
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,185,119,0.35); }
+  50%      { box-shadow: 0 0 0 14px rgba(212,185,119,0); }
+}
+
+/* Sweeping gold highlight across panels on hover */
+.spatial-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgba(212, 185, 119, 0.12) 48%,
+    rgba(255, 107, 0, 0.18) 50%,
+    rgba(212, 185, 119, 0.12) 52%,
+    transparent 62%
+  );
+  opacity: 0;
+  transform: translateX(-110%);
+  transition: opacity .2s ease;
+  mix-blend-mode: screen;
+}
+.spatial-glass { position: relative; overflow: hidden; }
+.spatial-glass > * { position: relative; z-index: 1; }
+.spatial-glass:hover::before {
+  opacity: 1;
+  animation: lightningSweep 1.1s cubic-bezier(.25,.8,.25,1) forwards;
+}
+
+/* Random ambient lightning — applied via .lightning-bg on main container */
+.lightning-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(2px 60px at 20% -5%, rgba(212, 185, 119, 0.8), transparent 80%),
+    radial-gradient(1px 80px at 82% -5%, rgba(255, 107, 0, 0.7), transparent 80%);
+  opacity: 0;
+  animation: lightningFlash 22s ease-in-out infinite;
+}
+.lightning-bg::before {
+  content: '';
+  position: fixed;
+  top: -10%;
+  left: 35%;
+  width: 2px;
+  height: 80vh;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(212, 185, 119, 0.9) 20%,
+    rgba(255, 107, 0, 0.85) 55%,
+    transparent 85%
+  );
+  filter: blur(1.2px);
+  opacity: 0;
+  transform: skewX(6deg);
+  animation: lightningFlash 32s ease-in-out infinite;
+  animation-delay: 8s;
+}
+
+/* Lightning badge pulse for critical / live indicators */
+.lightning-pulse {
+  animation: pulseGold 2.4s cubic-bezier(.66,0,0,1) infinite;
+}
+
+/* Score ring glow halo on hover parent */
+.spatial-glass:hover svg { filter: drop-shadow(0 0 16px currentColor); }
+
+/* Customer portal sections — auto-upgrade inline cards to spatial-glass (iter 241) */
+[data-testid="customer-home"] > div[style*="border-radius"],
+[data-testid="customer-home"] > div[style*="padding"]:not([data-testid]),
+[data-testid^="customer-"] [class*="card"],
+section[data-testid^="customer-"] > div {
+  /* no-op, placeholder */
+}
+/* Any inline card element with borderRadius:18 inside portal gets glass treatment */
+main [style*="borderRadius: 18"],
+main [style*="borderRadius:18"] {
+  background: rgba(18, 18, 22, 0.55) !important;
+  backdrop-filter: blur(22px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(140%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-top: 1px solid rgba(212, 185, 119, 0.18) !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+  transition: transform .3s cubic-bezier(.25,.8,.25,1), box-shadow .3s, border-color .3s !important;
+}
+main [style*="borderRadius: 18"]:hover,
+main [style*="borderRadius:18"]:hover {
+  transform: translateY(-2px);
+  border-top-color: rgba(212, 185, 119, 0.35) !important;
+  box-shadow: 0 28px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(212,185,119,0.14) !important;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   Customer Portal Cinematic Background (iter 242)
+   NOTE: Hero image is set via inline style in CustomerPortal.jsx
+   (webpack css-loader tries to resolve CSS url() as a module).
+   Here we only layer the dark wash + brand accents on top.
+   ════════════════════════════════════════════════════════════ */
+.customer-portal-bg {
+  position: relative;
+  background-color: #05050A;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
+}
+/* Dark wash + gold/orange accents layered on top of hero image */
+.customer-portal-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 700px at 95% -10%, rgba(212, 175, 55, 0.10), transparent 55%),
+    radial-gradient(800px 600px at -10% 110%, rgba(255, 107, 0, 0.08), transparent 55%),
+    linear-gradient(180deg, rgba(6, 6, 14, 0.58) 0%, rgba(8, 8, 15, 0.72) 55%, rgba(5, 5, 10, 0.86) 100%);
+}
+/* Vignette so bright subject doesn't fight with content */
+.customer-portal-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(5, 5, 10, 0.55) 100%);
+}
+
+/* ════════════════════════════════════════════════════════════
+   AUREM Mission Control Cinematic Background (iter 243)
+   AI-hands hero → dark wash → glass-transparent cards/tabs
+   ════════════════════════════════════════════════════════════ */
+.mission-control-bg {
+  position: relative;
+  background-color: #050912;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
+  color: #E8E0D0;
+}
+.mission-control-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 700px at 92% -10%, rgba(212, 175, 55, 0.09), transparent 55%),
+    radial-gradient(800px 600px at -10% 110%, rgba(255, 107, 0, 0.07), transparent 55%),
+    linear-gradient(180deg, rgba(5, 9, 18, 0.55) 0%, rgba(5, 9, 18, 0.72) 55%, rgba(5, 9, 18, 0.88) 100%);
+}
+.mission-control-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(5, 9, 18, 0.55) 100%);
+}
+
+/* Glass-ify every shadcn Card inside mission control */
+[data-testid="mission-control-root"] [class*="rounded-lg border"][class*="bg-card"],
+[data-testid="mission-control-root"] > div > div > *[class*="card"],
+[data-testid="mission-control-root"] .border.shadow-sm,
+[data-testid="mission-control-root"] [class*="border bg-"]:not(button):not([role="tab"]) {
+  background: rgba(15, 18, 28, 0.62) !important;
+  backdrop-filter: blur(22px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+  border: 1px solid rgba(212, 175, 55, 0.14) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(212, 175, 55, 0.10) !important;
+  color: #E8E0D0 !important;
+}
+/* Card text recoloring for legibility */
+[data-testid="mission-control-root"] h1,
+[data-testid="mission-control-root"] h2,
+[data-testid="mission-control-root"] h3,
+[data-testid="mission-control-root"] h4 {
+  color: #FFFFFF !important;
+}
+[data-testid="mission-control-root"] .text-gray-900,
+[data-testid="mission-control-root"] .text-gray-800,
+[data-testid="mission-control-root"] .text-gray-700 { color: #E8E0D0 !important; }
+[data-testid="mission-control-root"] .text-gray-600,
+[data-testid="mission-control-root"] .text-gray-500,
+[data-testid="mission-control-root"] .text-muted-foreground { color: rgba(232, 224, 208, 0.65) !important; }
+[data-testid="mission-control-root"] .text-gray-400 { color: rgba(232, 224, 208, 0.45) !important; }
+[data-testid="mission-control-root"] .text-pink-600 { color: #D4AF37 !important; }
+[data-testid="mission-control-root"] .text-orange-600 { color: #FF8A3D !important; }
+
+/* Light list rows inside cards → subtle glass */
+[data-testid="mission-control-root"] .bg-gray-50,
+[data-testid="mission-control-root"] .bg-white { background: rgba(255, 255, 255, 0.04) !important; border-color: rgba(212, 175, 55, 0.08) !important; }
+[data-testid="mission-control-root"] .bg-gray-100 { background: rgba(255, 255, 255, 0.06) !important; }
+
+/* Tab rail — translucent */
+[data-testid="mission-control-root"] [role="tablist"] {
+  background: rgba(15, 18, 28, 0.55) !important;
+  border: 1px solid rgba(212, 175, 55, 0.12) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+}
+[data-testid="mission-control-root"] [role="tab"] { color: rgba(232, 224, 208, 0.65) !important; }
+[data-testid="mission-control-root"] [role="tab"][data-state="active"] {
+  background: linear-gradient(135deg, rgba(212,175,55,0.22), rgba(255,107,0,0.14)) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(212, 175, 55, 0.3) !important;
+  box-shadow: 0 4px 16px rgba(212,175,55,0.25) !important;
+}
+
+/* Inputs inside mission control — dark glass */
+[data-testid="mission-control-root"] input:not([type="checkbox"]):not([type="radio"]),
+[data-testid="mission-control-root"] textarea,
+[data-testid="mission-control-root"] select {
+  background: rgba(12, 14, 22, 0.72) !important;
+  border: 1px solid rgba(212, 175, 55, 0.18) !important;
+  color: #E8E0D0 !important;
+}
+[data-testid="mission-control-root"] input::placeholder { color: rgba(232, 224, 208, 0.35) !important; }
+
+/* Outline button adjustments for dark bg */
+[data-testid="mission-control-root"] button[class*="variant"][class*="outline"],
+[data-testid="mission-control-root"] .border-orange-300 {
+  background: rgba(212, 175, 55, 0.06) !important;
+  border-color: rgba(212, 175, 55, 0.35) !important;
+  color: #D4AF37 !important;
+}
+[data-testid="mission-control-root"] button[class*="outline"]:hover {
+  background: rgba(212, 175, 55, 0.12) !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+   FUTURISTIC LIGHTING SHIMMER — blue-circuit admin background
+   ════════════════════════════════════════════════════════════ */
+.admin-shimmer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.admin-shimmer::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -35%;
+  width: 50%;
+  height: 140%;
+  background: linear-gradient(115deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(168, 210, 255, 0.00) 45%,
+    rgba(168, 210, 255, 0.08) 50%,
+    rgba(212, 175, 55, 0.06) 52%,
+    rgba(168, 210, 255, 0.00) 55%,
+    transparent 62%,
+    transparent 100%);
+  filter: blur(3px);
+  animation: aurem-shimmer 11s linear infinite;
+  mix-blend-mode: screen;
+}
+.admin-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(600px 280px at 18% 12%, rgba(103, 178, 255, 0.10), transparent 60%),
+    radial-gradient(700px 420px at 82% 88%, rgba(212, 175, 55, 0.08), transparent 62%);
+  animation: aurem-pulse-glow 6s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+@keyframes aurem-shimmer {
+  0%   { transform: translateX(0); opacity: 0.0; }
+  12%  { opacity: 1.0; }
+  50%  { transform: translateX(260%); opacity: 1.0; }
+  88%  { opacity: 0.0; }
+  100% { transform: translateX(340%); opacity: 0.0; }
+}
+@keyframes aurem-pulse-glow {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.95; }
+}
+/* Active tab — blue-cyan accent to match new background */
+[data-testid="mission-control-root"] [role="tab"][data-state="active"] {
+  background: linear-gradient(135deg, rgba(103, 178, 255, 0.22), rgba(212, 175, 55, 0.18)) !important;
+  border: 1px solid rgba(103, 178, 255, 0.32) !important;
+  box-shadow: 0 4px 18px rgba(103, 178, 255, 0.28), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+/* Ensure primary-action buttons (pink default) stay visible */
+[data-testid="mission-control-root"] .bg-pink-600,
+[data-testid="mission-control-root"] .bg-pink-700 {
+  background: linear-gradient(135deg, #D4AF37 0%, #FFB74D 100%) !important;
+  color: #0D0D0D !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.4) !important;
+}
+[data-testid="mission-control-root"] .text-blue-600 { color: #8ECBFF !important; }
+[data-testid="mission-control-root"] .border-orange-300,
+[data-testid="mission-control-root"] .text-orange-600 { color: #FFB74D !important; }
+
+
+/* ════════════════════════════════════════════════════════════
+   ORA Command Center — Futuristic glass-float + golden shimmer
+   (iter 257) — applies to /dashboard route
+   ════════════════════════════════════════════════════════════ */
+/* Global force-glass on any dark inline-style child of ora-command-console.
+   Uses attribute selectors + !important to override React inline styles. */
+[data-testid="ora-command-console"] [style*="background: rgb(15, 15, 17)"],
+[data-testid="ora-command-console"] [style*="background:#0f0f11"],
+[data-testid="ora-command-console"] [style*="background: #0f0f11"],
+[data-testid="ora-command-console"] [style*="background:#0f0f10"],
+[data-testid="ora-command-console"] [style*="background: #0f0f10"],
+[data-testid="ora-command-console"] [style*="background:#0d0d0f"],
+[data-testid="ora-command-console"] [style*="background: #0d0d0f"],
+[data-testid="ora-command-console"] [style*="background:#0e0e10"],
+[data-testid="ora-command-console"] [style*="background: #0e0e10"],
+[data-testid="ora-command-console"] [style*="background:#0a1a0a"],
+[data-testid="ora-command-console"] [style*="background: #0a1a0a"],
+[data-testid="ora-command-console"] [style*="background:#0c0c0d"],
+[data-testid="ora-command-console"] [style*="background: #0c0c0d"],
+[data-testid="ora-command-console"] [style*="background: rgb(12, 12, 13)"],
+[data-testid="ora-command-console"] [style*="background: rgb(14, 14, 16)"],
+[data-testid="ora-command-console"] [style*="background: rgb(13, 13, 15)"] {
+  background: rgba(15, 18, 28, 0.44) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  border-color: rgba(201, 162, 39, 0.18) !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+[data-testid="ora-command-console"] input[style*="background"],
+[data-testid="ora-command-console"] select[style*="background"] {
+  background: rgba(10, 12, 18, 0.55) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.ora-cmd-bg {
+  background-attachment: fixed !important;
+  background-position: center right !important;
+  background-size: cover !important;
+}
+/* Stronger dark wash for legibility over the bright blue-circuit hero */
+.ora-cmd-bg::after {
+  background:
+    radial-gradient(900px 700px at 95% 0%, rgba(212, 175, 55, 0.10), transparent 55%),
+    radial-gradient(800px 600px at -5% 100%, rgba(103, 178, 255, 0.07), transparent 55%),
+    linear-gradient(90deg, rgba(5, 9, 18, 0.72) 0%, rgba(5, 9, 18, 0.58) 45%, rgba(5, 9, 18, 0.38) 72%, rgba(5, 9, 18, 0.2) 100%) !important;
+}
+
+/* Golden-dominant shimmer on ORA (warmer than admin dashboard) */
+.ora-shimmer::before {
+  background: linear-gradient(115deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(212, 175, 55, 0.00) 46%,
+    rgba(212, 175, 55, 0.22) 50%,
+    rgba(255, 200, 90, 0.16) 53%,
+    rgba(212, 175, 55, 0.00) 56%,
+    transparent 62%,
+    transparent 100%) !important;
+  filter: blur(4px) !important;
+  animation: aurem-shimmer 9s linear infinite !important;
+}
+.ora-shimmer::after {
+  background:
+    radial-gradient(700px 320px at 22% 10%, rgba(212, 175, 55, 0.14), transparent 60%),
+    radial-gradient(800px 480px at 82% 90%, rgba(255, 183, 77, 0.10), transparent 62%) !important;
+}
+
+/* ═══ Glass-floated module cards in ORA grid ═══ */
+[data-testid="aurem-dashboard"] [class*="ora-module-card"],
+[data-testid="aurem-dashboard"] .ora-grid-card,
+[data-testid="aurem-dashboard"] .rounded-xl.border.bg-card,
+[data-testid="aurem-dashboard"] .main-content [class*="rounded-xl border"]:not(button):not([role="tab"]):not([role="menuitem"]),
+[data-testid="aurem-dashboard"] .main-content [class*="rounded-lg border"]:not(button):not([role="tab"]):not([role="menuitem"]) {
+  background: rgba(15, 18, 28, 0.42) !important;
+  backdrop-filter: blur(24px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+  border: 1px solid rgba(212, 175, 55, 0.22) !important;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(212, 175, 55, 0.06) !important;
+  color: #E8E0D0 !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease !important;
+}
+[data-testid="aurem-dashboard"] .ora-grid-card:hover,
+[data-testid="aurem-dashboard"] [class*="rounded-xl border"]:not(button):hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(212, 175, 55, 0.38) !important;
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 22px rgba(212, 175, 55, 0.18) !important;
+}
+
+/* Sidebar → glass with gold accent */
+[data-testid="aurem-dashboard"] aside,
+[data-testid="aurem-dashboard"] .sidebar,
+[data-testid="aurem-dashboard"] [class*="w-64"][class*="border-r"],
+[data-testid="aurem-dashboard"] [class*="w-[260px]"] {
+  background: rgba(12, 14, 22, 0.55) !important;
+  backdrop-filter: blur(28px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(150%) !important;
+  border-right: 1px solid rgba(212, 175, 55, 0.18) !important;
+}
+
+/* Top status bar + any floating pills → glass */
+[data-testid="aurem-dashboard"] .SystemStatusBar,
+[data-testid="aurem-dashboard"] [class*="system-status-bar"] {
+  background: rgba(12, 14, 22, 0.55) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+}
+
+/* Text color legibility recolors */
+[data-testid="aurem-dashboard"] .text-gray-900,
+[data-testid="aurem-dashboard"] .text-gray-800 { color: #F5EFE0 !important; }
+[data-testid="aurem-dashboard"] .text-gray-700,
+[data-testid="aurem-dashboard"] .text-gray-600 { color: rgba(232, 224, 208, 0.82) !important; }
+[data-testid="aurem-dashboard"] .text-gray-500,
+[data-testid="aurem-dashboard"] .text-muted-foreground { color: rgba(232, 224, 208, 0.62) !important; }
+[data-testid="aurem-dashboard"] .text-gray-400 { color: rgba(232, 224, 208, 0.42) !important; }
+
+/* Ensure the floating content-glass shell picks up the gold tint */
+[data-testid="aurem-dashboard"] .admin-content-glass {
+  background: rgba(12, 14, 22, 0.18) !important;
+  border: 1px solid rgba(212, 175, 55, 0.18) !important;
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(212, 175, 55, 0.08) !important;
+}
+
+/* ORA body / columns — fully transparent so bg image shines through */
+[data-testid="ora-command-console"] .ora-body,
+[data-testid="ora-command-console"] .ora-left,
+[data-testid="ora-command-console"] .ora-right {
+  background: transparent !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ORA Command Center — Unified cinematic layer (iter 245)
+   Same AI-hands hero as Mission Control + floating white-glass
+   shell around the main content scroll-root for consistency
+   with the customer portal treatment (iter 244).
+   ════════════════════════════════════════════════════════════ */
+.admin-dashboard-bg {
+  background-color: #050912;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
+  position: relative;
+}
+/* Dark wash + brand radials on top of hero for legibility */
+.admin-dashboard-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 700px at 92% -10%, rgba(212, 175, 55, 0.08), transparent 55%),
+    radial-gradient(800px 600px at -10% 110%, rgba(255, 107, 0, 0.06), transparent 55%),
+    linear-gradient(180deg, rgba(5, 9, 18, 0.62) 0%, rgba(5, 9, 18, 0.78) 55%, rgba(5, 9, 18, 0.90) 100%);
+}
+
+/* Floating white-glass shell for the main content pane */
+[data-testid="aurem-dashboard"] .admin-content-glass {
+  margin: 10px 14px 14px 10px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(26px) saturate(150%);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  border: 1px solid rgba(212, 175, 55, 0.20);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Keep sidebar & outer main from double-layering the hero dim */
+[data-testid="aurem-dashboard"] > .aurem-bg-container { z-index: 0; }
+
+/* On small screens, reduce the glass margin so content doesn't feel cramped */
+@media (max-width: 768px) {
+  [data-testid="aurem-dashboard"] .admin-content-glass {
+    margin: 6px;
+    border-radius: 18px;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   Customer Portal SUB-PAGE glass unifier (iter 250)
+   Auto-applies spatial-glass to common containers on every
+   /my/* sub-page (Website, Report, Billing, Social, Reviews,
+   Referrals, Settings) — without needing per-page refactor.
+   ════════════════════════════════════════════════════════════ */
+
+/* Glass-ify every direct child div of the sub-page root that doesn't
+   already carry inline background/backdrop-filter. Selector chain:
+   1. Any <div data-testid="customer-*"> container (root of each sub-page)
+   2. Its immediate children <div> that look like cards (have borderRadius)
+   — by convention the sub-pages use `const card = { borderRadius: 18, padding: 22 }` */
+[data-testid^="customer-"] > div:not([data-testid$="-loading"]):not([style*="grid"]),
+[data-testid^="customer-"] > div > div:not([data-testid$="-loading"]):not([style*="grid"]) {
+  /* no-op — avoids false positives; specific rules below */
+}
+
+/* Direct card-like divs (borderRadius:18 pattern used in all sub-pages) */
+[data-testid="customer-billing"] > div[style*="border-radius"],
+[data-testid="customer-reviews"] > div[style*="border-radius"],
+[data-testid="customer-referrals"] > div[style*="border-radius"],
+[data-testid="customer-settings"] > div[style*="border-radius"],
+[data-testid="customer-social"] > div[style*="border-radius"],
+[data-testid="customer-website"] > div[style*="border-radius"],
+[data-testid="customer-report"] > div[style*="border-radius"],
+[data-testid^="billing-"]:not([data-testid="billing-loading"]),
+[data-testid^="reviews-"]:not([data-testid="reviews-loading"]),
+[data-testid^="referrals-"],
+[data-testid^="settings-"],
+[data-testid^="social-"],
+[data-testid^="website-"],
+[data-testid^="report-"] {
+  background: rgba(15, 18, 28, 0.55) !important;
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(212, 175, 55, 0.14) !important;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(212, 175, 55, 0.08) !important;
+  position: relative;
+}
+
+/* Grid child cards (used by billing top row etc.) */
+[data-testid="customer-billing"] > div > div[style*="border-radius"],
+[data-testid="customer-reviews"] > div > div[style*="border-radius"],
+[data-testid="customer-referrals"] > div > div[style*="border-radius"],
+[data-testid="customer-settings"] > div > div[style*="border-radius"],
+[data-testid="customer-social"] > div > div[style*="border-radius"],
+[data-testid="customer-website"] > div > div[style*="border-radius"],
+[data-testid="customer-report"] > div > div[style*="border-radius"] {
+  background: rgba(15, 18, 28, 0.55) !important;
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(212, 175, 55, 0.14) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(212, 175, 55, 0.06) !important;
+}
+
+/* ─── One-time GOLDEN SHIMMER sweep on mount (iter 250) ───
+   Applied to any .spatial-glass or glassified customer sub-page card.
+   Runs once at 0.8s, then every 18s as subtle ambient breathe.
+*/
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+  }
+  30% { opacity: 0.7; }
+  60% { opacity: 0.7; }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.spatial-glass::after,
+[data-testid="customer-billing"] > div[style*="border-radius"]::after,
+[data-testid="customer-reviews"] > div[style*="border-radius"]::after,
+[data-testid="customer-referrals"] > div[style*="border-radius"]::after,
+[data-testid="customer-settings"] > div[style*="border-radius"]::after,
+[data-testid="customer-social"] > div[style*="border-radius"]::after,
+[data-testid="customer-website"] > div[style*="border-radius"]::after,
+[data-testid="customer-report"] > div[style*="border-radius"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(212, 185, 119, 0.10) 46%,
+    rgba(255, 138, 61, 0.14) 50%,
+    rgba(212, 185, 119, 0.10) 54%,
+    transparent 65%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: shimmerSweep 1.6s cubic-bezier(.25,.8,.25,1) 0.6s 1 forwards,
+             shimmerSweep 2s cubic-bezier(.25,.8,.25,1) 18s infinite;
+  z-index: 2;
+}
+
+/* Keep overflow hidden so shimmer clips to the card edge */
+.spatial-glass,
+[data-testid="customer-billing"] > div[style*="border-radius"],
+[data-testid="customer-reviews"] > div[style*="border-radius"],
+[data-testid="customer-referrals"] > div[style*="border-radius"],
+[data-testid="customer-settings"] > div[style*="border-radius"],
+[data-testid="customer-social"] > div[style*="border-radius"],
+[data-testid="customer-website"] > div[style*="border-radius"],
+[data-testid="customer-report"] > div[style*="border-radius"] {
+  overflow: hidden;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .spatial-glass::after,
+  [data-testid^="customer-"] > div::after {
+    animation: none !important;
+  }
+}
+
+
+
+/* Pixel status dot pulse (iter 252) */
+@keyframes pixelPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.8); opacity: 1; }
+  50%      { box-shadow: 0 0 18px rgba(34, 197, 94, 1), 0 0 32px rgba(34, 197, 94, 0.5); opacity: 0.75; }
+}

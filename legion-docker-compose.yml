@@ -1,0 +1,133 @@
+# ══════════════════════════════════════════════════════════════════
+# AUREM Legion Node — Docker Compose
+# ══════════════════════════════════════════════════════════════════
+# Runs the 3 Legion-Docker subdomain services that the cloud AUREM
+# platform probes via /api/admin/legion/health:
+#
+#   1. Voice Engine (DIY VAPI alternative) — port 8181
+#   2. Social Scheduler (Postiz)          — port 5000
+#   3. n8n Workflows                      — port 5678
+#
+# Place this file on your Legion machine (local hardware) and run:
+#     docker compose -f legion-docker-compose.yml up -d
+#
+# Then in cloud AUREM backend/.env set:
+#     VOICE_URL=https://voice.yourdomain.com      (reverse-proxied to :8181)
+#     SOCIAL_URL=https://social.yourdomain.com    (reverse-proxied to :5000)
+#     N8N_URL=https://n8n.yourdomain.com          (reverse-proxied to :5678)
+#
+# Use Caddy/Cloudflare Tunnel/Traefik to expose them as HTTPS subdomains.
+# ══════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Voice Engine (DIY Whisper + TTS + sentiment)
+  # ─────────────────────────────────────────────────────────────
+  # Pulls the lightweight AUREM voice-engine image or swap to your
+  # preferred open-source voice stack. Exposes /health + /stream.
+  voice-engine:
+    image: ghcr.io/aurem-platform/voice-engine:latest
+    container_name: aurem-voice
+    restart: unless-stopped
+    ports:
+      - "8181:8181"
+    environment:
+      - MODE=production
+      - WHISPER_MODEL=base
+      - CORS_ORIGINS=https://aurem.live,https://*.preview.emergentagent.com
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Social Scheduler (Postiz — open source)
+  # ─────────────────────────────────────────────────────────────
+  # https://github.com/gitroomhq/postiz-app
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: aurem-social
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MAIN_URL=https://social.yourdomain.com
+      - FRONTEND_URL=https://social.yourdomain.com
+      - NEXT_PUBLIC_BACKEND_URL=https://social.yourdomain.com/api
+      - JWT_SECRET=${POSTIZ_JWT_SECRET:-change-me-super-secret}
+      - DATABASE_URL=postgresql://postiz:postiz@postgres:5432/postiz
+      - REDIS_URL=redis://redis:6379
+      - BACKEND_INTERNAL_URL=http://localhost:3000
+      - STORAGE_PROVIDER=local
+      - UPLOAD_DIRECTORY=/uploads
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - postiz-uploads:/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. n8n Workflows (automation engine)
+  # ─────────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: aurem-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n.yourdomain.com
+      - N8N_PROTOCOL=https
+      - N8N_PORT=5678
+      - WEBHOOK_URL=https://n8n.yourdomain.com/
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-change-me}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=n8n
+    depends_on:
+      - postgres
+    volumes:
+      - n8n-data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # Shared infra
+  # ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: aurem-legion-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=postiz
+      - POSTGRES_USER=postiz
+      - POSTGRES_PASSWORD=postiz
+      - POSTGRES_MULTIPLE_DATABASES=postiz,n8n
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init.sh:ro
+
+  redis:
+    image: redis:7-alpine
+    container_name: aurem-legion-redis
+    restart: unless-stopped
+
+volumes:
+  postiz-uploads:
+  n8n-data:
+  postgres-data:

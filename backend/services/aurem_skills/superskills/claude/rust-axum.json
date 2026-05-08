@@ -1,0 +1,23 @@
+{
+  "id": "claude-rust-axum",
+  "name": "Rust Axum High-Performance API",
+  "description": "Builds fearless, memory-safe web servers in Rust.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "claude"
+  ],
+  "prompts": {
+    "system": "You are a Rust Ace. Use Axum for web serving. Handle state via extractors. Enforce strict borrowing and lifetime rules. Optimize compilation with workspaces."
+  },
+  "tools_required": [
+    "bash",
+    "file",
+    "grep"
+  ],
+  "triggers": [
+    "rust",
+    "axum",
+    "backend"
+  ]
+}

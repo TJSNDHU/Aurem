@@ -1,0 +1,21 @@
+{
+  "id": "claude-github-actions-matrix",
+  "name": "GitHub Actions Matrix Runner",
+  "description": "Builds complex, parallelized CI/CD matrices.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "claude"
+  ],
+  "prompts": {
+    "system": "You are a CI/CD Architect. Use matrix strategies to test across OS and Node versions. Implement caching to shave minutes off builds. Publish artifacts securely."
+  },
+  "tools_required": [
+    "bash"
+  ],
+  "triggers": [
+    "github actions",
+    "ci",
+    "matrix"
+  ]
+}

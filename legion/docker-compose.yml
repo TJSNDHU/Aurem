@@ -1,0 +1,151 @@
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: aurem-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  chatterbox:
+    image: bhimrazy/chatterbox-tts:v0.1.0
+    container_name: aurem-voice
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: aurem-social
+    ports:
+      - "8000:5000"
+    environment:
+      - DATABASE_URL=postgresql://postiz:postiz@postiz-db:5432/postiz
+      - REDIS_URL=redis://postiz-redis:6379
+      - JWT_SECRET=aurem-postiz-secret-2024
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+      - BACKEND_INTERNAL_URL=http://localhost:3000
+    depends_on:
+      - postiz-db
+      - postiz-redis
+    restart: unless-stopped
+
+  postiz-db:
+    image: postgres:16-alpine
+    container_name: aurem-postiz-db
+    environment:
+      - POSTGRES_USER=postiz
+      - POSTGRES_PASSWORD=postiz
+      - POSTGRES_DB=postiz
+    volumes:
+      - postiz_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  postiz-redis:
+    image: redis:7-alpine
+    container_name: aurem-postiz-redis
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n
+    container_name: aurem-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=aurem
+      - N8N_BASIC_AUTH_PASSWORD=AuremN8N2024
+      - N8N_HOST=n8n.aurem.live
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://n8n.aurem.live/
+      - GENERIC_TIMEZONE=America/Toronto
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+  # PentAGI — Autonomous AI Penetration Testing (Enterprise)
+  # Shannon → PentAGI (AI brain) → Kali Linux (tools) → nmap, sqlmap, metasploit
+  pentagi:
+    image: vxcontrol/pentagi:latest
+    container_name: aurem-pentagi
+    ports:
+      - "8443:8443"
+    environment:
+      - OPEN_AI_KEY=${EMERGENT_LLM_KEY}
+      - OPEN_AI_SERVER_URL=https://api.openai.com/v1
+      - PUBLIC_URL=https://pentagi.aurem.live
+      - CORS_ORIGINS=https://pentagi.aurem.live,https://aurem.live
+      - SERVER_PORT=8443
+      - SERVER_HOST=0.0.0.0
+      - SERVER_USE_SSL=false
+      - PENTAGI_POSTGRES_USER=postgres
+      - PENTAGI_POSTGRES_PASSWORD=aurem_pentagi_2026
+      - PENTAGI_POSTGRES_DB=pentagidb
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DOCKER_INSIDE=true
+      - DOCKER_DEFAULT_IMAGE_FOR_PENTEST=vxcontrol/kali-linux:latest
+      - DUCKDUCKGO_ENABLED=true
+      - SPLOITUS_ENABLED=true
+      - SCRAPER_PRIVATE_URL=https://aurem:aurem_scraper_2026@pentagi-scraper/
+      - LOCAL_SCRAPER_USERNAME=aurem
+      - LOCAL_SCRAPER_PASSWORD=aurem_scraper_2026
+    volumes:
+      - pentagi_data:/opt/pentagi/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - pentagi-db
+      - pentagi-scraper
+    restart: unless-stopped
+
+  # Kali Linux — Headless security tools container (used by PentAGI)
+  # Contains: nmap, sqlmap, metasploit, nikto, dirb, gobuster, hydra, john, etc.
+  kali:
+    image: vxcontrol/kali-linux:latest
+    container_name: aurem-kali
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+  pentagi-db:
+    image: vxcontrol/pgvector:latest
+    container_name: aurem-pentagi-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=aurem_pentagi_2026
+      - POSTGRES_DB=pentagidb
+    volumes:
+      - pentagi_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  pentagi-scraper:
+    image: vxcontrol/scraper:latest
+    container_name: aurem-pentagi-scraper
+    environment:
+      - AUTH_USER=aurem
+      - AUTH_PASSWORD=aurem_scraper_2026
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  postiz_db_data:
+  n8n_data:
+  pentagi_data:
+  pentagi_db_data:

@@ -1,0 +1,21 @@
+{
+  "id": "kimi-legal-contract-analysis",
+  "name": "Legal Document Analyzer",
+  "description": "Processes massive NDA/MSA documents for risk analysis.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "kimi"
+  ],
+  "prompts": {
+    "system": "You are a Legal Tech Expert. Find indemnification clauses. Highlight non-standard termination conditions. Summarize 100-page contracts clearly."
+  },
+  "tools_required": [
+    "file"
+  ],
+  "triggers": [
+    "legal",
+    "contract",
+    "analysis"
+  ]
+}

@@ -1,0 +1,198 @@
+"""
+Email Engine — Unified Email Sending Layer
+============================================
+Primary: Tenant's own Resend key (from DB)
+Fallback: Global RESEND_API_KEY from env
+From: ora@aurem.live
+
+Usage:
+    from services.email_engine import EmailEngine
+    engine = EmailEngine(db)
+    result = await engine.send_message(tenant_id, "user@email.com", "Subject", "<h1>Hi</h1>")
+"""
+
+import os
+import logging
+import resend
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_FROM = os.environ.get("RESEND_FROM_EMAIL", "ORA <onboarding@resend.dev>")
+
+
+class EmailEngine:
+    def __init__(self, db):
+        self.db = db
+
+    async def _get_api_key(self, tenant_id: str) -> str:
+        """Get Resend API key — tenant-specific first, then global fallback."""
+        try:
+            doc = await self.db.user_integrations.find_one(
+                {"tenant_id": tenant_id},
+                {"_id": 0, "email_config": 1}
+            )
+            if doc:
+                ec = doc.get("email_config", {})
+                tenant_key = ec.get("resend_api_key", "")
+                if tenant_key:
+                    return tenant_key
+        except Exception:
+            pass
+        return os.environ.get("RESEND_API_KEY", "")
+
+    async def _get_from_address(self, tenant_id: str) -> str:
+        """Get from address — tenant-specific or default."""
+        try:
+            doc = await self.db.user_integrations.find_one(
+                {"tenant_id": tenant_id},
+                {"_id": 0, "email_config": 1}
+            )
+            if doc:
+                ec = doc.get("email_config", {})
+                from_name = ec.get("from_name", "")
+                from_email = ec.get("from_email", "")
+                if from_email:
+                    return f"{from_name} <{from_email}>" if from_name else from_email
+        except Exception:
+            pass
+        return DEFAULT_FROM
+
+    async def send_message(
+        self,
+        tenant_id: str,
+        to: str,
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+    ) -> Dict:
+        """
+        Send a single email via Resend.
+        Uses tenant's own Resend key if set, falls back to global.
+        """
+        api_key = await self._get_api_key(tenant_id)
+        if not api_key:
+            return {"success": False, "error": "No Resend API key configured"}
+
+        from_addr = await self._get_from_address(tenant_id)
+        resend.api_key = api_key
+
+        try:
+            params = {
+                "from": from_addr,
+                "to": [to] if isinstance(to, str) else to,
+                "subject": subject,
+                "html": html_body,
+            }
+            if text_body:
+                params["text"] = text_body
+
+            result = resend.Emails.send(params)
+            email_id = result.get("id", "") if isinstance(result, dict) else str(result)
+
+            await self._log_email(tenant_id, to, subject, email_id, True)
+
+            logger.info(f"[Email] Sent to {to[:20]}... via Resend (tenant: {tenant_id})")
+            return {"success": True, "email_id": email_id, "engine": "resend"}
+
+        except Exception as e:
+            logger.error(f"[Email] Send failed: {e}")
+            await self._log_email(tenant_id, to, subject, "", False, str(e))
+            return {"success": False, "error": str(e), "engine": "resend"}
+
+    async def send_campaign_batch(
+        self,
+        tenant_id: str,
+        leads: List[Dict],
+        subject_template: str,
+        html_template: str,
+    ) -> Dict:
+        """
+        Send personalized emails to a batch of leads.
+        Checks do_not_contact list first. Returns sent/failed counts.
+        """
+        sent = 0
+        failed = 0
+        skipped = 0
+        results = []
+
+        # Load DNC list
+        dnc_emails = set()
+        try:
+            dnc_cursor = self.db.do_not_contact.find(
+                {"channel": {"$in": ["email", "all"]}},
+                {"_id": 0, "email": 1}
+            )
+            async for doc in dnc_cursor:
+                if doc.get("email"):
+                    dnc_emails.add(doc["email"].lower())
+        except Exception:
+            pass
+
+        for lead in leads:
+            email = lead.get("email", "")
+            if not email:
+                skipped += 1
+                continue
+            if email.lower() in dnc_emails:
+                skipped += 1
+                continue
+
+            # Personalize
+            name = lead.get("contact_name") or lead.get("first_name") or "there"
+            website = lead.get("website_url", "")
+            biz_name = lead.get("business_name", "")
+            score = lead.get("score", 50)
+            issues = lead.get("issues_count", 0)
+
+            subject = subject_template.format(
+                first_name=name, business_name=biz_name,
+                score=score, issues_count=issues,
+            )
+            html = html_template
+            html = html.replace("{{first_name}}", name)
+            html = html.replace("{{business_name}}", biz_name)
+            html = html.replace("{{website}}", website)
+            html = html.replace("{{score}}", str(score))
+            html = html.replace("{{issues_count}}", str(issues))
+
+            result = await self.send_message(tenant_id, email, subject, html)
+            if result.get("success"):
+                sent += 1
+                results.append({"email": email, "status": "sent", "email_id": result.get("email_id")})
+            else:
+                failed += 1
+                results.append({"email": email, "status": "failed", "error": result.get("error")})
+
+        return {
+            "sent": sent,
+            "failed": failed,
+            "skipped": skipped,
+            "total": len(leads),
+            "results": results[:20],
+        }
+
+    async def _log_email(self, tenant_id: str, to: str, subject: str, email_id: str, success: bool, error: str = ""):
+        """Log email send and update usage counter."""
+        try:
+            await self.db.email_logs.insert_one({
+                "tenant_id": tenant_id,
+                "to": to,
+                "subject": subject,
+                "email_id": email_id,
+                "success": success,
+                "error": error,
+                "engine": "resend",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+            })
+            if success:
+                await self.db.user_integrations.update_one(
+                    {"tenant_id": tenant_id},
+                    {
+                        "$inc": {"emails_sent": 1},
+                        "$set": {"last_email_at": datetime.now(timezone.utc).isoformat()},
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"[Email] Log failed: {e}")

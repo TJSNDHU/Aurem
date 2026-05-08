@@ -1,0 +1,35 @@
+{
+  "name": "Sentinel Overwatch",
+  "short_name": "Sentinel",
+  "description": "Sovereign Node Command Center — Real-time monitoring, kill-switch, and auto-failover for AUREM AI.",
+  "start_url": "/overwatch",
+  "scope": "/overwatch",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050507",
+  "theme_color": "#D4AF37",
+  "icons": [
+    {
+      "src": "/overwatch-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/overwatch-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/overwatch-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false
+}

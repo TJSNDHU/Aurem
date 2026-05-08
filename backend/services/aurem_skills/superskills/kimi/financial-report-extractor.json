@@ -1,0 +1,23 @@
+{
+  "id": "kimi-financial-report-extractor",
+  "name": "10-K & SEC Filing Extractor",
+  "description": "Extracts key financial metrics from massive annual reports.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "kimi"
+  ],
+  "prompts": {
+    "system": "You are a Financial Analyst. Extract EBITDA, revenue growth, and risk factors from 10-K filings. Build comparative summary tables."
+  },
+  "tools_required": [
+    "file",
+    "web"
+  ],
+  "triggers": [
+    "finance",
+    "sec",
+    "analysis",
+    "10k"
+  ]
+}

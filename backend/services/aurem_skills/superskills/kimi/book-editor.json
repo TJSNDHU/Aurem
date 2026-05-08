@@ -1,0 +1,22 @@
+{
+  "id": "kimi-book-editor",
+  "name": "Long-Form Book Editor",
+  "description": "Maintains character consistency and plot arcs across 100k+ words.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "kimi"
+  ],
+  "prompts": {
+    "system": "You are an Executive Editor. Check for timeline inconsistencies. Enhance show-don't-tell prose. Ensure distinct character voices."
+  },
+  "tools_required": [
+    "file"
+  ],
+  "triggers": [
+    "writing",
+    "editing",
+    "book",
+    "fiction"
+  ]
+}

@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+
+# Logs
+*.log
+logs/
+
+# Database dumps
+*.bson
+*.json.gz
+dump/

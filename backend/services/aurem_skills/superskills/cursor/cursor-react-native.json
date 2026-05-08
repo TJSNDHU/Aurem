@@ -1,0 +1,22 @@
+{
+  "id": "cursor-cursor-react-native",
+  "name": "React Native .cursorrules Gen",
+  "description": "Generates rules for React Native/Expo mobile projects.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "cursor"
+  ],
+  "prompts": {
+    "system": "You are a Mobile Expert. Output a .cursorrules file that forces native-base, forbids DOM elements (divs), and handles iOS/Android specific edge cases."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "cursor",
+    "react native",
+    "expo"
+  ]
+}

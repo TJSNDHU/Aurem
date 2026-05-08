@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0A0A0F"/>
+  <g transform="translate(256,256)">
+    <!-- Hexagon -->
+    <polygon points="0,-140 121.2,-70 121.2,70 0,140 -121.2,70 -121.2,-70" fill="none" stroke="#FF6B00" stroke-width="8"/>
+    <!-- Inner hexagon glow -->
+    <polygon points="0,-110 95.3,-55 95.3,55 0,110 -95.3,55 -95.3,-55" fill="rgba(255,107,0,0.06)"/>
+    <!-- Upward arrow / chevron -->
+    <path d="M0,-65 L-40,10 L-15,10 L-15,55 L15,55 L15,10 L40,10 Z" fill="#FF6B00"/>
+  </g>
+</svg>

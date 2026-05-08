@@ -1,0 +1,91 @@
+{% comment %}
+  AUREM ORA — Theme App Extension Block
+  Shopify 2026 Compliant: No ScriptTags
+  Merchants enable via Theme Editor > App Embeds > AUREM Pulse
+
+  This block:
+  1. Captures aurem_ref attribution tokens from URL
+  2. Stores in cookie for 30-day attribution window
+  3. Injects ref into cart attributes at checkout
+  4. Reports page views to Aurem analytics
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "AUREM Tracking",
+  "target": "body",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enable_tracking",
+      "label": "Enable AUREM Attribution Tracking",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "attribution_window",
+      "label": "Attribution Window (days)",
+      "min": 7,
+      "max": 90,
+      "step": 1,
+      "default": 30
+    },
+    {
+      "type": "text",
+      "id": "aurem_endpoint",
+      "label": "AUREM API Endpoint",
+      "default": ""
+    }
+  ]
+}
+{% endschema %}
+
+{% if section.settings.enable_tracking %}
+<script>
+(function() {
+  'use strict';
+
+  var COOKIE_NAME = 'aurem_ref';
+  var WINDOW_DAYS = {{ section.settings.attribution_window | default: 30 }};
+  var ENDPOINT = '{{ section.settings.aurem_endpoint }}';
+
+  function getParam(n) {
+    var m = location.search.match(new RegExp('[?&]' + n + '=([^&]+)'));
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  function setCk(n, v, d) {
+    var dt = new Date();
+    dt.setTime(dt.getTime() + d * 864e5);
+    document.cookie = n + '=' + v + ';expires=' + dt.toUTCString() + ';path=/;SameSite=Lax;Secure';
+  }
+
+  function getCk(n) {
+    var m = document.cookie.match(new RegExp('(^| )' + n + '=([^;]+)'));
+    return m ? m[2] : null;
+  }
+
+  var ref = getParam('aurem_ref');
+  if (ref) {
+    setCk(COOKIE_NAME, ref, WINDOW_DAYS);
+    try { sessionStorage.setItem(COOKIE_NAME, ref); } catch(e) {}
+  }
+
+  var stored = getCk(COOKIE_NAME) || (function() { try { return sessionStorage.getItem(COOKIE_NAME); } catch(e) { return null; } })();
+
+  if (stored) {
+    fetch('/cart/update.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attributes: { aurem_ref: stored } })
+    }).catch(function() {});
+
+    if (ENDPOINT) {
+      fetch(ENDPOINT + '/api/attribution/pixel?ref=' + encodeURIComponent(stored) + '&url=' + encodeURIComponent(location.href), {
+        method: 'GET', mode: 'no-cors'
+      }).catch(function() {});
+    }
+  }
+})();
+</script>
+{% endif %}

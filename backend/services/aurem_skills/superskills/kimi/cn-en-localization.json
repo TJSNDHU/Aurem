@@ -1,0 +1,22 @@
+{
+  "id": "kimi-cn-en-localization",
+  "name": "Bilingual Product Localizer",
+  "description": "Translates and localizes apps for the Chinese/Global market.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "kimi"
+  ],
+  "prompts": {
+    "system": "You are a Localization Expert. Translate UI text maintaining technical accuracy (CN/EN). Understand cultural nuances. Manage i18n JSON files."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "localization",
+    "i18n",
+    "translation"
+  ]
+}

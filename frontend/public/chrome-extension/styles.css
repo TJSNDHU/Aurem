@@ -1,0 +1,180 @@
+/* AUREM Lead Scraper — Extension Popup Styles */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 380px;
+  max-height: 540px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #050505;
+  color: #e0e0e0;
+  overflow-y: auto;
+}
+
+#app { padding: 0; }
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #1a1a1a;
+  background: #080808;
+}
+
+.logo-row { display: flex; align-items: center; gap: 10px; }
+
+.logo-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, #D4AF37, #8B7355);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 16px; color: #050505;
+}
+
+.logo-text { font-size: 14px; font-weight: 700; color: #D4AF37; letter-spacing: 2px; }
+.logo-sub { font-size: 10px; color: #666; letter-spacing: 1px; }
+
+.status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #333;
+  border: 2px solid #1a1a1a;
+  cursor: pointer;
+}
+.status-dot.connected { background: #4ade80; border-color: #4ade8040; box-shadow: 0 0 6px #4ade8060; }
+
+/* Settings */
+.settings-panel {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1a1a1a;
+  background: #0a0a0a;
+}
+.settings-panel.hidden { display: none; }
+.settings-panel label { display: block; font-size: 9px; color: #666; letter-spacing: 1px; text-transform: uppercase; margin: 8px 0 4px; }
+.settings-panel input {
+  width: 100%; padding: 8px 10px;
+  background: #151515; border: 1px solid #252525; border-radius: 6px;
+  color: #ccc; font-size: 11px; outline: none;
+}
+.settings-panel input:focus { border-color: #D4AF37; }
+.settings-msg { font-size: 10px; color: #4ade80; margin-top: 6px; min-height: 14px; }
+
+/* Page Info */
+.page-info {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex; align-items: center; gap: 10px;
+}
+.page-type-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 10px; font-weight: 600;
+  background: #1a1a1a; color: #888;
+  white-space: nowrap;
+}
+.type-linkedin { background: #0A66C215; color: #0A66C2; }
+.type-facebook { background: #1877F215; color: #1877F2; }
+.type-instagram { background: #E4405F15; color: #E4405F; }
+.type-xtwitter { background: #ffffff15; color: #999; }
+.type-youtube { background: #FF000015; color: #FF0000; }
+.type-general { background: #D4AF3715; color: #D4AF37; }
+
+.page-url { font-size: 10px; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+/* Buttons */
+.btn {
+  padding: 8px 14px; border: 1px solid #252525; border-radius: 8px;
+  background: #151515; color: #888; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn:hover { background: #1a1a1a; color: #ccc; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-gold {
+  background: linear-gradient(135deg, #D4AF37, #8B7355);
+  color: #050505; border: none;
+}
+.btn-gold:hover { opacity: 0.9; }
+.btn-full { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 12px; }
+.btn-sm { padding: 4px 10px; font-size: 10px; border-radius: 6px; }
+.btn-icon { font-size: 14px; }
+
+.actions { padding: 12px 16px; }
+
+/* Results */
+.results { border-top: 1px solid #1a1a1a; }
+.results.hidden { display: none; }
+
+.results-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid #111;
+}
+.results-header span { font-size: 11px; font-weight: 600; color: #D4AF37; }
+.results-actions { display: flex; gap: 4px; }
+
+.leads-list { max-height: 280px; overflow-y: auto; }
+
+.lead-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #0d0d0d;
+  transition: background 0.1s;
+}
+.lead-card:hover { background: #0a0a0a; }
+
+.lead-avatar {
+  width: 32px; height: 32px; min-width: 32px;
+  background: #D4AF3712; color: #D4AF37;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+
+.lead-info { flex: 1; min-width: 0; }
+.lead-name { font-size: 12px; font-weight: 600; color: #f0f0f0; }
+.lead-title { font-size: 10px; color: #888; margin-top: 1px; }
+.lead-company { font-size: 10px; color: #666; }
+.lead-details { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.lead-tag {
+  padding: 1px 6px; border-radius: 4px;
+  font-size: 9px; font-weight: 500;
+}
+.lead-tag.email { background: #3b82f610; color: #3b82f6; }
+.lead-tag.phone { background: #4ade8010; color: #4ade80; }
+.lead-tag.location { background: #a855f710; color: #a855f7; }
+
+.lead-source {
+  font-size: 9px; color: #444;
+  white-space: nowrap; padding-top: 2px;
+}
+
+.no-results {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 11px; color: #555;
+}
+.no-results.error { color: #ef4444; }
+
+/* Stored bar */
+.stored-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid #1a1a1a;
+  background: #080808;
+}
+.stored-bar span { font-size: 10px; color: #555; }
+
+/* Spinner */
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid #05050580; border-top-color: #050505;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #252525; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #333; }

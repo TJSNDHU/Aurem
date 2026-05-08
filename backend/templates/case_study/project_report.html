@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AUREM Platform — System Architecture Report</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+    @top-left {
+      content: "AUREM · System Architecture Report · {{ issued_at_short }}";
+      font-family: 'Cinzel', serif;
+      font-size: 8pt;
+      letter-spacing: 2px;
+      color: #888;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 7pt;
+      color: #888;
+    }
+    @bottom-left {
+      content: "Internal · Engineering Audit";
+      font-size: 7pt;
+      color: #888;
+      letter-spacing: 1pt;
+    }
+  }
+  @page :first {
+    margin: 0;
+    @top-left { content: none; }
+    @bottom-right { content: none; }
+    @bottom-left { content: none; }
+  }
+
+  :root {
+    --gold: #D4AF37;
+    --gold-soft: #C9A227;
+    --ink: #1a1a1a;
+    --mute: #8a8a8a;
+    --line: rgba(212,175,55,0.18);
+    --green: #256c42;
+    --orange: #8a5a00;
+    --red: #8a2020;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.55;
+    color: var(--ink);
+    background: #fff;
+    margin: 0;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    font-weight: 600;
+    letter-spacing: 0.5pt;
+    color: #0a0a12;
+    margin: 0 0 8px 0;
+  }
+  h1.section { font-size: 20pt; margin-bottom: 5mm; }
+  h2 { font-size: 13pt; margin-bottom: 3mm; }
+  h3 { font-size: 11pt; color: #0a0a12; }
+
+  .mono { font-family: 'JetBrains Mono', 'Menlo', monospace; }
+  .muted { color: var(--mute); }
+  .tiny { font-size: 7pt; letter-spacing: 2pt; text-transform: uppercase; color: var(--mute); font-weight: 600; }
+
+  /* ═══════════════════════════════════════════════════════════
+     COVER PAGE
+     ═══════════════════════════════════════════════════════════ */
+  .cover {
+    width: 210mm;
+    height: 297mm;
+    padding: 25mm 20mm;
+    background: radial-gradient(ellipse at top right, rgba(212,175,55,0.14), transparent 55%),
+                radial-gradient(ellipse at bottom left, rgba(212,175,55,0.06), transparent 50%),
+                linear-gradient(180deg, #050507 0%, #0a0a12 100%);
+    color: #e4ddd3;
+    position: relative;
+    page-break-after: always;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: 18mm; left: 18mm; right: 18mm;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.45;
+  }
+  .cover-mark {
+    font-family: 'Cinzel', serif;
+    font-size: 11pt;
+    letter-spacing: 12pt;
+    color: var(--gold);
+    margin-bottom: 60mm;
+    padding-top: 8mm;
+  }
+  .cover-eyebrow {
+    font-size: 8pt;
+    letter-spacing: 6pt;
+    color: var(--mute);
+    text-transform: uppercase;
+    margin-bottom: 8mm;
+  }
+  .cover-title {
+    font-family: 'Cinzel', serif;
+    font-size: 38pt;
+    font-weight: 400;
+    color: #fff;
+    line-height: 1.05;
+    margin-bottom: 4mm;
+  }
+  .cover-title .accent { color: var(--gold); font-style: italic; }
+  .cover-subtitle {
+    font-size: 11pt;
+    max-width: 150mm;
+    line-height: 1.55;
+    opacity: 0.82;
+    margin-bottom: 30mm;
+  }
+  .cover-meta {
+    position: absolute;
+    bottom: 25mm; left: 20mm; right: 20mm;
+    display: flex;
+    justify-content: space-between;
+    gap: 10mm;
+    border-top: 1px solid rgba(212,175,55,0.2);
+    padding-top: 8mm;
+  }
+  .cover-meta .block .label { color: var(--mute); letter-spacing: 2pt; text-transform: uppercase; font-size: 6.5pt; margin-bottom: 2mm; }
+  .cover-meta .block .value { color: #fff; font-size: 10pt; font-family: 'Cinzel', serif; letter-spacing: 1pt; }
+  .cover-confidential {
+    position: absolute;
+    top: 16mm; right: 16mm;
+    font-size: 7pt;
+    letter-spacing: 3pt;
+    color: var(--gold);
+    text-transform: uppercase;
+    padding: 3mm 5mm;
+    border: 1px solid var(--gold-soft);
+    border-radius: 2px;
+  }
+
+  /* Content pages */
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+
+  .section-eyebrow {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 7pt;
+    letter-spacing: 4pt;
+    color: var(--gold-soft);
+    text-transform: uppercase;
+    margin-bottom: 5mm;
+    font-weight: 600;
+  }
+  .section-eyebrow::before {
+    content: ''; width: 18mm; height: 1px; background: var(--gold-soft);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: flex;
+    gap: 3mm;
+    flex-wrap: wrap;
+    margin-bottom: 6mm;
+  }
+  .stat-card {
+    flex: 1 1 45mm;
+    min-width: 45mm;
+    background: #fafaf7;
+    border: 1px solid #eee6cf;
+    border-left: 3px solid var(--gold);
+    padding: 5mm 6mm;
+    border-radius: 2px;
+  }
+  .stat-label { font-size: 7pt; letter-spacing: 2.5pt; text-transform: uppercase; color: var(--mute); font-weight: 600; margin-bottom: 2mm; }
+  .stat-value { font-family: 'Cinzel', serif; font-size: 22pt; font-weight: 600; color: #0a0a12; line-height: 1; }
+  .stat-hint { font-size: 8pt; color: var(--mute); margin-top: 1.5mm; }
+
+  /* Tables */
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin-bottom: 5mm;
+  }
+  .table th {
+    text-align: left;
+    font-size: 7pt;
+    letter-spacing: 2pt;
+    text-transform: uppercase;
+    color: var(--mute);
+    padding: 3mm 3mm;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .table td {
+    padding: 2.5mm 3mm;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+  }
+  .table td.num { font-family: 'JetBrains Mono', monospace; text-align: right; }
+  .table tr:last-child td { border-bottom: none; }
+
+  /* Callouts */
+  .callout {
+    background: linear-gradient(180deg, #fffbea, #fef6d7);
+    border: 1px solid #e8d68a;
+    border-left: 4px solid var(--gold);
+    padding: 4mm 5mm;
+    border-radius: 2px;
+    margin: 4mm 0;
+    font-size: 9pt;
+  }
+  .callout .title { font-family: 'Cinzel', serif; font-size: 10pt; color: #5a4500; margin-bottom: 1.5mm; }
+  .callout .body { color: #443200; line-height: 1.55; }
+
+  .callout.dark {
+    background: #0a0a12;
+    color: #e4ddd3;
+    border: 1px solid rgba(212,175,55,0.3);
+    border-left: 4px solid var(--gold);
+  }
+  .callout.dark .title { color: var(--gold); }
+  .callout.dark .body { color: #e4ddd3; opacity: 0.88; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    font-size: 7pt;
+    letter-spacing: 1.5pt;
+    padding: 1mm 2.5mm;
+    border: 1px solid var(--line);
+    border-radius: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--gold-soft);
+    background: #fafaf3;
+  }
+  .badge.ok    { color: var(--green); border-color: #b6e0c8; background: #f0faf3; }
+  .badge.warn  { color: var(--orange); border-color: #e8d68a; background: #fffbea; }
+  .badge.risk  { color: var(--red); border-color: #f0bdbd; background: #fef4f4; }
+
+  /* Pill list */
+  .pill-list { display: flex; flex-wrap: wrap; gap: 2mm; margin: 2mm 0 5mm 0; }
+  .pill { font-size: 7.5pt; padding: 1.5mm 3mm; background: #fafaf3; border: 1px solid #eee6cf; border-radius: 8pt; color: #666; letter-spacing: 0.5pt; }
+
+  .lede { font-size: 10pt; color: #444; max-width: 165mm; line-height: 1.65; margin-bottom: 6mm; }
+
+  /* Section dividers */
+  .hr-gold { border: none; border-top: 1px solid var(--line); margin: 5mm 0; }
+
+  /* Risk matrix */
+  .risk-item {
+    display: grid;
+    grid-template-columns: 24mm 1fr;
+    gap: 6mm;
+    padding: 3mm 0;
+    border-bottom: 1px solid #eee;
+    font-size: 9pt;
+  }
+  .risk-item:last-child { border-bottom: none; }
+  .risk-sev { text-align: center; }
+  .risk-sev .label {
+    font-family: 'Cinzel', serif;
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 2mm 3mm;
+    border-radius: 2px;
+    display: inline-block;
+  }
+  .risk-sev.p0 .label { background: #fce8e8; color: #8a2020; border: 1px solid #f0bdbd; }
+  .risk-sev.p1 .label { background: #fef3e5; color: #8a5a00; border: 1px solid #e8d68a; }
+  .risk-sev.p2 .label { background: #eef7f2; color: #256c42; border: 1px solid #b6e0c8; }
+
+  .risk-body .head { font-weight: 700; color: #0a0a12; margin-bottom: 1mm; }
+  .risk-body .desc { color: #444; font-size: 9pt; line-height: 1.55; }
+
+  /* Future scenarios table */
+  .scenario {
+    padding: 4mm 5mm;
+    margin-bottom: 3mm;
+    border-radius: 2px;
+    border: 1px solid var(--line);
+    background: #fafaf3;
+  }
+  .scenario .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2mm; }
+  .scenario .title { font-family: 'Cinzel', serif; font-size: 11pt; color: #0a0a12; }
+  .scenario .prob { font-size: 8pt; color: #fff; background: var(--gold); padding: 1mm 3mm; border-radius: 6pt; font-weight: 700; letter-spacing: 1pt; }
+  .scenario .body { font-size: 8.5pt; color: #555; line-height: 1.55; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ COVER ═══════════════════════════════ -->
+<section class="cover">
+  <div class="cover-confidential">Confidential · Internal</div>
+  <div class="cover-mark">A · U · R · E · M</div>
+  <div class="cover-eyebrow">System Architecture Report · {{ issued_at_human }}</div>
+  <h1 class="cover-title">
+    Platform<br/>
+    <span class="accent">State of the Union.</span>
+  </h1>
+  <div class="cover-subtitle">
+    A comprehensive engineering audit of the AUREM Autonomous AI Workforce
+    Platform. Captured directly from the codebase, database telemetry, and
+    runtime configuration — no estimates, no marketing numbers. Intended for
+    founders, engineering review, and investor diligence.
+  </div>
+
+  <div class="cover-meta">
+    <div class="block">
+      <div class="label">Codebase</div>
+      <div class="value">{{ summary.total_loc }} LOC</div>
+    </div>
+    <div class="block">
+      <div class="label">Surface Area</div>
+      <div class="value">{{ summary.total_endpoints }} endpoints</div>
+    </div>
+    <div class="block">
+      <div class="label">Report ID</div>
+      <div class="value mono">{{ report_id }}</div>
+    </div>
+    <div class="block">
+      <div class="label">Issued</div>
+      <div class="value">{{ issued_at_short }}</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ EXEC SUMMARY ═══════════════════════════════ -->
+<section class="page" style="padding-top:4mm;">
+  <div class="section-eyebrow">§ 01 · Executive Summary</div>
+  <h1 class="section">What we built.</h1>
+  <p class="lede">
+    AUREM is a vertically integrated autonomous AI platform for Canadian SMBs —
+    replacing CRM, voice agents, uptime monitoring, content engines, and
+    compliance tooling with a single Stripe-billed subscription. As of this
+    audit, the platform comprises {{ summary.backend_routers }} backend routers,
+    {{ summary.backend_services }} services, and {{ summary.frontend_pages }}
+    frontend pages across {{ summary.total_loc }} lines of code — positioning
+    it at a surface area comparable to early Series-A SaaS companies.
+  </p>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Backend LOC</div>
+      <div class="stat-value">{{ summary.backend_loc_short }}</div>
+      <div class="stat-hint">{{ summary.backend_routers }} routers · {{ summary.backend_services }} services</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Frontend LOC</div>
+      <div class="stat-value">{{ summary.frontend_loc_short }}</div>
+      <div class="stat-hint">{{ summary.frontend_pages }} React pages</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">API Endpoints</div>
+      <div class="stat-value">{{ summary.total_endpoints }}</div>
+      <div class="stat-hint">across {{ summary.mongo_collections }}+ Mongo collections</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Product SKUs</div>
+      <div class="stat-value">{{ summary.catalog_skus }}</div>
+      <div class="stat-hint">live in catalog · Stripe LIVE mode</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">3rd-Party Integrations</div>
+      <div class="stat-value">{{ summary.integrations }}</div>
+      <div class="stat-hint">emergent · stripe · retell · twilio · resend · ...</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Background Schedulers</div>
+      <div class="stat-value">{{ summary.schedulers }}</div>
+      <div class="stat-hint">autonomous cron jobs live</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="title">▲ Headline Finding</div>
+    <div class="body">
+      AUREM has the codebase of a Series-A company, the product surface of a
+      late-stage startup, and the revenue of a pre-launch side project. The
+      gap between "what's built" and "what's validated" is the single biggest
+      strategic risk — not technical debt or platform gaps.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ ARCHITECTURE ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 02 · Architecture</div>
+  <h1 class="section">How it's wired.</h1>
+
+  <h2>Stack</h2>
+  <table class="table">
+    <thead><tr><th>Layer</th><th>Technology</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>React (CRA) · Tailwind · Shadcn/UI · Framer Motion</td><td>Cinematic spatial-glass UI</td></tr>
+      <tr><td>Backend</td><td>FastAPI · Motor (async Mongo) · Pydantic</td><td>Non-blocking startup, hot reload</td></tr>
+      <tr><td>Database</td><td>MongoDB</td><td>{{ summary.mongo_collections }}+ collections, best-effort indexing</td></tr>
+      <tr><td>AI / LLM</td><td>Emergent Integrations (Claude 4.5 · GPT 5 · Gemini 3)</td><td>Universal key, no direct SDK</td></tr>
+      <tr><td>Payments</td><td>Stripe (LIVE)</td><td>Tax-inclusive CAD pricing</td></tr>
+      <tr><td>Voice / SMS</td><td>Retell AI · Twilio · ElevenLabs · Deepgram</td><td>Graceful stub mode if keys missing</td></tr>
+      <tr><td>Email</td><td>Resend</td><td>HTML templates, attachment support</td></tr>
+      <tr><td>Reports / PDF</td><td>WeasyPrint · Jinja2</td><td>Board-ready Case Study Builder</td></tr>
+      <tr><td>Deployment</td><td>Kubernetes · Emergent Native</td><td>aurem.live (prod) · preview pods</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Router distribution (top domains)</h2>
+  <div class="pill-list">
+    {% for d in architecture.top_domains %}
+    <span class="pill">{{ d.name }} ({{ d.count }})</span>
+    {% endfor %}
+  </div>
+
+  <h2>Key integrations wired</h2>
+  <div class="pill-list">
+    {% for k in architecture.integrations %}
+    <span class="pill mono">{{ k }}</span>
+    {% endfor %}
+  </div>
+
+  <h2>Autonomous schedulers</h2>
+  <p style="font-size:9pt;color:#555;margin-bottom:2mm;">
+    The platform runs {{ summary.schedulers }} background asyncio schedulers.
+    Representative samples from the live runtime:
+  </p>
+  <div class="pill-list">
+    {% for s in architecture.schedulers %}
+    <span class="pill mono">{{ s }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ PRODUCT INVENTORY ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 03 · Product Inventory</div>
+  <h1 class="section">24 SKUs across 5 clusters.</h1>
+  <p class="lede">
+    The à la carte catalog is the monetization spine of AUREM. Every SKU
+    listed below is wired to Stripe LIVE mode with auto Product/Price
+    creation, tax-inclusive CAD pricing, and on-subscribe webhook
+    provisioning (e.g. Retell agent auto-creation).
+  </p>
+
+  <table class="table">
+    <thead><tr><th>Cluster</th><th>Service</th><th>Price / mo</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for svc in inventory.services %}
+      <tr>
+        <td>{{ svc.cluster }}</td>
+        <td class="mono">{{ svc.service_id }}</td>
+        <td class="num">${{ svc.price }} CAD</td>
+        <td><span class="badge {{ svc.badge_cls }}">{{ svc.status }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="title">▲ Pricing Innovation</div>
+    <div class="body">
+      Auto-bundle discount engine: 15% at 2 services, 25% at 4, 35% at 6,
+      45% at 8+. Combined with a 7-Day Power Trial (no credit card) and
+      Day-8 auto-downgrade to Forever Free, this produces a funnel few SMB
+      competitors can match on flexibility alone.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ AI WORKFORCE ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 04 · The AI Workforce</div>
+  <h1 class="section">Autonomous pillars.</h1>
+
+  {% for pillar in workforce.pillars %}
+  <div style="margin-bottom:5mm;padding-bottom:4mm;border-bottom:1px solid var(--line);">
+    <h3>{{ pillar.name }}</h3>
+    <p style="font-size:9pt;color:#555;margin:1mm 0 2mm 0;line-height:1.55;">{{ pillar.desc }}</p>
+    <div class="pill-list" style="margin:0;">
+      {% for k in pillar.capabilities %}
+      <span class="pill">{{ k }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+
+<!-- ═══════════════════════════════ OBSERVABILITY ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 05 · Observability & Self-Healing</div>
+  <h1 class="section">What watches itself.</h1>
+  <p class="lede">
+    AUREM includes its own triple-layer observability stack — unique among
+    SMB-focused SaaS platforms. Every user-facing error, API failure, and
+    endpoint degradation is captured, classified, and (where mechanically
+    safe) auto-healed without human intervention.
+  </p>
+
+  <table class="table">
+    <thead><tr><th>System</th><th>Scope</th><th>Auto-Heal</th><th>AI Layer</th></tr></thead>
+    <tbody>
+      <tr><td><strong>QA Bot · Layer 1</strong></td><td>20 critical endpoints pinged every 10min</td><td>—</td><td>Alert via Resend (recurring failures)</td></tr>
+      <tr><td><strong>QA Agent · Layer 2</strong></td><td>Chained user journeys, weekly deep run</td><td>—</td><td>Claude 4.5 RCA on failures</td></tr>
+      <tr><td><strong>Sentinel Client</strong></td><td>All browser-side JS errors + API failures</td><td>✓ Stale URL · ChunkLoad · 401 · 429</td><td>Claude 4.5 structured repair suggestions</td></tr>
+      <tr><td><strong>Site Monitor</strong></td><td>Customer-facing uptime checks (5-min cadence)</td><td>✓ Incident lifecycle automation</td><td>Enterprise tier includes AI RCA</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout dark">
+    <div class="title">◆ Trust-but-Verify Repair Model</div>
+    <div class="body">
+      The Sentinel Client Dashboard uses a 3-tier model: (1) silent capture,
+      (2) mechanical auto-heal for known patterns, (3) Claude-powered repair
+      suggestions that are <strong>never auto-applied</strong>. Every code
+      change remains a human decision via the Admin Review queue. This is the
+      differentiator vs Sentry: AUREM diagnoses; humans approve.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ COMPETITIVE ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 06 · Competitive Position</div>
+  <h1 class="section">Who can beat us.</h1>
+
+  <table class="table">
+    <thead><tr><th>Category</th><th>Top Competitor</th><th>Their Edge</th><th>AUREM's Edge</th></tr></thead>
+    <tbody>
+    {% for c in competitive.rows %}
+      <tr>
+        <td>{{ c.category }}</td>
+        <td>{{ c.competitor }}</td>
+        <td style="font-size:8.5pt;color:#555;">{{ c.their_edge }}</td>
+        <td style="font-size:8.5pt;color:#0a0a12;">{{ c.our_edge }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="title">▲ Real Threat Assessment</div>
+    <div class="body">
+      External competitors are a managed risk — feature parity takes 12+
+      months to achieve and none currently bundle voice + uptime + CRM +
+      content in one Canadian-domiciled stack. The <strong>internal
+      threats</strong> (feature creep, codebase sprawl without customer
+      validation, runway exhaustion before MRR proof) are the dominant risk
+      factors.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ RISK ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 07 · Risk Register</div>
+  <h1 class="section">Honest risks. Ranked.</h1>
+
+  {% for r in risks %}
+  <div class="risk-item">
+    <div class="risk-sev {{ r.sev_cls }}"><span class="label">{{ r.severity }}</span></div>
+    <div class="risk-body">
+      <div class="head">{{ r.title }}</div>
+      <div class="desc">{{ r.body }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+
+<!-- ═══════════════════════════════ FUTURE ═══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 08 · Future Scenarios</div>
+  <h1 class="section">Where this goes.</h1>
+
+  {% for sc in future.scenarios %}
+  <div class="scenario">
+    <div class="head">
+      <div class="title">{{ sc.title }}</div>
+      <div class="prob">{{ sc.probability }}</div>
+    </div>
+    <div class="body">{{ sc.body }}</div>
+  </div>
+  {% endfor %}
+
+  <hr class="hr-gold" />
+
+  <h2>30-Day Execution Focus</h2>
+  <p style="font-size:9pt;color:#555;line-height:1.6;">
+    {{ future.focus }}
+  </p>
+
+  <div class="callout dark" style="margin-top:5mm;">
+    <div class="title">◆ Bottom Line</div>
+    <div class="body">
+      {{ future.bottom_line }}
+    </div>
+  </div>
+
+  <div style="margin-top:10mm;padding-top:4mm;border-top:1px solid var(--line);font-size:7pt;color:var(--mute);letter-spacing:1.5pt;display:flex;justify-content:space-between;">
+    <div>Verified from live codebase · {{ summary.total_loc }} LOC inspected</div>
+    <div>Issued by AUREM Autonomous Systems</div>
+  </div>
+</section>
+
+</body>
+</html>

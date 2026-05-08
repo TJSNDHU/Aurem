@@ -1,0 +1,218 @@
+/* ═══════════════════════════════════════════════════════════
+   AUREM UNIFIED THEME SYSTEM
+   ═══════════════════════════════════════════════════════════
+   
+   Architecture: CSS Custom Properties + Cascade Overrides
+   
+   This file is the SINGLE source of truth for theming across
+   all 30+ dashboard components. It works by:
+   
+   1. Defining comprehensive CSS variables for dark/light modes
+   2. Using CSS attribute selectors to override Tailwind arbitrary 
+      values (text-[#xxx], bg-white/xx) across ALL components
+   3. Overriding native HTML elements (input, select, textarea)
+      to be theme-aware globally
+   4. Providing utility classes (.t-heading, .t-body, etc.)
+   
+   NO component changes needed — this file handles everything.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── DARK MODE (DEFAULT) ─── */
+:root {
+  --t-bg-primary: #050505;
+  --t-bg-card: rgba(15, 15, 15, 0.65);
+  --t-bg-card-solid: #111111;
+  --t-bg-surface: rgba(255, 255, 255, 0.03);
+  --t-bg-elevated: rgba(255, 255, 255, 0.06);
+  --t-bg-input: rgba(255, 255, 255, 0.05);
+  --t-bg-hover: rgba(255, 255, 255, 0.05);
+
+  --t-border-default: rgba(212, 163, 115, 0.12);
+  --t-border-subtle: rgba(255, 255, 255, 0.06);
+  --t-border-input: rgba(212, 163, 115, 0.15);
+
+  --t-text-heading: #E8E4DE;
+  --t-text-body: #C0BAB2;
+  --t-text-secondary: #9A9590;
+  --t-text-muted: #6B6560;
+  --t-text-inverse: #050505;
+
+  --t-scrollbar-thumb: rgba(212, 163, 115, 0.15);
+  --t-scrollbar-thumb-hover: rgba(212, 163, 115, 0.25);
+}
+
+/* ─── LIGHT MODE ─── */
+html.light {
+  --t-bg-primary: #F5F3EE;
+  --t-bg-card: rgba(255, 255, 255, 0.85);
+  --t-bg-card-solid: #FFFFFF;
+  --t-bg-surface: rgba(26, 48, 38, 0.03);
+  --t-bg-elevated: rgba(26, 48, 38, 0.06);
+  --t-bg-input: rgba(26, 48, 38, 0.04);
+  --t-bg-hover: rgba(26, 48, 38, 0.04);
+
+  --t-border-default: rgba(26, 48, 38, 0.12);
+  --t-border-subtle: rgba(26, 48, 38, 0.06);
+  --t-border-input: rgba(26, 48, 38, 0.12);
+
+  --t-text-heading: #1A3026;
+  --t-text-body: #2a3a2e;
+  --t-text-secondary: #5a6a5e;
+  --t-text-muted: #8a9a8e;
+  --t-text-inverse: #F5F3EE;
+
+  --t-scrollbar-thumb: rgba(26, 48, 38, 0.15);
+  --t-scrollbar-thumb-hover: rgba(26, 48, 38, 0.25);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   BIDIRECTIONAL TRANSITIONS
+   ═══════════════════════════════════════════════════════════ */
+html *,
+html *::before,
+html *::after {
+  transition: background-color 0.3s ease,
+              color 0.25s ease,
+              border-color 0.25s ease,
+              box-shadow 0.3s ease;
+}
+/* Exclude animated elements */
+html .animate-spin,
+html .animate-ping,
+html .animate-pulse,
+html [class*="animate-"] {
+  transition: none !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE: Override hardcoded Tailwind text colors
+   ═══════════════════════════════════════════════════════════ */
+
+/* Dark text colors → light text in dark mode */
+html.dark [class*="text-[#1A1A2E]"] { color: var(--t-text-heading) !important; }
+html.dark [class*="text-[#1a1a2e]"] { color: var(--t-text-heading) !important; }
+html.dark [class*="text-[#111"]     { color: var(--t-text-heading) !important; }
+html.dark [class*="text-[#222"]     { color: var(--t-text-heading) !important; }
+html.dark [class*="text-[#333"]     { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-[#444"]     { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-[#555"]     { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-[#5a5a72"]  { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-[#666"]     { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-[#777"]     { color: var(--t-text-muted) !important; }
+html.dark [class*="text-[#888"]     { color: var(--t-text-muted) !important; }
+html.dark [class*="text-[#999"]     { color: var(--t-text-muted) !important; }
+html.dark [class*="text-[#aaa"]     { color: var(--t-text-muted) !important; }
+html.dark [class*="text-gray-500"]  { color: var(--t-text-muted) !important; }
+html.dark [class*="text-gray-600"]  { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-gray-700"]  { color: var(--t-text-body) !important; }
+html.dark [class*="text-gray-800"]  { color: var(--t-text-heading) !important; }
+html.dark [class*="text-gray-900"]  { color: var(--t-text-heading) !important; }
+html.dark [class*="text-slate-"]    { color: var(--t-text-secondary) !important; }
+html.dark [class*="text-zinc-"]     { color: var(--t-text-secondary) !important; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE: Override hardcoded Tailwind backgrounds
+   ═══════════════════════════════════════════════════════════ */
+
+html.dark [class*="bg-white/80"]  { background: var(--t-bg-card) !important; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+html.dark [class*="bg-white/70"]  { background: var(--t-bg-card) !important; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+html.dark [class*="bg-white/60"]  { background: var(--t-bg-card) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+html.dark [class*="bg-white/50"]  { background: var(--t-bg-surface) !important; }
+html.dark [class*="bg-white/40"]  { background: var(--t-bg-surface) !important; }
+html.dark [class*="bg-white/30"]  { background: var(--t-bg-surface) !important; }
+html.dark [class*="bg-white/20"]  { background: rgba(255,255,255,0.03) !important; }
+html.dark [class*="bg-white/10"]  { background: rgba(255,255,255,0.02) !important; }
+html.dark [class*="bg-white "],
+html.dark .bg-white               { background: var(--t-bg-card-solid) !important; }
+html.dark [class*="bg-gray-50"]   { background: var(--t-bg-surface) !important; }
+html.dark [class*="bg-gray-100"]  { background: var(--t-bg-surface) !important; }
+html.dark [class*="bg-gray-200"]  { background: var(--t-bg-elevated) !important; }
+html.dark [class*="bg-slate-"]    { background: var(--t-bg-surface) !important; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE: Override hardcoded borders
+   ═══════════════════════════════════════════════════════════ */
+
+html.dark [class*="border-[#2D7A4A]"]  { border-color: var(--t-border-default) !important; }
+html.dark [class*="border-[#e5e7eb]"]  { border-color: var(--t-border-subtle) !important; }
+html.dark [class*="border-[#ddd"]      { border-color: var(--t-border-subtle) !important; }
+html.dark [class*="border-[#ccc"]      { border-color: var(--t-border-subtle) !important; }
+html.dark [class*="border-[#eee"]      { border-color: var(--t-border-subtle) !important; }
+html.dark [class*="border-gray-"]      { border-color: var(--t-border-subtle) !important; }
+html.dark [class*="divide-gray-"]      { border-color: var(--t-border-subtle) !important; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE: Form elements
+   ═══════════════════════════════════════════════════════════ */
+
+html.dark input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not(.no-theme-override),
+html.dark select:not(.no-theme-override),
+html.dark textarea:not(.no-theme-override) {
+  background: var(--t-bg-input) !important;
+  color: var(--t-text-heading) !important;
+  border-color: var(--t-border-input) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--t-text-muted) !important;
+}
+
+html.dark select option {
+  background: #1a1a1a;
+  color: var(--t-text-heading);
+}
+
+/* Focus states */
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: rgba(212, 163, 115, 0.3) !important;
+  box-shadow: 0 0 0 2px rgba(212, 163, 115, 0.08) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE: Override hardcoded dark text colors
+   ═══════════════════════════════════════════════════════════ */
+
+html.light [class*="text-white/80"] { color: var(--t-text-heading) !important; }
+html.light [class*="text-white/70"] { color: var(--t-text-body) !important; }
+html.light [class*="text-white/60"] { color: var(--t-text-secondary) !important; }
+html.light [class*="text-white/50"] { color: var(--t-text-secondary) !important; }
+html.light [class*="text-white/40"] { color: var(--t-text-muted) !important; }
+html.light [class*="text-white/30"] { color: var(--t-text-muted) !important; }
+
+/* Light mode placeholder text */
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: var(--t-text-muted) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITY CLASSES (for new/refactored components)
+   ═══════════════════════════════════════════════════════════ */
+
+.t-heading   { color: var(--t-text-heading); }
+.t-body      { color: var(--t-text-body); }
+.t-secondary { color: var(--t-text-secondary); }
+.t-muted     { color: var(--t-text-muted); }
+.t-card      { background: var(--t-bg-card); border: 1px solid var(--t-border-default); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.t-surface   { background: var(--t-bg-surface); }
+.t-input     { background: var(--t-bg-input); border: 1px solid var(--t-border-input); color: var(--t-text-heading); }
+
+
+/* ═══════════════════════════════════════════════════════════
+   SCROLLBAR THEMING
+   ═══════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--t-scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--t-scrollbar-thumb-hover); }

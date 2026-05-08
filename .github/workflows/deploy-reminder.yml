@@ -1,0 +1,163 @@
+name: AUREM · Auto-Deploy Bridge
+
+# Iter 281 — Living-Machine deploy bridge.
+#
+# This workflow is the final link of the autonomous repair loop:
+#   client_errors burst → Sentinel red → Autonomous Repair Engine dispatches
+#   Tier 1/2 fixes live → Tier 3 stages code fix → auto-commit → THIS workflow.
+#
+# What fires on each push to main:
+#   1. ALWAYS: Invalidate drift cache on preview pod (dashboard refreshes in <15s)
+#   2. ALWAYS: Refresh autonomous-repair status so panel shows latest state
+#   3. IF commit message starts with "[auto-heal]":
+#        • Send Resend email to operator with fix summary + approve-to-deploy link
+#        • POST to AUREM_EMERGENT_DEPLOY_WEBHOOK (activates zero-touch once
+#          Emergent publishes the webhook — currently beta-gated)
+#   4. FOR ALL OTHER COMMITS: Resend a deploy-reminder email so operator sees drift
+#
+# Required repo secrets (GitHub → Settings → Secrets → Actions):
+#   AUREM_PREVIEW_URL              Preview pod base URL
+#   AUREM_ADMIN_TOKEN              Long-lived admin JWT
+#   RESEND_API_KEY                 Email notifications
+#   RESEND_NOTIFY_EMAIL            Destination email
+#   AUREM_EMERGENT_DEPLOY_WEBHOOK  (optional, future) — activates full zero-touch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  auto-deploy-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invalidate preview drift cache
+        if: ${{ secrets.AUREM_PREVIEW_URL != '' && secrets.AUREM_ADMIN_TOKEN != '' }}
+        continue-on-error: true
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.AUREM_ADMIN_TOKEN }}" \
+            "${{ secrets.AUREM_PREVIEW_URL }}/api/admin/deploy-drift/invalidate" \
+            -w "[deploy-drift invalidate HTTP %{http_code}]\n"
+
+      - name: Refresh autonomous-repair status (so panel re-renders)
+        if: ${{ secrets.AUREM_PREVIEW_URL != '' && secrets.AUREM_ADMIN_TOKEN != '' }}
+        continue-on-error: true
+        run: |
+          curl -sS \
+            -H "Authorization: Bearer ${{ secrets.AUREM_ADMIN_TOKEN }}" \
+            "${{ secrets.AUREM_PREVIEW_URL }}/api/admin/autonomous-repair/status" \
+            -o /dev/null -w "[ar-status HTTP %{http_code}]\n"
+
+      - name: Detect [auto-heal] commit
+        id: autoheal
+        # FIX 1: No checkout step exists in this workflow, so `git log` always
+        # fails silently (GITHUB_WORKSPACE is empty). Use the push event payload
+        # instead — github.event.head_commit.message is always available on push.
+        #
+        # FIX 2: Pass the message through an env var to prevent shell injection.
+        # Direct ${{ }} interpolation into shell strings is evaluated by GitHub
+        # Actions before bash sees them — a message containing ' or \ would
+        # break the script or silently corrupt the match.
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if echo "$COMMIT_MSG" | grep -qiE '^\[auto-heal\]'; then
+            echo "is_auto_heal=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "is_auto_heal=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resend · auto-heal email (code-fix committed by AI)
+        if: ${{ steps.autoheal.outputs.is_auto_heal == 'true' && secrets.RESEND_API_KEY != '' && secrets.RESEND_NOTIFY_EMAIL != '' }}
+        # FIX 3: Build the JSON payload with jq so all values are properly
+        # escaped. Direct ${{ }} interpolation into a -d '...' string means
+        # GitHub evaluates the expression first, then bash sees the result
+        # inside single quotes — any ' in a secret value breaks the shell
+        # command; any " breaks the JSON. jq --arg handles both safely.
+        env:
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          RESEND_NOTIFY_EMAIL:  ${{ secrets.RESEND_NOTIFY_EMAIL }}
+          PREVIEW_URL:          ${{ secrets.AUREM_PREVIEW_URL }}
+          COMMIT_SHA:           ${{ github.sha }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg to      "$RESEND_NOTIFY_EMAIL" \
+            --arg sha     "$COMMIT_SHA" \
+            --arg dashurl "$PREVIEW_URL/admin/pillars-map" \
+            '{
+              "from": "AUREM Auto-Heal <ora@aurem.live>",
+              "to":   [$to],
+              "subject": "[auto-heal] Code fix committed — 1 click to deploy",
+              "html": (
+                "<p><b>Autonomous Repair Engine</b> committed a code fix.</p>" +
+                "<p>Commit: <code>" + $sha + "</code></p>" +
+                "<p><b>Review → Deploy</b>: <a href=\"" + $dashurl + "\">Open Dashboard</a></p>" +
+                "<p>This fix was generated after detecting a repeat error signature. " +
+                "It has passed backend pytest locally. aurem.live will serve it as soon as Deploy is hit.</p>"
+              )
+            }')
+
+          curl -sS -X POST "https://api.resend.com/emails" \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            -w "[auto-heal email HTTP %{http_code}]\n"
+
+      - name: Resend · standard deploy reminder (any commit)
+        if: ${{ steps.autoheal.outputs.is_auto_heal == 'false' && secrets.RESEND_API_KEY != '' && secrets.RESEND_NOTIFY_EMAIL != '' }}
+        env:
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          RESEND_NOTIFY_EMAIL:  ${{ secrets.RESEND_NOTIFY_EMAIL }}
+          PREVIEW_URL:          ${{ secrets.AUREM_PREVIEW_URL }}
+          COMMIT_SHA:           ${{ github.sha }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg to      "$RESEND_NOTIFY_EMAIL" \
+            --arg sha     "$COMMIT_SHA" \
+            --arg dashurl "$PREVIEW_URL/admin/pillars-map" \
+            '{
+              "from": "AUREM Deploy <ora@aurem.live>",
+              "to":   [$to],
+              "subject": "AUREM · New commit pending deploy",
+              "html": (
+                "<p>Push landed on <code>main</code> (<code>" + $sha + "</code>).</p>" +
+                "<p><b>aurem.live is NOT yet serving this commit</b> until Deploy is hit.</p>" +
+                "<p><a href=\"" + $dashurl + "\">Open Deploy Status</a></p>"
+              )
+            }')
+
+          curl -sS -X POST "https://api.resend.com/emails" \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            -w "[deploy-reminder HTTP %{http_code}]\n"
+
+      - name: Emergent auto-deploy (future-gated webhook)
+        if: ${{ secrets.AUREM_EMERGENT_DEPLOY_WEBHOOK != '' }}
+        continue-on-error: true
+        # is_auto_heal is a literal "true"/"false" string from GITHUB_OUTPUT.
+        # Convert to JSON boolean via jq --argjson so the webhook receives a
+        # proper boolean, not a string.
+        env:
+          WEBHOOK_URL:   ${{ secrets.AUREM_EMERGENT_DEPLOY_WEBHOOK }}
+          COMMIT_SHA:    ${{ github.sha }}
+          IS_AUTO_HEAL:  ${{ steps.autoheal.outputs.is_auto_heal }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg    commit       "$COMMIT_SHA" \
+            --argjson is_auto_heal "$IS_AUTO_HEAL" \
+            '{
+              "commit":       $commit,
+              "branch":       "main",
+              "actor":        "github-action",
+              "source":       "auto-deploy-bridge",
+              "is_auto_heal": $is_auto_heal
+            }')
+
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            -w "[emergent-deploy HTTP %{http_code}]\n"

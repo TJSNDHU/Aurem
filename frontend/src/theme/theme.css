@@ -1,0 +1,100 @@
+/* ═══════════════════════════════════════════════════════════
+   AUREM Auto Theme — Light Mode Overrides
+   Non-invasive CSS-only approach: targets Tailwind arbitrary 
+   value classes and remaps dark colors to light equivalents.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Smooth transition on ALL elements — bidirectional */
+html *,
+html *::before,
+html *::after {
+  transition: background-color 0.35s ease, color 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ─── Backgrounds ─── */
+html.light [class*="bg-[#050505]"] { background-color: #F5F3EE !important; }
+html.light [class*="bg-[#080808]"] { background-color: #F0EDE8 !important; }
+html.light [class*="bg-[#0A0A0A]"] { background-color: #FFFFFF !important; }
+html.light [class*="bg-[#0D0D0D]"] { background-color: #FAFAF8 !important; }
+html.light [class*="bg-[#111]"]    { background-color: #F0EDE8 !important; }
+html.light [class*="bg-[#141414]"] { background-color: #F0EDE8 !important; }
+html.light [class*="bg-[#151515]"] { background-color: #F5F3EE !important; }
+html.light [class*="bg-[#1A1A1A]"] { background-color: #E8E5DE !important; }
+html.light [class*="bg-[#252525]"] { background-color: #E0DDD6 !important; }
+
+/* ─── Text Colors ─── */
+html.light [class*="text-[#F4F4F4]"] { color: #1A1A1A !important; }
+html.light [class*="text-[#f4f4f4]"] { color: #1A1A1A !important; }
+html.light [class*="text-[#CCC]"]    { color: #333333 !important; }
+html.light [class*="text-[#AAA]"]    { color: #555555 !important; }
+html.light [class*="text-[#888]"]    { color: #666666 !important; }
+html.light [class*="text-[#777]"]    { color: #555555 !important; }
+html.light [class*="text-[#666]"]    { color: #777777 !important; }
+html.light [class*="text-[#555]"]    { color: #888888 !important; }
+html.light [class*="text-[#5a5a72]"] { color: #777788 !important; }
+html.light [class*="text-[#444]"]    { color: #999999 !important; }
+html.light [class*="text-[#333]"]    { color: #AAAAAA !important; }
+
+/* ─── Border Colors ─── */
+html.light [class*="border-[#1A1A1A]"] { border-color: #E0DDD6 !important; }
+html.light [class*="border-[#141414]"] { border-color: #E8E5DE !important; }
+html.light [class*="border-[#252525]"] { border-color: #D8D5CE !important; }
+html.light [class*="border-[#333]"]    { border-color: #D0CCC5 !important; }
+
+/* ─── Gold Accent — slightly darker for light backgrounds ─── */
+html.light [class*="text-[#D4AF37]"] { color: #B8962E !important; }
+html.light [class*="text-[#d4af37]"] { color: #B8962E !important; }
+html.light [class*="text-[#e2c97e]"] { color: #9A7D24 !important; }
+html.light [class*="border-[#D4AF37]"] { border-color: #B8962E !important; }
+
+/* ─── Gradient overrides for gold buttons ─── */
+html.light [class*="from-[#D4AF37]"] { --tw-gradient-from: #C4A030 !important; }
+html.light [class*="to-[#8B7355]"]   { --tw-gradient-to: #7A6345 !important; }
+
+/* ─── Divide colors ─── */
+html.light [class*="divide-[#141414]"] > * + * { border-color: #E8E5DE !important; }
+html.light [class*="divide-[#1A1A1A]"] > * + * { border-color: #E0DDD6 !important; }
+
+/* ─── Scrollbar for light mode ─── */
+html.light ::-webkit-scrollbar-track { background: #F5F3EE; }
+html.light ::-webkit-scrollbar-thumb { background: #D0CCC5; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #B8B5AE; }
+
+/* ─── Selection highlight ─── */
+html.light ::selection { background: #D4AF3730; color: #1A1A1A; }
+
+/* ─── Input placeholders ─── */
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #AAA !important;
+}
+
+/* ─── Focus ring adjustments ─── */
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #B8962E80 !important;
+}
+
+/* ─── Shadows for light mode depth ─── */
+html.light [class*="rounded-xl"],
+html.light [class*="rounded-2xl"] {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+}
+
+/* ─── Code blocks ─── */
+html.light pre,
+html.light code {
+  background-color: #F0EDE8 !important;
+  color: #444 !important;
+}
+
+/* ─── Ensure landing page also transforms ─── */
+html.light body {
+  background-color: transparent;
+}
+
+/* ═══ DARK MODE — Veridian Oasis bg renders via .aurem-bg-container ═══ */
+html.dark body {
+  background-color: #F4F7F2;
+}

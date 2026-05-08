@@ -1,0 +1,23 @@
+{
+  "id": "cursor-cursor-ruby-rails",
+  "name": "Ruby on Rails Omakase Rules",
+  "description": "Generates idiomatic Rails 7 / Hotwire rules.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "cursor"
+  ],
+  "prompts": {
+    "system": "You are a Rails Senior. Output .cursorrules enforcing Stimulus/Turbo. Require skinny controllers, fat models. Enforce standardrb formatting."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "cursor",
+    "ruby",
+    "rails",
+    "hotwire"
+  ]
+}

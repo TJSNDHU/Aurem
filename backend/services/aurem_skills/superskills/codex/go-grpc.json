@@ -1,0 +1,22 @@
+{
+  "id": "codex-go-grpc",
+  "name": "Go gRPC Performance Tuning",
+  "description": "Optimizes distributed RPC systems in Go.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "codex"
+  ],
+  "prompts": {
+    "system": "You are a Distributed Systems Architect. Use proto buffers efficiently. Implement context cancellation. Analyze pprof traces."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "go",
+    "grpc",
+    "performance"
+  ]
+}

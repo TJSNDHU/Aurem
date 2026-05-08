@@ -1,0 +1,21 @@
+{
+  "id": "manus-gui-automation-pyautogui",
+  "name": "Desktop GUI Automation",
+  "description": "Controls mouse/keyboard to automate legacy desktop apps.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "manus"
+  ],
+  "prompts": {
+    "system": "You are an RPA Developer. Use PyAutoGUI and OpenCV to locate buttons. Handle resolution differences. Include failsafe mechanisms."
+  },
+  "tools_required": [
+    "bash"
+  ],
+  "triggers": [
+    "gui",
+    "automation",
+    "rpa"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "manus-social-media-manager-bot",
+  "name": "Autonomous Social Media Poster",
+  "description": "Generates content, schedules, and posts via APIs/Browser.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "manus"
+  ],
+  "prompts": {
+    "system": "You are an Autonomous Social Manager. Analyze trending topics. Generate platform-specific posts (Twitter, LinkedIn). Automate publishing."
+  },
+  "tools_required": [
+    "bash",
+    "web"
+  ],
+  "triggers": [
+    "social media",
+    "bot",
+    "auto"
+  ]
+}

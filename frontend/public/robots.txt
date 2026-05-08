@@ -1,0 +1,109 @@
+# ═══════════════════════════════════════════════════════
+# AUREM — robots.txt (Search engines + AI crawlers)
+# ═══════════════════════════════════════════════════════
+
+# Default: allow well-behaved bots
+User-agent: *
+Allow: /
+Allow: /audit
+Allow: /share/system-overview
+Allow: /framework
+Allow: /privacy
+Allow: /terms
+Allow: /support
+Allow: /login
+Allow: /forgot-password
+
+Disallow: /dashboard
+Disallow: /my
+Disallow: /admin
+Disallow: /api/
+Disallow: /settings
+Disallow: /reset-password
+Disallow: /verify-email
+
+# ═══════════════════════════════════════════════════════
+# AI CRAWLERS — Explicit allow (GEO / Generative Engine Optimization)
+# ═══════════════════════════════════════════════════════
+# OpenAI (ChatGPT, GPT browser)
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# Anthropic (Claude)
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+# Google (Gemini + AI Overviews)
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+# Meta AI (Llama)
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# ByteDance (Doubao)
+User-agent: Bytespider
+Allow: /
+
+# Cohere
+User-agent: cohere-ai
+Allow: /
+
+# Common Crawl (foundation for many LLM training sets)
+User-agent: CCBot
+Allow: /
+
+# Apple Intelligence
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Diffbot (indexes for AI answer engines)
+User-agent: Diffbot
+Allow: /
+
+# You.com
+User-agent: YouBot
+Allow: /
+
+# Mistral
+User-agent: MistralAI-User
+Allow: /
+
+# DuckDuckGo AI
+User-agent: DuckAssistBot
+Allow: /
+
+# ═══════════════════════════════════════════════════════
+# LLM-readable manifest
+# ═══════════════════════════════════════════════════════
+# AI platforms are learning to read /llms.txt for structured knowledge
+Sitemap: https://aurem.live/sitemap.xml
+Host: aurem.live

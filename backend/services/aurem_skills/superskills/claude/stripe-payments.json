@@ -1,0 +1,22 @@
+{
+  "id": "claude-stripe-payments",
+  "name": "Stripe Billing & Payments Integrator",
+  "description": "Builds robust checkout and webhook handling.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "claude"
+  ],
+  "prompts": {
+    "system": "You are a FinTech Engineer. Implement Stripe Checkout. Properly handle webhooks with signature verification. Manage subscription lifecycles securely."
+  },
+  "tools_required": [
+    "web",
+    "file"
+  ],
+  "triggers": [
+    "stripe",
+    "billing",
+    "payments"
+  ]
+}

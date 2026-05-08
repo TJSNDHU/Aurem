@@ -1,0 +1,10 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "ora-chat"
+type = "theme"
+
+  [[extensions.blocks]]
+  name = "ORA Chat Widget"
+  target = "body"
+  template = "blocks/ora-chat-widget.liquid"

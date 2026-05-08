@@ -1,0 +1,73 @@
+source_collection,lead_id,business_name,phone,status,error,provider_msg_id,trigger_source,timestamp
+campaign_leads.outreach_history,tj-auto-clinic-001,TJ Auto Clinic Limited,+12265017777,sent,,,unknown,2026-04-17T21:32:00Z
+campaign_leads.outreach_history,tj-auto-clinic-001,TJ Auto Clinic Limited,12265017777,sent,,,unknown,2026-04-17T19:15:30.033948+00:00
+campaign_leads.outreach_history,tj-auto-clinic-001,TJ Auto Clinic Limited,+12265017777,,,,unknown,
+campaign_leads.outreach_history,spadina-auto,Spadina Auto,(416)9254251,failed,,,auto,2026-04-22T17:51:09.443910+00:00
+campaign_leads.outreach_history,spadina-auto,Spadina Auto,(416)9254251,failed,,,auto,2026-04-22T17:51:17.429341+00:00
+campaign_leads.outreach_history,neo-coffee-bar-king-x-spadina,NEO COFFEE BAR KING X SPADINA,(437)9159155,failed,,,auto,2026-04-22T17:51:26.150962+00:00
+campaign_leads.outreach_history,neo-coffee-bar-king-x-spadina,NEO COFFEE BAR KING X SPADINA,(437)9159155,failed,,,auto,2026-04-22T17:51:34.334765+00:00
+campaign_leads.outreach_history,salon-solis,Salon Solis,(416)9441464,failed,,,auto,2026-04-22T17:51:42.338965+00:00
+campaign_leads.outreach_history,salon-solis,Salon Solis,(416)9441464,failed,,,auto,2026-04-22T17:51:44.975414+00:00
+campaign_leads.outreach_history,all-ontario-express-inc,All Ontario Express Inc,(905)9401680,failed,,,auto,2026-04-22T17:51:59.791380+00:00
+campaign_leads.outreach_history,all-ontario-express-inc,All Ontario Express Inc,(905)9401680,failed,,,auto,2026-04-22T17:52:07.958033+00:00
+campaign_leads.outreach_history,toronto-best-auto,Toronto Best Auto,(416)2481241,failed,,,auto,2026-04-22T17:52:30.147722+00:00
+campaign_leads.outreach_history,toronto-best-auto,Toronto Best Auto,(416)2481241,failed,,,auto,2026-04-22T17:52:38.603906+00:00
+campaign_leads.outreach_history,toronto-best-auto,Toronto Best Auto,(416)2481241,failed,,,auto,2026-04-22T17:52:38.758602+00:00
+campaign_leads.outreach_history,ssr-auto-service,SSR AUTO SERVICE,(416)4668782,failed,,,auto,2026-04-22T17:52:47.652296+00:00
+campaign_leads.outreach_history,master-mechanic-high-park,Master Mechanic High Park,(416)5322449,failed,,,auto,2026-04-22T17:55:25.545548+00:00
+campaign_leads.outreach_history,fine-tuned-autos-best-auto-repair-shop-york-toronto,"Fine Tuned Autos - Best Auto Repair Shop York, Toronto",(416)2430949,failed,,,auto,2026-04-22T17:55:29.250270+00:00
+campaign_leads.outreach_history,euromechanic-mcdermott-motors,EuroMechanic - McDermott Motors,(416)3611707,failed,,,auto,2026-04-22T17:55:37.842034+00:00
+campaign_leads.outreach_history,king-strachan-automotive,KING & STRACHAN AUTOMOTIVE,(416)7608100,failed,,,auto,2026-04-22T17:55:40.628804+00:00
+campaign_leads.outreach_history,lupe-s-auto,Lupe's Auto,(909)9883131,failed,,,auto,2026-04-22T17:55:51.629886+00:00
+campaign_leads.outreach_history,lupe-s-auto,Lupe's Auto,(909)9883131,failed,,,auto,2026-04-22T17:55:51.816101+00:00
+campaign_leads.outreach_history,auto-depot-performance-group,Auto Depot Performance Group,(705)2222277,failed,,,auto,2026-04-22T17:56:10.324774+00:00
+campaign_leads.outreach_history,auto-depot-performance-group,Auto Depot Performance Group,(705)2222277,failed,,,auto,2026-04-22T17:56:10.349488+00:00
+campaign_leads.outreach_history,the-auto-shop-inc,The Auto Shop Inc,(905)8950476,failed,,,auto,2026-04-22T17:56:22.366770+00:00
+campaign_leads.outreach_history,the-auto-shop-inc,The Auto Shop Inc,(905)8950476,failed,,,auto,2026-04-22T17:56:22.177843+00:00
+campaign_leads.outreach_history,dowdy-s-automotive,Dowdy's Automotive,(541)8892754,failed,,,auto,2026-04-22T17:56:39.703256+00:00
+campaign_leads.outreach_history,dowdy-s-automotive,Dowdy's Automotive,(541)8892754,failed,,,auto,2026-04-22T17:56:39.728737+00:00
+campaign_leads.outreach_history,central-import,Central Import,(416)8649092,failed,,,auto,2026-04-22T17:50:53.908664+00:00
+campaign_leads.outreach_history,central-import,Central Import,(416)8649092,failed,,,auto,2026-04-22T17:50:54.184782+00:00
+campaign_leads.outreach_history,anchor-salon-llc,Anchor Salon LLC,(585)7348129,failed,,,auto,2026-04-22T17:56:51.567609+00:00
+campaign_leads.outreach_history,reflections-salon-spa-llc,"Reflections Salon & Spa, llc",(419)5293535,failed,,,auto,2026-04-22T17:56:59.863208+00:00
+campaign_leads.outreach_history,sara-s-beauty-studio,Sara's Beauty Studio,(909)6731942,failed,,,auto,2026-04-22T17:57:08.753328+00:00
+campaign_leads.outreach_history,the-collective-house-salon,The Collective House Salon,(905)8532031,failed,,,auto,2026-04-22T17:57:18.453812+00:00
+campaign_leads.outreach_history,jackie-s-beauty-salon,Jackie's Beauty Salon,(909)9836497,failed,,,auto,2026-04-22T17:58:13.206506+00:00
+campaign_leads.outreach_history,orchard-restaurant,Orchard Restaurant,(403)2432392,failed,,,auto,2026-04-22T17:58:18.313992+00:00
+campaign_leads.outreach_history,ten-foot-henry,Ten Foot Henry,(403)4755537,failed,,,auto,2026-04-22T17:58:33.719728+00:00
+campaign_leads.outreach_history,brampton-entrepreneur-centre-co-working-space,Brampton Entrepreneur Centre + Co-working Space,(905)8742650,failed,,,auto,2026-04-22T17:58:37.623442+00:00
+campaign_leads.outreach_history,brampton-business-centre,Brampton Business Centre,(905)8742650,failed,,,auto,2026-04-22T17:58:40.711846+00:00
+campaign_leads.outreach_history,brampton-businesses-directory,Brampton Businesses Directory,(905)8122570,failed,,,auto,2026-04-22T17:58:43.601109+00:00
+campaign_leads.outreach_history,downtown-brampton-bia,Downtown Brampton BIA,(905)8743518,failed,,,auto,2026-04-22T17:58:47.352660+00:00
+campaign_leads.outreach_history,brampton-board-of-trade,Brampton Board of Trade,(905)4511122,failed,,,auto,2026-04-22T17:58:51.893672+00:00
+campaign_leads.outreach_history,bhive,BHive,(647)6321072,failed,,,auto,2026-04-22T17:58:57.068505+00:00
+campaign_leads.outreach_history,shoppers-world-brampton,Shoppers World Brampton,(905)4591337,failed,,,auto,2026-04-22T17:59:06.361362+00:00
+campaign_leads.outreach_history,global-accounting-services-inc,Global Accounting Services Inc.,(905)4518081,failed,,,auto,2026-04-22T18:02:02.682361+00:00
+campaign_leads.outreach_history,empowered-4x-business-development-centre-and-coworking-space,Empowered 4x - Business Development Centre and Coworking Space,(905)4978200,failed,,,auto,2026-04-22T18:02:07.610650+00:00
+campaign_leads.outreach_history,brampton-service-canada-centre-passport-services,Brampton Service Canada Centre - Passport Services,(800)6226232,failed,,,auto,2026-04-22T18:02:11.206283+00:00
+campaign_leads.outreach_history,tossdown,tossdown,(647)9487127,failed,,,auto,2026-04-22T18:02:26.515367+00:00
+campaign_leads.outreach_history,the-old-shoe-factory,The Old Shoe Factory,(437)8384038,failed,,,auto,2026-04-22T18:02:40.317035+00:00
+campaign_leads.outreach_history,wcg-employment-services-brampton,WCG Employment Services - Brampton,(888)3538501,failed,,,auto,2026-04-22T18:02:49.900090+00:00
+campaign_leads.outreach_history,brampton-mall,Brampton Mall,(905)7939417,failed,,,auto,2026-04-22T18:02:53.527904+00:00
+campaign_leads.outreach_history,algoma-university,Algoma University,(905)4510100,failed,,,auto,2026-04-22T18:03:03.567694+00:00
+campaign_leads.outreach_history,segovia-coffee-co,Segovia Coffee Co.,(905)4563131,failed,,,auto,2026-04-22T18:03:12.810991+00:00
+campaign_leads.outreach_history,staples,Staples,(905)7962403,failed,,,auto,2026-04-22T18:04:02.843058+00:00
+campaign_leads.outreach_history,the-raven-bistro,The Raven Bistro,(780)8525151,failed,,,auto,2026-04-22T18:04:06.102454+00:00
+campaign_leads.outreach_history,ocean-pacific-gym-and-wellness,Ocean Pacific Gym and Wellness,(619)3774421,failed,,,auto,2026-04-22T18:04:50.980615+00:00
+campaign_leads.outreach_history,ocean-pacific-gym-and-wellness,Ocean Pacific Gym and Wellness,(619)3774421,failed,,,auto,2026-04-22T18:04:59.130034+00:00
+campaign_leads.outreach_history,peladeau-real-estate-agency,Peladeau Real Estate Agency,(418)6942026,failed,,,auto,2026-04-22T18:05:02.094076+00:00
+campaign_leads.outreach_history,peladeau-real-estate-agency,Peladeau Real Estate Agency,(418)6942026,failed,,,auto,2026-04-22T18:05:10.039935+00:00
+campaign_leads.outreach_history,quipe-samuelsen-courtiers-immobiliers-sutton-qu-bec,Équipe Samuelsen Courtiers Immobiliers Sutton Québec,(418)5700124,failed,,,auto,2026-04-22T18:05:12.538549+00:00
+campaign_leads.outreach_history,quipe-samuelsen-courtiers-immobiliers-sutton-qu-bec,Équipe Samuelsen Courtiers Immobiliers Sutton Québec,(418)5700124,failed,,,auto,2026-04-22T18:05:20.235368+00:00
+campaign_leads.outreach_history,the-yard-gym-pacific-beach,The Yard Gym Pacific Beach,(619)6957396,failed,,,auto,2026-04-22T18:05:28.017739+00:00
+campaign_leads.outreach_history,the-yard-gym-pacific-beach,The Yard Gym Pacific Beach,(619)6957396,failed,,,auto,2026-04-22T18:05:35.953374+00:00
+campaign_leads.outreach_history,engel-v-lkers-courtiers-immobiliers-qu-bec,Engel & Völkers Courtiers Immobiliers Québec,(418)4761111,failed,,,auto,2026-04-22T18:05:43.882752+00:00
+campaign_leads.outreach_history,engel-v-lkers-courtiers-immobiliers-qu-bec,Engel & Völkers Courtiers Immobiliers Québec,(418)4761111,failed,,,auto,2026-04-22T18:05:46.880680+00:00
+campaign_leads.outreach_history,renegade,Renegade,(619)6771861,failed,,,auto,2026-04-22T18:05:54.339842+00:00
+campaign_leads.outreach_history,renegade,Renegade,(619)6771861,failed,,,auto,2026-04-22T18:05:55.498707+00:00
+whatsapp_message_log,,,16134000000,,,Psrkpucq3l0.VY4-wMoDwalNgA,unknown,2026-04-13T22:40:03.617917+00:00
+whatsapp_message_log,,,16134000000,,,PsqMNosNQ2Rcwrg-wEEDwalNgA,unknown,2026-04-13T22:42:16.927226+00:00
+whatsapp_message_log,,,16134000000,,,PsoRAJB5o2vlmAY-wM4DwalNgA,unknown,2026-04-13T22:42:20.864990+00:00
+whatsapp_message_log,,,16134000000,,,Psr2G_ZhC9D4XRQ-wLkDwalNgA,unknown,2026-04-13T23:02:18.295222+00:00
+whatsapp_message_log,,,12265017777,,,PsrII0AxX2aM7D8-wIsC2w1RsQ,unknown,2026-04-17T18:49:43.502468+00:00
+whatsapp_message_log,,,12265017777,,,Psq7QdiN0zBPQw4-wE4C2w1RsQ,unknown,2026-04-17T21:00:01.364538+00:00

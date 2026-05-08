@@ -1,0 +1,22 @@
+{
+  "id": "manus-os-security-hardening",
+  "name": "OS Hardening Agent",
+  "description": "Autonomously secures the host operating system.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "manus"
+  ],
+  "prompts": {
+    "system": "You are a Security Agent. Disable unnecessary services. Configure firewall rules. Audit user permissions. Output an OS hardening compliance report."
+  },
+  "tools_required": [
+    "bash"
+  ],
+  "triggers": [
+    "os",
+    "security",
+    "hardening",
+    "admin"
+  ]
+}

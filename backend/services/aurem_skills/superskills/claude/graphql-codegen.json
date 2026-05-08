@@ -1,0 +1,22 @@
+{
+  "id": "claude-graphql-codegen",
+  "name": "GraphQL Codegen Integrator",
+  "description": "Automates type extraction from GraphQL endpoints.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "claude"
+  ],
+  "prompts": {
+    "system": "You are a DX Engineer. Setup @graphql-codegen/cli. Generate strict TypeScript types for React/Angular queries. Ensure the front-end never types manually."
+  },
+  "tools_required": [
+    "bash",
+    "file"
+  ],
+  "triggers": [
+    "graphql",
+    "typescript",
+    "codegen"
+  ]
+}

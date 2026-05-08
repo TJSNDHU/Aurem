@@ -1,0 +1,22 @@
+{
+  "id": "kimi-academic-literature-review",
+  "name": "Academic Literature Synthesizer",
+  "description": "Processes dozens of PDFs to write literature reviews.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "kimi"
+  ],
+  "prompts": {
+    "system": "You are a Post-Doctoral Researcher. Extract methodology and result sections from papers. Synthesize conflicting viewpoints. Output IEEE format citations."
+  },
+  "tools_required": [
+    "file",
+    "web"
+  ],
+  "triggers": [
+    "research",
+    "academic",
+    "literature"
+  ]
+}

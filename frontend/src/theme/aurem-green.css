@@ -1,0 +1,409 @@
+/* ═══ AUREM × VoltAgent Design System ═══ */
+/* Abyss Black canvas + AUREM Orange accent */
+
+:root {
+  --bg-veridian-soft: #050507;
+  --bg-veridian-center: #0A0A0D;
+  --copper-accent: #FF6B00;
+  --copper-glow: rgba(255, 107, 0, 0.4);
+  --glass-bg: rgba(16, 16, 16, 0.75);
+  --glass-border: rgba(61, 58, 57, 0.35);
+  --aurem-green-dark: #0D0D10;
+  --aurem-green: #101014;
+  --aurem-green-mid: #1A1A1F;
+  --aurem-green-light: #FF6B00;
+  --aurem-green-accent: #FF8C33;
+  --aurem-green-pale: #FFB380;
+  --aurem-gold: #FF6B00;
+  --aurem-gold-light: #FF8C33;
+  --aurem-text: #f2f2f2;
+  --aurem-text-secondary: #b8b3b0;
+  --aurem-sidebar-bg: linear-gradient(180deg, #0D0D10 0%, #050507 100%);
+  /* Content area theme variables */
+  --aurem-heading: #f2f2f2;
+  --aurem-body: #d4d0cc;
+  --aurem-body-secondary: #b8b3b0;
+  --aurem-card-bg: rgba(16, 16, 16, 0.75);
+  --aurem-card-border: rgba(61, 58, 57, 0.35);
+  --aurem-surface: rgba(255,255,255,0.02);
+  --aurem-input-bg: rgba(255,255,255,0.04);
+  --aurem-input-border: rgba(61, 58, 57, 0.4);
+  --aurem-divider: rgba(61, 58, 57, 0.25);
+  --aurem-hover: rgba(255, 107, 0, 0.06);
+}
+
+/* ═══ Animations ═══ */
+@keyframes auremFadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes auremFadeSlideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes auremSlideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes auremGrowWidth {
+  from { width: 0; }
+}
+
+@keyframes auremDrawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes auremShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes auremFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes auremBreathe {
+  0%, 100% { transform: scale(1) translate(0, 0); }
+  25% { transform: scale(1.01) translate(2px, -1px); }
+  50% { transform: scale(1.02) translate(0, 2px); }
+  75% { transform: scale(1.01) translate(-2px, -1px); }
+}
+
+@keyframes auremIconPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,0,0.15); }
+  50% { box-shadow: 0 0 14px 3px rgba(255,107,0,0.08); }
+}
+
+@keyframes auremGlowPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes auremSpinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ═══ Fixed Background Container ═══ */
+.aurem-bg-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  background-color: #050507;
+  background: radial-gradient(ellipse at 50% 30%, #0D0D10 0%, #050507 55%, #030305 100%);
+  overflow: hidden;
+}
+
+.aurem-bg-container .geometric-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: url('./veridian-network.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.06;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.15));
+  animation: auremBreathe 20s ease-in-out infinite;
+}
+
+/* ═══ Dashboard Layout ═══ */
+.aurem-dashboard-bg {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* ═══ Glass Card Base — Carbon Surface + Deep Elevation ═══ */
+.aurem-glass-card {
+  background: rgba(16, 16, 16, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(61, 58, 57, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.02);
+  transition: transform 0.15s ease-out, box-shadow 0.3s ease, border-color 0.3s ease;
+  position: relative;
+}
+
+.aurem-glass-card:hover {
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.8), 0 0 15px rgba(255, 107, 0, 0.12);
+  border-color: rgba(255, 107, 0, 0.18);
+}
+
+/* ═══ Sidebar ═══ */
+.aurem-sidebar {
+  background: var(--aurem-sidebar-bg);
+  border-radius: 0 16px 16px 0;
+  box-shadow: 4px 0 32px rgba(0,0,0,0.6), 0 0 15px rgba(255,107,0,0.06);
+  position: relative;
+  z-index: 2;
+}
+
+.aurem-sidebar-nav-item {
+  transition: all 0.3s ease;
+}
+
+.aurem-sidebar-nav-item.active {
+  background: rgba(255, 107, 0, 0.12);
+  box-shadow: inset 3px 0 0 #FF6B00, 0 0 12px rgba(255, 107, 0, 0.15);
+  color: #FF6B00;
+  border-radius: 8px;
+}
+
+.aurem-sidebar-nav-item:not(.active):hover {
+  background: rgba(255, 107, 0, 0.06);
+  color: rgba(255,255,255,0.9);
+}
+
+/* ═══ Status Badges ═══ */
+.aurem-badge-online {
+  color: #FF6B00;
+  text-shadow: 0 0 8px rgba(255,107,0,0.3);
+}
+
+/* ═══ VoltAgent Typography ═══ */
+.aurem-heading {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aurem-data {
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  font-weight: 400;
+}
+
+/* Apply Cinzel to all major headings */
+.aurem-dashboard-bg h1,
+.aurem-dashboard-bg h2,
+.aurem-sidebar h3,
+[data-testid="aurem-dashboard"] h1,
+[data-testid="aurem-dashboard"] h2 {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Body text — Jost */
+.aurem-dashboard-bg,
+[data-testid="aurem-dashboard"] {
+  font-family: 'Jost', 'Inter', -apple-system, sans-serif;
+}
+
+/* Data values — JetBrains Mono */
+[data-testid="aurem-dashboard"] .text-3xl,
+[data-testid="aurem-dashboard"] .text-2xl,
+[data-testid="aurem-dashboard"] .text-xl {
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  font-weight: 400;
+}
+
+/* Code/mono blocks */
+[data-testid="aurem-dashboard"] .font-mono {
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+}
+
+
+/* ═══ Scrollbar ═══ */
+.aurem-scroll::-webkit-scrollbar { width: 4px; }
+.aurem-scroll::-webkit-scrollbar-track { background: transparent; }
+.aurem-scroll::-webkit-scrollbar-thumb { background: rgba(255,107,0,0.2); border-radius: 2px; }
+.aurem-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,107,0,0.35); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   LIGHT MODE — Full Override for AUREM Components
+   Activated by html.light class (set by ThemeContext)
+   ═══════════════════════════════════════════════════════════════════ */
+
+html.light {
+  --bg-veridian-soft: #F5F3EE;
+  --bg-veridian-center: #FFFFFF;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(26, 48, 38, 0.12);
+  --aurem-text: #1A1A2E;
+  --aurem-text-secondary: #555555;
+  --aurem-sidebar-bg: linear-gradient(180deg, #F0EDE8 0%, #E8E5DE 100%);
+  /* Content area theme variables */
+  --aurem-heading: #1A3026;
+  --aurem-body: #2a3a2e;
+  --aurem-body-secondary: #5a6a5e;
+  --aurem-card-bg: rgba(255, 255, 255, 0.85);
+  --aurem-card-border: rgba(26, 48, 38, 0.10);
+  --aurem-surface: rgba(26, 48, 38, 0.03);
+  --aurem-input-bg: rgba(26, 48, 38, 0.04);
+  --aurem-input-border: rgba(26, 48, 38, 0.12);
+  --aurem-divider: rgba(26, 48, 38, 0.08);
+  --aurem-hover: rgba(26, 48, 38, 0.04);
+}
+
+/* ─── Background Container ─── */
+html.light .aurem-bg-container {
+  background-color: #F5F3EE;
+  background: radial-gradient(ellipse at 50% 40%, #FAFAF8 0%, #F0EDE8 60%, #E8E5DE 100%);
+}
+
+html.light .aurem-bg-container .geometric-overlay {
+  opacity: 0.04;
+  filter: invert(1) drop-shadow(0 0 5px rgba(26,48,38,0.1));
+}
+
+/* ─── Dashboard Layout ─── */
+html.light .aurem-dashboard-bg {
+  background: transparent !important;
+}
+
+/* ─── Glass Cards ─── */
+html.light .aurem-glass-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(26, 48, 38, 0.10) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+html.light .aurem-glass-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 0 12px rgba(26, 48, 38, 0.04);
+}
+
+/* ─── Sidebar ─── */
+html.light .aurem-sidebar {
+  background: var(--aurem-sidebar-bg);
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.05), 0 0 8px rgba(26, 48, 38, 0.03);
+}
+
+html.light .aurem-sidebar-nav-item.active {
+  background: rgba(26, 48, 38, 0.08);
+  box-shadow: inset 3px 0 0 #1A3026, 0 0 10px rgba(26, 48, 38, 0.08);
+  color: #1A3026;
+}
+
+html.light .aurem-sidebar-nav-item:not(.active):hover {
+  background: rgba(26, 48, 38, 0.04);
+  color: #1A3026;
+}
+
+/* ─── Sidebar Text Colors ─── */
+html.light .aurem-sidebar .text-white,
+html.light .aurem-sidebar [class*="text-white"] {
+  color: #1A3026 !important;
+}
+
+html.light .aurem-sidebar [class*="text-white\\/60"],
+html.light .aurem-sidebar [class*="text-white/60"] {
+  color: #555555 !important;
+}
+
+html.light .aurem-sidebar [class*="text-white\\/40"],
+html.light .aurem-sidebar [class*="text-white/40"] {
+  color: #888888 !important;
+}
+
+html.light .aurem-sidebar [class*="text-white\\/30"],
+html.light .aurem-sidebar [class*="text-white/30"] {
+  color: #999999 !important;
+}
+
+html.light .aurem-sidebar h3 {
+  color: #888888 !important;
+}
+
+html.light .aurem-sidebar .text-\[\#D4A373\],
+html.light .aurem-sidebar [class*="text-[#D4A373]"] {
+  color: #8B5A2B !important;
+}
+
+/* ─── Sidebar Logo Area ─── */
+html.light .aurem-sidebar .text-\[14px\] {
+  color: #1A3026 !important;
+}
+
+/* ─── Sidebar Theme Toggle ─── */
+html.light .aurem-sidebar [class*="bg-white\\/10"],
+html.light .aurem-sidebar [class*="bg-white/10"] {
+  background-color: rgba(26, 48, 38, 0.08) !important;
+}
+
+html.light .aurem-sidebar [class*="bg-white\\/5"],
+html.light .aurem-sidebar [class*="bg-white/5"] {
+  background-color: rgba(26, 48, 38, 0.04) !important;
+}
+
+html.light .aurem-sidebar [class*="bg-\\[#D4A373\\]\\/20"],
+html.light .aurem-sidebar [class*="bg-[#D4A373]/20"] {
+  background-color: rgba(139, 90, 43, 0.12) !important;
+}
+
+html.light .aurem-sidebar [class*="border-white"] {
+  border-color: rgba(26, 48, 38, 0.08) !important;
+}
+
+/* ─── Status Badge ─── */
+html.light .aurem-badge-online {
+  color: #1A8740;
+  text-shadow: none;
+}
+
+/* ─── Main Content Area Text ─── */
+html.light [data-testid="aurem-dashboard"] [class*="text-[#E8E4DE]"],
+html.light [data-testid="aurem-dashboard"] [class*="text-[#e8e4de]"] {
+  color: #1A1A2E !important;
+}
+
+html.light [data-testid="aurem-dashboard"] [class*="text-[#9A9590]"],
+html.light [data-testid="aurem-dashboard"] [class*="text-[#9a9590]"] {
+  color: #666666 !important;
+}
+
+html.light [data-testid="aurem-dashboard"] [class*="text-[#C0BAB2]"],
+html.light [data-testid="aurem-dashboard"] [class*="text-[#c0bab2]"] {
+  color: #444444 !important;
+}
+
+/* ─── Cards with inline dark backgrounds ─── */
+html.light [data-testid="aurem-dashboard"] [style*="background: rgba(15"] {
+  background: rgba(26, 48, 38, 0.03) !important;
+}
+
+html.light [data-testid="aurem-dashboard"] [style*="background: #0A0A0A"],
+html.light [data-testid="aurem-dashboard"] [style*="background: #050505"],
+html.light [data-testid="aurem-dashboard"] [style*="background: #080808"] {
+  background: #FFFFFF !important;
+}
+
+html.light [data-testid="aurem-dashboard"] [style*="background: rgba(0, 0, 0"] {
+  background: rgba(26, 48, 38, 0.02) !important;
+}
+
+/* ─── Metrics cards ─── */
+html.light [data-testid="aurem-dashboard"] [style*="background: rgba(45,122,74,0.04)"] {
+  background: rgba(45, 122, 74, 0.06) !important;
+  border-color: rgba(45, 122, 74, 0.12) !important;
+}
+
+/* ─── Module cards in overview ─── */
+html.light [data-testid="aurem-dashboard"] .rounded-2xl[style*="border: 1px solid rgba(212,163,115"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(26, 48, 38, 0.08) !important;
+}
+
+/* ─── Global inline style overrides for common dark patterns ─── */
+html.light [style*="border-color: rgba(212,163,115,0.0"],
+html.light [style*="borderColor: rgba(212,163,115,0.0"] {
+  border-color: rgba(26, 48, 38, 0.08) !important;
+}
+
+/* ─── Scrollbar for light mode ─── */
+html.light .aurem-scroll::-webkit-scrollbar-track { background: #F5F3EE; }
+html.light .aurem-scroll::-webkit-scrollbar-thumb { background: rgba(26, 48, 38, 0.15); }
+html.light .aurem-scroll::-webkit-scrollbar-thumb:hover { background: rgba(26, 48, 38, 0.25); }
+

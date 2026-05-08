@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AUREM Business Structure</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0b0f;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 40px 20px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  .container {
+    width: 100%;
+    max-width: 1400px;
+  }
+  h1 {
+    text-align: center;
+    color: #D4AF37;
+    font-size: 28px;
+    letter-spacing: 6px;
+    margin-bottom: 8px;
+    font-weight: 300;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 12px;
+    letter-spacing: 3px;
+    margin-bottom: 40px;
+  }
+  .layers {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  .layer {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+  }
+  .layer-tag {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: #0a0b0f;
+    padding: 2px 12px;
+    color: #D4AF37;
+    font-size: 9px;
+    letter-spacing: 3px;
+    border: 1px solid rgba(212,175,55,0.3);
+    border-radius: 20px;
+  }
+  .layer h2 {
+    color: #e2c97e;
+    font-size: 14px;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+  .node {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: all 0.3s;
+  }
+  .node.primary {
+    border-color: rgba(212,175,55,0.4);
+    background: rgba(212,175,55,0.06);
+  }
+  .node.action {
+    border-color: rgba(74,222,128,0.3);
+    background: rgba(74,222,128,0.04);
+  }
+  .node.alert {
+    border-color: rgba(248,113,113,0.3);
+    background: rgba(248,113,113,0.04);
+  }
+  .node.cloud {
+    border-color: rgba(96,165,250,0.3);
+    background: rgba(96,165,250,0.04);
+  }
+  .node-title {
+    color: #e8e8e8;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .node-desc {
+    color: #777;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .arrow {
+    text-align: center;
+    color: #D4AF37;
+    font-size: 18px;
+    margin: 4px 0;
+    opacity: 0.4;
+  }
+  .connector {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 32px;
+  }
+  .connector-line {
+    width: 2px;
+    height: 30px;
+    background: linear-gradient(to bottom, rgba(212,175,55,0.4), rgba(212,175,55,0.1));
+  }
+  .flow-row {
+    display: flex;
+    gap: 10px;
+  }
+  .flow-row .node { flex: 1; }
+  .bottom-bar {
+    background: rgba(212,175,55,0.05);
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 12px;
+    padding: 20px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .bar-item {
+    text-align: center;
+  }
+  .bar-value {
+    color: #D4AF37;
+    font-size: 20px;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+  }
+  .bar-label {
+    color: #666;
+    font-size: 9px;
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .badge-gold { background: rgba(212,175,55,0.15); color: #D4AF37; }
+  .badge-green { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .badge-blue { background: rgba(96,165,250,0.15); color: #60a5fa; }
+  .badge-red { background: rgba(248,113,113,0.15); color: #f87171; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>AUREM</h1>
+  <div class="subtitle">AUTOMATION INTELLIGENCE &mdash; FULL BUSINESS STRUCTURE</div>
+
+  <div class="layers">
+    <!-- Layer 1: Corporate -->
+    <div class="layer">
+      <div class="layer-tag">LAYER 1</div>
+      <h2>CORPORATE &amp; BRAND</h2>
+      <div class="node primary">
+        <div class="node-title">Aurem AI Platform <span class="badge badge-gold">PARENT</span></div>
+        <div class="node-desc">Overarching intelligence engine. SaaS automation platform for business operations.</div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="node">
+        <div class="node-title">Reroots Aesthetics Inc. <span class="badge badge-green">BRAND</span></div>
+        <div class="node-desc">Consumer-facing biotech skincare. Primary data lab and implementation case for Aurem AI.</div>
+      </div>
+    </div>
+
+    <!-- Layer 2: Operations -->
+    <div class="layer">
+      <div class="layer-tag">LAYER 2</div>
+      <h2>OPERATIONAL WORKFLOW</h2>
+      <div class="node cloud">
+        <div class="node-title">Customer Inquiry</div>
+        <div class="node-desc">Ingress via SMS, Web, or AI Call</div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="node primary">
+        <div class="node-title">Sentiment Analyzer <span class="badge badge-gold">AI</span></div>
+        <div class="node-desc">Clinical_Inquiry | Efficacy_Concern | Logistics_Update | Aesthetic_Feedback</div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="flow-row">
+        <div class="node alert">
+          <div class="node-title">War Room <span class="badge badge-red">HIGH</span></div>
+          <div class="node-desc">Panic Hook &rarr; Mississauga</div>
+        </div>
+        <div class="node action">
+          <div class="node-title">Auto Response <span class="badge badge-green">STD</span></div>
+          <div class="node-desc">Cloud SMS Gateway</div>
+        </div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="node">
+        <div class="node-title">GEO Feedback Loop</div>
+        <div class="node-desc">Data indexed for Generative Engine Optimization. Improves future AI search visibility.</div>
+      </div>
+    </div>
+
+    <!-- Layer 3: Technical -->
+    <div class="layer">
+      <div class="layer-tag">LAYER 3</div>
+      <h2>PHASE C ARCHITECTURE</h2>
+      <div class="node primary">
+        <div class="node-title">Monolith Core <span class="badge badge-gold">LEGION</span></div>
+        <div class="node-desc">40k-line Python backend. Being modularized via Operation Clean-Cut.</div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="node">
+        <div class="node-title">Emergent AI + Context Bridge</div>
+        <div class="node-desc">Lead Architect agent with AuremContextManager gatekeeper. Graph-first, token-optimized.</div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="flow-row">
+        <div class="node cloud">
+          <div class="node-title">Microservices</div>
+          <div class="node-desc">Sentiment | UI Pulse | Cloud SMS</div>
+        </div>
+        <div class="node">
+          <div class="node-title">Knowledge Base</div>
+          <div class="node-desc">7 Pillars: Directives, Schemas, Auth</div>
+        </div>
+      </div>
+      <div class="arrow">&#8595;</div>
+      <div class="node action">
+        <div class="node-title">Safety Buffer <span class="badge badge-green">ACTIVE</span></div>
+        <div class="node-desc">Migration mode circuit breaker. Zero-glitch UI protection.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Stats -->
+  <div class="bottom-bar">
+    <div class="bar-item">
+      <div class="bar-value">7</div>
+      <div class="bar-label">KNOWLEDGE PILLARS</div>
+    </div>
+    <div class="bar-item">
+      <div class="bar-value">40K</div>
+      <div class="bar-label">LINES OF CODE</div>
+    </div>
+    <div class="bar-item">
+      <div class="bar-value">90%</div>
+      <div class="bar-label">TOKEN SAVINGS</div>
+    </div>
+    <div class="bar-item">
+      <div class="bar-value">5</div>
+      <div class="bar-label">AI AGENTS</div>
+    </div>
+    <div class="bar-item">
+      <div class="bar-value">3</div>
+      <div class="bar-label">MICROSERVICES</div>
+    </div>
+    <div class="bar-item">
+      <div class="bar-value">&lt;5%</div>
+      <div class="bar-label">REFACTOR TOKEN COST</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

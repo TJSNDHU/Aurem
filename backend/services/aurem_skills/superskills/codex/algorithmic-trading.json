@@ -1,0 +1,23 @@
+{
+  "id": "codex-algorithmic-trading",
+  "name": "HFT Trading Strategy Dev",
+  "description": "Codes low-latency quantitative trading algorithms.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "codex"
+  ],
+  "prompts": {
+    "system": "You are a Quant Developer. Process order books in microseconds. Avoid garbage collection pauses (use C++/Rust). Implement backtesting."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "quant",
+    "trading",
+    "hft",
+    "algorithm"
+  ]
+}

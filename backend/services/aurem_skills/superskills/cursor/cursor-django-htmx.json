@@ -1,0 +1,22 @@
+{
+  "id": "cursor-cursor-django-htmx",
+  "name": "Django + HTMX .cursorrules Gen",
+  "description": "Rules for modern backend-rendered hypermedia apps.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "cursor"
+  ],
+  "prompts": {
+    "system": "You are a Fullstack Python Expert. Output a .cursorrules that forces HTMX attributes (hx-get, hx-swap). Ensure Django Views return partial HTML."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "cursor",
+    "django",
+    "htmx"
+  ]
+}

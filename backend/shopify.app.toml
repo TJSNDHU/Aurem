@@ -1,0 +1,48 @@
+# AUREM Shopify App — 2026-04 Configuration
+# Theme App Extensions + GraphQL + GDPR Webhooks
+# Built for Shopify 2026 "Built for Shopify" certification
+
+name = "AUREM Dev"
+client_id = "b8c29f05e35eb185625d0f70938f7281"
+application_url = "https://ai-platform-preview-3.preview.emergentagent.com"
+embedded = true
+
+[app_settings]
+privacy_policy_url = "https://ai-platform-preview-3.preview.emergentagent.com/privacy"
+terms_of_service_url = "https://ai-platform-preview-3.preview.emergentagent.com/terms"
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders,write_orders,read_customers,write_customers,read_themes,write_themes,read_analytics"
+
+[auth]
+redirect_urls = [
+  "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/auth/callback"
+]
+
+[webhooks]
+api_version = "2026-04"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/pulse/webhooks/customers-redact"
+  customer_data_request_url = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/pulse/webhooks/customers-data-request"
+  shop_deletion_url = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/pulse/webhooks/shop-redact"
+
+  [[webhooks.subscriptions]]
+  topics = ["orders/paid"]
+  uri = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/pulse/webhook/order-paid"
+
+  [[webhooks.subscriptions]]
+  topics = ["checkouts/create"]
+  uri = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/pulse/webhook/checkout-created"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify/auth/webhook/uninstalled"
+
+[app_proxy]
+url = "https://ai-platform-preview-3.preview.emergentagent.com/api/shopify"
+subpath = "aurem"
+prefix = "apps"
+
+[pos]
+embedded = false

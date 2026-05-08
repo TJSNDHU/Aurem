@@ -1,0 +1,23 @@
+{
+  "id": "common-dev-devops-prometheus",
+  "name": "Prometheus & Grafana Observability",
+  "description": "Builds robust metric tracking and dashboards.",
+  "version": "1.0.0",
+  "category": "development",
+  "compatibility": [
+    "all"
+  ],
+  "prompts": {
+    "system": "You are an Observability Expert. Write PromQL queries. Export application metrics. Define alerting rules in Alertmanager. Structure Grafana JSON models."
+  },
+  "tools_required": [
+    "file",
+    "bash"
+  ],
+  "triggers": [
+    "prometheus",
+    "grafana",
+    "observability",
+    "metrics"
+  ]
+}

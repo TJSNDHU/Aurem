@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{ customer_name }} — AUREM Quarterly Business Review</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+    @top-left {
+      content: "AUREM · Business Review · {{ report_period_label }}";
+      font-family: 'Cinzel', serif;
+      font-size: 8pt;
+      letter-spacing: 2px;
+      color: #888;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: 'Inter', sans-serif;
+      font-size: 7pt;
+      color: #888;
+    }
+    @bottom-left {
+      content: "Confidential — {{ customer_name }}";
+      font-family: 'Inter', sans-serif;
+      font-size: 7pt;
+      color: #888;
+    }
+  }
+  @page :first {
+    margin: 0;
+    @top-left { content: none; }
+    @bottom-right { content: none; }
+    @bottom-left { content: none; }
+  }
+
+  :root {
+    --gold: #D4AF37;
+    --gold-soft: #C9A227;
+    --gold-glow: rgba(212,175,55,0.18);
+    --bg-deep: #050507;
+    --bg-card: #10101a;
+    --ink: #E4DDD3;
+    --mute: #8a8a8a;
+    --line: rgba(212,175,55,0.18);
+    --green: #7EC8A0;
+    --orange: #F6A23B;
+    --red: #EF4444;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.55;
+    color: var(--ink);
+    background: #fff;
+    margin: 0;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin: 0 0 10px 0;
+    color: #111;
+  }
+
+  .tiny { font-size: 7.5pt; letter-spacing: 2px; text-transform: uppercase; color: var(--mute); }
+  .mono { font-family: 'JetBrains Mono', 'Menlo', monospace; }
+  .gold { color: var(--gold-soft); }
+  .muted { color: var(--mute); }
+  .strong { font-weight: 700; }
+
+  /* ═══════════════════════════════════════════════════════════
+     COVER PAGE — full bleed dark cinematic
+     ═══════════════════════════════════════════════════════════ */
+  .cover {
+    width: 210mm;
+    height: 297mm;
+    padding: 25mm 18mm;
+    background: radial-gradient(ellipse at top right, rgba(212,175,55,0.12), transparent 55%),
+                radial-gradient(ellipse at bottom left, rgba(212,175,55,0.05), transparent 45%),
+                linear-gradient(180deg, #050507 0%, #0a0a12 100%);
+    color: var(--ink);
+    position: relative;
+    page-break-after: always;
+    overflow: hidden;
+  }
+
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: 18mm;
+    left: 16mm;
+    right: 16mm;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.45;
+  }
+
+  .cover-mark {
+    font-family: 'Cinzel', serif;
+    font-size: 11pt;
+    letter-spacing: 12pt;
+    color: var(--gold);
+    margin-bottom: 60mm;
+    padding-top: 8mm;
+  }
+
+  .cover-eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 8pt;
+    letter-spacing: 6pt;
+    color: var(--mute);
+    text-transform: uppercase;
+    margin-bottom: 8mm;
+  }
+
+  .cover-title {
+    font-family: 'Cinzel', serif;
+    font-size: 38pt;
+    font-weight: 400;
+    color: #fff;
+    line-height: 1.05;
+    margin-bottom: 4mm;
+    letter-spacing: 0.5pt;
+  }
+  .cover-title .accent { color: var(--gold); font-style: italic; }
+
+  .cover-subtitle {
+    font-size: 12pt;
+    color: var(--ink);
+    max-width: 140mm;
+    line-height: 1.5;
+    opacity: 0.82;
+    margin-bottom: 30mm;
+  }
+
+  .cover-meta {
+    position: absolute;
+    bottom: 25mm;
+    left: 18mm;
+    right: 18mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12mm;
+    border-top: 1px solid rgba(212,175,55,0.2);
+    padding-top: 8mm;
+  }
+  .cover-meta .block { font-size: 8.5pt; }
+  .cover-meta .block .label { color: var(--mute); letter-spacing: 2pt; text-transform: uppercase; font-size: 6.5pt; margin-bottom: 2mm; }
+  .cover-meta .block .value { color: var(--ink); font-size: 10pt; font-family: 'Cinzel', serif; letter-spacing: 1pt; }
+
+  .cover-confidential {
+    position: absolute;
+    top: 16mm;
+    right: 16mm;
+    font-size: 7pt;
+    letter-spacing: 3pt;
+    color: var(--gold);
+    text-transform: uppercase;
+    padding: 3mm 5mm;
+    border: 1px solid var(--gold-soft);
+    border-radius: 2px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     CONTENT PAGES
+     ═══════════════════════════════════════════════════════════ */
+  .page { page-break-after: always; padding-top: 4mm; }
+  .page:last-child { page-break-after: auto; }
+
+  .section-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 7.5pt;
+    letter-spacing: 4pt;
+    color: var(--gold-soft);
+    text-transform: uppercase;
+    margin-bottom: 6mm;
+    font-weight: 600;
+  }
+  .section-eyebrow::before {
+    content: '';
+    width: 18mm;
+    height: 1px;
+    background: var(--gold-soft);
+  }
+
+  h1.section { font-size: 22pt; margin-bottom: 6mm; color: #0a0a12; }
+  h2.section { font-size: 15pt; margin-bottom: 4mm; color: #0a0a12; }
+  h3 { font-size: 11pt; color: #0a0a12; }
+
+  .lede { font-size: 10.5pt; color: #444; max-width: 160mm; line-height: 1.65; margin-bottom: 8mm; }
+
+  /* KPI Grid (exec summary) */
+  .kpi-grid {
+    display: flex;
+    gap: 3mm;
+    flex-wrap: wrap;
+    margin-bottom: 6mm;
+  }
+  .kpi-card {
+    flex: 1 1 40%;
+    min-width: 75mm;
+    background: #fafaf7;
+    border: 1px solid #eee6cf;
+    border-left: 3px solid var(--gold);
+    padding: 6mm 7mm 5mm 7mm;
+    border-radius: 2px;
+  }
+  .kpi-label { font-size: 7pt; letter-spacing: 3pt; text-transform: uppercase; color: var(--mute); margin-bottom: 3mm; font-weight: 600; }
+  .kpi-value { font-family: 'Cinzel', serif; font-size: 28pt; font-weight: 600; color: #0a0a12; line-height: 1; margin-bottom: 1mm; }
+  .kpi-value.positive { color: #256c42; }
+  .kpi-value.warning  { color: #8a5a00; }
+  .kpi-value.danger   { color: #8a2020; }
+  .kpi-trend { font-size: 8.5pt; color: var(--mute); }
+  .kpi-trend.up    { color: #256c42; }
+  .kpi-trend.down  { color: #8a2020; }
+
+  /* Data tables (metric rows) */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin-bottom: 6mm;
+  }
+  .data-table th {
+    text-align: left;
+    font-size: 7.5pt;
+    letter-spacing: 2pt;
+    text-transform: uppercase;
+    color: var(--mute);
+    padding: 3mm 3mm;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .data-table td {
+    padding: 3mm 3mm;
+    border-bottom: 1px solid #eee;
+    color: #333;
+    vertical-align: top;
+  }
+  .data-table td.num { font-family: 'JetBrains Mono', monospace; text-align: right; font-size: 10pt; }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  /* Callout blocks */
+  .callout {
+    background: linear-gradient(180deg, #fffbea 0%, #fef6d7 100%);
+    border: 1px solid #e8d68a;
+    border-left: 4px solid var(--gold);
+    padding: 5mm 6mm;
+    border-radius: 2px;
+    margin: 5mm 0;
+  }
+  .callout .title { font-family: 'Cinzel', serif; font-size: 11pt; margin-bottom: 2mm; color: #5a4500; letter-spacing: 0.5pt; }
+  .callout .body { font-size: 9.5pt; color: #443200; line-height: 1.5; }
+
+  .callout.dark {
+    background: #10101a;
+    border: 1px solid rgba(212,175,55,0.25);
+    border-left: 4px solid var(--gold);
+    color: var(--ink);
+  }
+  .callout.dark .title { color: var(--gold); }
+  .callout.dark .body { color: var(--ink); opacity: 0.9; }
+
+  /* Status bar chart (uptime per day) */
+  .uptime-bar {
+    display: flex;
+    gap: 1px;
+    height: 22mm;
+    margin: 4mm 0 6mm 0;
+    background: #fafafa;
+    padding: 2mm;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .uptime-bar .day {
+    flex: 1;
+    background: var(--green);
+    border-radius: 1px;
+    min-width: 1px;
+  }
+  .uptime-bar .day.partial { background: var(--orange); }
+  .uptime-bar .day.down    { background: var(--red); }
+  .uptime-bar .day.none    { background: #e5e5e5; }
+
+  /* AI suggestion cards */
+  .ai-card {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--gold-soft);
+    padding: 5mm;
+    margin-bottom: 4mm;
+    border-radius: 2px;
+    background: #fafaf7;
+  }
+  .ai-card .meta { font-size: 7pt; letter-spacing: 2pt; text-transform: uppercase; color: var(--mute); margin-bottom: 2mm; }
+  .ai-card .rc { font-size: 10pt; color: #0a0a12; font-weight: 600; margin-bottom: 2mm; }
+  .ai-card .fx { font-size: 9pt; color: #444; line-height: 1.55; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    font-size: 7pt;
+    letter-spacing: 1.5pt;
+    padding: 1.5mm 3mm;
+    border: 1px solid var(--line);
+    border-radius: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--gold-soft);
+    background: #fafaf3;
+  }
+  .badge.ok    { color: #256c42; border-color: #b6e0c8; background: #f0faf3; }
+  .badge.warn  { color: #8a5a00; border-color: #e8d68a; background: #fffbea; }
+  .badge.risk  { color: #8a2020; border-color: #f0bdbd; background: #fef4f4; }
+
+  .hr-gold { border: none; border-top: 1px solid var(--line); margin: 6mm 0; }
+
+  .footer-stamp {
+    margin-top: 10mm;
+    padding-top: 4mm;
+    border-top: 1px solid var(--line);
+    font-size: 7.5pt;
+    color: var(--mute);
+    letter-spacing: 1.5pt;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Outlook section */
+  .outlook {
+    background: #0a0a12;
+    color: var(--ink);
+    padding: 10mm;
+    border-radius: 3px;
+    position: relative;
+    margin-top: 6mm;
+    border: 1px solid rgba(212,175,55,0.3);
+  }
+  .outlook h2 { color: var(--gold); font-size: 14pt; margin-bottom: 4mm; }
+  .outlook .prediction {
+    display: flex; gap: 5mm; padding: 4mm 0;
+    border-bottom: 1px solid rgba(212,175,55,0.15);
+  }
+  .outlook .prediction:last-child { border-bottom: none; }
+  .outlook .prediction .num {
+    font-family: 'Cinzel', serif;
+    font-size: 20pt;
+    color: var(--gold);
+    width: 12mm;
+    line-height: 1;
+  }
+  .outlook .prediction .text { flex: 1; font-size: 9.5pt; line-height: 1.6; }
+  .outlook .prediction .text .h { color: #fff; font-weight: 600; margin-bottom: 1.5mm; font-size: 10.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ COVER ══════════════════════════════ -->
+<section class="cover">
+  <div class="cover-confidential">Confidential</div>
+  <div class="cover-mark">A · U · R · E · M</div>
+  <div class="cover-eyebrow">{{ report_type_label }} · {{ report_period_label }}</div>
+  <h1 class="cover-title">
+    {{ customer_name }}<br/>
+    <span class="accent">Business Review</span>
+  </h1>
+  <div class="cover-subtitle">
+    A comprehensive audit of your AI-assisted infrastructure performance —
+    uptime, incidents prevented, AI workforce activity, and return on
+    automation. Generated from verified telemetry captured by the AUREM
+    Sentinel, Site Monitor, and ORA Command systems.
+  </div>
+
+  <div class="cover-meta">
+    <div class="block">
+      <div class="label">Prepared For</div>
+      <div class="value">{{ customer_name }}</div>
+    </div>
+    <div class="block">
+      <div class="label">Period</div>
+      <div class="value">{{ period_start_human }} — {{ period_end_human }}</div>
+    </div>
+    <div class="block">
+      <div class="label">Report ID</div>
+      <div class="value mono">{{ report_id }}</div>
+    </div>
+    <div class="block">
+      <div class="label">Issued</div>
+      <div class="value">{{ issued_at_human }}</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ EXEC SUMMARY ══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 01 · Executive Summary</div>
+  <h1 class="section">The quarter at a glance.</h1>
+  <p class="lede">
+    During this reporting window AUREM's autonomous systems delivered
+    <span class="strong">{{ exec.total_actions }}</span> verified actions on
+    behalf of {{ customer_name }} — preventing
+    <span class="strong">{{ exec.incidents_prevented }}</span> downtime events,
+    processing <span class="strong">{{ exec.leads_handled }}</span> leads, and
+    capturing <span class="strong">{{ exec.errors_captured }}</span> client-side
+    incidents before they reached your users.
+  </p>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Uptime</div>
+      <div class="kpi-value {{ exec.uptime_class }}">{{ exec.uptime_pct }}%</div>
+      <div class="kpi-trend">{{ exec.uptime_trend }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Incidents Resolved</div>
+      <div class="kpi-value positive">{{ exec.incidents_resolved }}</div>
+      <div class="kpi-trend">avg MTTR: {{ exec.avg_mttr_human }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Time Saved</div>
+      <div class="kpi-value positive">{{ exec.hours_saved }}h</div>
+      <div class="kpi-trend up">≈ ${{ exec.dollars_saved }} in labor</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">AI Actions</div>
+      <div class="kpi-value">{{ exec.ai_actions }}</div>
+      <div class="kpi-trend">human time replaced</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="title">▲ Return on Automation</div>
+    <div class="body">
+      Based on verified telemetry, AUREM delivered an estimated
+      <strong>${{ exec.dollars_saved }}</strong> in avoided labor + downtime
+      costs this {{ period_word }}. Against a platform investment of
+      <strong>${{ exec.period_spend }}</strong>, this represents a
+      <strong>{{ exec.roi_multiplier }}×</strong> return on investment.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ UPTIME & RELIABILITY ══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 02 · Uptime & Reliability</div>
+  <h1 class="section">Site Monitor telemetry.</h1>
+  <p class="lede">
+    AUREM pinged {{ uptime.url_count }} of your endpoints every
+    {{ uptime.interval_human }} across the reporting window. Every failure
+    triggered an incident which is tracked below with MTTR and resolution path.
+  </p>
+
+  <div class="uptime-bar">
+    {% for d in uptime.days_strip %}
+      <div class="day {{ d.cls }}" title="{{ d.day }} · {{ d.pct }}%"></div>
+    {% endfor %}
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr><th>Endpoint</th><th>Checks</th><th>Uptime</th><th>Avg Latency</th><th>Incidents</th></tr>
+    </thead>
+    <tbody>
+      {% for ep in uptime.endpoints %}
+      <tr>
+        <td class="mono" style="max-width:85mm;word-break:break-all;">{{ ep.url }}</td>
+        <td class="num">{{ ep.checks }}</td>
+        <td class="num {{ ep.uptime_cls }}">{{ ep.uptime_pct }}%</td>
+        <td class="num">{{ ep.avg_latency_ms }}ms</td>
+        <td class="num">{{ ep.incidents }}</td>
+      </tr>
+      {% endfor %}
+      {% if not uptime.endpoints %}
+      <tr><td colspan="5" class="muted" style="text-align:center;padding:8mm;">No endpoints monitored during this window.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  {% if uptime.top_incidents %}
+  <h3>Top incidents resolved</h3>
+  <table class="data-table">
+    <thead><tr><th>Started</th><th>Endpoint</th><th>Duration</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for inc in uptime.top_incidents %}
+      <tr>
+        <td>{{ inc.started_human }}</td>
+        <td class="mono" style="max-width:70mm;word-break:break-all;">{{ inc.url }}</td>
+        <td class="num">{{ inc.duration_human }}</td>
+        <td><span class="badge {{ inc.badge_cls }}">{{ inc.status }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<!-- ══════════════════════════════ ERROR INTELLIGENCE — SENTINEL ══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 03 · Error Intelligence</div>
+  <h1 class="section">The Sentinel wall.</h1>
+  <p class="lede">
+    The AUREM Sentinel captures every client-side error from your browser
+    sessions and classifies them instantly. Silent production bugs that
+    typically reach users for hours before manual triage were intercepted and
+    — where mechanically safe — auto-healed without human intervention.
+  </p>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Errors Captured</div>
+      <div class="kpi-value">{{ sentinel.total_captured }}</div>
+      <div class="kpi-trend">across {{ sentinel.unique_users }} users</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Auto-Healed</div>
+      <div class="kpi-value positive">{{ sentinel.auto_healed }}</div>
+      <div class="kpi-trend up">{{ sentinel.auto_healed_pct }}% zero-touch</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Spikes Detected</div>
+      <div class="kpi-value {{ sentinel.spike_cls }}">{{ sentinel.spikes }}</div>
+      <div class="kpi-trend">early-warning alerts fired</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">AI Diagnoses</div>
+      <div class="kpi-value gold">{{ sentinel.ai_diagnoses }}</div>
+      <div class="kpi-trend">structured suggestions</div>
+    </div>
+  </div>
+
+  <h3>Top error categories</h3>
+  <table class="data-table">
+    <thead><tr><th>Category</th><th>Count</th><th>Affected Users</th><th>Disposition</th></tr></thead>
+    <tbody>
+      {% for t in sentinel.top_types %}
+      <tr>
+        <td>{{ t.label }}</td>
+        <td class="num">{{ t.count }}</td>
+        <td class="num">{{ t.unique_users }}</td>
+        <td><span class="badge {{ t.badge_cls }}">{{ t.disposition }}</span></td>
+      </tr>
+      {% endfor %}
+      {% if not sentinel.top_types %}
+      <tr><td colspan="4" class="muted" style="text-align:center;padding:8mm;">No errors captured this period. Clean run.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════ ORA WORKFORCE ══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 04 · The ORA Workforce</div>
+  <h1 class="section">Autonomous actions delivered.</h1>
+  <p class="lede">
+    The ORA command layer operated as a distributed workforce — discovering
+    leads, scoring them, triggering outreach, answering inbound voice calls,
+    and producing the morning briefing every operating day.
+  </p>
+
+  <table class="data-table">
+    <thead>
+      <tr><th>Channel</th><th>Volume</th><th>Est. Human Equivalent</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Lead discovery hunts</td><td class="num">{{ ora.hunts }}</td><td class="num">{{ ora.hunts_hh }}</td></tr>
+      <tr><td>Leads qualified</td><td class="num">{{ ora.leads }}</td><td class="num">{{ ora.leads_hh }}</td></tr>
+      <tr><td>Voice conversations</td><td class="num">{{ ora.voice_calls }}</td><td class="num">{{ ora.voice_hh }}</td></tr>
+      <tr><td>Morning briefings</td><td class="num">{{ ora.briefs }}</td><td class="num">{{ ora.briefs_hh }}</td></tr>
+      <tr><td>System pulse sweeps</td><td class="num">{{ ora.pulse_sweeps }}</td><td class="num">{{ ora.pulse_hh }}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="title">⚡ Equivalent human workforce</div>
+    <div class="body">
+      The autonomous actions captured above would have required approximately
+      <strong>{{ ora.equivalent_ftes }}</strong> full-time employees at market
+      rate (assuming an 8-hour day at ${{ ora.assumed_hourly_rate }}/hr). AUREM
+      delivered the same output for <strong>${{ exec.period_spend }}</strong>
+      this {{ period_word }}.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════ AI OUTLOOK ══════════════════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">§ 05 · AI Outlook</div>
+  <h1 class="section">Predictive briefing.</h1>
+  <p class="lede">
+    The following forward-looking assessment was produced by Claude 4.5 based
+    on the full telemetry set above. These are advisory suggestions — not
+    operating decisions — and should be reviewed by your operations lead.
+  </p>
+
+  <div class="outlook">
+    <h2>Next {{ period_word }} · {{ outlook.horizon_label }}</h2>
+    {% for p in outlook.predictions %}
+    <div class="prediction">
+      <div class="num">{{ loop.index }}</div>
+      <div class="text">
+        <div class="h">{{ p.title }}</div>
+        <div>{{ p.body }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    {% if not outlook.predictions %}
+    <div class="prediction"><div class="text"><div class="h">No predictions available</div>
+    <div>Insufficient telemetry to generate forward-looking signal. Report back next period.</div>
+    </div></div>
+    {% endif %}
+  </div>
+
+  <div class="callout dark" style="margin-top:6mm;">
+    <div class="title">◆ Bottom line</div>
+    <div class="body">{{ outlook.bottom_line }}</div>
+  </div>
+
+  <div class="footer-stamp">
+    <div>Verified telemetry · {{ verification.endpoint_count }} endpoints · {{ verification.data_point_count }} data points</div>
+    <div>Issued by AUREM Autonomous Systems</div>
+  </div>
+</section>
+
+</body>
+</html>
