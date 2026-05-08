@@ -26,6 +26,15 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Disaster Recovery: Primary → Secondary Atlas mirror live ✅**
+  - New service: `/app/backend/services/db_backup_service.py` (drop+insert mirror, per-collection stats, Resend email on failure)
+  - New router: `/app/backend/routers/admin_dr_backup_router.py` — `POST /api/admin/backup/trigger`, `GET /api/admin/backup/status` (super_admin only)
+  - APScheduler cron `aurem_dr_backup_daily` registered: daily 03:00 UTC
+  - Secondary cluster: Atlas M0 free tier "Backupmy" (`backupmy.uxvf9mh.mongodb.net`), separate Atlas project for blast-radius isolation
+  - **First production mirror VERIFIED**: 462 collections, 159,410 docs, 11min24s, status=ok (run_id `dr-20260508T160226Z`)
+  - High-volume transient logs excluded (`api_audit_log`, `site_monitor_logs`, `qa_bot_endpoint_log`, `agent_feed`, `a2a_events`, `*_archive`) for ~70% size reduction
+  - Failover doc: `/app/memory/DISASTER_RECOVERY.md` — 30-second URL-swap procedure documented
+  - Run history persisted in `db_backup_runs` collection on primary
 - **2026-02-08 — Customer Portal /my fully responsive (mobile/tablet/desktop) ✅**
   - Created `useViewport` hook (`/app/frontend/src/platform/luxe/useViewport.js`)
   - Sidebar → mobile drawer with hamburger toggle + backdrop + close button

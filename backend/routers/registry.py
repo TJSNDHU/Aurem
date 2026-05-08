@@ -452,6 +452,7 @@ def register_all_routers(app, db):
         "routers.custom_subscription_router",
         "routers.admin_plan_router",
         "routers.admin_plan_management",
+        "routers.admin_dr_backup_router",
         "routers.self_healing_router",
     ]:
         if _should_skip(module_path):
@@ -1655,6 +1656,24 @@ def register_all_routers(app, db):
             replace_existing=True
         )
         logger.info("[REGISTRY] Self-scan cron scheduled: daily at 3:00 AM EST")
+
+        # Daily Disaster Recovery: mirror primary → secondary Atlas cluster.
+        # Runs at 03:00 UTC (low-traffic window). Skipped silently if
+        # SECONDARY_MONGO_URL is not configured.
+        try:
+            from services.db_backup_service import run_backup_async
+            aurem_scheduler.add_job(
+                run_backup_async,
+                CronTrigger(hour=3, minute=0, timezone="UTC"),
+                id='aurem_dr_backup_daily',
+                name='AUREM DR Backup (Primary → Secondary)',
+                kwargs={'triggered_by': 'scheduler_cron'},
+                replace_existing=True,
+                misfire_grace_time=3600,
+            )
+            logger.info("[REGISTRY] DR backup cron scheduled: daily at 03:00 UTC")
+        except Exception as _e:
+            logger.warning(f"[REGISTRY] DR backup cron failed to register: {_e}")
 
         # Midnight daily usage reset for tenant_customers
         async def reset_tenant_daily_usage():
