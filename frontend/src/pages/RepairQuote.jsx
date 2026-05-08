@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Zap, Globe2, Mail, Smartphone, Link2, FileSearch, CalendarDays, ArrowRight } from "lucide-react";
+import { Loader2, ShieldCheck, Zap, Globe2, Mail, Smartphone, Link2, FileSearch, CalendarDays, ArrowRight, Sparkles, Copy, Check } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -43,6 +43,58 @@ const RepairQuote = () => {
   const progressTimerRef = useRef(null);
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
+
+  // ── "I don't have a website" instant-builder flow (7-day trial) ───
+  const [showNoSite, setShowNoSite] = useState(false);
+  const [nwsForm, setNwsForm] = useState({
+    business_name: "",
+    email: "",
+    phone: "",
+    city: "",
+    category: "",
+    consent: true,
+  });
+  const [nwsLoading, setNwsLoading] = useState(false);
+  const [nwsResult, setNwsResult] = useState(null);
+  const [nwsError, setNwsError] = useState("");
+  const [pwdCopied, setPwdCopied] = useState(false);
+
+  const onNwsChange = useCallback((k) => (e) => {
+    const v = e?.target?.type === "checkbox" ? e.target.checked : e.target.value;
+    setNwsForm((p) => ({ ...p, [k]: v }));
+  }, []);
+
+  const submitNws = useCallback(async (e) => {
+    e?.preventDefault?.();
+    setNwsError("");
+    setNwsResult(null);
+    if (!nwsForm.business_name.trim() || !nwsForm.email.trim()) {
+      setNwsError("Business name aur email dono chahiye.");
+      return;
+    }
+    if (!nwsForm.consent) {
+      setNwsError("CASL consent mark karo.");
+      return;
+    }
+    setNwsLoading(true);
+    try {
+      const r = await fetch(`${API}/api/website-builder/no-website`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nwsForm),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setNwsError(body?.detail || `Failed (HTTP ${r.status})`);
+      } else {
+        setNwsResult(body);
+      }
+    } catch (e) {
+      setNwsError(e.message || "Network error");
+    } finally {
+      setNwsLoading(false);
+    }
+  }, [nwsForm]);
 
   // iter 282al-13 — synthetic 0→100 progress bar that mirrors the
   // 6-step audit (SSL → speed → mobile → links → contact → social).
@@ -141,7 +193,7 @@ const RepairQuote = () => {
             <span className="text-zinc-500">Already have an account?</span>
             <button
               type="button"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/my")}
               data-testid="repair-quote-login-btn"
               className="px-4 py-2 rounded-md border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition font-medium"
             >
@@ -287,6 +339,213 @@ const RepairQuote = () => {
           </form>
         )}
 
+        {/* ── NO-WEBSITE CTA — opens instant 7-day starter site flow ── */}
+        {!report && !showNoSite && (
+          <div data-testid="no-website-cta-wrap" className="mt-5 text-center">
+            <button
+              type="button"
+              data-testid="no-website-cta"
+              onClick={() => { setShowNoSite(true); setNwsResult(null); setNwsError(""); }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/15 text-amber-300 text-[13px] font-medium transition"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              I don't have a website — build me a free one (7-day trial)
+            </button>
+          </div>
+        )}
+
+        {/* ── NO-WEBSITE FORM ── */}
+        {!report && showNoSite && !nwsResult && (
+          <form
+            onSubmit={submitNws}
+            data-testid="no-website-form"
+            className="mt-6 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-zinc-950/70 p-6 space-y-4"
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-400 mb-1">
+                  <Sparkles className="w-3 h-3" /> Free Starter Site · 7-day Trial
+                </div>
+                <h3 className="text-xl font-semibold">Build my website now</h3>
+                <p className="text-zinc-400 text-[13px] mt-1">
+                  We'll instantly generate a live sample site, install AUREM pixels, and create your dashboard. Subscribe before day 7 to keep it.
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="no-website-cancel"
+                onClick={() => setShowNoSite(false)}
+                className="text-zinc-500 hover:text-zinc-300 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-zinc-500">
+                  Business Name <span className="text-amber-400">*</span>
+                </label>
+                <input
+                  data-testid="nws-business-name"
+                  type="text"
+                  placeholder="Acme Roofing"
+                  value={nwsForm.business_name}
+                  onChange={onNwsChange("business_name")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-zinc-500">
+                  Email <span className="text-amber-400">*</span>
+                </label>
+                <input
+                  data-testid="nws-email"
+                  type="email"
+                  placeholder="you@business.com"
+                  value={nwsForm.email}
+                  onChange={onNwsChange("email")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-zinc-500">Phone</label>
+                <input
+                  data-testid="nws-phone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={nwsForm.phone}
+                  onChange={onNwsChange("phone")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-zinc-500">City</label>
+                <input
+                  data-testid="nws-city"
+                  type="text"
+                  placeholder="Toronto, ON"
+                  value={nwsForm.city}
+                  onChange={onNwsChange("city")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-wider text-zinc-500">Industry</label>
+                <input
+                  data-testid="nws-category"
+                  type="text"
+                  placeholder="Roofing, HVAC, etc."
+                  value={nwsForm.category}
+                  onChange={onNwsChange("category")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-start gap-3 text-[12px] text-zinc-400 select-none cursor-pointer">
+              <input
+                data-testid="nws-consent"
+                type="checkbox"
+                checked={nwsForm.consent}
+                onChange={onNwsChange("consent")}
+                className="mt-1 accent-amber-500"
+              />
+              <span>
+                I agree to receive my login credentials + onboarding emails (CASL-compliant). Trial ends in 7 days unless I subscribe.
+              </span>
+            </label>
+
+            {nwsError && (
+              <div data-testid="nws-error" className="rounded-lg border border-rose-900 bg-rose-950/40 p-3 text-[13px] text-rose-300">
+                {nwsError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={nwsLoading}
+              data-testid="nws-submit"
+              className="w-full bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold py-3.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
+            >
+              {nwsLoading ? (<><Loader2 className="w-4 h-4 animate-spin" /> Building your site…</>) : (<><Sparkles className="w-4 h-4" /> Build my free site</>)}
+            </button>
+          </form>
+        )}
+
+        {/* ── NO-WEBSITE SUCCESS ── */}
+        {nwsResult && (
+          <div data-testid="nws-result" className="mt-6 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-zinc-950/70 p-6 space-y-5">
+            <div>
+              <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-300 mb-2">
+                <Sparkles className="w-3 h-3" /> Your starter site is live
+              </div>
+              <h3 className="text-2xl font-semibold">Welcome to AUREM 👋</h3>
+              <p className="text-zinc-400 text-sm mt-2">
+                Your sample website is live for <strong className="text-amber-300">7 days</strong>. Save these credentials — you'll need them to sign in to your dashboard.
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-black/40 border border-zinc-800 p-4 space-y-3 font-mono text-[13px]">
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Email</span>
+                <span data-testid="nws-result-email" className="text-zinc-100">{nwsResult.email}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">BIN</span>
+                <span data-testid="nws-result-bin" className="text-amber-300">{nwsResult.bin}</span>
+              </div>
+              <div className="flex justify-between gap-3 items-center">
+                <span className="text-zinc-500">Temp password</span>
+                <div className="flex items-center gap-2">
+                  <span data-testid="nws-result-password" className="text-zinc-100 select-all">{nwsResult.temp_password}</span>
+                  <button
+                    type="button"
+                    data-testid="nws-result-copy"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(nwsResult.temp_password);
+                      setPwdCopied(true);
+                      setTimeout(() => setPwdCopied(false), 1800);
+                    }}
+                    className="text-amber-300 hover:text-amber-200"
+                    aria-label="Copy password"
+                  >
+                    {pwdCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-500">Trial ends</span>
+                <span className="text-zinc-100">{new Date(nwsResult.trial_ends_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <a
+                href={nwsResult.sample_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="nws-view-site"
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/15 text-amber-300 font-medium transition"
+              >
+                <Globe2 className="w-4 h-4" /> View my site
+              </a>
+              <a
+                href="/my"
+                data-testid="nws-go-dashboard"
+                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold transition"
+              >
+                Sign in to dashboard <ArrowRight className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* Report */}
         {report && (
           <div data-testid="repair-quote-report" className="space-y-6">
@@ -397,13 +656,13 @@ const RepairQuote = () => {
                 Reply YES for a fixed-price repair plan.
               </div>
 
-              {/* iter 282al-13 — NEXT button → customer sign-up */}
+              {/* Post-audit → /my customer interface (signup mode pre-filled) */}
               <a
-                href={`/signup?email=${encodeURIComponent(form.email || "")}&biz=${encodeURIComponent(form.business_name || "")}&from=repair-audit`}
+                href={`/my?signup=1&email=${encodeURIComponent(form.email || "")}&biz=${encodeURIComponent(form.business_name || "")}&from=repair-audit`}
                 data-testid="repair-quote-next-btn"
                 className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold transition shadow-lg shadow-amber-500/20"
               >
-                Next — Create your AUREM account
+                Next — Open my AUREM dashboard
                 <ArrowRight className="w-4 h-4" />
               </a>
 

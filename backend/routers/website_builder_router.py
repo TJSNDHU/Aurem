@@ -112,6 +112,149 @@ async def generate(body: GenerateRequest, request: Request):
 
 
 # ─────────────────────────────────────────────────────────────
+# PUBLIC: NO-WEBSITE INSTANT STARTER (7-day trial, no auth needed)
+# ─────────────────────────────────────────────────────────────
+class NoWebsiteRequest(BaseModel):
+    business_name: str
+    email: str
+    phone: Optional[str] = ""
+    city: Optional[str] = ""
+    category: Optional[str] = ""  # e.g. "Roofing", "HVAC", "Realtor"
+    consent: bool = True
+
+
+@router.post("/no-website")
+async def no_website_instant(body: NoWebsiteRequest, request: Request):
+    """
+    Public, no-auth endpoint for the homepage "I don't have a website" CTA.
+    Creates a self-service lead → generates a sample site → provisions a
+    7-day trial customer account → returns the slug + a one-time login URL.
+    """
+    import secrets as _secrets
+    import bcrypt as _bcrypt
+    from datetime import timedelta as _timedelta
+
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+
+    business_name = (body.business_name or "").strip()
+    email = (body.email or "").strip().lower()
+    if not business_name or not email or "@" not in email:
+        raise HTTPException(400, "business_name and a valid email are required")
+    if not body.consent:
+        raise HTTPException(400, "Consent (CASL) is required")
+
+    now = datetime.now(timezone.utc)
+    trial_ends = now + _timedelta(days=7)
+
+    # 1) Build the lead doc the existing generator expects.
+    from services.website_builder import slugify
+    lead_id = f"nws_{_secrets.token_hex(6)}"
+    slug = slugify(business_name)
+    lead = {
+        "lead_id": lead_id,
+        "business_name": business_name,
+        "email": email,
+        "phone": (body.phone or "").strip(),
+        "location": (body.city or "").strip(),
+        "category": (body.category or "").strip() or "Local Business",
+        "rating": "5.0",
+        "reviews_count": 0,
+        "hours": {},
+        "source": "no_website_signup",
+        "created_at": now.isoformat(),
+    }
+    await db.campaign_leads.update_one(
+        {"lead_id": lead_id}, {"$setOnInsert": lead}, upsert=True
+    )
+
+    # 2) Re-use existing generator (sync, fast — runs in thread).
+    import asyncio as _asyncio
+    website = await _asyncio.to_thread(generate_website, lead)
+    website["lead_id"] = lead_id
+    website["trial_started_at"] = now.isoformat()
+    website["trial_ends_at"] = trial_ends.isoformat()
+    website["trial_expired"] = False
+    website["status"] = website.get("status") or "approved"
+    # Use lead_id as the slug suffix to guarantee uniqueness.
+    final_slug = f"{website.get('slug', slug) or slug}-{lead_id[-6:]}"
+    website["slug"] = final_slug
+
+    await db[COLLECTION].update_one(
+        {"slug": final_slug}, {"$set": website}, upsert=True
+    )
+
+    # 3) Provision (or upsert) a customer account in platform_users.
+    #    Keep the password reset token short-lived; the email contains the
+    #    one-time login URL using the existing /my password-reset flow.
+    existing_user = await db.platform_users.find_one({"email": email}, {"_id": 0})
+    user_id = (existing_user or {}).get("user_id") or f"u_{_secrets.token_hex(8)}"
+    bin_code = (existing_user or {}).get("bin") or f"AURE-NWS-{_secrets.token_hex(3).upper()}"
+    temp_password = _secrets.token_urlsafe(12)
+    hashed = _bcrypt.hashpw(temp_password.encode(), _bcrypt.gensalt()).decode()
+
+    user_doc = {
+        "user_id": user_id,
+        "email": email,
+        "password_hash": hashed,
+        "bin": bin_code,
+        "full_name": business_name,
+        "company_name": business_name,
+        "tier": "starter",
+        "tier_status": "trial",
+        "trial_started_at": now.isoformat(),
+        "trial_ends_at": trial_ends.isoformat(),
+        "sample_site_slug": final_slug,
+        "source": "no_website_signup",
+        "created_at": (existing_user or {}).get("created_at", now.isoformat()),
+        "updated_at": now.isoformat(),
+    }
+    await db.platform_users.update_one(
+        {"email": email},
+        {"$set": user_doc, "$setOnInsert": {"_first_seen": now.isoformat()}},
+        upsert=True,
+    )
+    # Mirror to legacy `users` collection so existing admin/login flows still see this account
+    await db.users.update_one(
+        {"email": email},
+        {"$set": {
+            "email": email,
+            "password": hashed,
+            "password_hash": hashed,
+            "name": business_name,
+            "tier": "starter",
+            "tier_status": "trial",
+            "trial_ends_at": trial_ends.isoformat(),
+        }},
+        upsert=True,
+    )
+
+    # 4) Return everything the frontend needs to redirect the visitor.
+    public_base = os.environ.get("PUBLIC_APP_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+    sample_url = f"{public_base}/sample/{final_slug}"
+    login_url  = f"{public_base}/my"
+
+    logger.info(f"[NO-WEBSITE] new starter site for {email} → /sample/{final_slug}")
+
+    return {
+        "ok": True,
+        "slug": final_slug,
+        "sample_url": sample_url,
+        "login_url": login_url,
+        "email": email,
+        "bin": bin_code,
+        "temp_password": temp_password,  # shown once on the success screen
+        "trial_ends_at": trial_ends.isoformat(),
+        "message": (
+            "Your sample site is live for 7 days. Use the credentials below to "
+            "sign in to your dashboard. Subscribe before the trial ends to keep "
+            "the site live."
+        ),
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # LIST (must be before /{slug} to avoid route conflict)
 # ─────────────────────────────────────────────────────────────
 @router.get("/list")

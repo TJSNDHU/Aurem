@@ -26,6 +26,15 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — RepairQuote flows + Instant Website Builder for "no-website" leads ✅**
+  - **`POST /api/website-builder/no-website`** (NEW, public, no-auth) — creates lead → calls existing `generate_website()` → provisions customer in `platform_users` + `users` (7-day trial, tier=starter, BIN=`AURE-NWS-XXXX`) → returns slug, sample_url, login_url, temp_password
+  - `RepairQuote.jsx`: top-right **"Log In"** now goes to `/my` (was `/login`)
+  - Post-audit **"Next"** button now goes to `/my?signup=1&email=...` (was `/signup`)
+  - Brand-new **"I don't have a website — build me a free one (7-day trial)"** CTA pill below the audit form
+  - On click: full inline form (business name, email, phone, city, industry, CASL consent) → submits to public endpoint
+  - On success: glass success card showing **Email / BIN / Temp password (with copy button) / Trial end date** + "View my site" + "Sign in to dashboard" buttons
+  - **E2E verified**: visitor → fill form → site generated → /sample/{slug} live → login with temp password → `/api/platform/auth/login` returns valid JWT
+  - Redis rate-limit warning quieted: now logs **once on transition** to fallback instead of every request (memory limiter takes over silently — sovereign override working as designed)
 - **2026-02-08 — "Remember me" checkbox on `/my` login overlay ✅**
   - New checkbox with testid `auth-remember`, label "Keep me signed in for 30 days", default CHECKED
   - Storage strategy:

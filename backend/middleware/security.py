@@ -107,7 +107,14 @@ class RedisRateLimiter:
 
                 return False
             except (asyncio.TimeoutError, Exception) as e:
-                logging.warning(f"Redis rate limit check failed, using memory: {e}")
+                # Redis is best-effort — we always have an in-memory fallback.
+                # Log once on the *transition* to disconnected so prod logs
+                # aren't spammed with the same warning every request.
+                if self._connected:
+                    logging.warning(
+                        f"Redis unavailable, switching to in-memory rate "
+                        f"limiter (sovereign fallback): {e}"
+                    )
                 self._connected = False  # Stop trying Redis until reconnect
         
         # Fallback to in-memory
