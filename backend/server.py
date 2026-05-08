@@ -1127,6 +1127,24 @@ async def startup_event():
                 except Exception as e:
                     logging.warning(f"[STARTUP] ⚠️  Startup validation error: {e}")
                 # ════════════════════════════════════════════════════════════════
+
+                # ════════════════════════════════════════════════════════════════
+                # FOUNDER AUTO-PROVISION — idempotent, runs every startup.
+                # Ensures founder accounts (teji.ss1986@gmail.com, admin@aurem.live)
+                # exist as LIFETIME ENTERPRISE in WHATEVER DB is connected
+                # (preview pod or Atlas production). Critical for production
+                # because Atlas != preview DB; without this founders show as
+                # STARTER/TRIAL on aurem.live.
+                # ════════════════════════════════════════════════════════════════
+                try:
+                    from services.founder_provision import ensure_founders
+                    fdr = await asyncio.wait_for(ensure_founders(db), timeout=8.0)
+                    logging.info(f"[STARTUP] founders provisioned: {fdr}")
+                except asyncio.TimeoutError:
+                    logging.warning("[STARTUP] ⚠️  Founder provisioning timed out — continuing")
+                except Exception as e:
+                    logging.warning(f"[STARTUP] ⚠️  Founder provisioning failed: {e}")
+                # ════════════════════════════════════════════════════════════════
                 
         except Exception as e:
             logging.error(f"❌ MongoDB client creation failed: {e}")
