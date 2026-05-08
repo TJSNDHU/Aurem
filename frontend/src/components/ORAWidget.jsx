@@ -17,6 +17,11 @@ const ACCENT = "#D4AF37";
 const BG_DARK = "#0A0A0A";
 const BORDER = "rgba(212, 175, 55, 0.25)";
 
+const isMobileViewport = () => {
+  try { return typeof window !== 'undefined' && window.innerWidth < 768; }
+  catch { return false; }
+};
+
 const DEFAULT_STATE = {
   position: { x: null, y: null },   // null → bottom-right anchor
   size: { w: 340, h: 460 },
@@ -27,10 +32,19 @@ const DEFAULT_STATE = {
 const loadState = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_STATE };
-    return { ...DEFAULT_STATE, ...JSON.parse(raw) };
+    const parsed = raw ? JSON.parse(raw) : {};
+    const merged = { ...DEFAULT_STATE, ...parsed };
+    // On mobile, force-minimize on first hydration so the widget never
+    // covers the auth overlay or page content. User can still expand manually.
+    if (isMobileViewport()) {
+      merged.minimized = true;
+      // Snap back to bottom-right anchor on mobile so a previously-dragged
+      // position from desktop does not push the bar off-screen.
+      merged.position = { x: null, y: null };
+    }
+    return merged;
   } catch {
-    return { ...DEFAULT_STATE };
+    return { ...DEFAULT_STATE, minimized: isMobileViewport() };
   }
 };
 
@@ -52,11 +66,12 @@ export default function ORAWidget() {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // First-visit auto-open is the default state (minimized: false). Returning
-  // visitors get whatever they last set (minimized true if they collapsed it).
+  // First-visit auto-open ONLY on desktop. On mobile we keep the widget
+  // collapsed by default so it never covers auth overlays or page content.
   useEffect(() => {
     if (!state.visited) {
-      const next = { ...state, visited: true, minimized: false };
+      const onMobile = isMobileViewport();
+      const next = { ...state, visited: true, minimized: onMobile };
       setState(next);
       saveState(next);
     }
@@ -196,11 +211,21 @@ export default function ORAWidget() {
   };
 
   // ─── Position / sizing ─────────────────────────────────────
+  // Clamp the widget to the viewport so on small phones it never covers
+  // the whole screen (max ~88vw wide × 56vh tall). This is purely a
+  // render-time cap; saved state stays untouched.
+  const vw = (typeof window !== 'undefined' ? window.innerWidth : 1280);
+  const vh = (typeof window !== 'undefined' ? window.innerHeight : 800);
+  const maxW = Math.max(280, Math.min(vw - 24, 360));
+  const maxH = Math.max(220, Math.min(Math.round(vh * 0.62), 460));
+  const clampedW = Math.min(state.size.w, maxW);
+  const clampedH = Math.min(state.size.h, maxH);
+
   const widgetStyle = state.position.x === null
-    ? { right: 16, bottom: 16 }
+    ? { right: 12, bottom: 12 }
     : { left: state.position.x, top: state.position.y };
 
-  const heightStyle = state.minimized ? { height: 48 } : { height: state.size.h };
+  const heightStyle = state.minimized ? { height: 48 } : { height: clampedH };
 
   return (
     <div
@@ -209,7 +234,7 @@ export default function ORAWidget() {
       style={{
         position: "fixed",
         zIndex: 2147483600,
-        width: state.size.w,
+        width: clampedW,
         ...heightStyle,
         ...widgetStyle,
         background: BG_DARK,

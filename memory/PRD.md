@@ -26,6 +26,16 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Customer Portal /my fully responsive (mobile/tablet/desktop) ✅**
+  - Created `useViewport` hook (`/app/frontend/src/platform/luxe/useViewport.js`)
+  - Sidebar → mobile drawer with hamburger toggle + backdrop + close button
+  - HeaderStrip → mobile-aware (hamburger button + truncated label)
+  - All rigid grids (`repeat(N,1fr)`) → fluid `repeat(auto-fit, minmax(...))` so KPIs reflow 2×2 on mobile, 4×1 on desktop
+  - AgentsTile bar chart adapts via `auto-fit minmax(38px,1fr)`
+  - Card padding/border-radius use `clamp()` for fluid scaling
+  - PageShell H1 uses `clamp(18px, 4vw, 22px)`
+  - **Critical fix**: ORA help widget was covering login form on mobile (fixed `width:340 × height:460` covered 86% × 54% of phone). Now defaults to minimized (48px bar) on mobile + clamps width/height to viewport (`max ~88vw × 56vh`)
+  - Verified across 393px (mobile), 820px (tablet), 1920px (desktop)
 - **2026-02-08 — Customer Portal /my (Luxe) E2E verified ✅**
   - Rebuilt luxe/* folder post git rollback (LuxeAuthContext, LuxeAuthOverlay, LuxePages, useLuxeDashboardData, tokens)
   - All files use `lib/api.js` BACKEND_URL helper — zero direct `process.env.REACT_APP_BACKEND_URL` usage in luxe/*

@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Home as HomeIcon, Activity, Shield, Bot, Users, Sparkles, Cog,
-  User as UserIcon, LogOut, Bell, Zap,
+  User as UserIcon, LogOut, Bell, Zap, Menu as MenuIcon, X as CloseIcon,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -15,6 +15,7 @@ import { Toaster } from 'sonner';
 import { LuxeAuthProvider, useLuxeAuth } from '../luxe/LuxeAuthContext';
 import { LuxeAuthOverlay } from '../luxe/LuxeAuthOverlay';
 import { useLuxeDashboardData } from '../luxe/useLuxeDashboardData';
+import { useViewport } from '../luxe/useViewport';
 import {
   Card, StatusDot,
   ProfilePage, LiveHealthPage, SecurityPage,
@@ -37,67 +38,144 @@ const NAV = [
 ];
 
 // ── Sidebar ──────────────────────────────────────────────────────────
-const Sidebar = ({ active, onNav, onLogout, user }) => (
-  <aside style={{
-    width: 200, padding: '20px 14px',
-    display: 'flex', flexDirection: 'column', gap: 4,
-    background: 'rgba(8,10,14,0.72)',
-    borderRight: '1px solid rgba(212,163,115,0.10)',
-    backdropFilter: 'blur(18px)',
-    WebkitBackdropFilter: 'blur(18px)',
-    height: '100vh', position: 'sticky', top: 0,
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 22, paddingLeft: 4 }}>
-      <span style={{
-        width: 26, height: 26, borderRadius: 7,
-        background: 'linear-gradient(135deg, #FFE4A8, #C9A84C)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: fontDisplay, color: INK, fontSize: 14, fontWeight: 700,
-      }}>A</span>
-      <span style={{ color: TEXT_HI, fontFamily: fontDisplay, letterSpacing: '0.30em', fontSize: 13, fontWeight: 700 }}>AUREM</span>
-    </div>
-    {NAV.map(({ k, label, icon: Icon }) => (
-      <button key={k} data-testid={`nav-${k}`} onClick={() => onNav(k)}
+// Desktop: full 200px rail. Tablet: 200px rail. Mobile: hidden (drawer).
+const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobileClose }) => {
+  const visible = !isMobile || mobileOpen;
+  const navClick = (k) => {
+    onNav(k);
+    if (isMobile) onMobileClose?.();
+  };
+  return (
+    <>
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          onClick={onMobileClose}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+            zIndex: 90,
+          }}
+        />
+      )}
+      <aside
+        data-testid="luxe-sidebar"
         style={{
+          width: 200, padding: '20px 14px',
+          display: visible ? 'flex' : 'none',
+          flexDirection: 'column', gap: 4,
+          background: 'rgba(8,10,14,0.92)',
+          borderRight: '1px solid rgba(212,163,115,0.10)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
+          height: '100vh',
+          position: isMobile ? 'fixed' : 'sticky',
+          top: 0, left: 0,
+          zIndex: isMobile ? 100 : 1,
+          transition: 'transform .25s ease',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 22, paddingLeft: 4,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              width: 26, height: 26, borderRadius: 7,
+              background: 'linear-gradient(135deg, #FFE4A8, #C9A84C)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: fontDisplay, color: INK, fontSize: 14, fontWeight: 700,
+            }}>A</span>
+            <span style={{
+              color: TEXT_HI, fontFamily: fontDisplay,
+              letterSpacing: '0.30em', fontSize: 13, fontWeight: 700,
+            }}>AUREM</span>
+          </div>
+          {isMobile && (
+            <button
+              data-testid="sidebar-close"
+              onClick={onMobileClose}
+              aria-label="Close menu"
+              style={{
+                background: 'transparent', border: 'none', color: TEXT_MD,
+                cursor: 'pointer', padding: 4,
+              }}
+            >
+              <CloseIcon size={18} />
+            </button>
+          )}
+        </div>
+        {NAV.map(({ k, label, icon: Icon }) => (
+          <button key={k} data-testid={`nav-${k}`} onClick={() => navClick(k)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: active === k ? 'rgba(212,163,115,0.10)' : 'transparent',
+              border: `1px solid ${active === k ? STROKE : 'transparent'}`,
+              color: active === k ? GOLD_HI : TEXT_MD,
+              fontFamily: fontMono, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
+              cursor: 'pointer', textAlign: 'left',
+            }}>
+            <Icon size={14} />
+            {label}
+          </button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <div style={{
+          padding: '10px 12px', fontFamily: fontMono, color: TEXT_LO, fontSize: 9,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {user?.email || 'Loading…'}
+        </div>
+        <button data-testid="nav-logout" onClick={onLogout} style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 12px', borderRadius: 10,
-          background: active === k ? 'rgba(212,163,115,0.10)' : 'transparent',
-          border: `1px solid ${active === k ? STROKE : 'transparent'}`,
-          color: active === k ? GOLD_HI : TEXT_MD,
+          padding: '10px 12px', borderRadius: 10, background: 'transparent',
+          border: '1px solid transparent', color: TEXT_MD,
           fontFamily: fontMono, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
           cursor: 'pointer', textAlign: 'left',
         }}>
-        <Icon size={14} />
-        {label}
-      </button>
-    ))}
-    <div style={{ flex: 1 }} />
-    <div style={{ padding: '10px 12px', fontFamily: fontMono, color: TEXT_LO, fontSize: 9 }}>
-      {user?.email || 'Loading…'}
-    </div>
-    <button data-testid="nav-logout" onClick={onLogout} style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 12px', borderRadius: 10, background: 'transparent',
-      border: '1px solid transparent', color: TEXT_MD,
-      fontFamily: fontMono, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
-      cursor: 'pointer', textAlign: 'left',
-    }}>
-      <LogOut size={14} />
-      Sign Out
-    </button>
-  </aside>
-);
+          <LogOut size={14} />
+          Sign Out
+        </button>
+      </aside>
+    </>
+  );
+};
 
 // ── Header strip ─────────────────────────────────────────────────────
-const HeaderStrip = ({ user }) => (
+const HeaderStrip = ({ user, isMobile, onMenuOpen }) => (
   <div style={{
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '10px 18px', borderBottom: '1px solid rgba(212,163,115,0.08)',
+    padding: '10px 14px', borderBottom: '1px solid rgba(212,163,115,0.08)',
+    gap: 8,
   }}>
-    <div style={{ fontFamily: fontMono, fontSize: 10, color: TEXT_LO, letterSpacing: '0.20em' }}>
-      AUREM PLATFORM · CUSTOMER
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      {isMobile && (
+        <button
+          data-testid="sidebar-open"
+          onClick={onMenuOpen}
+          aria-label="Open menu"
+          style={{
+            background: 'transparent', border: '1px solid rgba(212,163,115,0.18)',
+            color: TEXT_MD, padding: '6px 8px', borderRadius: 8, cursor: 'pointer',
+            display: 'flex', alignItems: 'center',
+          }}
+        >
+          <MenuIcon size={16} />
+        </button>
+      )}
+      <div style={{
+        fontFamily: fontMono, fontSize: 10, color: TEXT_LO, letterSpacing: '0.20em',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {isMobile ? 'AUREM' : 'AUREM PLATFORM · CUSTOMER'}
+      </div>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: fontMono, fontSize: 10, color: TEXT_MD }}>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      fontFamily: fontMono, fontSize: 10, color: TEXT_MD,
+      flexShrink: 0,
+    }}>
       <Bell size={13} />
       <span>{(user?.tier || 'starter').toUpperCase()}</span>
       <span style={{ color: GOLD_HI }}>•</span>
@@ -131,13 +209,20 @@ const AgentsTile = ({ agents }) => (
     <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 14 }}>
       Active Agents (Real-Time)
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 10, height: 110, alignItems: 'end' }}>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(38px, 1fr))',
+      gap: 10, alignItems: 'end',
+    }}>
       {agents.map((a, i) => {
         const h = 16 + (a.v / 100) * 70;
         const isHi = a.v >= 70;
         const display = a.n >= 1000 ? `${(a.n / 1000).toFixed(1)}k` : String(a.n);
         return (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+          <div key={i} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            minHeight: 110, justifyContent: 'flex-end',
+          }}
             title={`${a.k}: ${a.n} ${a.status || ''}`}
           >
             <span style={{ fontFamily: fontMono, color: isHi ? '#FFE4A8' : TEXT_HI, fontSize: 9, fontWeight: 700 }}>{display}</span>
@@ -271,16 +356,23 @@ const AlertsTile = ({ data }) => {
 
 // ── Home (12-tile grid) ──────────────────────────────────────────────
 const HomePage = ({ data }) => (
-  <div data-testid="page-home" style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+  <div data-testid="page-home" style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <PulseRing active={!!data.pulse?.active} />
-      <h1 style={{ margin: 0, color: TEXT_HI, fontFamily: fontDisplay, fontSize: 22, fontWeight: 700, letterSpacing: '0.10em' }}>AUREM PULSE</h1>
+      <h1 style={{
+        margin: 0, color: TEXT_HI, fontFamily: fontDisplay,
+        fontSize: 'clamp(18px, 4vw, 22px)', fontWeight: 700, letterSpacing: '0.10em',
+      }}>AUREM PULSE</h1>
       <span style={{ fontFamily: fontMono, fontSize: 10, color: data.pulse?.active ? '#bef264' : '#fbbf24', letterSpacing: '0.20em' }}>
         ● {data.pulse?.active ? 'ACTIVE' : 'STANDBY'}
       </span>
     </div>
-    {/* Row 1: 4 KPIs */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+    {/* Row 1: 4 KPIs — auto-fit becomes 2x2 on mobile, 4x1 on desktop */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+      gap: 12,
+    }}>
       <KpiTile testid="total-revenue" label="Total Revenue"
         value={`$${(data.totalRevenue?.value || 0).toLocaleString()}`}
         sub={`Δ ${data.totalRevenue?.deltaPct?.toFixed(1) ?? 0}%`} />
@@ -294,13 +386,21 @@ const HomePage = ({ data }) => (
         value={(data.agents || []).filter(a => /ACTIVE|SCANNING|ENGAGING|HUNTING|NURTURING|AMPLIFYING|SPEAKING|WATCHING/i.test(a.status)).length + ' / 8'}
         sub="of 8 customer agents" />
     </div>
-    {/* Row 2: agents (2 cols) + Vanguard (2 cols) */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-      <AgentsTile agents={data.agents || []} />
-      <div style={{ gridColumn: 'span 2' }}><VanguardTile data={data} /></div>
+    {/* Row 2: agents + Vanguard — stacks on mobile */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: 12,
+    }}>
+      <div style={{ minWidth: 0 }}><AgentsTileWrap agents={data.agents || []} /></div>
+      <div style={{ minWidth: 0 }}><VanguardTile data={data} /></div>
     </div>
-    {/* Row 3: scan + repair + alerts (3 cols) */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+    {/* Row 3: scan + repair + alerts — collapses naturally */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gap: 12,
+    }}>
       <ScanTile data={data} />
       <RepairTile data={data} />
       <AlertsTile data={data} />
@@ -314,10 +414,51 @@ const HomePage = ({ data }) => (
   </div>
 );
 
+// AgentsTile already takes `gridColumn: span 2` for the original 4-col layout.
+// In the new auto-fit grid we don't want that column-span; wrap to strip it.
+const AgentsTileWrap = ({ agents }) => (
+  <Card testid="agents-tile">
+    <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 14 }}>
+      Active Agents (Real-Time)
+    </div>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(38px, 1fr))',
+      gap: 10, alignItems: 'end',
+    }}>
+      {agents.map((a, i) => {
+        const h = 16 + (a.v / 100) * 70;
+        const isHi = a.v >= 70;
+        const display = a.n >= 1000 ? `${(a.n / 1000).toFixed(1)}k` : String(a.n);
+        return (
+          <div key={i} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            minHeight: 110, justifyContent: 'flex-end',
+          }}
+            title={`${a.k}: ${a.n} ${a.status || ''}`}
+          >
+            <span style={{ fontFamily: fontMono, color: isHi ? '#FFE4A8' : TEXT_HI, fontSize: 9, fontWeight: 700 }}>{display}</span>
+            <div style={{
+              width: 16, height: h, borderRadius: 4,
+              background: isHi
+                ? 'linear-gradient(180deg, #FFE4A8 0%, #C9A84C 100%)'
+                : 'linear-gradient(180deg, #6A6560 0%, #3A3530 100%)',
+              boxShadow: isHi ? '0 4px 14px rgba(212,163,115,0.45)' : 'none',
+            }} />
+            <span style={{ fontFamily: fontMono, color: TEXT_LO, fontSize: 8, letterSpacing: '0.06em' }}>{a.k.toUpperCase()}</span>
+          </div>
+        );
+      })}
+    </div>
+  </Card>
+);
+
 // ── Inner shell (auth-gated) ─────────────────────────────────────────
 const Inner = () => {
   const { token, user, loading, logout } = useLuxeAuth();
+  const { isMobile } = useViewport();
   const [active, setActive] = useState('home');
+  const [mobileOpen, setMobileOpen] = useState(false);
   const data = useLuxeDashboardData(token);
 
   const Page = useMemo(() => {
@@ -344,10 +485,28 @@ const Inner = () => {
       color: TEXT_HI,
       overflow: 'hidden',
     }}>
-      <Sidebar active={active} onNav={setActive} onLogout={logout} user={user} />
+      <Sidebar
+        active={active}
+        onNav={setActive}
+        onLogout={logout}
+        user={user}
+        isMobile={isMobile}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-        <HeaderStrip user={user} />
-        <div style={{ flex: 1, padding: 18, overflowY: 'auto', minHeight: 0 }}>
+        <HeaderStrip
+          user={user}
+          isMobile={isMobile}
+          onMenuOpen={() => setMobileOpen(true)}
+        />
+        <div style={{
+          flex: 1,
+          padding: isMobile ? '12px 12px 24px' : 18,
+          overflowY: 'auto',
+          minHeight: 0,
+          WebkitOverflowScrolling: 'touch',
+        }}>
           {Page}
         </div>
       </main>

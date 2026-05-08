@@ -27,7 +27,8 @@ const API = BACKEND_URL;
 export const Card = ({ children, style, contentStyle, testid }) => (
   <div data-testid={testid} style={{
     position: 'relative',
-    padding: 22, borderRadius: 26, overflow: 'hidden',
+    padding: 'clamp(14px, 3vw, 22px)', borderRadius: 'clamp(16px, 3vw, 26px)',
+    overflow: 'hidden',
     background:
       'radial-gradient(140% 80% at 30% 0%, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.04) 22%, transparent 55%),' +
       'linear-gradient(165deg, rgba(60,62,72,0.40) 0%, rgba(18,20,28,0.46) 60%, rgba(40,42,52,0.36) 100%)',
@@ -38,6 +39,7 @@ export const Card = ({ children, style, contentStyle, testid }) => (
       '0 1px 0 rgba(255,255,255,0.18) inset,' +
       ' 0 -1px 0 rgba(0,0,0,0.40) inset,' +
       ' 0 22px 44px -14px rgba(0,0,0,0.65)',
+    minWidth: 0,
     ...style,
   }}>
     <span aria-hidden="true" style={{
@@ -95,17 +97,17 @@ const Row = ({ k, v, mono = false, small = false }) => (
 const PageShell = ({ icon: Icon, title, subtitle, children, testid, fitViewport }) => (
   <div data-testid={testid} style={{
     display: 'flex', flexDirection: 'column', gap: 18,
-    flex: 1, minWidth: 0, padding: '4px 6px',
+    flex: 1, minWidth: 0, padding: '4px 2px',
     height: fitViewport ? '100%' : 'auto',
     minHeight: 0,
     overflow: fitViewport ? 'hidden' : 'visible',
   }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       {Icon && <Icon size={20} style={{ color: GOLD_HI }} />}
-      <div>
+      <div style={{ minWidth: 0 }}>
         <h1 style={{
           margin: 0, color: TEXT_HI, fontFamily: fontDisplay,
-          fontSize: 22, fontWeight: 700, letterSpacing: '0.10em',
+          fontSize: 'clamp(18px, 4vw, 22px)', fontWeight: 700, letterSpacing: '0.10em',
         }}>{title}</h1>
         {subtitle && <div style={{ color: TEXT_LO, fontFamily: fontBody, fontSize: 12 }}>{subtitle}</div>}
       </div>
@@ -216,7 +218,11 @@ export const ProfilePage = () => {
     <PageShell icon={UserIcon} title="Profile"
       subtitle="Your account, plan, ORA scan schedule & live bug feed."
       testid="page-profile">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 18 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 18,
+      }}>
         <Card>
           <SectionLabel>Account Details</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -471,7 +477,11 @@ export const LiveHealthPage = () => {
 
   return (
     <PageShell icon={Activity} title="Live Health" subtitle="Real-time sentinel pulse from the platform." testid="page-live-health" fitViewport>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, flex: '0 0 auto' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 14, flex: '0 0 auto',
+      }}>
         <Card>
           <SectionLabel right={<StatusDot status={overall} />}>Health Score</SectionLabel>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
@@ -585,7 +595,11 @@ export const SecurityPage = () => {
 
   return (
     <PageShell icon={Shield} title="Security" subtitle="Live alerts & account protection." testid="page-security" fitViewport>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, flex: '0 0 auto' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 14, flex: '0 0 auto',
+      }}>
         <Card>
           <SectionLabel right={<StatusDot status="GREEN" />}>FaceID</SectionLabel>
           <div style={{ fontFamily: fontDisplay, color: TEXT_HI, fontSize: 30, fontWeight: 700 }}>Active</div>
@@ -664,7 +678,11 @@ export const AutomationPage = () => {
 
   return (
     <PageShell icon={Bot} title="Automation" subtitle="Active workflows & orchestrator queue." testid="page-automation" fitViewport>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, flex: '1 1 auto', minHeight: 0 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 14, flex: '1 1 auto', minHeight: 0,
+      }}>
         <Card style={{ display: 'flex', flexDirection: 'column' }}
           contentStyle={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
           <SectionLabel right={<StatusDot status={workflows.length > 0 ? 'GREEN' : 'YELLOW'} />}>
@@ -744,7 +762,11 @@ export const CRMPage = () => {
 
   return (
     <PageShell icon={Users} title="CRM" subtitle="Leads, contacts & conversion pipeline." testid="page-crm" fitViewport>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, flex: '0 0 auto' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: 14, flex: '0 0 auto',
+      }}>
         {[
           { k: 'Total leads',    v: fmt(stats.total_leads ?? leads.length) },
           { k: 'Qualified',      v: fmt(stats.qualified ?? 0) },
@@ -841,7 +863,11 @@ export const SettingsPage = () => {
   const { user, logout } = useLuxeAuth();
   return (
     <PageShell icon={Cog} title="Settings" subtitle="Onboarding, plan & danger zone." testid="page-settings" fitViewport>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, flex: '1 1 auto', minHeight: 0 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 14, flex: '1 1 auto', minHeight: 0,
+      }}>
         <Card>
           <SectionLabel>Onboarding</SectionLabel>
           <Row k="Email" v={user?.email || '—'} />
