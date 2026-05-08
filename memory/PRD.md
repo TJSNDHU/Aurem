@@ -26,6 +26,12 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Auth Expired errors → graceful re-prompt (Sentinel #1 issue fixed) ✅**
+  - Sentinel telemetry showed 78 "Auth Expired" events from 2 unique users — was the top user-facing error
+  - Built `apiClient` axios instance in `lib/api.js` with auto-attach token + silent refresh on 401 (single-flight, no concurrent refresh storms)
+  - Added GLOBAL axios interceptor: any 401 from /api endpoints (except login routes) fires `aurem:auth-expired` window event → graceful re-prompt
+  - `LuxeAuthContext.jsx` listens for the event → clears token + shows overlay (no red error toast, no broken UI)
+  - **E2E verified**: corrupt token + reload → /api/platform/me returns 401 → overlay reappears cleanly within 3s
 - **2026-02-08 — Scout agent ImportError fixed (production ORA chat) ✅**
   - Production ORA chat showed "Scout agent unavailable: ImportError" — root cause: `services/agents/__init__.py` was importing all agents but NOT re-exporting `AuremAgent` base class, so `hunter_ora`/`followup_ora`/`closer_ora` failed `from services.agents import AuremAgent`
   - Fix: added `from shared.agents import AuremAgent` re-export at top of `services/agents/__init__.py`

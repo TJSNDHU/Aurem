@@ -88,6 +88,22 @@ export const LuxeAuthProvider = ({ children }) => {
     })();
   }, [token, fetchMe]);
 
+  // Listen for the global auth-expired event fired by the shared apiClient
+  // 401 interceptor. When any API call comes back with a 401 and refresh
+  // also fails, we transparently log the user out so the LuxeAuthOverlay
+  // re-prompts — no scary red error toast, no broken page state.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onExpired = () => {
+      clearToken();
+      setToken(null);
+      setUser(null);
+      setError('Session expired. Please sign in again.');
+    };
+    window.addEventListener('aurem:auth-expired', onExpired);
+    return () => window.removeEventListener('aurem:auth-expired', onExpired);
+  }, []);
+
   const login = async ({ identifier, password, remember = true }) => {
     setError(null);
     try {
