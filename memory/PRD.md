@@ -26,6 +26,15 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Sentinel autonomous AI-diagnose wired into A2A → Council → ORA stack ✅**
+  - User explicitly rejected a separate "Auto-Diagnose Top 5" admin button; demanded the diagnosis be baked into the existing autonomous repair stack
+  - Created `services/sentinel_ai_diagnose.py` — single-source-of-truth Claude diagnose service (`diagnose_error`, `build_suggestion_doc`, `diagnose_and_store`) with dedup by signature + sibling-mark to avoid duplicate LLM spend
+  - Refactored manual `POST /api/admin/sentinel/analyze/{error_id}` to call the shared service (DRY — kills ~80 lines duplicate Claude code in router)
+  - Extended `services/sentinel_repair_loop.py` with `_run_ai_diagnose_pass`: aggregates top UNIQUE unhealed AI-eligible signatures (ai_eligible=True, no auto_heal_key, no existing pending suggestion), token-budgeted via `SENTINEL_AI_DIAGNOSE_BUDGET` env (default 5/cycle), per-signature pipeline = A2A `AI_DIAGNOSE_PICKED` → Council `deliberate(action=sentinel_ai_diagnose:{classification}, required=[qa,security], advisory=[casl])` → APPROVED → Claude → store suggestion → A2A `ORA_DIAGNOSED` + `ora_brain_thoughts` learning row → mark sibling errors as `ai_diagnosed`
+  - Wired `run_sentinel_repair_cycle` into `routers/registry.py` aurem_scheduler (`IntervalTrigger(seconds=60)`, max_instances=1, coalesce=True) — was orphan code, never scheduled
+  - Tightened auto_heal pipeline query from `auto_heal_key.$ne=""` to `$type=string,$ne=""` so null/missing values fall through to AI-diagnose pass instead of being auto-healed as no-ops
+  - **E2E verified live**: planted 2 fake AI-eligible 500s (payments checkout null-split + onboarding KeyError) → cycle ran in 60s → both got `ai_diagnosed` status + linked suggestion_ids; Claude returned P0 0.92-confidence + P1 with accurate root_cause/suggested_fix; ORA brain ingested learnings; scheduler showed `sentinel_repair_loop` in `/api/admin/scheduler/count` (37 jobs running)
+  - Cost-bounded: max 5 unique signatures/cycle × 1 LLM call each = max 300 calls/hour even under flood. Manual admin clicks remain unbounded via separate route.
 - **2026-02-08 — Sentinel Backend 5xx flood eliminated (root-cause fix) ✅**
   - Diagnosed via prod Sentinel pull: 114 distinct "backend_5xx" errors, 90%+ were Cloudflare/origin transients (502/503/520/521/522/523/524) during pod restart cycles, NOT app bugs. Top noise: `/api/public/status` 127×503, `/api/admin/pillars-map/overview` 30+× 502/520, `/api/voice-analytics/data` 13×520
   - **Frontend `lib/sentinel.js`**: added `ORIGIN_TRANSIENT_STATUSES` set [502,503,520,521,522,523,524] — fetch sniffer skips reporting these entirely (CDN-edge, not actionable). Real 500/501/505 still ship.

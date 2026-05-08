@@ -39,6 +39,13 @@ AUTO_HEAL_LABELS: Dict[str, str] = {
 POLL_LIMIT = 25          # max errors handled per cycle (avoid overwhelming the bus)
 MAX_AGE_HOURS = 24       # ignore errors older than this — they're stale
 
+# iter 322 — AI-diagnose budget per cycle. Claude is paid per-call so we
+# cap the number of UNIQUE signatures we diagnose autonomously per tick.
+# Manual admin clicks remain unlimited (separate route).
+AI_DIAGNOSE_BUDGET_PER_CYCLE = int(os.environ.get(
+    "SENTINEL_AI_DIAGNOSE_BUDGET", "5",
+))
+
 
 def _get_db():
     """Late-binding DB resolver — keeps this module import-time safe even
@@ -168,6 +175,183 @@ async def _heal_one(error_doc: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+async def _diagnose_one_ai_eligible(
+    db, sig_doc: Dict[str, Any],
+) -> Dict[str, Any]:
+    """A2A → Council → ORA pipeline for ONE unique unhealed signature whose
+    classification is AI-eligible (e.g. real `backend_5xx`). Calls Claude via
+    `services.sentinel_ai_diagnose.diagnose_and_store`, persists the
+    suggestion, emits learning events. Returns outcome metadata.
+    """
+    classification = sig_doc.get("classification") or "unknown"
+    error_id = sig_doc.get("error_id") or ""
+    signature = sig_doc.get("signature") or ""
+
+    # 1) A2A — visibility on the live feed
+    await _emit_a2a(
+        "sentinel",
+        "AI_DIAGNOSE_PICKED",
+        {
+            "error_id": error_id,
+            "signature": signature,
+            "classification": classification,
+            "url": (sig_doc.get("url") or "")[:120],
+        },
+    )
+
+    # 2) Council deliberate — gate the LLM spend
+    verdict = "APPROVED"
+    try:
+        from services.council_deliberate import deliberate
+        result = await deliberate(
+            action=f"sentinel_ai_diagnose:{classification}",
+            agent="sentinel",
+            payload={
+                "error_id": error_id,
+                "signature": signature,
+                "classification": classification,
+            },
+            required=["qa", "security"],
+            advisory=["casl"],
+        )
+        verdict = result.get("verdict", "APPROVED")
+    except Exception as e:
+        logger.warning(f"[SentinelRepair] AI-diagnose council unavailable: {e}")
+
+    if verdict != "APPROVED":
+        await _emit_a2a(
+            "council",
+            "AI_DIAGNOSE_REJECTED",
+            {"error_id": error_id, "verdict": verdict, "signature": signature},
+        )
+        # Mark all errors with this signature as rejected so we don't burn
+        # tokens re-trying next cycle.
+        try:
+            await db.client_errors.update_many(
+                {"signature": signature, "status": "new"},
+                {"$set": {"status": "council_rejected"}},
+            )
+        except Exception:
+            pass
+        return {"signature": signature, "outcome": "council_rejected"}
+
+    # 3) APPROVED — call Claude via the shared service
+    try:
+        from services.sentinel_ai_diagnose import diagnose_and_store
+        suggestion = await diagnose_and_store(
+            db, sig_doc, source="autonomous_a2a"
+        )
+    except Exception as e:
+        logger.warning(f"[SentinelRepair] AI diagnose failed sig={signature}: {e}")
+        await _emit_a2a(
+            "sentinel",
+            "AI_DIAGNOSE_FAILED",
+            {"signature": signature, "error": f"{type(e).__name__}: {str(e)[:120]}"},
+        )
+        return {"signature": signature, "outcome": "diagnose_failed"}
+
+    # 4) ORA learning — feed the brain
+    await _emit_a2a(
+        "ora",
+        "ORA_DIAGNOSED",
+        {
+            "signature": signature,
+            "classification": classification,
+            "suggestion_id": (suggestion or {}).get("suggestion_id"),
+            "severity": (suggestion or {}).get("severity"),
+            "confidence": (suggestion or {}).get("confidence"),
+        },
+    )
+    await _record_ora_learning(sig_doc, outcome="ai_diagnosed")
+
+    return {
+        "signature": signature,
+        "outcome": "ai_diagnosed",
+        "suggestion_id": (suggestion or {}).get("suggestion_id"),
+        "severity": (suggestion or {}).get("severity"),
+    }
+
+
+async def _run_ai_diagnose_pass(db) -> Dict[str, Any]:
+    """Find up to N UNIQUE unhealed AI-eligible signatures and run them
+    through the council + Claude diagnose pipeline. Token-bounded by
+    AI_DIAGNOSE_BUDGET_PER_CYCLE.
+    """
+    if AI_DIAGNOSE_BUDGET_PER_CYCLE <= 0:
+        return {"diagnosed": 0, "skipped_existing": 0, "rejected": 0}
+
+    cutoff = datetime.now(timezone.utc).timestamp() - (MAX_AGE_HOURS * 3600)
+
+    # Aggregate: top unique signatures with status=new + ai_eligible + no
+    # auto_heal_key (auto_heal queue handled separately above).
+    pipeline = [
+        {"$match": {
+            "status": "new",
+            "ai_eligible": True,
+            "$or": [
+                {"auto_heal_key": {"$in": [None, ""]}},
+                {"auto_heal_key": {"$exists": False}},
+            ],
+        }},
+        {"$sort": {"ts": -1}},
+        {"$group": {
+            "_id": "$signature",
+            "doc": {"$first": "$$ROOT"},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": AI_DIAGNOSE_BUDGET_PER_CYCLE * 3},  # over-fetch for dedup
+    ]
+
+    candidates: List[Dict[str, Any]] = []
+    try:
+        async for row in db.client_errors.aggregate(pipeline):
+            doc = row.get("doc") or {}
+            sig = doc.get("signature") or row.get("_id")
+            if not sig:
+                continue
+            # Skip if a pending suggestion already exists for this sig.
+            existing = await db.repair_suggestions.find_one(
+                {"source_signature": sig, "status": "pending"}, {"_id": 1},
+            )
+            if existing:
+                continue
+            # Age check
+            try:
+                ts = doc.get("ts") or ""
+                ts_ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+                if ts_ts < cutoff:
+                    continue
+            except Exception:
+                pass
+            candidates.append(doc)
+            if len(candidates) >= AI_DIAGNOSE_BUDGET_PER_CYCLE:
+                break
+    except Exception as e:
+        logger.warning(f"[SentinelRepair] AI-diagnose aggregate failed: {e}")
+        return {"diagnosed": 0, "skipped_existing": 0, "rejected": 0, "error": str(e)[:120]}
+
+    diagnosed = 0
+    rejected = 0
+    failed = 0
+    for doc in candidates:
+        outcome = await _diagnose_one_ai_eligible(db, doc)
+        out = outcome.get("outcome")
+        if out == "ai_diagnosed":
+            diagnosed += 1
+        elif out == "council_rejected":
+            rejected += 1
+        else:
+            failed += 1
+
+    return {
+        "diagnosed": diagnosed,
+        "rejected": rejected,
+        "failed": failed,
+        "candidates_seen": len(candidates),
+    }
+
+
 async def run_sentinel_repair_cycle() -> Dict[str, Any]:
     """One full cycle: pull NEW errors → loop → mark healed/rejected."""
     db = _get_db()
@@ -178,13 +362,15 @@ async def run_sentinel_repair_cycle() -> Dict[str, Any]:
     started = datetime.now(timezone.utc).isoformat()
 
     # Pull a small batch of unprocessed errors (status=new, ai_eligible).
+    # iter 322 — restrict to docs with a NON-EMPTY string auto_heal_key so
+    # `null` / missing values fall through to the AI-diagnose pass below.
     cursor = (
         db.client_errors
         .find(
             {
                 "status": "new",
                 "ai_eligible": True,
-                "auto_heal_key": {"$exists": True, "$ne": ""},
+                "auto_heal_key": {"$type": "string", "$ne": ""},
             },
             {"_id": 1, "error_id": 1, "classification": 1, "auto_heal_key": 1,
              "signature": 1, "url": 1, "message": 1, "ts": 1},
@@ -226,6 +412,14 @@ async def run_sentinel_repair_cycle() -> Dict[str, Any]:
             logger.debug(f"[SentinelRepair] update skipped: {e}")
         handled.append(outcome)
 
+    # iter 322 — autonomous AI-diagnose pass: surface real backend_5xx
+    # signatures (no auto-heal pattern) to Claude via Council gating.
+    ai_summary = {"diagnosed": 0, "rejected": 0, "failed": 0}
+    try:
+        ai_summary = await _run_ai_diagnose_pass(db)
+    except Exception as e:
+        logger.warning(f"[SentinelRepair] AI-diagnose pass failed: {e}")
+
     return {
         "ok": True,
         "started_at": started,
@@ -236,4 +430,5 @@ async def run_sentinel_repair_cycle() -> Dict[str, Any]:
             "auto_healed": sum(1 for h in handled if h.get("outcome") == "auto_healed"),
             "council_rejected": sum(1 for h in handled if h.get("outcome") == "council_rejected"),
         },
+        "ai_diagnose": ai_summary,
     }

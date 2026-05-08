@@ -484,106 +484,27 @@ async def admin_analyze_error(error_id: str, request: Request):
     err = await _db.client_errors.find_one({"error_id": error_id}, {"_id": 0})
     if not err:
         raise HTTPException(404, "error not found")
-
     if not err.get("ai_eligible"):
-        raise HTTPException(400, f"error classification '{err.get('classification')}' is not AI-eligible (has auto-heal or not analyzable)")
+        raise HTTPException(
+            400,
+            f"error classification '{err.get('classification')}' is not AI-eligible",
+        )
 
-    # Check if a pending suggestion already exists for this signature
-    existing = await _db.repair_suggestions.find_one({
-        "source_signature": err.get("signature"),
-        "status": "pending",
-    }, {"_id": 0})
-    if existing:
-        return {"ok": True, "suggestion_id": existing["suggestion_id"], "reused": True, "suggestion": existing}
-
-    # Call Claude via Emergent LLM key
+    from services.sentinel_ai_diagnose import diagnose_and_store
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        key = os.environ.get("EMERGENT_LLM_KEY", "")
-        if not key:
-            raise HTTPException(500, "EMERGENT_LLM_KEY not configured")
-
-        chat = LlmChat(
-            api_key=key,
-            session_id=f"sentinel-{uuid.uuid4().hex[:8]}",
-            system_message=(
-                "You are AUREM's senior SRE. Given a captured client-side error, "
-                "produce a STRICT JSON repair suggestion for human review. "
-                "Never modify code — only suggest. Keep confidence honest.\n\n"
-                "Output JSON schema (no other text, no markdown fences):\n"
-                '{\n'
-                '  "severity": "P0"|"P1"|"P2"|"P3",\n'
-                '  "root_cause": "1-2 sentence diagnosis",\n'
-                '  "suggested_fix": "natural-language description of the fix",\n'
-                '  "code_hint": "optional pseudo-diff or file path to inspect",\n'
-                '  "affected_files": ["path/to/file1", ...],\n'
-                '  "test_hint": "how to verify the fix works",\n'
-                '  "confidence": 0.0-1.0,\n'
-                '  "requires_deploy": true|false,\n'
-                '  "safe_auto_apply": false\n'
-                "}\n"
-                'Rule: set "safe_auto_apply" to true ONLY for mechanical single-line fixes. '
-                'For anything structural, set to false.'
-            ),
-        ).with_model("anthropic", "claude-sonnet-4-5")
-
-        compact = {
-            "type": err.get("type"),
-            "classification": err.get("classification"),
-            "message": err.get("message"),
-            "status_code": err.get("status_code"),
-            "url": err.get("url"),
-            "method": err.get("method"),
-            "stack_head": (err.get("stack") or "")[:1200],
-            "page_url": err.get("page_url"),
-            "hostname": err.get("hostname"),
-        }
-        reply = await chat.send_message(UserMessage(text=f"Error:\n{json.dumps(compact, indent=2)}"))
-        raw = str(reply).strip()
-
-        # Extract JSON (handle any wrapping)
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start == -1 or end == -1:
-            raise ValueError(f"LLM did not return JSON: {raw[:200]}")
-        parsed = json.loads(raw[start:end + 1])
-    except HTTPException:
-        raise
+        suggestion = await diagnose_and_store(_db, err, source="manual")
     except Exception as e:
         logger.exception(f"[sentinel] AI analyze failed: {e}")
         raise HTTPException(500, f"AI diagnosis failed: {e}")
 
-    now = datetime.now(timezone.utc)
-    suggestion = {
-        "suggestion_id": f"rs_{uuid.uuid4().hex[:12]}",
-        "error_id": error_id,
-        "source_signature": err.get("signature"),
-        "created_at": now.isoformat(),
-        "status": "pending",  # pending | applied | rejected | modified
-        "severity": parsed.get("severity") or "P2",
-        "root_cause": (parsed.get("root_cause") or "")[:500],
-        "suggested_fix": (parsed.get("suggested_fix") or "")[:1500],
-        "code_hint": (parsed.get("code_hint") or "")[:2000],
-        "affected_files": (parsed.get("affected_files") or [])[:10],
-        "test_hint": (parsed.get("test_hint") or "")[:400],
-        "confidence": float(parsed.get("confidence") or 0),
-        "requires_deploy": bool(parsed.get("requires_deploy")),
-        "safe_auto_apply": bool(parsed.get("safe_auto_apply")),  # informational only — NOT acted on
-        "error_snapshot": {
-            "classification": err.get("classification"),
-            "message": err.get("message"),
-            "url": err.get("url"),
-            "status_code": err.get("status_code"),
-        },
+    reused = bool(suggestion and suggestion.get("source") != "manual" or
+                  (suggestion and suggestion.get("error_id") != error_id))
+    return {
+        "ok": True,
+        "suggestion_id": suggestion["suggestion_id"],
+        "reused": reused,
+        "suggestion": suggestion,
     }
-    await _db.repair_suggestions.insert_one(dict(suggestion))
-    await _db.client_errors.update_one(
-        {"error_id": error_id},
-        {"$set": {"status": "analyzed", "suggestion_id": suggestion["suggestion_id"]}},
-    )
-
-    suggestion.pop("_id", None)
-    return {"ok": True, "suggestion_id": suggestion["suggestion_id"], "reused": False, "suggestion": suggestion}
 
 
 # ═════════════════════════════════════════════════════════════════════

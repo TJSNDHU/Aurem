@@ -2358,6 +2358,26 @@ def register_all_routers(app, db):
         aurem_scheduler.start()
         logger.info("[REGISTRY] AUREM Bug Engine scheduler started (every 10 min)")
 
+        # iter 322 — Sentinel A2A → Council → ORA repair loop. Picks up
+        # NEW client_errors every 60s, auto-heals known patterns, and
+        # autonomously diagnoses the top N unique AI-eligible signatures
+        # (e.g. real backend_5xx) via Claude — token-budgeted.
+        try:
+            from services.sentinel_repair_loop import run_sentinel_repair_cycle
+            from apscheduler.triggers.interval import IntervalTrigger as _IT
+            aurem_scheduler.add_job(
+                run_sentinel_repair_cycle,
+                _IT(seconds=60),
+                id="sentinel_repair_loop",
+                name="Sentinel Repair Loop (A2A → Council → ORA + AI Diagnose)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] Sentinel repair loop scheduled (every 60s)")
+        except Exception as sr_e:
+            logger.warning(f"[REGISTRY] Sentinel repair loop schedule failed: {sr_e}")
+
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:
             from services.ora_phase_25 import attach_phase_25_scheduler
