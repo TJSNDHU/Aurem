@@ -270,16 +270,21 @@ async def get_current_platform_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     token = authorization.split(" ")[1]
-    logger.info(f"[PLATFORM AUTH] Verifying token: {token[:30]}...")
-    logger.info(f"[PLATFORM AUTH] Using JWT_SECRET: {JWT_SECRET[:20]}...")
     
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        logger.info(f"[PLATFORM AUTH] Decoded payload: {payload}")
-        user = await db.platform_users.find_one({"_id": payload["user_id"]})
+        
+        # Support both user_id (legacy) and email-based lookup (platform_auth_router tokens)
+        user = None
+        if payload.get("user_id"):
+            user = await db.platform_users.find_one({"_id": payload["user_id"]})
+        elif payload.get("email"):
+            # Lookup by email for tokens from platform_auth_router
+            user = await db.platform_users.find_one({"email": payload["email"].lower()})
+        
         if not user:
             # For admin user, return from hardcoded credentials
-            if payload.get("user_id") == "admin":
+            if payload.get("user_id") == "admin" or payload.get("role") == "admin":
                 return {
                     "_id": "admin",
                     "email": payload.get("email"),

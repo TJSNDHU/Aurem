@@ -470,7 +470,7 @@ export const LiveHealthPage = () => {
   };
 
   return (
-    <PageShell icon={Activity} title="Live Health" subtitle="Real-time sentinel pulse from the platform." testid="page-livehealth" fitViewport>
+    <PageShell icon={Activity} title="Live Health" subtitle="Real-time sentinel pulse from the platform." testid="page-live-health" fitViewport>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, flex: '0 0 auto' }}>
         <Card>
           <SectionLabel right={<StatusDot status={overall} />}>Health Score</SectionLabel>
@@ -647,12 +647,15 @@ export const AutomationPage = () => {
       const headers = { Authorization: `Bearer ${token}` };
       try {
         const wf = (await axios.get(`${API}/api/orchestrator/workflows`, { headers, timeout: 10000 })).data;
-        setWorkflows(wf?.workflows || wf?.items || []);
-      } catch {}
+        // Handle various response formats: {workflows: []}, {items: []}, or direct array
+        const wfList = Array.isArray(wf) ? wf : (wf?.workflows || wf?.items || []);
+        setWorkflows(Array.isArray(wfList) ? wfList : []);
+      } catch { setWorkflows([]); }
       try {
         const q = (await axios.get(`${API}/api/orchestrator/queue`, { headers, timeout: 10000 })).data;
-        setQueue({ depth: q?.depth ?? (q?.items?.length || 0), items: q?.items || [] });
-      } catch {}
+        const items = Array.isArray(q) ? q : (q?.items || []);
+        setQueue({ depth: q?.depth ?? items.length, items: Array.isArray(items) ? items : [] });
+      } catch { setQueue({ depth: 0, items: [] }); }
     };
     load();
     const id = setInterval(load, 20000);
