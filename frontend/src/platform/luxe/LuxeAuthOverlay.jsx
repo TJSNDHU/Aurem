@@ -58,7 +58,9 @@ const PasswordField = ({
 };
 
 export const LuxeAuthOverlay = () => {
-  const { login, signup, error: ctxError, loading: ctxLoading } = useLuxeAuth();
+  const {
+    login, signup, error: ctxError, loading: ctxLoading, rememberPreference,
+  } = useLuxeAuth();
 
   // Detect ?reset_token=… on first render → switch to 'reset' mode automatically.
   const [mode, setMode] = useState(() => {
@@ -74,6 +76,7 @@ export const LuxeAuthOverlay = () => {
   const [confirmPwd, setConfirmPwd] = useState('');
   const [fullName, setFullName] = useState('');
   const [company, setCompany] = useState('');
+  const [remember, setRemember] = useState(rememberPreference !== false);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState(null);
   const [info, setInfo] = useState(null);
@@ -99,7 +102,7 @@ export const LuxeAuthOverlay = () => {
 
     try {
       if (mode === 'login') {
-        const r = await login({ identifier: identifier.trim(), password });
+        const r = await login({ identifier: identifier.trim(), password, remember });
         if (!r.ok) setLocalError(r.error);
       } else if (mode === 'signup') {
         if (!identifier.includes('@')) {
@@ -110,6 +113,7 @@ export const LuxeAuthOverlay = () => {
           email: identifier.trim(), password,
           full_name: fullName.trim() || identifier.trim().split('@')[0],
           company_name: company.trim() || 'My Company',
+          remember,
         });
         if (!r.ok) setLocalError(r.error);
       } else if (mode === 'forgot') {
@@ -288,6 +292,35 @@ export const LuxeAuthOverlay = () => {
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
           </>
+        )}
+
+        {/* "Remember me" — only relevant when actively signing in/up */}
+        {(mode === 'login' || mode === 'signup') && (
+          <label
+            data-testid="auth-remember-label"
+            htmlFor="auth-remember-checkbox"
+            style={{
+              marginTop: 12,
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              cursor: 'pointer', userSelect: 'none',
+              fontFamily: fontMono, fontSize: 10, color: TEXT_LO,
+              letterSpacing: '0.10em',
+            }}
+          >
+            <input
+              id="auth-remember-checkbox"
+              data-testid="auth-remember"
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              style={{
+                width: 14, height: 14, cursor: 'pointer',
+                accentColor: GOLD_HI,
+                margin: 0,
+              }}
+            />
+            <span>Keep me signed in for 30 days</span>
+          </label>
         )}
 
         {mode === 'reset' && (

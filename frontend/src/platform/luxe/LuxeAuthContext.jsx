@@ -9,7 +9,42 @@ import { BACKEND_URL } from '../../lib/api';
 
 const API = BACKEND_URL;
 const TOKEN_KEY = 'aurem_customer_token';
+const REMEMBER_KEY = 'aurem_customer_remember';
 const LuxeAuthCtx = createContext(null);
+
+// Storage helpers — when "remember me" is checked we persist to localStorage
+// (survives browser restart). Otherwise we use sessionStorage (cleared when
+// the tab closes), so a shared/public computer doesn't leak the session.
+const readToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  } catch { return null; }
+};
+const writeToken = (tok, remember) => {
+  try {
+    // Always clear the other store first to avoid stale tokens.
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    if (remember) {
+      localStorage.setItem(TOKEN_KEY, tok);
+      localStorage.setItem(REMEMBER_KEY, '1');
+    } else {
+      sessionStorage.setItem(TOKEN_KEY, tok);
+      localStorage.removeItem(REMEMBER_KEY);
+    }
+  } catch (_e) { /* private mode etc. — silent fail */ }
+};
+const clearToken = () => {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+  } catch (_e) { /* noop */ }
+};
+const readRememberPreference = () => {
+  try { return localStorage.getItem(REMEMBER_KEY) === '1'; }
+  catch { return false; }
+};
 
 export const useLuxeAuth = () => {
   const ctx = useContext(LuxeAuthCtx);
@@ -18,10 +53,15 @@ export const useLuxeAuth = () => {
 };
 
 export const LuxeAuthProvider = ({ children }) => {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState(() => readToken());
   const [user, setUser]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Default to true: a brand-new visitor signing in expects to stay signed in.
+  // Returning visitors restore their previous preference from localStorage.
+  const [rememberPreference, setRememberPreference] = useState(
+    () => readRememberPreference() || true
+  );
 
   const fetchMe = useCallback(async (tok) => {
     if (!tok) return null;
@@ -33,7 +73,7 @@ export const LuxeAuthProvider = ({ children }) => {
       return data;
     } catch (_e) {
       // Token invalid / backend down — clear so user re-auths.
-      localStorage.removeItem(TOKEN_KEY);
+      clearToken();
       setToken(null);
       setUser(null);
       return null;
@@ -48,7 +88,7 @@ export const LuxeAuthProvider = ({ children }) => {
     })();
   }, [token, fetchMe]);
 
-  const login = async ({ identifier, password }) => {
+  const login = async ({ identifier, password, remember = true }) => {
     setError(null);
     try {
       // Identifier can be email OR business_id (BIN). Backend accepts both.
@@ -58,7 +98,8 @@ export const LuxeAuthProvider = ({ children }) => {
         : { business_id: identifier, password };
       const { data } = await axios.post(`${API}/api/platform/auth/login`, body, { timeout: 15000 });
       if (!data?.token) throw new Error(data?.detail || 'Login failed');
-      localStorage.setItem(TOKEN_KEY, data.token);
+      writeToken(data.token, remember);
+      setRememberPreference(remember);
       setToken(data.token);
       await fetchMe(data.token);
       return { ok: true };
@@ -69,14 +110,15 @@ export const LuxeAuthProvider = ({ children }) => {
     }
   };
 
-  const signup = async ({ email, password, full_name, company_name }) => {
+  const signup = async ({ email, password, full_name, company_name, remember = true }) => {
     setError(null);
     try {
       const { data } = await axios.post(`${API}/api/platform/auth/register`, {
         email, password, full_name, company_name,
       }, { timeout: 15000 });
       if (!data?.token) throw new Error(data?.detail || 'Signup failed');
-      localStorage.setItem(TOKEN_KEY, data.token);
+      writeToken(data.token, remember);
+      setRememberPreference(remember);
       setToken(data.token);
       await fetchMe(data.token);
       return { ok: true };
@@ -88,7 +130,7 @@ export const LuxeAuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
+    clearToken();
     setToken(null);
     setUser(null);
   };
@@ -96,6 +138,7 @@ export const LuxeAuthProvider = ({ children }) => {
   return (
     <LuxeAuthCtx.Provider value={{
       token, user, loading, error,
+      rememberPreference,
       login, signup, logout,
       refetchMe: () => fetchMe(token),
     }}>

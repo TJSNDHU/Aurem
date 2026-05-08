@@ -26,6 +26,14 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — "Remember me" checkbox on `/my` login overlay ✅**
+  - New checkbox with testid `auth-remember`, label "Keep me signed in for 30 days", default CHECKED
+  - Storage strategy:
+    - **Checked** → token in `localStorage` (persistent across browser restarts) + flag `aurem_customer_remember=1`
+    - **Unchecked** → token in `sessionStorage` only (cleared when tab closes — safer for shared computers)
+  - Returning visitors: previous preference restored from localStorage flag
+  - `LuxeAuthContext` exposes new `rememberPreference` value; `login()` and `signup()` accept `remember` flag
+  - **E2E verified** (Playwright, 5 checks): default checked, login routes token correctly to localStorage vs sessionStorage based on box state, logout clears both stores
 - **2026-02-08 — Password Reset + show/hide toggle on `/my` login overlay ✅**
   - Rebuilt `LuxeAuthOverlay.jsx` with 4 modes: login / signup / forgot / reset
   - Eye-toggle (`Eye`/`EyeOff` lucide icons) on every password field — testids `auth-password-toggle`, `auth-new-password-toggle`, `auth-confirm-password-toggle`
