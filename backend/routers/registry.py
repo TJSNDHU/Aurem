@@ -2301,8 +2301,16 @@ def register_all_routers(app, db):
         try:
             from services.pixel_heartbeat import run_pixel_heartbeat
             from server import db as _db
+
+            async def _pixel_heartbeat_job():
+                """Async wrapper so APScheduler awaits the coroutine.
+                A bare `lambda: run_pixel_heartbeat(db)` returns a coroutine
+                but APScheduler's sync executor never awaits it → leaks +
+                'coroutine was never awaited' RuntimeWarning."""
+                return await run_pixel_heartbeat(_db)
+
             aurem_scheduler.add_job(
-                lambda: run_pixel_heartbeat(_db),
+                _pixel_heartbeat_job,
                 CronTrigger(hour="2,8,14,20", minute=15, timezone="UTC"),
                 id='pixel_heartbeat',
                 name='Pixel Heartbeat: auto-verify AUREM pixel on all tracked sites',

@@ -26,6 +26,10 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Pixel Heartbeat coroutine leak fix ✅**
+  - `routers/registry.py` was passing `lambda: run_pixel_heartbeat(_db)` to APScheduler — returned a coroutine but the lambda's caller never awaited it → `RuntimeWarning: coroutine 'run_pixel_heartbeat' was never awaited` on every scheduled run, leaking memory + CPU
+  - Wrapped in proper `async def _pixel_heartbeat_job():` so AsyncIOScheduler awaits cleanly
+  - **Verified**: 25s uptime check — zero `never awaited` warnings since boot
 - **2026-02-08 — PRODUCTION DEPLOYMENT BLOCKERS FIXED ✅**
   - **Root cause 1**: `routers/ai_email_router.py` had `import resend` at module top level (BEFORE the defensive try/except block). Production's older resend SDK lazy-loads `resend.logs` submodule which is missing → entire module fails to import → bulk-wire warning AND knock-on registration failures cascading the rest of startup. **Fix**: removed the unconditional import, kept only the `try/except` defensive one.
   - **Root cause 2**: `services/email_engine.py` had unconditional `import resend` at line 16. Same fix applied — wrapped in try/except with stub fallback.
