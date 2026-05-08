@@ -951,12 +951,12 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
         upsert=True
     )
 
-    # Use /app route for PWA reset flow - dynamic origin only, no hardcoded fallback
+    # Use /my route which is the new Luxe customer portal.
     origin = request.headers.get("origin")
     if not origin:
         raise HTTPException(status_code=400, detail="Origin header required for password reset")
-    reset_link = f"{origin}/app?reset_token={reset_token}"
-    
+    reset_link = f"{origin}/my?reset_token={reset_token}"
+
     # Get user's name for personalized email
     name = user.get("name") or user.get("first_name") or "there"
 
@@ -965,25 +965,37 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
         resend.api_key = RESEND_API_KEY
 
         resend.Emails.send({
-            "from": "ReRoots <hello@reroots.ca>",
+            "from": "AUREM <hello@aurem.live>",
             "to": email,
-            "subject": "Reset your ReRoots password",
+            "subject": "Reset your AUREM password",
             "html": f"""
-            <div style="background:#060608;color:#F0EBE0;padding:40px;font-family:Georgia,serif;">
-                <h2 style="color:#C9A86E;margin-bottom:20px;">Password Reset</h2>
+            <div style="background:#0A0C10;color:#F0EBE0;padding:40px;font-family:Georgia,serif;">
+                <div style="text-align:center;margin-bottom:24px;">
+                  <span style="display:inline-block;width:36px;height:36px;border-radius:9px;
+                               background:linear-gradient(135deg,#FFE4A8,#C9A84C);color:#0A0C10;
+                               font-family:Inter,sans-serif;font-weight:700;font-size:18px;
+                               line-height:36px;text-align:center;">A</span>
+                </div>
+                <h2 style="color:#FFE4A8;margin-bottom:20px;font-family:Georgia,serif;letter-spacing:0.05em;">Password Reset</h2>
                 <p style="margin-bottom:16px;">Hi {name},</p>
-                <p style="margin-bottom:24px;">Click below to reset your password. Link expires in 1 hour.</p>
-                <a href="{reset_link}" 
-                   style="background:#C9A86E;color:#060608;padding:14px 28px;
-                          text-decoration:none;border-radius:4px;display:inline-block;
-                          font-family:sans-serif;letter-spacing:0.1em;font-size:12px;">
-                    RESET PASSWORD
-                </a>
-                <p style="color:#5C5548;font-size:12px;margin-top:24px;">
-                    If you didn't request this, ignore this email.
+                <p style="margin-bottom:24px;">Click below to reset your AUREM password. The link expires in 1 hour.</p>
+                <div style="text-align:center;margin:30px 0;">
+                  <a href="{reset_link}"
+                     style="background:linear-gradient(135deg,#FFE4A8,#C9A84C);color:#0A0C10;
+                            padding:14px 32px;text-decoration:none;border-radius:6px;
+                            display:inline-block;font-family:Inter,sans-serif;
+                            letter-spacing:0.18em;font-size:12px;font-weight:600;
+                            text-transform:uppercase;">
+                      Reset Password
+                  </a>
+                </div>
+                <p style="color:#8a8275;font-size:12px;margin-top:24px;">
+                    If you didn't request this, you can safely ignore this email.
                 </p>
                 <hr style="border:none;border-top:1px solid #1a1a1a;margin:30px 0;"/>
-                <p style="color:#3a3a3a;font-size:11px;">reroots.ca · Canadian Biotech Skincare</p>
+                <p style="color:#6a6560;font-size:11px;font-family:monospace;letter-spacing:0.1em;">
+                  AUREM · Autonomous Intelligence Platform · Mississauga, Canada
+                </p>
             </div>
             """
         })
@@ -1014,10 +1026,24 @@ async def reset_password(request_data: PasswordResetConfirm):
 
     new_hash = hash_password(request_data.new_password)
 
+    # Sync BOTH `password` and `password_hash` so admin/customer login flows
+    # (which read different fields) stay in lockstep.
     await get_auth_db().users.update_one(
         {"email": reset_record["email"]},
-        {"$set": {"password": new_hash}}
+        {"$set": {"password": new_hash, "password_hash": new_hash}}
     )
+    # Also mirror to platform_users + aurem_users (best-effort).
+    try:
+        await get_auth_db().platform_users.update_one(
+            {"email": reset_record["email"]},
+            {"$set": {"password_hash": new_hash}}
+        )
+        await get_auth_db().aurem_users.update_one(
+            {"email": reset_record["email"]},
+            {"$set": {"password_hash": new_hash}}
+        )
+    except Exception as _e:
+        logging.warning(f"[RESET] secondary mirror failed: {_e}")
 
     await get_auth_db().password_resets.update_one(
         {"token": request_data.token},

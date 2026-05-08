@@ -446,12 +446,25 @@ async def reset_password(request_data: PasswordResetConfirm):
 
     hashed_password = bcrypt.hashpw(request_data.new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
+    # Sync BOTH `password` and `password_hash` so admin/customer login flows
+    # (which read different fields) stay in lockstep across users / aurem_users
+    # / platform_users / team_members collections.
     user_result = await db.users.update_one(
-        {"email": email}, {"$set": {"password": hashed_password}}
+        {"email": email},
+        {"$set": {"password": hashed_password, "password_hash": hashed_password}},
     )
     team_result = await db.team_members.update_one(
         {"email": email}, {"$set": {"password_hash": hashed_password}}
     )
+    try:
+        await db.aurem_users.update_one(
+            {"email": email}, {"$set": {"password_hash": hashed_password}}
+        )
+        await db.platform_users.update_one(
+            {"email": email}, {"$set": {"password_hash": hashed_password}}
+        )
+    except Exception as _e:
+        logging.warning(f"[RESET] secondary mirror failed: {_e}")
 
     if user_result.modified_count == 0 and team_result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")

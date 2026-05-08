@@ -26,6 +26,15 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Password Reset + show/hide toggle on `/my` login overlay ✅**
+  - Rebuilt `LuxeAuthOverlay.jsx` with 4 modes: login / signup / forgot / reset
+  - Eye-toggle (`Eye`/`EyeOff` lucide icons) on every password field — testids `auth-password-toggle`, `auth-new-password-toggle`, `auth-confirm-password-toggle`
+  - "FORGOT?" link inline next to PASSWORD label → switches to email-only forgot form
+  - URL `?reset_token=…` auto-detected → switches to "Set new password" form with new + confirm fields and validates match locally
+  - Backend bug fixes:
+    - `routes/auth.py reset_password` now syncs both `password` AND `password_hash` across `users` / `platform_users` / `aurem_users` collections (was missing `password_hash`, breaking customer login post-reset)
+    - `routers/server_misc_routes.py reset_password` (the actually-mounted handler) — same fix applied + branding switched to AUREM gold
+  - **E2E verified**: forgot → token → reset → admin login → reset back → admin login again — full cycle passes via curl test
 - **2026-02-08 — Auth fixes (founder password reset + Google login)** ✅
   - Founder admin password reset: `teji.ss1986@gmail.com` / `Aurem@Founder2026!`. Synced across `users` (`password` + `password_hash`), `aurem_users`, `platform_users`. Cleared stale `auth_provider`/`require_sso` blockers.
   - Created missing **`POST /api/auth/google/callback`** endpoint (`routes/auth.py`). Frontend `GoogleAuthCallback.jsx` was hitting it but it never existed — only `/google/session` and `/google/admin-session` did. The new unified callback peeks at the email and routes to admin or customer flow automatically.
