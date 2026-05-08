@@ -37,7 +37,19 @@ ENTERPRISE_LIMITS = {
 
 async def ensure_founders(db) -> dict:
     """Idempotently upsert founder accounts as LIFETIME ENTERPRISE.
-    Safe to run on every startup. Returns a summary."""
+    Safe to run on every startup. Returns a summary.
+
+    Mirrors the founder identity into BOTH `platform_users` (customer portal)
+    and `users` (admin portal — `/admin/login` reads from this collection)
+    so a single set of credentials authenticates everywhere.
+
+    Password resolution priority (per email index):
+      1. ENV var `ADMIN_PASSWORD_HASH_<N>` already-bcrypted hash (preferred for prod).
+         Use `$$` to escape any literal `$` in the env value.
+      2. ENV var `FOUNDER_PASSWORD_RESET=1` + seed password → re-hash and set.
+      3. New account only (insert): hash the seed password.
+      4. Existing account: leave password untouched.
+    """
     if db is None:
         return {"ok": False, "reason": "db unavailable"}
     env_emails = os.environ.get("FOUNDER_EMAILS", "").strip()
@@ -48,13 +60,27 @@ async def ensure_founders(db) -> dict:
         if not any(f["email"].lower() == em for f in founders):
             founders.append({"email": em, "password": None, "business_id": None, "full_name": "Founder"})
 
+    force_reset = os.environ.get("FOUNDER_PASSWORD_RESET", "").lower() in ("1", "true", "yes")
+
     upserts = 0
     upgrades = 0
     now = datetime.now(timezone.utc)
-    for fdr in founders:
+    for idx, fdr in enumerate(founders, start=1):
         email = fdr["email"].lower()
         existing = await db.platform_users.find_one({"email": email}, {"_id": 0, "user_id": 1})
         user_id = (existing or {}).get("user_id") or f"plat_{os.urandom(12).hex()[:24]}"
+
+        # Resolve the password hash to use for THIS founder.
+        env_hash_raw = os.environ.get(f"ADMIN_PASSWORD_HASH_{idx}", "")
+        env_hash = env_hash_raw.replace("$$", "$") if env_hash_raw else ""
+        new_hash = None
+        if env_hash:
+            new_hash = env_hash  # trust the env-provided bcrypt hash
+        elif force_reset and fdr.get("password"):
+            new_hash = _pwd_ctx.hash(fdr["password"])
+        elif not existing and fdr.get("password"):
+            # First-time provision — set seed password
+            new_hash = _pwd_ctx.hash(fdr["password"])
 
         update_set = {
             "email": email,
@@ -72,20 +98,52 @@ async def ensure_founders(db) -> dict:
         }
         if fdr.get("business_id"):
             update_set["business_id"] = fdr["business_id"]
-        # Only set password if (a) account is new, OR (b) seed password explicitly provided
+        # Apply the resolved password hash (if any) to platform_users.
         update_on_insert = {"created_at": now, "company_name": "AUREM Platform"}
-        if not existing and fdr.get("password"):
-            update_on_insert["password_hash"] = _pwd_ctx.hash(fdr["password"])
-        elif existing and fdr.get("password"):
-            # Reset to seed password ONLY if explicitly enabled via env (preserves user-changed passwords)
-            if os.environ.get("FOUNDER_PASSWORD_RESET", "").lower() in ("1", "true", "yes"):
-                update_set["password_hash"] = _pwd_ctx.hash(fdr["password"])
+        if new_hash:
+            update_set["password_hash"] = new_hash
 
         await db.platform_users.update_one(
             {"email": email},
             {"$set": update_set, "$setOnInsert": update_on_insert},
             upsert=True,
         )
+
+        # ─── MIRROR INTO `users` (admin portal source-of-truth) ───
+        # `/api/auth/admin/login` reads from db.users — without an entry
+        # here, /admin/login fails with "Invalid credentials" even though
+        # platform_users has the correct hash. Sync both fields.
+        users_set = {
+            "email": email,
+            "name": fdr.get("full_name") or "AUREM Founder",
+            "is_admin": True,
+            "is_super_admin": True,
+            "role": "super_admin",
+            "tier": "enterprise",
+            "tier_status": "active",
+            "lifetime": True,
+            "founder": True,
+            "updated_at": now,
+        }
+        if new_hash:
+            users_set["password"] = new_hash
+            users_set["password_hash"] = new_hash
+        await db.users.update_one(
+            {"email": email},
+            {"$set": users_set, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+
+        # Also keep `aurem_users` (legacy customer-login fallback) in sync.
+        aurem_set = {"email": email, "role": "super_admin", "is_admin": True}
+        if new_hash:
+            aurem_set["password_hash"] = new_hash
+        await db.aurem_users.update_one(
+            {"email": email},
+            {"$set": aurem_set, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+
         if existing:
             upgrades += 1
         else:
