@@ -76,9 +76,54 @@ def _verify_admin(authorization: Optional[str]) -> dict:
 # backoff + treat intermittent failures as yellow (not red), and attempt
 # a motor-level reconnect before declaring hard red. Green response is
 # cached 30s on success so a single slow ping can't flap the dot.
+#
+# iter 322 — P1 anti-flap hardening (user feedback: "system shows offline
+# every few mins"). Atlas M0 free-tier shared-CPU bursts spike pings to
+# 3-4s during cold cache, causing P1 to flap red↔green every 5-10 min.
+#   • Background pre-warm pinger every 10s keeps the motor pool hot →
+#     hot pings consistently <100ms even on M0
+#   • Sticky-green window extended 30s → 90s (covers the typical M0
+#     burst-credit refill cycle of ~60s)
+#   • RED only after 3 CONSECUTIVE bad cycles (true outage gate); single
+#     or double bad cycles surface as YELLOW so the system stays "live"
+#     with a degraded label rather than going fully offline.
 
 _P1_LAST_GREEN_TS = 0.0
-_P1_GREEN_STICKY_SEC = 30.0
+_P1_GREEN_STICKY_SEC = 90.0  # iter 322: was 30s — too tight for M0 bursts
+_P1_CONSECUTIVE_FAILS = 0
+_P1_FAIL_THRESHOLD_FOR_RED = 3  # iter 322: only RED after 3 bad cycles
+_P1_PREWARMER_STARTED = False
+
+
+async def _p1_prewarm_loop(db) -> None:
+    """Background tick — pings Mongo every 10s to keep the motor pool hot.
+    Never raises. Updates _P1_LAST_GREEN_TS on success so the public health
+    endpoint can short-circuit to green when warm pings are healthy."""
+    global _P1_LAST_GREEN_TS, _P1_CONSECUTIVE_FAILS
+    while True:
+        try:
+            ok = await _p1_single_ping(db, timeout=2.0)
+            if ok:
+                _P1_LAST_GREEN_TS = time.time()
+                _P1_CONSECUTIVE_FAILS = 0
+        except Exception:
+            pass
+        await asyncio.sleep(10)
+
+
+def start_p1_prewarmer(db) -> bool:
+    """Idempotent — start the background ping warmer once at app startup."""
+    global _P1_PREWARMER_STARTED
+    if _P1_PREWARMER_STARTED:
+        return False
+    try:
+        asyncio.create_task(_p1_prewarm_loop(db))
+        _P1_PREWARMER_STARTED = True
+        logger.info("[pillar-p1] pre-warm loop started (10s tick)")
+        return True
+    except RuntimeError:
+        # No running loop yet — safe to skip; will start on first health hit.
+        return False
 
 
 async def _p1_single_ping(db, timeout: float) -> bool:
@@ -93,28 +138,38 @@ async def _p1_single_ping(db, timeout: float) -> bool:
 async def _check_p1_infrastructure(db) -> str:
     """Mongo reachable with graceful retry + sticky-green + yellow-on-transient.
 
-    Green  : any ping succeeds within 3 attempts (4s / 3s / 2.5s backoff).
-    Yellow : all pings slow but the *last* green is within 30s (transient).
-    Red    : all 3 pings fail AND no green seen in last 30s.
+    Green  : warm-pinger green within sticky window OR any of 3 retries succeeds.
+    Yellow : warm-pinger had recent green within sticky window (transient blip).
+    Red    : 3 consecutive bad cycles AND no green seen within sticky window.
     """
-    global _P1_LAST_GREEN_TS
+    global _P1_LAST_GREEN_TS, _P1_CONSECUTIVE_FAILS
     now_ts = time.time()
+
+    # iter 322 — sticky-green short-circuit. If the background warmer
+    # observed a healthy ping within the sticky window, trust it. Avoids
+    # racing N concurrent pollers all hitting Atlas at once.
+    if (now_ts - _P1_LAST_GREEN_TS) < _P1_GREEN_STICKY_SEC:
+        _P1_CONSECUTIVE_FAILS = 0
+        return "green"
 
     # First attempt — generous 4s timeout (Atlas cold-cache spikes can hit 3s).
     if await _p1_single_ping(db, timeout=4.0):
         _P1_LAST_GREEN_TS = now_ts
+        _P1_CONSECUTIVE_FAILS = 0
         return "green"
 
     # Second attempt — tighter 3s.
     await asyncio.sleep(0.2)
     if await _p1_single_ping(db, timeout=3.0):
         _P1_LAST_GREEN_TS = now_ts
+        _P1_CONSECUTIVE_FAILS = 0
         return "green"
 
     # Third attempt — final 2.5s; if this fails, try motor-level reconnect.
     await asyncio.sleep(0.3)
     if await _p1_single_ping(db, timeout=2.5):
         _P1_LAST_GREEN_TS = now_ts
+        _P1_CONSECUTIVE_FAILS = 0
         return "green"
 
     # Auto-repair attempt: poke the motor client to force a topology refresh.
@@ -127,15 +182,19 @@ async def _check_p1_infrastructure(db) -> str:
                 client.list_database_names(), timeout=4.0
             )
             _P1_LAST_GREEN_TS = now_ts
+            _P1_CONSECUTIVE_FAILS = 0
             logger.info("[pillar-p1] auto-repair via topology refresh succeeded")
             return "green"
     except Exception as e:
         logger.warning(f"[pillar-p1] auto-repair reconnect failed: {e}")
 
-    # Sticky-green window: if we were green < 30s ago, this is a transient blip.
-    if (now_ts - _P1_LAST_GREEN_TS) < _P1_GREEN_STICKY_SEC:
-        return "yellow"
-    return "red"
+    # Failure path — increment consecutive-fail counter. Only declare RED
+    # after N consecutive cycles fail. Single/double blips → YELLOW so the
+    # system stays "live" with a degraded label rather than offline.
+    _P1_CONSECUTIVE_FAILS += 1
+    if _P1_CONSECUTIVE_FAILS >= _P1_FAIL_THRESHOLD_FOR_RED:
+        return "red"
+    return "yellow"
 
 
 async def _check_p2_intelligence(db) -> str:

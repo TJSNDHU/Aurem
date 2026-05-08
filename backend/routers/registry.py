@@ -701,6 +701,16 @@ def register_all_routers(app, db):
         except Exception:
             pass
 
+    # iter 322 — P1 Mongo pre-warm pinger (anti-flap). Keeps the motor pool
+    # hot so Atlas M0 burst-credit throttling never causes cold-start ping
+    # spikes that flip the Infrastructure pillar offline.
+    if db is not None:
+        try:
+            from routers.pillars_health_router import start_p1_prewarmer
+            start_p1_prewarmer(db)
+        except Exception as e:
+            logger.warning(f"[REGISTRY] P1 prewarmer not started: {e}")
+
     # V2V Stream Engine (paired with vapi_voice_router)
     if not _should_skip("routers.v2v_stream_engine"):
         try:

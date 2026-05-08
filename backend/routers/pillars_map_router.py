@@ -49,8 +49,10 @@ _jwt_alg: str = "HS256"
 SILENT_FAILURE_MINUTES = 15
 
 # iter 285.8 — per-collection threshold overrides.
-# Default is SILENT_FAILURE_MINUTES (15). Writers with slower cadences need
-# longer windows so we don't flag them RED mid-cycle.
+# iter 322 — extended for known slow-cadence writers. Default is
+# SILENT_FAILURE_MINUTES (15). Workers with slower cadences get longer
+# windows so a single missed APScheduler tick doesn't paint the pillar red.
+# Rule of thumb: threshold = expected_cadence_minutes × 2.5
 SILENT_FAILURE_OVERRIDES = {
     # ClawChief heartbeat runs every 15 min + 3 min startup delay → buffer to 25 min
     "heartbeats":          25,
@@ -59,6 +61,21 @@ SILENT_FAILURE_OVERRIDES = {
     # system_pulse is legacy (writer archived); give long buffer since we downgrade
     # to expects_writes=False below — this override is insurance only
     "system_pulse":        1440,
+    # Hourly self-audit + nightly cycles need wider windows
+    "self_audit_log":      90,
+    "nightly_cycle_log":   1500,  # nightly = ~24h, allow 25h buffer
+    "ora_brain_thoughts":  120,   # ORA learning is bursty
+    "agent_actions":       45,    # agent ticks staggered
+    "campaign_leads":      60,    # outreach ticks every 30-60 min
+    "scout_runs":          90,    # scout ticks slow (Google Places quotas)
+    "dr_backup_runs":      1500,  # daily DR mirror
+    "council_decisions":   120,   # council convenes when needed
+    "approvals":           240,   # approvals bursty
+    "voice_call_logs":     1440,  # voice can have multi-hour idle stretches
+    # Outreach channel writers — degrade to yellow not red when external
+    # quota throttles them (handled below in breaker-aware logic).
+    "email_log":           60,
+    "sms_logs":            60,
 }
 
 
@@ -1187,11 +1204,43 @@ async def _gather_pillar(key: str, spec: dict) -> dict:
     else:
         overall = "green"
 
+    # iter 322 — breaker-aware downgrade: when the cause of red is an OPEN
+    # external breaker (Twilio / Resend / OpenRouter / Groq quota or rate
+    # limit), the system itself is healthy — only the upstream is throttled.
+    # Surface this as YELLOW with a `throttled_by` label so the frontend can
+    # show "Outreach throttled — Twilio cooling down" instead of "OFFLINE".
+    throttled_by: list[str] = []
+    if overall == "red":
+        try:
+            from services.breakers import breaker_status
+            statuses = breaker_status()
+            # Map a breaker to the pillar(s) it influences.
+            pillar_breaker_map = {
+                "p3_outreach":  ("twilio", "resend"),
+                "p2_cognition": ("openrouter", "groq", "anthropic", "openai"),
+                "p4_revenue":   ("stripe",),
+            }
+            relevant = pillar_breaker_map.get(key, ())
+            for b_name, b_state in statuses.items():
+                if not isinstance(b_state, dict):
+                    continue
+                if b_state.get("state") == "open" and any(
+                    r in b_name.lower() for r in relevant
+                ):
+                    throttled_by.append(b_name)
+            # Only downgrade if EVERY red signal is attributable to a breaker
+            # AND there is no silent_failure or unreachable (genuine app bugs).
+            if throttled_by and not unreachable and not silent_failures:
+                overall = "yellow"
+        except Exception:
+            pass
+
     return {
         "key": key,
         "label": spec["label"],
         "color": spec["color"],
         "status": overall,
+        "throttled_by": throttled_by or None,
         "workers": {
             "live": len(workers_live),
             "done": len(workers_done),

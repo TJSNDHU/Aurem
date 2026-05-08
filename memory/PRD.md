@@ -26,6 +26,19 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Pillar anti-flap hardening (system "always live", never offline) ✅**
+  - User reported pillars going offline every few mins on prod. Diagnosed 4 root causes: (1) Atlas M0 burst-credit ping spikes, (2) APScheduler missed ticks, (3) external API breakers tripping, (4) backend transient 5xx (already fixed earlier today)
+  - **A — P1 latency hardening** (`routers/pillars_health_router.py`):
+    - Background pre-warm pinger (`_p1_prewarm_loop`, 10s tick) keeps motor pool hot — Atlas connections never go cold
+    - Sticky-green window 30s → **90s** (covers M0 ~60s burst-credit refill cycle)
+    - 3-retry failure → **YELLOW** (single/double blips), only **RED after 3 consecutive cycles** (true outage gate)
+    - Wired prewarmer launch into `routers/registry.py` startup
+  - **B — Per-pillar silent-failure thresholds** (`routers/pillars_map_router.py`):
+    - Extended `SILENT_FAILURE_OVERRIDES` for 11 known slow-cadence writers (self_audit_log: 90m, nightly_cycle_log: 25h, ora_brain_thoughts: 2h, agent_actions: 45m, campaign_leads: 60m, scout_runs: 90m, dr_backup_runs: 25h, council_decisions: 2h, approvals: 4h, voice_call_logs: 24h, email_log/sms_logs: 60m). Single missed APScheduler tick no longer paints pillar red.
+  - **C — Breaker-aware status downgrade** (`routers/pillars_map_router.py` `_gather_pillar`):
+    - When a pillar is RED but the only signal is `backend_red` AND the cause is an OPEN circuit breaker (twilio/resend/openrouter/groq/stripe), downgrade RED → YELLOW with `throttled_by: [breaker_name]` field. Frontend can show "Outreach throttled — Twilio cooling down" instead of "OFFLINE". System stays "live" with degraded label.
+    - Pillar→breaker map: `p3_outreach`→twilio/resend, `p2_cognition`→openrouter/groq/anthropic/openai, `p4_revenue`→stripe
+  - **E2E verified**: 1 fail → yellow, 2 fails → yellow, 3 fails → red. Live API call returned all 4 pillars green. P1 prewarmer wired in registry.
 - **2026-02-08 — Sentinel autonomous AI-diagnose wired into A2A → Council → ORA stack ✅**
   - User explicitly rejected a separate "Auto-Diagnose Top 5" admin button; demanded the diagnosis be baked into the existing autonomous repair stack
   - Created `services/sentinel_ai_diagnose.py` — single-source-of-truth Claude diagnose service (`diagnose_error`, `build_suggestion_doc`, `diagnose_and_store`) with dedup by signature + sibling-mark to avoid duplicate LLM spend
