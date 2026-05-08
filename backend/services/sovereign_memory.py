@@ -144,10 +144,13 @@ async def review_learning(
     doc = await db[PENDING].find_one({"id": learning_id}, {"_id": 0})
     if not doc:
         return {"ok": False, "error": "learning_not_found"}
-    if doc["status"] != "pending":
-        return {"ok": False, "error": f"already_{doc['status']}"}
+    # Defensive: legacy pending rows may be missing fields. Use .get() so
+    # the council rotation worker never KeyErrors on partial documents.
+    doc_status = doc.get("status") or "pending"
+    if doc_status != "pending":
+        return {"ok": False, "error": f"already_{doc_status}"}
     # Rule 1: submitter cannot stamp its own submission.
-    if doc["submitted_by"] == reviewer_role:
+    if doc.get("submitted_by") == reviewer_role:
         return {"ok": False, "error": "self_stamp_forbidden"}
     # Rule 2: same role cannot stamp twice.
     if any(s.get("role") == reviewer_role for s in doc.get("stamps", [])):
