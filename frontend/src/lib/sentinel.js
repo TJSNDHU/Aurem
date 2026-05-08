@@ -447,11 +447,23 @@ function _installFetchSniffer() {
     // Only report /api/* failures (internal backend) — skip 3rd-party noise.
     // 404s are NEVER reported — they're expected on optional endpoints and
     // add no signal. Capture only 5xx + 401/403/429 (real failures).
+    //
+    // iter 322 — DROP Cloudflare-layer transient origin errors entirely.
+    // Status codes 502/503/520/521/522/523/524 are emitted by the CF edge
+    // when the origin pod is restarting, cold-starting, or the upstream
+    // event loop briefly stalls during an Atlas latency spike. These are
+    // NOT actionable application bugs — they show as a flood in Sentinel
+    // (90%+ of historical noise) and drown out real 500s. Real backend
+    // exceptions surface as 500/501/505 and are still captured below.
+    const ORIGIN_TRANSIENT_STATUSES = new Set([502, 503, 520, 521, 522, 523, 524]);
     try {
       const isApi = url.includes("/api/");
       const status = response.status;
+      if (ORIGIN_TRANSIENT_STATUSES.has(status)) {
+        return response; // CDN-layer transient, do not ship
+      }
       const shouldReport = isApi && !_isIgnoredUrl(url) && !response.ok && (
-        status >= 500 ||           // server error
+        status >= 500 ||           // genuine app error (500/501/505)
         status === 401 ||          // unexpected auth failure
         status === 403 ||          // unexpected forbidden
         status === 429             // rate-limited (so we know)

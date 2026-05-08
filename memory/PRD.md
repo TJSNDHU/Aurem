@@ -26,6 +26,13 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Sentinel Backend 5xx flood eliminated (root-cause fix) ✅**
+  - Diagnosed via prod Sentinel pull: 114 distinct "backend_5xx" errors, 90%+ were Cloudflare/origin transients (502/503/520/521/522/523/524) during pod restart cycles, NOT app bugs. Top noise: `/api/public/status` 127×503, `/api/admin/pillars-map/overview` 30+× 502/520, `/api/voice-analytics/data` 13×520
+  - **Frontend `lib/sentinel.js`**: added `ORIGIN_TRANSIENT_STATUSES` set [502,503,520,521,522,523,524] — fetch sniffer skips reporting these entirely (CDN-edge, not actionable). Real 500/501/505 still ship.
+  - **Backend `routers/sentinel_client_router.py`**: classifier returns `origin_transient` bucket (ai_eligible=False); ingest endpoint drops these statuses before Mongo write (defense-in-depth for legacy cached clients)
+  - **`routers/agents_router.py` `/api/agents/status`**: hardened with try/except per subsystem (agent registry import, A2A bus, Mongo aggregate) — returns degraded payload with `degraded` reasons instead of 500. Polled every 30s by dashboard, cannot 500.
+  - **`services/sovereign_memory.py`**: defensive `.get()` for `submitted_by`/`status` in `review_learning` — fixes recurring `[council-rotation] review error: 'submitted_by'` log spam on legacy pending docs
+  - Verified locally: 503 ingest → `dropped: origin_transient`; 500 ingest → still classified `backend_5xx` ai_eligible=True
 - **2026-02-08 — Auth Expired errors → graceful re-prompt (Sentinel #1 issue fixed) ✅**
   - Sentinel telemetry showed 78 "Auth Expired" events from 2 unique users — was the top user-facing error
   - Built `apiClient` axios instance in `lib/api.js` with auto-attach token + silent refresh on 401 (single-flight, no concurrent refresh storms)

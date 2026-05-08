@@ -115,6 +115,13 @@ def _classify(err: Dict[str, Any]) -> Dict[str, Any]:
     # AI-eligible buckets
     if etype == "network_failure":
         return {"type": "network_failure", "auto_heal_key": None, "ai_eligible": True}
+    # iter 322 — Cloudflare/origin transient codes (502/503/520-524) are
+    # CDN-edge errors during pod restart or upstream stalls, NOT app bugs.
+    # Bucket them separately so they don't drown out real backend_5xx.
+    # Drop at ingest layer too (see ingest_client_error) — only persist a
+    # minimal sample.
+    if etype == "api_error" and status in (502, 503, 520, 521, 522, 523, 524):
+        return {"type": "origin_transient", "auto_heal_key": None, "ai_eligible": False}
     if etype == "api_error" and status and status >= 500:
         return {"type": "backend_5xx", "auto_heal_key": None, "ai_eligible": True}
     if etype == "api_error" and status and 400 <= status < 500:
@@ -236,6 +243,13 @@ async def ingest_client_error(body: ClientErrorBody, request: Request):
     # Drop 404s — always expected on optional endpoints, never signal.
     if body.status_code == 404:
         return {"ok": False, "dropped": "http_404_ignored"}
+
+    # iter 322 — drop Cloudflare/origin transient codes at ingest. These
+    # are CDN-edge errors (502/503/520-524) during pod restart cycles —
+    # historically 90%+ of all "5xx" noise. The frontend now suppresses
+    # them, but legacy cached clients still ship; defense-in-depth here.
+    if body.status_code in (502, 503, 520, 521, 522, 523, 524):
+        return {"ok": False, "dropped": "origin_transient"}
 
     # iter 295 — production hardening: drop trivial / empty errors before any DB hit
     msg = (body.message or "").strip()

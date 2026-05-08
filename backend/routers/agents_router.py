@@ -61,22 +61,44 @@ def _require_admin(request: Request):
 
 @router.get("/agents/status")
 async def agents_status(request: Request):
-    """Snapshot of all 4 agents + combined stats for the Admin Command Center."""
-    _require_admin(request)
-    from services.agents import all_agents
-    from services.a2a_bus import bus
+    """Snapshot of all 4 agents + combined stats for the Admin Command Center.
 
-    agents = [a.snapshot() for a in all_agents()]
+    iter 322 — hardened: any subsystem failure (agent registry import,
+    A2A bus init, Mongo aggregate latency) returns a safe degraded payload
+    instead of bubbling a 500. Polled every 30s by the dashboard, so a
+    transient blip must NEVER show as a backend exception.
+    """
+    _require_admin(request)
+
+    agents: List[Dict[str, Any]] = []
+    a2a_recent: List[Dict[str, Any]] = []
+    degraded_reasons: List[str] = []
+
+    try:
+        from services.agents import all_agents
+        agents = [a.snapshot() for a in all_agents()]
+    except Exception as e:
+        logger.warning(f"[agents/status] all_agents failed: {e}")
+        degraded_reasons.append(f"agents:{str(e)[:80]}")
+
+    try:
+        from services.a2a_bus import bus
+        a2a_recent = bus.recent(30)
+    except Exception as e:
+        logger.warning(f"[agents/status] a2a bus failed: {e}")
+        degraded_reasons.append(f"a2a:{str(e)[:80]}")
+
     combined = {"new_today": 0, "followup_today": 0, "closing_today": 0, "referral_today": 0}
     for a in agents:
-        st = a.get("today_stats", {})
-        if a["agent_id"] == "hunter_ora":
+        st = a.get("today_stats", {}) or {}
+        aid = a.get("agent_id")
+        if aid == "hunter_ora":
             combined["new_today"] = st.get("scouted", 0)
-        elif a["agent_id"] == "followup_ora":
+        elif aid == "followup_ora":
             combined["followup_today"] = st.get("drip_sent", 0)
-        elif a["agent_id"] == "closer_ora":
+        elif aid == "closer_ora":
             combined["closing_today"] = st.get("closer_attempts", 0)
-        elif a["agent_id"] == "referral_ora":
+        elif aid == "referral_ora":
             combined["referral_today"] = st.get("referrals_contacted", 0)
 
     # Pull today's revenue / replies if available
@@ -94,8 +116,8 @@ async def agents_status(request: Request):
             replied = await _db.campaign_leads.count_documents({
                 "last_reply_at": {"$gte": start},
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[agents/status] revenue/replied probe skipped: {e}")
 
     return {
         "agents": agents,
@@ -105,7 +127,8 @@ async def agents_status(request: Request):
             "replied": replied,
             "revenue_cad": revenue,
         },
-        "a2a_recent": bus.recent(30),
+        "a2a_recent": a2a_recent,
+        "degraded": degraded_reasons or None,
     }
 
 
