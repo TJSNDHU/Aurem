@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-import resend
 
 # Import existing services
 from services.content_ai import generate_content, CONTENT_TYPES, apply_brand_guard
@@ -28,24 +27,28 @@ def set_db(database):
     _db = database
 
 # Initialize Resend SDK (defensive — some build environments fail to load
-# resend's transitive submodules; we fall back to a no-op stub so this
-# router still mounts and the rest of the email pipeline works).
+# resend's transitive submodules like `resend.logs`; we fall back to a
+# no-op stub so this router still mounts and the rest of the email
+# pipeline works).
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 try:
-    import resend  # noqa: F401  (used at runtime by _send_email helpers)
+    import resend
     if RESEND_API_KEY:
         resend.api_key = RESEND_API_KEY
     _RESEND_AVAILABLE = True
 except Exception as _resend_err:
-    import logging as _logging
-    _logging.warning(f"[ai_email_router] resend SDK unavailable, "
-                     f"using stub: {_resend_err}")
-    class _ResendStub:  # noqa: D401
+    logger.warning(
+        f"[ai_email_router] resend SDK unavailable, using stub: {_resend_err}"
+    )
+
+    class _ResendStub:
         api_key = None
+
         class Emails:
             @staticmethod
             def send(*_a, **_kw):
                 raise RuntimeError("Resend SDK not loaded")
+
     resend = _ResendStub()  # type: ignore
     _RESEND_AVAILABLE = False
 

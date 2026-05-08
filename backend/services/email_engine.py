@@ -13,9 +13,29 @@ Usage:
 
 import os
 import logging
-import resend
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+
+# Defensive resend import — production may have an older SDK build whose
+# transitive `resend.logs` submodule is missing, breaking module load and
+# cascading to "[bulk-wire] failed: No module named 'resend.logs'".
+# Falling back to a stub keeps the rest of the email pipeline alive.
+try:
+    import resend
+except Exception as _resend_err:  # pragma: no cover
+    logging.getLogger(__name__).warning(
+        f"[email_engine] resend SDK unavailable, using stub: {_resend_err}"
+    )
+
+    class _ResendStub:
+        api_key = None
+
+        class Emails:
+            @staticmethod
+            def send(*_a, **_kw):
+                raise RuntimeError("Resend SDK not loaded")
+
+    resend = _ResendStub()  # type: ignore
 
 logger = logging.getLogger(__name__)
 

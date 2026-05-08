@@ -26,6 +26,11 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — PRODUCTION DEPLOYMENT BLOCKERS FIXED ✅**
+  - **Root cause 1**: `routers/ai_email_router.py` had `import resend` at module top level (BEFORE the defensive try/except block). Production's older resend SDK lazy-loads `resend.logs` submodule which is missing → entire module fails to import → bulk-wire warning AND knock-on registration failures cascading the rest of startup. **Fix**: removed the unconditional import, kept only the `try/except` defensive one.
+  - **Root cause 2**: `services/email_engine.py` had unconditional `import resend` at line 16. Same fix applied — wrapped in try/except with stub fallback.
+  - **Root cause 3**: `routers/admin_dr_backup_router.py` was creating `AsyncIOMotorClient(MONGO_URL)` at module-import time. In Atlas prod with slow DNS or missing env var, this can hang/crash the import → blocks router registration. **Fix**: converted to lazy `_get_db()` accessor invoked only on request.
+  - Verified preview backend restart: 8s startup, 1922 routes mounted, zero bulk-wire failures, "Application startup complete" reached cleanly.
 - **2026-02-08 — RepairQuote flows + Instant Website Builder for "no-website" leads ✅**
   - **`POST /api/website-builder/no-website`** (NEW, public, no-auth) — creates lead → calls existing `generate_website()` → provisions customer in `platform_users` + `users` (7-day trial, tier=starter, BIN=`AURE-NWS-XXXX`) → returns slug, sample_url, login_url, temp_password
   - `RepairQuote.jsx`: top-right **"Log In"** now goes to `/my` (was `/login`)

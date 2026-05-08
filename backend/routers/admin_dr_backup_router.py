@@ -19,8 +19,22 @@ from services.db_backup_service import run_backup
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/backup", tags=["admin", "backup"])
 
-_db_client = AsyncIOMotorClient(os.environ.get("MONGO_URL"))
-_db = _db_client[os.environ.get("DB_NAME", "aurem_db")]
+# Lazy DB accessor — avoids creating an AsyncIOMotorClient at module-import
+# time (which can crash startup on K8s deploy when MONGO_URL is missing
+# or uses Atlas DNS that's slow to resolve before the event loop is up).
+_db_client = None
+_db_handle = None
+
+
+def _get_db():
+    global _db_client, _db_handle
+    if _db_handle is None:
+        url = os.environ.get("MONGO_URL")
+        if not url:
+            return None
+        _db_client = AsyncIOMotorClient(url)
+        _db_handle = _db_client[os.environ.get("DB_NAME", "aurem_db")]
+    return _db_handle
 
 
 async def _require_super_admin(authorization: str = None) -> Dict[str, Any]:
@@ -72,8 +86,17 @@ async def backup_status(authorization: str = None) -> Dict[str, Any]:
     await _require_super_admin(authorization=authorization)
 
     runs: List[Dict[str, Any]] = []
+    db = _get_db()
+    if db is None:
+        return {
+            "ok": True,
+            "runs": [],
+            "secondary": {"configured": False, "reachable": False},
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "warning": "MONGO_URL not configured",
+        }
     cursor = (
-        _db["db_backup_runs"]
+        db["db_backup_runs"]
         .find({}, {"_id": 0, "collections": 0})
         .sort("started_at", -1)
         .limit(20)
