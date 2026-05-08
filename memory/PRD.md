@@ -24,6 +24,23 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 - Email/DNS: Cloudflare Workers + Cloudflare DNS API + Resend
 - Pixel: `aurem-pixel.js` served by `pixel_patches_router.py`
 
+
+## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Customer Portal /my (Luxe) E2E verified ✅**
+  - Rebuilt luxe/* folder post git rollback (LuxeAuthContext, LuxeAuthOverlay, LuxePages, useLuxeDashboardData, tokens)
+  - All files use `lib/api.js` BACKEND_URL helper — zero direct `process.env.REACT_APP_BACKEND_URL` usage in luxe/*
+  - testing_agent_v3_fork (iteration_319) — 100% pass on login, 8 sub-pages (Home/Profile/Live Health/Security/Automation/CRM/ORA/Settings), logout
+  - Bugs fixed by testing agent: (1) `/api/platform/me` token lookup now supports both user_id and email-based payloads (ai_platform_router.py); (2) testid `page-live-health` consistency in LuxePages.jsx; (3) AutomationPage defensive Array.isArray() for workflows
+  - New active test creds: `e2e-test-luxe@aurem-test.com` / `Test@1234567`
+- **2026-02-08 — Security key rotation post-breach**
+  - All default DB passwords rotated via `/app/scripts/rotate_default_passwords.py`
+  - Founder/admin/customer credentials updated in /app/memory/test_credentials.md
+  - User contacted Emergent Support for managed Atlas + Universal LLM key rotation (production-side, awaiting confirmation)
+- **2026-02-08 — Production startup hardening**
+  - Defensive guards around `resend.api_key` assignment to prevent module-level crash on missing key
+  - Removed global service worker (sw.js) interception of `/api` POST routes (login/pixel)
+
+
 ## Implemented (Recent)
 - **2026-02-06 — Customer Health Monitor + Auto-Repair Pipeline live**
   3 new services + 1 router + 1 admin panel + Morning Brief integration:
