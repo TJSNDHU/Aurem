@@ -250,11 +250,22 @@ async def evening_brief(db) -> Dict[str, Any]:
 # ═══════════════════════════════════════════
 
 def register_nightly_jobs(scheduler, db):
-    """Call from server startup. `scheduler` is the existing AsyncIOScheduler."""
-    scheduler.add_job(lambda: day_close(db),        "cron", hour=23, minute=0, id="aurem_day_close", replace_existing=True)
-    scheduler.add_job(lambda: next_day_prep(db),    "cron", hour=0,  minute=0, id="aurem_next_day_prep", replace_existing=True)
-    scheduler.add_job(lambda: auto_learn(db),       "cron", hour=2,  minute=0, id="aurem_auto_learn", replace_existing=True)
-    scheduler.add_job(lambda: evening_brief(db),    "cron", hour=19, minute=0, id="aurem_evening_brief", replace_existing=True)
+    """Call from server startup. `scheduler` is the existing AsyncIOScheduler.
+
+    NOTE: AsyncIOScheduler awaits coroutine functions directly, but a
+    `lambda: <async_fn>(db)` returns a coroutine that the executor never
+    awaits → "coroutine never awaited" RuntimeWarning + memory leak.
+    Use proper async wrapper closures instead.
+    """
+    async def _day_close():       return await day_close(db)
+    async def _next_day_prep():   return await next_day_prep(db)
+    async def _auto_learn():      return await auto_learn(db)
+    async def _evening_brief():   return await evening_brief(db)
+
+    scheduler.add_job(_day_close,      "cron", hour=23, minute=0, id="aurem_day_close",     replace_existing=True)
+    scheduler.add_job(_next_day_prep,  "cron", hour=0,  minute=0, id="aurem_next_day_prep", replace_existing=True)
+    scheduler.add_job(_auto_learn,     "cron", hour=2,  minute=0, id="aurem_auto_learn",    replace_existing=True)
+    scheduler.add_job(_evening_brief,  "cron", hour=19, minute=0, id="aurem_evening_brief", replace_existing=True)
 
     # Google Places nightly reviews sync (Feb 2026 — P1 #3)
     try:
@@ -277,7 +288,9 @@ def register_nightly_jobs(scheduler, db):
     # Postiz daily auto-post at 10 AM
     try:
         from services.postiz_service import daily_autopost_cron
-        scheduler.add_job(lambda: daily_autopost_cron(db), "cron", hour=10, minute=0, id="aurem_postiz_daily", replace_existing=True)
+        async def _postiz_daily():
+            return await daily_autopost_cron(db)
+        scheduler.add_job(_postiz_daily, "cron", hour=10, minute=0, id="aurem_postiz_daily", replace_existing=True)
         logger.info("[NightlyCycle] Postiz daily auto-post scheduled (10 AM)")
     except Exception as e:
         logger.warning(f"[NightlyCycle] Postiz auto-post not scheduled: {e}")
@@ -330,7 +343,9 @@ def register_nightly_jobs(scheduler, db):
     # EvoMap Evolver nightly review — 2:45 AM (after auto-learn @2AM, after health @2:30)
     try:
         from services.evolver_client import run_review as _evolver_review
-        scheduler.add_job(lambda: _evolver_review(db), "cron", hour=2, minute=45,
+        async def _evolver_review_job():
+            return await _evolver_review(db)
+        scheduler.add_job(_evolver_review_job, "cron", hour=2, minute=45,
                           id="aurem_evolver_review", replace_existing=True)
         logger.info("[NightlyCycle] Evolver nightly review scheduled (2:45 AM)")
     except Exception as e:
