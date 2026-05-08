@@ -61,6 +61,7 @@ async def ensure_founders(db) -> dict:
             founders.append({"email": em, "password": None, "business_id": None, "full_name": "Founder"})
 
     force_reset = os.environ.get("FOUNDER_PASSWORD_RESET", "").lower() in ("1", "true", "yes")
+    disable_2fa = os.environ.get("FOUNDER_DISABLE_2FA", "").lower() in ("1", "true", "yes")
 
     upserts = 0
     upgrades = 0
@@ -115,6 +116,7 @@ async def ensure_founders(db) -> dict:
         # platform_users has the correct hash. Sync both fields.
         users_set = {
             "email": email,
+            "id": user_id,  # admin login JWT uses user["id"]
             "name": fdr.get("full_name") or "AUREM Founder",
             "is_admin": True,
             "is_super_admin": True,
@@ -128,6 +130,11 @@ async def ensure_founders(db) -> dict:
         if new_hash:
             users_set["password"] = new_hash
             users_set["password_hash"] = new_hash
+        # Emergency 2FA disable — set FOUNDER_DISABLE_2FA=1 in prod env if
+        # founder lost access to authenticator. Re-enable via admin UI after.
+        if disable_2fa:
+            users_set["totp_enabled"] = False
+            users_set["totp_secret"] = ""
         await db.users.update_one(
             {"email": email},
             {"$set": users_set, "$setOnInsert": {"created_at": now}},
@@ -162,7 +169,18 @@ async def ensure_founders(db) -> dict:
                 }, "$setOnInsert": {"created_at": now, "events_received": 0}},
                 upsert=True,
             )
-    msg = f"[FOUNDERS] Provisioned {upserts} new + {upgrades} upgraded ({len(founders)} total)"
+    flags = []
+    if force_reset:
+        flags.append("FOUNDER_PASSWORD_RESET=1")
+    if disable_2fa:
+        flags.append("FOUNDER_DISABLE_2FA=1")
+    if any(os.environ.get(f"ADMIN_PASSWORD_HASH_{i}") for i in range(1, 5)):
+        flags.append("ADMIN_PASSWORD_HASH_*")
+    flags_str = f" [flags: {', '.join(flags)}]" if flags else ""
+    msg = (
+        f"[FOUNDERS] Provisioned {upserts} new + {upgrades} upgraded "
+        f"({len(founders)} total){flags_str}"
+    )
     logger.info(msg)
     print(msg, flush=True)
-    return {"ok": True, "new": upserts, "upgraded": upgrades, "total": len(founders)}
+    return {"ok": True, "new": upserts, "upgraded": upgrades, "total": len(founders), "flags": flags}
