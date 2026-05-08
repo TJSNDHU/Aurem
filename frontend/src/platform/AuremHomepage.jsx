@@ -530,7 +530,7 @@ const AuremHomepage = () => {
           <button onClick={() => scrollTo("pricing")} data-testid="nav-link-pricing">Pricing</button>
         </div>
         <div className="nav-actions">
-          <Link to="/login" className="nav-login" data-testid="nav-link-login" aria-label="Log in to your AUREM account">
+          <Link to="/my" className="nav-login" data-testid="nav-link-login" aria-label="Log in to your AUREM account">
             <span className="nav-login-icon"><User size={16} strokeWidth={1.8} /></span>
             <span className="nav-login-text">Log In</span>
           </Link>
@@ -916,7 +916,7 @@ const AuremHomepage = () => {
             <Link to="/status" data-testid="footer-link-status">System Status</Link>
             <Link to="/privacy" data-testid="footer-link-privacy">Privacy Policy</Link>
             <Link to="/terms" data-testid="footer-link-terms">Terms of Use</Link>
-            <Link to="/login" data-testid="footer-link-login">Log In</Link>
+            <Link to="/my" data-testid="footer-link-login">Log In</Link>
           </div>
           <div className="footer-copy">© 2026 Polaris Built Inc. &nbsp;·&nbsp; Mississauga, Ontario, Canada &nbsp;·&nbsp; CASL &amp; PIPEDA Compliant</div>
         </div>
