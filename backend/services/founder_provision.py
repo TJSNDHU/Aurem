@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DEFAULT_FOUNDERS = [
-    {"email": "teji.ss1986@gmail.com", "password": "Admin123",          "business_id": "AURE-FNDR-001", "full_name": "AUREM Admin"},
-    {"email": "admin@aurem.live",      "password": "AuremAdmin2024!",   "business_id": "AURE-FNDR-002", "full_name": "AUREM Founder"},
+    {"email": "teji.ss1986@gmail.com", "password": "ul4Fb*u^l^Nuazh@B%Q8", "business_id": "AURE-FNDR-001", "full_name": "AUREM Admin"},
+    {"email": "admin@aurem.live",      "password": "o2VmqItgD3STdLlHWX^u", "business_id": "AURE-FNDR-002", "full_name": "AUREM Founder"},
 ]
 
 ENTERPRISE_LIMITS = {

@@ -63,7 +63,7 @@ async def run_background_init(
                     "first_name": "Teji",
                     "last_name": "Admin",
                     "password": hash_password(
-                        os.environ.get("ADMIN_SEED_PASSWORD", "Admin123")
+                        os.environ.get("ADMIN_SEED_PASSWORD", "vyoOeNWyZCGMbmf5u8dc")
                     ),
                     "is_admin": True,
                     "is_super_admin": True,
