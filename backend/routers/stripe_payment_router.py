@@ -8,7 +8,7 @@ and plan activation for AUREM's 3-tier pricing (CAD).
 import os
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
