@@ -46,11 +46,39 @@ async function req(method, path, body, isFormData = false) {
  * POST /api/auth/login
  * Body: { email, password }
  * Returns: { access_token, user: { id, name, email, tier, points, skin_type, role } }
+ *
+ * iter 322x — Silent 1x retry on 401.
+ *   Atlas M0 cold-start sometimes returns None on the first .find_one()
+ *   even when the row exists. Backend already does an internal 250ms
+ *   retry (routes/auth.py); this is the second safety net so the user
+ *   never sees a flicker if both the backend retry AND a fresh-pool
+ *   miss collide. 800ms backoff between attempts as spec'd.
  */
 export async function login(email, password) {
-  const data = await req("POST", "/api/auth/login", { email, password });
-  setToken(data.token || data.access_token);
-  return normalizeUser(data.user);
+  const _attempt = async () => {
+    const data = await req("POST", "/api/auth/login", { email, password });
+    setToken(data.token || data.access_token);
+    return normalizeUser(data.user);
+  };
+  try {
+    return await _attempt();
+  } catch (err) {
+    const msg = String(err?.message || err || "");
+    // Only retry on transient auth signals — never on a real wrong password.
+    // We can't tell them apart 100% from the client side, but the backend
+    // returns the same 401 either way; user impact of one 800ms retry on a
+    // genuinely-wrong password is one extra round-trip. Acceptable.
+    const looksTransient =
+      msg.includes("Invalid credentials") ||
+      msg.toLowerCase().includes("error 401") ||
+      msg.toLowerCase().includes("error 500") ||
+      msg.toLowerCase().includes("error 502") ||
+      msg.toLowerCase().includes("error 503");
+    if (!looksTransient) throw err;
+    // 800ms backoff (per spec) before silent retry
+    await new Promise((r) => setTimeout(r, 800));
+    return await _attempt();
+  }
 }
 
 /**

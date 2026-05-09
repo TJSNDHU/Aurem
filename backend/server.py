@@ -1154,6 +1154,34 @@ async def startup_event():
                 except Exception as e:
                     logging.warning(f"[STARTUP] ⚠️  Founder provisioning failed: {e}")
                 # ════════════════════════════════════════════════════════════════
+
+                # iter 322x — Mongo connection pool pre-warm.
+                # Send 5 parallel cheap queries against the auth-critical
+                # collections so the pool has live connections by the time
+                # the first real login lands. Eliminates the "Atlas cold-
+                # start returns None" failure mode for /api/auth/login.
+                try:
+                    async def _prewarm():
+                        cmds = [
+                            db.users.estimated_document_count(),
+                            db.platform_users.estimated_document_count(),
+                            db.team_members.estimated_document_count(),
+                            db.aurem_billing.estimated_document_count(),
+                            db.command("ping"),
+                        ]
+                        return await asyncio.gather(*cmds, return_exceptions=True)
+                    pw_t0 = time.time()
+                    pw_results = await asyncio.wait_for(_prewarm(), timeout=8.0)
+                    n_ok = sum(1 for r in pw_results if not isinstance(r, Exception))
+                    logging.info(
+                        f"[STARTUP] auth-pool prewarm done in {(time.time()-pw_t0)*1000:.0f}ms "
+                        f"({n_ok}/{len(pw_results)} ok)"
+                    )
+                except asyncio.TimeoutError:
+                    logging.warning("[STARTUP] ⚠️  auth-pool prewarm timed out")
+                except Exception as e:
+                    logging.warning(f"[STARTUP] ⚠️  auth-pool prewarm failed: {e}")
+                # ════════════════════════════════════════════════════════════════
                 
         except Exception as e:
             logging.error(f"❌ MongoDB client creation failed: {e}")

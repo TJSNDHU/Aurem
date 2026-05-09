@@ -214,6 +214,12 @@ async def register(user_data: UserCreate):
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
     """Login with email, phone, or AUREM Business ID (BIN)."""
+    # iter 322x — auth reliability instrumentation. 4 timestamps surfaced
+    # so we can pinpoint exactly where intermittent latency creeps in.
+    import time as _time
+    _t = {"received": _time.monotonic()}
+    _attempt_id = uuid.uuid4().hex[:8]
+
     if not credentials.email and not credentials.phone:
         raise HTTPException(status_code=400, detail="Email or phone number required")
 
@@ -265,6 +271,24 @@ async def login(credentials: UserLogin):
 
     # Check regular users
     user = await get_auth_db().users.find_one(query, {"_id": 0})
+    _t["db_lookup_done"] = _time.monotonic()
+    
+    # iter 322x — silent retry once on transient DB miss. Atlas M0 cold
+    # starts have been observed to return None on the first read after a
+    # >5 minute idle window even when the row exists. Re-query once with
+    # a 250ms backoff before declaring the user unknown.
+    if user is None and credentials.email:
+        try:
+            import asyncio as _aio
+            await _aio.sleep(0.25)
+            user = await get_auth_db().users.find_one(query, {"_id": 0})
+            if user is not None:
+                logging.warning(
+                    f"[AUTH][{_attempt_id}] silent_retry hit — user found on 2nd query "
+                    f"(Atlas cold-start signal)"
+                )
+        except Exception as _e:
+            logging.warning(f"[AUTH][{_attempt_id}] silent_retry raised: {_e}")
     
     # Check if user signed up with Google OAuth - they must use Google Sign-in
     if user:
@@ -290,6 +314,7 @@ async def login(credentials: UserLogin):
     if user and verify_password(credentials.password, user.get("password", "")):
         clear_failed_logins(identifier)
         token = create_token(user["id"], user.get("is_admin", False), email=user.get("email"))
+        _t["jwt_issued"] = _time.monotonic()
 
         response_data = {
             "id": user["id"],
@@ -307,6 +332,15 @@ async def login(credentials: UserLogin):
         else:
             response_data["is_super_admin"] = False
 
+        _t["response_built"] = _time.monotonic()
+        # iter 322x — single structured log line per successful login
+        logging.info(
+            f"[AUTH][{_attempt_id}] OK email={credentials.email} "
+            f"db_lookup_ms={int((_t['db_lookup_done']-_t['received'])*1000)} "
+            f"jwt_ms={int((_t['jwt_issued']-_t['db_lookup_done'])*1000)} "
+            f"build_ms={int((_t['response_built']-_t['jwt_issued'])*1000)} "
+            f"total_ms={int((_t['response_built']-_t['received'])*1000)}"
+        )
         return TokenResponse(token=token, user=response_data)
 
     # Check team members
@@ -345,6 +379,15 @@ async def login(credentials: UserLogin):
                 )
 
     record_failed_login(identifier)
+    # iter 322x — log 401 with timing so we can distinguish "wrong password"
+    # from "DB returned None on cold start"
+    _t["response_built"] = _time.monotonic()
+    logging.warning(
+        f"[AUTH][{_attempt_id}] 401 email={credentials.email} "
+        f"user_found={'yes' if user else 'no'} "
+        f"db_lookup_ms={int((_t['db_lookup_done']-_t['received'])*1000)} "
+        f"total_ms={int((_t['response_built']-_t['received'])*1000)}"
+    )
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
