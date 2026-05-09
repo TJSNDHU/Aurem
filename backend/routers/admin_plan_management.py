@@ -480,7 +480,7 @@ async def assign_plan_to_tenant(body: dict, admin=Depends(verify_admin)):
 @router.get("/usage/{tenant_id}")
 async def get_tenant_usage(tenant_id: str, admin=Depends(verify_admin)):
     """Get usage summary for a specific tenant."""
-    from services.plan_enforcement import get_usage_summary
+    from services.subscription_manager import get_usage_summary  # iter 322w
     return await get_usage_summary(tenant_id)
 
 
@@ -489,7 +489,7 @@ async def get_all_tenant_usage(admin=Depends(verify_admin)):
     """Get usage summary for all tenants + MRR."""
     if _db is None:
         raise HTTPException(500, "Database not initialized")
-    from services.plan_enforcement import get_usage_summary
+    from services.subscription_manager import get_usage_summary  # iter 322w
 
     tenants = await _db.users.distinct("tenant_id")
     summaries = []

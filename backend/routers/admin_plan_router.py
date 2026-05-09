@@ -44,7 +44,7 @@ async def _get_user(authorization: str = Header(None)):
 @router.get("/my-usage")
 async def my_usage(user=Depends(_get_user)):
     """Get current user's plan usage summary for sidebar widget."""
-    from services.plan_enforcement import get_usage_summary
+    from services.subscription_manager import get_usage_summary  # iter 322w
     tenant_id = user.get("tenant_id", "aurem_platform")
     return await get_usage_summary(tenant_id)
 
@@ -52,7 +52,7 @@ async def my_usage(user=Depends(_get_user)):
 @router.get("/my-plan")
 async def my_plan(user=Depends(_get_user)):
     """Get current user's plan details."""
-    from services.plan_enforcement import get_tenant_plan
+    from services.subscription_manager import get_tenant_plan  # iter 322w
     tenant_id = user.get("tenant_id", "aurem_platform")
     plan = await get_tenant_plan(tenant_id)
     plan.pop("_id", None)
@@ -63,7 +63,7 @@ async def my_plan(user=Depends(_get_user)):
 async def available_plans():
     """Public: List all active plans for pricing page."""
     if db is None:
-        from services.plan_enforcement import PLAN_TIERS
+        from services.subscription_manager import PLAN_TIERS  # iter 322w
         plans = [{"tier": k, **v, "active": True} for k, v in PLAN_TIERS.items()]
         return {"plans": plans}
     plans = await db.subscription_plans.find(
@@ -75,6 +75,6 @@ async def available_plans():
 @router.get("/check-feature/{feature}")
 async def check_feature(feature: str, user=Depends(_get_user)):
     """Check if a feature is available on the user's plan."""
-    from services.plan_enforcement import check_feature_access
+    from services.subscription_manager import check_feature_access  # iter 322w
     tenant_id = user.get("tenant_id", "aurem_platform")
     return await check_feature_access(tenant_id, feature)

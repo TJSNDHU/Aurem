@@ -3,13 +3,14 @@ Smart Search Router
 Intelligent search with Google → DuckDuckGo fallback
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
 
 from services.smart_search import get_smart_search
 from utils.ttl_cache import cache_get, cache_set
+from utils.service_gate import require_service  # iter 322w STEP 3
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +232,8 @@ async def scout_business_endpoint(
 
 
 @router.post("/scout")
-async def scout_business_post(body: dict):
+@require_service("scout", quota_kind="scout_limit")  # iter 322w STEP 3
+async def scout_business_post(request: Request, body: dict):
     """Scout a business (POST version)."""
     name = body.get("name") or body.get("business_name") or body.get("query", "")
     location = body.get("location", "")

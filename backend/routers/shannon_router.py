@@ -253,7 +253,7 @@ async def run_pentest(req: PentestRequest, authorization: str = Header(None)):
     tenant_id = payload.get("tenant_id") or payload.get("business_id") or "aurem_platform"
 
     # Enterprise tier gate
-    from services.plan_enforcement import PLAN_TIERS
+    from services.subscription_manager import PLAN_TIERS  # type: ignore  # iter 322w
     tier = "starter"
     try:
         import server

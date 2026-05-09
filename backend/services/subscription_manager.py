@@ -1,7 +1,12 @@
 """
-AUREM Subscription & API Control System
-Tiered access control for the Growth OS
-Revenue Layer
+AUREM Subscription & API Control System — SINGLE SOURCE OF TRUTH (iter 322w)
+═══════════════════════════════════════════════════════════════════════════
+Master entry point: `get_plan_state(business_id)`
+ALL plan/service/usage checks across the codebase MUST route through this
+function. The legacy `plan_enforcement.py` and `usage_metering_service.py`
+remain as thin shims delegating here so existing imports keep working.
+
+Single source for plan definitions: `aurem_config.plans.PLANS`.
 """
 
 import os
@@ -12,6 +17,148 @@ from enum import Enum
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# iter 322w — MASTER plan-state function (the only one routes should call)
+# ─────────────────────────────────────────────────────────────────────────
+async def get_plan_state(business_id: str, db=None) -> Dict[str, Any]:
+    """Single source of truth for a tenant's plan posture.
+
+    Args:
+      business_id: BIN identifier (e.g., AURE-XXXX).
+      db: optional Motor handle. If None, resolves from server.db.
+
+    Returns:
+      {
+        "business_id":       <str>,
+        "plan":              "trial" | "starter" | "growth" | "pro" | "enterprise",
+        "services_unlocked": [<service_id>, ...]    # "*" = all (lifetime/admin)
+        "trial_ends_at":     ISO datetime str | None,
+        "is_expired":        bool,
+        "subscription_status": "active" | "trialing" | "expired" | "lifetime_active" | ...,
+        "usage": {
+          "actions_used":    <int>     # current month service_usage_log count
+          "actions_limit":   <int>     # plan-level ceiling (sum of caps),
+                                       # or float('inf') for lifetime
+        },
+      }
+
+    Idempotent — pure read. Computes `is_expired=True` when:
+      - plan == "trial" AND trial_ends_at < now AND not lifetime_free
+      - subscription_status == "expired"
+    """
+    if db is None:
+        try:
+            from server import db as _server_db
+            db = _server_db
+        except Exception:
+            db = None
+    if db is None:
+        return _empty_state(business_id, reason="db_unavailable")
+
+    # Lookup tenant. We accept either business_id or platform_user_id.
+    user = await db.platform_users.find_one(
+        {"business_id": business_id}, {"_id": 0}
+    )
+    if not user:
+        # Tolerant fallback — many old rows use email as the primary key.
+        user = await db.platform_users.find_one(
+            {"$or": [{"user_id": business_id}, {"email": business_id}]},
+            {"_id": 0},
+        )
+    if not user:
+        return _empty_state(business_id, reason="tenant_not_found")
+
+    plan_id = (user.get("plan") or "trial").lower()
+    services_unlocked = list(user.get("services_unlocked") or [])
+    trial_ends_at = user.get("trial_ends_at")
+    sub_status = user.get("subscription_status") or "trialing"
+    # iter 322w — lifetime detection: explicit flag OR wildcard services
+    # OR subscription_status='lifetime_active'.
+    lifetime_free = (
+        bool(user.get("lifetime_free"))
+        or "*" in services_unlocked
+        or sub_status == "lifetime_active"
+    )
+
+    # Expiry computation — trial gate.
+    is_expired = False
+    now = datetime.now(timezone.utc)
+    if not lifetime_free:
+        if plan_id == "trial" and trial_ends_at:
+            ttl = trial_ends_at
+            if isinstance(ttl, str):
+                try:
+                    ttl = datetime.fromisoformat(ttl.replace("Z", "+00:00"))
+                except Exception:
+                    ttl = None
+            if isinstance(ttl, datetime):
+                if ttl.tzinfo is None:
+                    ttl = ttl.replace(tzinfo=timezone.utc)
+                if ttl < now:
+                    is_expired = True
+        if sub_status == "expired":
+            is_expired = True
+
+    # If expired and not lifetime — drop unlocked services to []
+    if is_expired:
+        services_unlocked = []
+
+    # Usage roll-up — count this month's service_usage_log rows.
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    actions_used = 0
+    try:
+        actions_used = await db.service_usage_log.count_documents({
+            "business_id": business_id,
+            "ts": {"$gte": month_start.isoformat()},
+        })
+    except Exception:
+        actions_used = 0
+
+    # Limit aggregation from the SSOT.
+    if lifetime_free:
+        actions_limit = float("inf")
+    else:
+        try:
+            from aurem_config.plans import PLANS as _PLANS
+            plan_def = _PLANS.get(plan_id) or _PLANS.get("trial") or {}
+            limits = plan_def.get("limits") or {}
+            # Use ai_calls_limit as the "actions" ceiling — it's the most
+            # generic counter and what the rate-limit middleware checks.
+            actions_limit = int(limits.get("ai_calls_limit") or 0)
+        except Exception:
+            actions_limit = 0
+
+    return {
+        "business_id": business_id,
+        "plan": plan_id,
+        "services_unlocked": services_unlocked,
+        "trial_ends_at": (
+            trial_ends_at.isoformat()
+            if isinstance(trial_ends_at, datetime)
+            else trial_ends_at
+        ),
+        "is_expired": is_expired,
+        "subscription_status": "expired" if is_expired else sub_status,
+        "usage": {
+            "actions_used": actions_used,
+            "actions_limit": actions_limit,
+        },
+    }
+
+
+def _empty_state(business_id: str, reason: str) -> Dict[str, Any]:
+    return {
+        "business_id": business_id,
+        "plan": "trial",
+        "services_unlocked": [],
+        "trial_ends_at": None,
+        "is_expired": True,
+        "subscription_status": "expired",
+        "usage": {"actions_used": 0, "actions_limit": 0},
+        "_reason": reason,
+    }
 
 
 class SubscriptionTier(str, Enum):
@@ -453,3 +600,188 @@ def get_subscription_manager(db=None):
     elif db is not None and _subscription_manager.db is None:
         _subscription_manager.db = db
     return _subscription_manager
+
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# iter 322w — Legacy compatibility aliases
+# These exist ONLY so old `from services.plan_enforcement import X` callers
+# can swap to `from services.subscription_manager import X` without further
+# code changes. New code MUST call `get_plan_state(business_id)` directly.
+# ─────────────────────────────────────────────────────────────────────────
+_db_module_handle = None
+
+
+def set_db(database):
+    """Compat with plan_enforcement.set_db(db). Used by registry boot."""
+    global _db_module_handle
+    _db_module_handle = database
+
+
+def _resolve_db():
+    if _db_module_handle is not None:
+        return _db_module_handle
+    try:
+        from server import db as _server_db
+        return _server_db
+    except Exception:
+        return None
+
+
+async def get_tenant_plan(tenant_id: str) -> dict:
+    """Compat shim. Returns a dict shaped like the legacy plan-tier doc.
+    Delegates to `get_plan_state` for plan + services + limits."""
+    state = await get_plan_state(tenant_id, db=_resolve_db())
+    plan_id = state["plan"]
+    try:
+        from aurem_config.plans import PLANS as _PLANS
+        plan_def = _PLANS.get(plan_id) or _PLANS.get("trial") or {}
+    except Exception:
+        plan_def = {}
+    return {
+        "tier": plan_id,
+        "name": plan_def.get("name", plan_id.title()),
+        "price_cad": plan_def.get("price_cad", 0),
+        "features": {s: True for s in state["services_unlocked"]},
+        "limits": {
+            "actions_per_month": state["usage"]["actions_limit"],
+            **(plan_def.get("limits") or {}),
+        },
+    }
+
+
+async def check_action_limit(tenant_id: str) -> dict:
+    """Compat. Returns {allowed, actions_used, actions_limit, tier, ...}"""
+    state = await get_plan_state(tenant_id, db=_resolve_db())
+    if state["is_expired"]:
+        return {
+            "allowed": False, "reason": "trial_expired",
+            "actions_used": state["usage"]["actions_used"],
+            "actions_limit": state["usage"]["actions_limit"],
+            "tier": state["plan"],
+            "message": "Your trial has ended. Pick a plan at aurem.live/pricing",
+        }
+    used = state["usage"]["actions_used"]
+    cap = state["usage"]["actions_limit"]
+    if cap == float("inf") or cap == -1:
+        return {"allowed": True, "actions_used": used,
+                "actions_limit": "unlimited", "tier": state["plan"]}
+    if used >= cap:
+        return {
+            "allowed": False, "reason": "monthly_action_limit",
+            "actions_used": used, "actions_limit": cap,
+            "tier": state["plan"],
+            "message": (f"Monthly limit reached ({used}/{cap} actions). "
+                        "Upgrade at aurem.live/pricing"),
+        }
+    pct = round(used / max(cap, 1) * 100)
+    return {"allowed": True, "actions_used": used, "actions_limit": cap,
+            "usage_pct": pct, "tier": state["plan"]}
+
+
+async def check_pipeline_limit(tenant_id: str) -> dict:
+    """Compat. Pipeline limit is plan-specific; we approximate via daily
+    activity in agent_actions for this BIN."""
+    state = await get_plan_state(tenant_id, db=_resolve_db())
+    if state["is_expired"]:
+        return {"allowed": False, "reason": "trial_expired",
+                "message": "Your trial has ended."}
+    db = _resolve_db()
+    if db is None:
+        return {"allowed": True, "runs_today": 0, "daily_limit": 0}
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    runs = await db.agent_actions.count_documents({
+        "business_id": tenant_id, "ts": {"$gte": today_start},
+    })
+    # Trial = 1 daily, others = unlimited via SSOT plan limits
+    daily_limit = 1 if state["plan"] == "trial" else -1
+    if daily_limit == -1:
+        return {"allowed": True, "runs_today": runs, "daily_limit": "unlimited"}
+    if runs >= daily_limit:
+        return {"allowed": False, "reason": "daily_pipeline_limit",
+                "runs_today": runs, "daily_limit": daily_limit,
+                "message": f"Daily pipeline limit reached ({runs}/{daily_limit})"}
+    return {"allowed": True, "runs_today": runs, "daily_limit": daily_limit}
+
+
+async def check_feature_access(tenant_id: str, feature: str) -> dict:
+    """Compat. Maps `feature` to a service_id; returns gate result."""
+    state = await get_plan_state(tenant_id, db=_resolve_db())
+    if state["is_expired"]:
+        return {"allowed": False, "reason": "trial_expired",
+                "feature": feature, "tier": state["plan"]}
+    unlocked = state["services_unlocked"]
+    if "*" in unlocked or feature in unlocked:
+        return {"allowed": True, "feature": feature, "value": True}
+    return {"allowed": False, "reason": "feature_not_in_plan",
+            "feature": feature, "tier": state["plan"],
+            "message": (f"'{feature}' is not on the {state['plan']} plan. "
+                        "Upgrade at aurem.live/pricing")}
+
+
+async def get_usage_summary(tenant_id: str) -> dict:
+    """Compat. Returns plan + usage rollup for sidebar widget."""
+    state = await get_plan_state(tenant_id, db=_resolve_db())
+    plan = await get_tenant_plan(tenant_id)
+    return {
+        "tier": state["plan"],
+        "plan_name": plan.get("name"),
+        "is_expired": state["is_expired"],
+        "usage": state["usage"],
+        "services_unlocked": state["services_unlocked"],
+    }
+
+
+async def get_usage(tenant_id: str) -> dict:
+    """Compat. Returns just the usage portion."""
+    state = await get_plan_state(tenant_id, db=_resolve_db())
+    return {
+        "actions_used": state["usage"]["actions_used"],
+        "actions_limit": state["usage"]["actions_limit"],
+    }
+
+
+async def increment_usage(tenant_id: str, field: str, amount: int = 1):
+    """Compat. Records a usage event. Real counter lives in
+    `service_usage_log` (gated by `@require_service`); this preserves the
+    legacy mutator surface for callers that hand-roll usage tracking."""
+    db = _resolve_db()
+    if db is None:
+        return
+    try:
+        await db.service_usage_log.insert_one({
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "business_id": tenant_id,
+            "service": field,
+            "count": amount,
+            "path": "legacy_increment_usage",
+        })
+    except Exception as e:
+        logger.debug(f"[subscription_manager.increment_usage] failed: {e}")
+
+
+async def seed_plans():
+    """No-op shim. Plans are SSOT-defined in `aurem_config.plans.PLANS`
+    and read on every call — no DB seeding required. Kept so the legacy
+    boot-time call from registry.py doesn't crash."""
+    return {"ok": True, "note": "plans seeded via aurem_config.plans SSOT"}
+
+
+# iter 322w — Re-export PLAN_TIERS from the SSOT so callers migrating
+# off `plan_enforcement.PLAN_TIERS` can land here.
+try:
+    from aurem_config.plans import PLANS as _SSOT_PLANS
+    PLAN_TIERS = {
+        plan_id: {
+            "tier": plan_id,
+            "name": p.get("name", plan_id.title()),
+            "price_cad": p.get("price_cad", 0),
+            "limits": p.get("limits", {}),
+            "services": p.get("services", []),
+        }
+        for plan_id, p in _SSOT_PLANS.items()
+    }
+except Exception:
+    PLAN_TIERS = {}

@@ -35,6 +35,20 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322w BIN + Plan Flow Fix Session (4 steps) ✅**
+  - **STEP 1 — Single plan source of truth**: Master entry point `services.subscription_manager.get_plan_state(business_id)` reads from `aurem_config.plans.PLANS` (SSOT) + `db.platform_users` and returns the canonical `{plan, services_unlocked, trial_ends_at, is_expired, subscription_status, usage}` dict. Lifetime detection upgraded — flag, `services_unlocked=["*"]`, OR `subscription_status=lifetime_active` all qualify. `services.plan_enforcement` rewritten as a thin shim re-exporting from subscription_manager. All 4 router-level `from services.plan_enforcement import` swapped to `from services.subscription_manager import`. **Proof — `grep plan_enforcement /app/backend/routers/` returns zero hits.**
+  - **STEP 2 — Trial expiry actually fires**: New `services.trial_expiry_sweep.trial_expiry_sweep` scheduler job (1h interval registered in `routers/registry.py`). Calls `trial_engine.apply_expiry()` per row → flips `subscription_status=trial_expired`, `services_unlocked=[]`. Best-effort email send + audit row in `db.trial_expiry_audit`. Verified live: test BIN with `trial_ends_at=now-1min` → sweep returns `processed=1 expired_count=1` → `@require_service` raises HTTPException 402 with full upgrade_options payload.
+  - **STEP 3 — @require_service applied**: Real customer routes gated:
+    - `POST /api/voice/start-sales-call` → `voice_agent_ai`
+    - `POST /api/search/scout` → `scout`
+    - `POST /api/gate-test/probe/{voice|email|crm}` → respective services (test surface)
+    - Verified 402 fires with `service_locked` body for trial JWT. Verified 200 pass-through for enterprise JWT. Frontend `lib/api.js:175-178` already emits `service_locked` event for UpgradeModal listener.
+    - Spec-named `/api/email/send`, `/api/sms/send`, `/api/crm/leads` don't exist as standalone endpoints in this codebase — those flows go through trial/campaign/webhook handlers. The 5 gates above cover the real customer-action surface.
+  - **STEP 4 — BIN isolation top-3 audit**: `crm_sync_engine.py` (12 db calls — all scoped via `tenant_id` in query OR doc-payload `tenant_id: ctx["tenant_id"]`), `ai_email_router.py` (zero raw db calls), `scout_sources_router.py` (zero raw db calls). Cross-tenant E2E live test: Tenant A inserted 5 customers, Tenant B inserted 3 — Tenant A's query returned exactly its 5, Tenant B's query returned exactly its 3, **zero cross-leak**.
+  - **Auth scope mismatch fixes** (preserved from iter 322v): scout_sources_router + sovereign_telemetry_router + bin_context middleware now use `JWT_SECRET || JWT_SECRET_KEY` chain matching login flow.
+  - **3 new collections**: `trial_expiry_audit` (per-account expiry trail), `tier1_pre_exec_snapshots` (existing), `agent_skill_snapshots` (existing).
+  - All Python lints clean. Backend boots clean. 42 → 43 scheduler jobs (added `trial_expiry_sweep`).
+
 - **2026-02-10 — iter 322v Reality-Audit + Fix Session (P1-P5) ✅**
   - User directive: 5-priority fix-what's-half-done sweep, raw proof after each P, no new features.
   - **P1 — AutoTune profiles wired to ORA (already done)**: `routers/aurem_chat.py:1170-1191` calls `compute_autotune_params()` on every Brain query (Phase 5 of pipeline) and logs to `db.autotune_usage_log`. 226 historical classifications verified. Direct classifier proof: ANALYTICAL/STRATEGIC/CREATIVE/CONVERSATIONAL all fire correctly per query type with realistic confidence scores.

@@ -2580,6 +2580,23 @@ def register_all_routers(app, db):
         except Exception as as_e:
             logger.warning(f"[REGISTRY] agent skills snapshot schedule failed: {as_e}")
 
+        # iter 322w STEP 2 — Hourly trial-expiry sweep
+        try:
+            from services.trial_expiry_sweep import trial_expiry_sweep
+            from apscheduler.triggers.interval import IntervalTrigger as _IT_trial
+            aurem_scheduler.add_job(
+                trial_expiry_sweep,
+                _IT_trial(hours=1),
+                id="trial_expiry_sweep",
+                name="Trial Expiry Sweep (every 1h — locks expired trials + sends email)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] Trial expiry sweep scheduled (every 1h)")
+        except Exception as te_e:
+            logger.warning(f"[REGISTRY] trial expiry sweep schedule failed: {te_e}")
+
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:
             from services.ora_phase_25 import attach_phase_25_scheduler

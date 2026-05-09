@@ -3,7 +3,7 @@ AUREM AI Voice Sales Co-Pilot
 Full custom DIY voice solution for production calls
 """
 
-from fastapi import APIRouter, HTTPException, Header, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Header, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
@@ -12,6 +12,8 @@ import json
 import os
 import jwt as pyjwt
 import logging
+
+from utils.service_gate import require_service  # iter 322w STEP 3
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +203,12 @@ on investment."""
 
 
 @router.post("/api/voice/start-sales-call")
-async def start_sales_call(request: SalesCallRequest, authorization: str = Header(None)):
+@require_service("voice_agent_ai", quota_kind="voice_limit")  # iter 322w STEP 3
+async def start_sales_call(
+    request: Request,
+    body: SalesCallRequest,
+    authorization: str = Header(None),
+):
     """
     Start AI-assisted sales call
     AI automatically presents scan results and handles conversation
@@ -213,12 +220,12 @@ async def start_sales_call(request: SalesCallRequest, authorization: str = Heade
         user = _get_current_user(authorization)
         
         # Get scan data
-        scan = await db.system_scans.find_one({"scan_id": request.scan_id}, {"_id": 0})
+        scan = await db.system_scans.find_one({"scan_id": body.scan_id}, {"_id": 0})
         if not scan:
             raise HTTPException(status_code=404, detail="Scan not found")
         
         # Get pricing recommendation
-        pricing_response = await _calculate_pricing_internal(request.scan_id)
+        pricing_response = await _calculate_pricing_internal(body.scan_id)
         
         # Create AI context
         call_context = SalesCallContext(scan, pricing_response)
@@ -240,12 +247,12 @@ async def start_sales_call(request: SalesCallRequest, authorization: str = Heade
         call_id = f"call_{secrets.token_urlsafe(16)}"
         call_session = {
             "call_id": call_id,
-            "scan_id": request.scan_id,
+            "scan_id": body.scan_id,
             "tenant_id": user.get("tenant_id"),
             "created_by": user.get("user_id"),
-            "customer_email": request.customer_email,
-            "customer_phone": request.customer_phone,
-            "call_type": request.call_type,
+            "customer_email": body.customer_email,
+            "customer_phone": body.customer_phone,
+            "call_type": body.call_type,
             "call_script": call_script,
             "status": "active",
             "started_at": datetime.now(timezone.utc).isoformat(),

@@ -279,7 +279,7 @@ async def campaigns(limit: int = 10, authorization: str = Header(None)):
 async def tiers(authorization: str = Header(None)):
     """Content engine tier limits for each plan."""
     await _auth(authorization)
-    from services.plan_enforcement import PLAN_TIERS
+    from services.subscription_manager import PLAN_TIERS  # type: ignore  # iter 322w
     return {
         tier: {
             "name": plan["name"],
