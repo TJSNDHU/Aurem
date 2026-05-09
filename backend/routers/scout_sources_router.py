@@ -39,12 +39,11 @@ def _require_admin(request: Request) -> Dict[str, Any]:
     token = auth[7:] if auth.startswith("Bearer ") else ""
     if not token:
         raise HTTPException(401, "Auth required")
+    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not secret:
+        raise HTTPException(500, "JWT_SECRET not configured")
     try:
-        payload = jwt.decode(
-            token,
-            os.environ.get("JWT_SECRET", "aurem_default_secret"),
-            algorithms=["HS256"],
-        )
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
     except Exception:
         raise HTTPException(401, "Invalid token")
     if not (payload.get("is_admin") or payload.get("is_super_admin") or

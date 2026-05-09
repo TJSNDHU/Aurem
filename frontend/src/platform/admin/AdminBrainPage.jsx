@@ -61,20 +61,30 @@ export default function AdminBrainPage() {
   const [overview, setOverview] = useState(null);
   const [flow, setFlow] = useState(null);
   const [notif, setNotif] = useState(null);
+  const [deploy, setDeploy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(async () => {
     try {
       setErr('');
-      const [o, f, n] = await Promise.all([
+      // allSettled so one failing endpoint doesn't blank the whole page.
+      const [ro, rf, rn, rd] = await Promise.allSettled([
         fetchJSON('/api/admin/autonomous/overview'),
         fetchJSON('/api/admin/autonomous/pipeline-flow?limit=10'),
         fetchJSON('/api/admin/autonomous/notifications?limit=10&unread_only=true'),
+        fetchJSON('/api/admin/deploy-readiness'),
       ]);
-      setOverview(o);
-      setFlow(f);
-      setNotif(n);
+      if (ro.status === 'fulfilled') setOverview(ro.value);
+      if (rf.status === 'fulfilled') setFlow(rf.value);
+      if (rn.status === 'fulfilled') setNotif(rn.value);
+      if (rd.status === 'fulfilled') setDeploy(rd.value);
+
+      // Surface only if EVERYTHING failed
+      const allFailed = [ro, rf, rn, rd].every(r => r.status === 'rejected');
+      if (allFailed) {
+        setErr(String(ro.reason?.message || ro.reason || 'all endpoints failed'));
+      }
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
@@ -144,6 +154,63 @@ export default function AdminBrainPage() {
         }}>
           {err}
         </div>
+      )}
+
+      {/* iter 322v — Deploy-Readiness Widget */}
+      {deploy && (
+        <section
+          data-testid="deploy-readiness-widget"
+          style={{
+            background: COMP_BG,
+            border: `1px solid ${deploy.overall === 'ready' ? '#3A4A2A' : '#4A2A1E'}`,
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 16,
+            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            color: deploy.overall === 'ready' ? '#4AD4A0' : '#F0A030',
+            fontWeight: 600, fontSize: 14,
+          }}>
+            {deploy.overall === 'ready' ? '✅' : '⚠️'} Deploy Readiness:
+            <span data-testid="deploy-readiness-overall">{deploy.overall.replace('_', ' ').toUpperCase()}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12 }}>
+            {[
+              ['stripe', deploy.stripe],
+              ['twilio', deploy.twilio],
+              ['vapid', deploy.vapid],
+              ['resend', deploy.resend],
+              ['llm', deploy.llm],
+            ].map(([k, v]) => {
+              const ok = v !== 'missing';
+              const live = v === 'live';
+              const color = live ? '#4AD4A0' : ok ? '#D4AF7A' : '#E0524A';
+              return (
+                <div
+                  key={k}
+                  data-testid={`deploy-readiness-${k}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '4px 10px', borderRadius: 999,
+                    background: '#14130F', border: `1px solid ${color}40`,
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+                  <span style={{ color: '#8B8475', fontWeight: 500 }}>{k}:</span>
+                  <span style={{ color, fontWeight: 600 }}>{v}</span>
+                </div>
+              );
+            })}
+          </div>
+          {deploy.missing?.length > 0 && (
+            <div style={{ color: '#E0524A', fontSize: 11, marginLeft: 'auto' }}>
+              missing: {deploy.missing.join(', ')}
+            </div>
+          )}
+        </section>
       )}
 
       {/* Top row — pipeline component cards */}

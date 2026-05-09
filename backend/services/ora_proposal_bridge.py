@@ -346,6 +346,28 @@ async def _publish_proposal(
             })
         except Exception as e:
             logger.debug(f"[publish] founder_notifications insert skipped: {e}")
+        # iter 322v — also fire web push to all subscribed founder devices.
+        try:
+            from services.push_notification_service import notify_high_risk_proposal
+            # Find every push-subscribed admin user and notify them.
+            cur = db.push_subscriptions.find(
+                {"user_id": {"$exists": True}}, {"_id": 0, "user_id": 1}
+            ).limit(50)
+            seen = set()
+            async for s in cur:
+                uid = s.get("user_id")
+                if uid and uid not in seen:
+                    seen.add(uid)
+                    try:
+                        await notify_high_risk_proposal(
+                            uid,
+                            plain_language.get("problem_found") or request_text[:120],
+                            pid,
+                        )
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.debug(f"[publish] high-risk push fan-out skipped: {e}")
 
     return pid
 

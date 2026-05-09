@@ -737,6 +737,15 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] autonomous_stack_router not loaded: {e}")
 
+    # iter 322v — Deploy-Readiness widget endpoint
+    if not _should_skip("routers.deploy_readiness_router"):
+        try:
+            from routers.deploy_readiness_router import router as deploy_readiness_router
+            app.include_router(deploy_readiness_router)
+            logger.info("[REGISTRY] deploy_readiness_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] deploy_readiness_router not loaded: {e}")
+
     # iter 322 — Service gate E2E probe endpoints
     if not _should_skip("routers.gate_test_router"):
         try:
@@ -2553,6 +2562,23 @@ def register_all_routers(app, db):
             logger.info("[REGISTRY] ORA proposal bridge watchdog scheduled (every 5min)")
         except Exception as wd_e:
             logger.warning(f"[REGISTRY] ORA proposal bridge watchdog schedule failed: {wd_e}")
+
+        # iter 322v — Daily agent skill snapshot (00:00 UTC)
+        try:
+            from routers.training_dashboard_router import snapshot_agent_skills_daily
+            from apscheduler.triggers.cron import CronTrigger as _CT_skills
+            aurem_scheduler.add_job(
+                snapshot_agent_skills_daily,
+                _CT_skills(hour=0, minute=0),
+                id="agent_skills_daily_snapshot",
+                name="Daily Agent Skill Snapshot (30d rolling)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] Daily agent skills snapshot scheduled (00:00 UTC)")
+        except Exception as as_e:
+            logger.warning(f"[REGISTRY] agent skills snapshot schedule failed: {as_e}")
 
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:

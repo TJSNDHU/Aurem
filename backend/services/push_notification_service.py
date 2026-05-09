@@ -174,3 +174,45 @@ async def notify_p0_alert(user_id: str, alert_msg: str):
         alert_msg[:120],
         {"event": "p0_alert", "urgent": True},
     )
+
+
+# iter 322v — additional event triggers (HIGH-risk + pipeline + payment + brief)
+async def notify_high_risk_proposal(user_id: str, title: str, proposal_id: str):
+    """Fire when a HIGH-risk Dev Console proposal is published."""
+    await _send_push(
+        user_id,
+        "HIGH RISK Proposal",
+        title[:120],
+        {"event": "high_risk_proposal", "proposal_id": proposal_id, "urgent": True},
+    )
+
+
+async def notify_pipeline_complete(user_id: str, summary: str):
+    """Fire when an outbound campaign / pipeline run completes."""
+    await _send_push(
+        user_id,
+        "Pipeline Complete",
+        summary[:120],
+        {"event": "pipeline_complete"},
+    )
+
+
+async def notify_payment_received(user_id: str, amount: float, customer: str = ""):
+    """Fire when a payment is captured (Stripe webhook etc.)."""
+    body = f"${amount:,.2f}" + (f" from {customer}" if customer else "")
+    await _send_push(
+        user_id,
+        "Payment Received",
+        body,
+        {"event": "payment_received", "amount": amount},
+    )
+
+
+async def send_test_push(user_id: str, label: str = "Test push"):
+    """Founder-callable smoke test."""
+    await _send_push(
+        user_id,
+        "AUREM Test Push",
+        label[:120],
+        {"event": "test"},
+    )

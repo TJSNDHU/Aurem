@@ -359,47 +359,122 @@ async def a2a_status(request: Request):
         {}, {"_id": 0}, sort=[("timestamp", -1)]
     )
 
-    # Agent skill levels — dynamic from MongoDB
-    agent_defs = [
-        {"id": "scout", "name": "Scout Agent", "role": "Lead Discovery", "default_skill": 72},
-        {"id": "architect", "name": "Architect Agent", "role": "System Design", "default_skill": 85},
-        {"id": "envoy", "name": "Envoy Agent", "role": "Outreach", "default_skill": 68},
-        {"id": "closer", "name": "Closer Agent", "role": "Deal Closing", "default_skill": 77},
-        {"id": "orchestrator", "name": "Orchestrator", "role": "Coordination", "default_skill": 90},
-    ]
+    # Agent skill levels — dynamic from MongoDB (last 30 days, real success rate).
+    # Source of truth: db.agent_actions (real outbound + autonomous activity).
+    # Each row has fields: agent, success (bool), ts (datetime).
+    from datetime import timedelta as _td
+    cutoff_30d = datetime.now(timezone.utc) - _td(days=30)
+
+    # Build dynamic agent list from distinct agent values in the last 30d.
+    distinct_agents = await db.agent_actions.distinct(
+        "agent", {"ts": {"$gte": cutoff_30d}}
+    ) or []
+    # Display names fall back to the id if no friendly mapping exists.
+    name_map = {
+        "closer":       ("Closer Agent",       "Deal Closing"),
+        "envoy":        ("Envoy Agent",        "Outreach"),
+        "followup":     ("Followup Agent",     "Multi-touch"),
+        "hunter":       ("Hunter Agent",       "Lead Discovery"),
+        "hunter_ora":   ("Hunter ORA",         "Lead Discovery"),
+        "referral_ora": ("Referral ORA",       "Referral pipeline"),
+        "learning_bus": ("Learning Bus",       "Cross-agent learning"),
+        "wedge":        ("Wedge Agent",        "Vertical strategy"),
+        "scout":        ("Scout (library)",    "Discovery sources"),
+    }
 
     agents = []
-    for a in agent_defs:
-        # Calculate dynamic score from audit trail success/fail rate
-        total = await db.audit_trail.count_documents({"agent_id": a["id"]})
-        successful = await db.audit_trail.count_documents({
-            "agent_id": a["id"],
-            "$or": [
-                {"data.critic.verdict": "APPROVED"},
-                {"data.critic.passed": True},
-                {"data.summary": {"$exists": True, "$ne": ""}},
-            ],
+    for agent_id in distinct_agents:
+        # iter 322v — real calculation: (successful / total) * 100, last 30d.
+        total = await db.agent_actions.count_documents({
+            "agent": agent_id, "ts": {"$gte": cutoff_30d}
         })
-        if total >= 5:
-            skill = int((successful / total) * 100)
-        else:
-            skill = a["default_skill"]
-
+        successful = await db.agent_actions.count_documents({
+            "agent": agent_id, "ts": {"$gte": cutoff_30d}, "success": True
+        })
+        skill = int((successful / total) * 100) if total > 0 else 0
+        name, role = name_map.get(agent_id, (agent_id.replace("_", " ").title(), "Agent"))
         agents.append({
-            "id": a["id"],
-            "name": a["name"],
-            "role": a["role"],
+            "id": agent_id,
+            "name": name,
+            "role": role,
             "skill_level": skill,
             "total_actions": total,
             "successful_actions": successful,
-            "source": "dynamic" if total >= 5 else "default",
+            "window_days": 30,
+            "source": "live_30d_calculation",
         })
+    # Sort by total_actions desc so the most-active agents appear first.
+    agents.sort(key=lambda a: -a["total_actions"])
 
     return {
         "agents": agents,
         "total_sessions": sessions,
         "last_session": last,
     }
+
+
+# ─── iter 322v — Reusable helper + daily snapshot ───────────────────────
+async def _compute_agent_skills_30d():
+    """Returns the same `agents` array the /a2a endpoint serves —
+    factored out so the daily scheduler re-uses identical logic."""
+    from datetime import timedelta as _td
+    if db is None:
+        return []
+    cutoff_30d = datetime.now(timezone.utc) - _td(days=30)
+    distinct_agents = await db.agent_actions.distinct(
+        "agent", {"ts": {"$gte": cutoff_30d}}
+    ) or []
+    name_map = {
+        "closer":       ("Closer Agent",       "Deal Closing"),
+        "envoy":        ("Envoy Agent",        "Outreach"),
+        "followup":     ("Followup Agent",     "Multi-touch"),
+        "hunter":       ("Hunter Agent",       "Lead Discovery"),
+        "hunter_ora":   ("Hunter ORA",         "Lead Discovery"),
+        "referral_ora": ("Referral ORA",       "Referral pipeline"),
+        "learning_bus": ("Learning Bus",       "Cross-agent learning"),
+        "wedge":        ("Wedge Agent",        "Vertical strategy"),
+        "scout":        ("Scout (library)",    "Discovery sources"),
+    }
+    agents = []
+    for agent_id in distinct_agents:
+        total = await db.agent_actions.count_documents({
+            "agent": agent_id, "ts": {"$gte": cutoff_30d}
+        })
+        successful = await db.agent_actions.count_documents({
+            "agent": agent_id, "ts": {"$gte": cutoff_30d}, "success": True
+        })
+        skill = int((successful / total) * 100) if total > 0 else 0
+        name, role = name_map.get(agent_id, (agent_id.replace("_", " ").title(), "Agent"))
+        agents.append({
+            "id": agent_id, "name": name, "role": role,
+            "skill_level": skill,
+            "total_actions": total, "successful_actions": successful,
+            "window_days": 30, "source": "live_30d_calculation",
+        })
+    agents.sort(key=lambda a: -a["total_actions"])
+    return agents
+
+
+async def snapshot_agent_skills_daily():
+    """Persisted daily snapshot — keyed on snapshot_date. Idempotent.
+    Lets the dashboard chart skill drift over time."""
+    if db is None:
+        return {"ok": False, "reason": "db_unavailable"}
+    try:
+        agents = await _compute_agent_skills_30d()
+        snap_date = datetime.now(timezone.utc).date().isoformat()
+        await db.agent_skill_snapshots.update_one(
+            {"snapshot_date": snap_date},
+            {"$set": {
+                "snapshot_date": snap_date,
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "agents": agents,
+            }},
+            upsert=True,
+        )
+        return {"ok": True, "snapshot_date": snap_date, "n_agents": len(agents)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
 
 
 @router.post("/a2a/trigger")
