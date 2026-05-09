@@ -44,12 +44,21 @@ SRC_EMAIL = "admin@aurem.live"
 DST_EMAIL = "teji.ss1986+dogfood@gmail.com"
 EXTRA_DELETE = ["pawandeep19may1985@gmail.com"]
 
+# iter 322 — final BIN renames. cleanup endpoint cascade-replaces these
+# everywhere (auth collections + every BIN-scoped collection in the DB).
+BIN_RENAMES = {
+    "AURE-FNDR-001": "AURE-ADMIN",   # founder admin
+    "AURE-FNDR-002": "AURE-SUPER",   # dogfood
+    "AURE-3M4G":     "AURE-SUPER",   # legacy dogfood (pre-merge) → consolidate
+}
+
 EMAIL_FIELDS = [
     "email", "owner_email", "user_email", "to", "recipient", "contact_email",
     "customer_email", "sender_email", "from", "from_email", "client_email",
     "lead_email", "applicant_email", "subscriber_email",
 ]
 ID_FIELDS = ["user_id", "owner_id", "tenant_id", "business_id", "customer_id", "plat_user_id"]
+BIN_FIELDS = ["business_id", "tenant_id", "tenant_bin", "owner_business_id", "bin"]
 
 
 def _is_test_email(email: str) -> bool:
@@ -304,14 +313,45 @@ async def run_cleanup(request: Request):
         f"[db-migrate] iter322-cleanup ran: tests={test_total} extra={sum(extra_log.values())} "
         f"merge={merge_summary.get('merged')} leaks={len(leaks)}"
     )
+
+    # iter 322 — BIN rename cascade. Replaces every reference to the old
+    # FNDR-style BINs and the legacy AURE-3M4G dogfood BIN with the final
+    # AURE-ADMIN / AURE-SUPER identifiers across all collections + fields.
+    rename_summary = await _cascade_rename_bins(_db)
+
     return {
         "ok": True,
         "test_purge": {"emails": test_emails, "by_collection": purge_log, "total": test_total},
         "merge": merge_summary,
         "extra_delete": {"emails": EXTRA_DELETE, "by_collection": extra_log, "total": sum(extra_log.values())},
+        "bin_rename": rename_summary,
         "leaks_after": leaks,
         "final": {
             "auth_counts": final_counts,
             "remaining_emails": sorted(remaining_emails),
         },
     }
+
+
+async def _cascade_rename_bins(db) -> Dict[str, Any]:
+    """Replace every occurrence of an old BIN id across every collection
+    and every BIN-bearing field. Idempotent — safe to re-run."""
+    summary: Dict[str, int] = {}
+    if db is None:
+        return {"renamed": 0}
+    all_colls = await db.list_collection_names()
+    for old_bin, new_bin in BIN_RENAMES.items():
+        if old_bin == new_bin:
+            continue
+        for c in all_colls:
+            for f in BIN_FIELDS:
+                try:
+                    res = await db[c].update_many(
+                        {f: old_bin}, {"$set": {f: new_bin}}
+                    )
+                    if res.modified_count > 0:
+                        key = f"{c}.{f}: {old_bin}->{new_bin}"
+                        summary[key] = res.modified_count
+                except Exception:
+                    pass
+    return {"renamed_total": sum(summary.values()), "by_path": summary}

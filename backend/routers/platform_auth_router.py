@@ -265,14 +265,26 @@ async def register(request: RegisterRequest, req: Request = None):
         }
         await db.platform_users.insert_one(user_data)
 
-        # Auto-generate Business ID and send welcome package
+        # iter 322 — start 7-day trial via SSOT trial engine. This sets
+        # plan, services_unlocked, usage_limits, trial_ends_at on the
+        # platform_users row + aurem_billing.
         try:
             from routers.business_id_router import ensure_business_id
+            from services.trial_engine import start_trial as _start_trial
             refreshed_user = await db.platform_users.find_one({"email": email}, {"_id": 0})
             if refreshed_user:
                 await ensure_business_id(refreshed_user)
-                # Re-fetch so we pick up the freshly generated business_id
                 refreshed_user = await db.platform_users.find_one({"email": email}, {"_id": 0}) or refreshed_user
+                bin_id = (
+                    refreshed_user.get("business_id")
+                    or refreshed_user.get("tenant_id")
+                    or refreshed_user.get("id")
+                )
+                if bin_id:
+                    try:
+                        await _start_trial(db, bin_id, email)
+                    except Exception as _trial_err:
+                        logger.warning(f"[signup] trial_engine.start_trial failed: {_trial_err}")
                 # Trigger welcome package (async, non-blocking). First arg MUST be
                 # the tenant_id (business_id) — passing email worked by accident
                 # because user_doc is also supplied, but every record written

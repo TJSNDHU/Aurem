@@ -29,6 +29,8 @@ import LuxeServicesPreview from './platform/preview/LuxeServicesPreview';
 import Admin2FAEnroll from './platform/Admin2FAEnroll';
 import BoardroomPage from './platform/BoardroomPage';
 import AdminShell from './platform/AdminShell';
+import UpgradeModal from './components/UpgradeModal';
+import TrialBanner from './components/TrialBanner';
 import AdminSSOT from './platform/AdminSSOT';
 import AdminConsole from './platform/AdminConsole';
 import AWBCockpit from './platform/AWBCockpit';
@@ -401,6 +403,12 @@ function App() {
 
               {/* Persistent draggable ORA support widget — survives route changes */}
               <ORAWidget />
+
+              {/* iter 322 — Trial countdown banner (auto-hidden on paid plans) */}
+              <TrialBanner />
+
+              {/* iter 322 — Upgrade modal listens for service-locked + quota-exceeded events */}
+              <UpgradeModal />
             </div>
           </AccessibilityWrapper>
         </BrowserRouter>

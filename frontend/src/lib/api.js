@@ -162,9 +162,7 @@ axios.interceptors.response.use(
     try {
       const status = error?.response?.status;
       const url = error?.config?.url || '';
-      // Only react to 401s on /api endpoints. Skip the auth endpoints
-      // themselves to avoid firing during a legitimate "wrong password"
-      // login attempt.
+      // 401 — auth expired
       if (
         status === 401 &&
         url.includes('/api/') &&
@@ -173,6 +171,24 @@ axios.interceptors.response.use(
         !url.includes('/api/platform/auth/login')
       ) {
         dispatchAuthExpired();
+      }
+      // iter 322 — 402 service_locked. Surface to UpgradeModal listener.
+      if (status === 402 && url.includes('/api/')) {
+        const detail = error?.response?.data?.detail || error?.response?.data || {};
+        if (detail.error === 'service_locked') {
+          try {
+            window.dispatchEvent(new CustomEvent('aurem:service-locked', { detail }));
+          } catch (_e) { /* ignore */ }
+        }
+      }
+      // iter 322 — 429 quota_exceeded. Surface for upgrade-prompt UX.
+      if (status === 429 && url.includes('/api/')) {
+        const detail = error?.response?.data?.detail || error?.response?.data || {};
+        if (detail.error === 'quota_exceeded') {
+          try {
+            window.dispatchEvent(new CustomEvent('aurem:quota-exceeded', { detail }));
+          } catch (_e) { /* ignore */ }
+        }
       }
     } catch (_e) { /* never throw from interceptor */ }
     return Promise.reject(error);

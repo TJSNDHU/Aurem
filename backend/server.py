@@ -867,6 +867,15 @@ try:
 except ImportError as e:
     print(f"[STARTUP] Tier Metering Middleware not loaded: {e}", flush=True)
 
+# iter 322 — BIN context middleware. Decodes JWT once, attaches BinCtx to
+# request.state. Must come BEFORE service_gate-decorated routes.
+try:
+    from middleware.bin_context import BinContextMiddleware
+    app.add_middleware(BinContextMiddleware)
+    print("[STARTUP] BIN Context Middleware loaded", flush=True)
+except Exception as e:
+    print(f"[STARTUP] BIN Context Middleware not loaded: {e}", flush=True)
+
 
 # Register global exception handler (extracted from middleware/crash_protection.py)
 app.add_exception_handler(Exception, global_exception_handler)
@@ -1202,6 +1211,9 @@ async def startup_event():
         set_cron_db(db)
         set_misc_deps(db, os.environ.get("JWT_SECRET", ""), "HS256", ws_manager)
         logging.info("✓ Extracted modules initialized (Milestone, Cron, Misc Routes)")
+
+        # iter 322 — expose db on app.state for service_gate decorator
+        app.state.db = db
         
         # Register ALL routers (extracted from server.py Phase 2)
         register_all_routers(app, db)

@@ -701,6 +701,37 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] db_migrate_router not loaded: {e}")
 
+    # iter 322 — Hybrid plans + Stripe base-plan checkout
+    if not _should_skip("routers.billing_plan_router"):
+        try:
+            from routers.billing_plan_router import router as billing_plan_router, set_db as set_billing_db
+            app.include_router(billing_plan_router)
+            if db is not None:
+                set_billing_db(db)
+            logger.info("[REGISTRY] billing_plan_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] billing_plan_router not loaded: {e}")
+
+    # iter 322 — Admin ORA Q&A across anonymized BIN telemetry
+    if not _should_skip("routers.admin_ora_router"):
+        try:
+            from routers.admin_ora_router import router as admin_ora_router, set_db as set_aora_db
+            app.include_router(admin_ora_router)
+            if db is not None:
+                set_aora_db(db)
+            logger.info("[REGISTRY] admin_ora_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] admin_ora_router not loaded: {e}")
+
+    # iter 322 — Service gate E2E probe endpoints
+    if not _should_skip("routers.gate_test_router"):
+        try:
+            from routers.gate_test_router import router as gate_test_router
+            app.include_router(gate_test_router)
+            logger.info("[REGISTRY] gate_test_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] gate_test_router not loaded: {e}")
+
     # Panic Takeover (separate from settings)
     if not _should_skip("routers.panic_takeover_router"):
         try:
@@ -2397,6 +2428,23 @@ def register_all_routers(app, db):
             logger.info("[REGISTRY] Sentinel repair loop scheduled (every 60s)")
         except Exception as sr_e:
             logger.warning(f"[REGISTRY] Sentinel repair loop schedule failed: {sr_e}")
+
+        # iter 322 — Trial reminder + expiry sweep (hourly)
+        try:
+            from services.trial_reminder_scheduler import trial_reminder_tick
+            from apscheduler.triggers.interval import IntervalTrigger as _IT2
+            aurem_scheduler.add_job(
+                trial_reminder_tick,
+                _IT2(hours=1),
+                id="trial_reminder_tick",
+                name="Trial Reminder + Expiry Sweep",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] Trial reminder scheduler attached (hourly)")
+        except Exception as tr_e:
+            logger.warning(f"[REGISTRY] Trial reminder schedule failed: {tr_e}")
 
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:

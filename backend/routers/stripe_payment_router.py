@@ -584,6 +584,17 @@ async def stripe_webhook(request: Request):
         if not is_health_ping:
             logger.info(f"[Stripe] Webhook: {event_type} (verified={sig_verified})")
 
+        # iter 322 — bridge to plan_resolver for base-plan lifecycle events
+        try:
+            metadata = data_obj.get("metadata", {}) if isinstance(data_obj, dict) else {}
+            # capture sub id for downstream persistence
+            if event_type.startswith("customer.subscription.") and isinstance(data_obj, dict):
+                metadata = dict(metadata or {})
+                metadata.setdefault("subscription_id", data_obj.get("id"))
+            await _recompute_bin_after_stripe_event(metadata, event_type)
+        except Exception as _b_e:
+            logger.debug(f"[Stripe] plan_resolver bridge skipped: {_b_e}")
+
         # Persist event for idempotency + dashboard health (skip ping spam)
         if _db is not None and not is_health_ping:
             try:
@@ -756,6 +767,61 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         logger.error(f"[Stripe] Webhook error: {e}")
         return {"received": True, "error": str(e)}
+
+
+async def _recompute_bin_after_stripe_event(metadata: Dict[str, Any], event_type: str):
+    """iter 322 — bridge Stripe events → plan_resolver so services_unlocked
+    stays fresh. Called inline from the webhook handler for base-plan and
+    add-on lifecycle events. Best-effort, never raises out."""
+    try:
+        bin_id = (metadata or {}).get("business_id")
+        if not bin_id:
+            return
+        if _db is None:
+            return
+        # On payment success / subscription updates, persist plan + recompute
+        # services_unlocked. On payment failure, suspend access until cure.
+        from services.plan_resolver import recompute_services_unlocked
+        if event_type in (
+            "customer.subscription.created",
+            "customer.subscription.updated",
+            "checkout.session.completed",
+            "invoice.payment_succeeded",
+        ):
+            plan = (metadata or {}).get("plan")
+            if plan:
+                await _db.aurem_billing.update_one(
+                    {"business_id": bin_id},
+                    {"$set": {
+                        "plan": plan,
+                        "status": "active",
+                        "stripe_subscription_id": (metadata or {}).get("subscription_id") or None,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                    upsert=True,
+                )
+            await recompute_services_unlocked(_db, bin_id)
+        elif event_type == "invoice.payment_failed":
+            await _db.aurem_billing.update_one(
+                {"business_id": bin_id},
+                {"$set": {
+                    "status": "past_due",
+                    "payment_failed_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+            # Don't immediately suspend — Stripe retries 3x. Suspension
+            # happens on customer.subscription.deleted if Stripe gives up.
+        elif event_type == "customer.subscription.deleted":
+            await _db.aurem_billing.update_one(
+                {"business_id": bin_id},
+                {"$set": {
+                    "status": "cancelled",
+                    "cancelled_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
+            await recompute_services_unlocked(_db, bin_id)
+    except Exception as e:
+        logger.warning(f"[Stripe] iter322 plan_resolver bridge failed: {e}")
 
 
 # ═══════════════════════════════════════════════════

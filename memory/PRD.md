@@ -26,6 +26,23 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-09 — Hybrid pricing + service gating + admin ORA learning (full Phase A+D+B+C end-to-end) ✅**
+  - User locked: counter-proposal A→D→B→C→E→F→G→Agents→Pixel build order. Hybrid pricing CAD: $97/$197/$447/$997. Trial bundle: crm_starter+email_campaigns+cwv_monitor+daily_intel.
+  - **Foundation files**: `aurem_config/plans.py` (SSOT), `services/plan_resolver.py` (kills 3 fragmented plan systems), `middleware/bin_context.py` (decodes JWT once → request.state.bin_ctx), `utils/service_gate.py` (`@require_service` decorator: 402 lock / 429 quota / auto-log usage / anonymized admin telemetry), `utils/bin_repo.py` (BinScopedRepo wrapper)
+  - **Trial lifecycle**: `services/trial_engine.py` + `services/trial_reminder_scheduler.py` (day-4, day-6, expiry sweep, idempotent). Wired into platform_auth signup + scheduled hourly via aurem_scheduler (38 jobs total).
+  - **Stripe → plan state bridge**: `routers/billing_plan_router.py` (subscribe/upgrade/cancel/state) + extended Stripe webhook calls `plan_resolver.recompute_services_unlocked` on subscription events; suspend on payment_failed/subscription.deleted.
+  - **Admin ORA learning loop**: `routers/admin_ora_router.py` — `GET /summary`, `POST /ask` (Claude grounded on hashed-BIN telemetry pool), `GET /recent`. Anonymizer hashes BIN with `ADMIN_ORA_HASH_SALT` env. NO PII / BIN strings ever leak in aggregation.
+  - **BIN renames** baked: AURE-FNDR-001→`AURE-ADMIN`, AURE-FNDR-002→`AURE-SUPER` in `services/founder_provision.py`. `routers/db_migrate_router.py` extended with `_cascade_rename_bins` covering all collections + 5 BIN-bearing fields. One-shot endpoint `POST /api/admin/db-migrate/iter322-cleanup` runs cleanup + merge + rename.
+  - **Frontend**: `lib/api.js` axios interceptor (401/402/403 events), `components/UpgradeModal.jsx` (Stripe checkout flow on 402 service-locked), `components/TrialBanner.jsx` (sticky countdown, auto-fetches `/api/billing/plan/state`, hidden on paid plans). Mounted in `App.js`.
+  - **E2E verified — 9/9 tests passed** (`/tmp/e2e_iter322.py`):
+    1) Founder JWT → AURE-SUPER + ["*"] ✅  2) Founder voice probe → 200 ✅
+    3) Trial signup → trial_engine writes status=trialing, ends=+7d ✅
+    4) Trial voice probe → **402 service_locked with upgrade_options** ✅
+    5) Trial email/crm probes → 200 (in bundle) ✅
+    6) admin_ora_brain — anonymized telemetry rows persisted ✅
+    7) `/api/admin/ora/summary` → unique_bins=2 with by_service_plan rollup ✅
+    8) Trial state stored correctly ✅  9) `plan_resolver` returns plan+services+limits ✅
+  - All lints clean. Frontend smoke screenshot: customer access page renders cleanly.
 - **2026-02-08 — AUREM Dogfood account fully activated (admin@aurem.live = Lifetime Enterprise FREE) ✅**
   - User to drive all paid services through their own dogfood customer account instead of admin account going forward
   - Extended `services/founder_provision.py` with `LIFETIME_FREE_PERKS` block applied on every startup (idempotent):
