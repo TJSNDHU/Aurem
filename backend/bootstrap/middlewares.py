@@ -90,10 +90,10 @@ def register_security_headers(app) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 2. JWT blocklist — reject revoked tokens via Redis lookup
+# 2. JWT blocklist — reject revoked tokens via MongoDB lookup (iter 322y)
 # ══════════════════════════════════════════════════════════════════════
 class JWTBlocklistMiddleware(BaseHTTPMiddleware):
-    """Check every Bearer token against Redis blocklist. Revoked tokens get 401."""
+    """Check every Bearer token against MongoDB blocklist. Revoked tokens get 401."""
 
     async def dispatch(self, request, call_next):
         auth = request.headers.get("authorization", "")

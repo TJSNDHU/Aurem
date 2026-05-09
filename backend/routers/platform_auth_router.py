@@ -90,7 +90,7 @@ def verify_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def verify_token_with_blocklist(token: str) -> dict:
-    """Verify token AND check Redis blocklist."""
+    """Verify token AND check MongoDB blocklist (iter 322y — was external cache)."""
     payload = verify_token(token)
     jti = payload.get("jti")
     if jti:
@@ -450,7 +450,7 @@ async def verify_auth(token: str):
 
 @router.post("/logout")
 async def logout(request: Request):
-    """Logout — revoke JWT token via Redis blocklist."""
+    """Logout — revoke JWT token via MongoDB blocklist (iter 322y)."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return {"success": True, "message": "No token to revoke"}

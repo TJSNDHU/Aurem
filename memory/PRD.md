@@ -35,6 +35,20 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322y Auth Path Redis Removal ✅**
+  - User directive: "Redis dependency remove karo completely from auth path. MongoDB only."
+  - **Rewrote `shared/auth/jwt_blocklist.py`** — was Redis SETEX, now uses `db.token_blocklist` collection with TTL index (`expireAfterSeconds=0` on `expires_at`) for auto-purge + unique index on `jti`. Same public API (`block_token`, `is_blocked`, `unblock_token`, new `blocklist_size` diagnostic). All 4 callers (`platform_auth_router`, `aurem_routes`, `bootstrap/middlewares`, server) work zero-change.
+  - **Schema** matches user spec: `{jti, blocked_at, reason, expires_at}` with 8h TTL aligning JWT expiry.
+  - **Failsafe choice**: when Mongo is down, `is_blocked()` returns `False` (availability over strict revocation). A logged-out token retains access for at most 8h until JWT exp anyway — safer than locking everyone out on a transient Mongo blip.
+  - Cleaned 6 docstring/comment references to "Redis blocklist" so `grep -rn "redis" /app/backend/{routes,routers,shared/auth,bootstrap}` returns ZERO HITS in auth path.
+  - **E2E verified — 8/8 assertions** (block → check → row → indexes → unblock → check):
+    - `is_blocked()` pre-block False, post-block True, post-unblock False ✓
+    - TTL index `expireAfterSeconds=0` present ✓
+    - Unique `jti` index present ✓
+    - Row persisted with reason + expires_at ✓
+  - Login still works post-fix: attempt #1 HTTP 200 1.37s (cold + bcrypt), attempt #2 HTTP 200 0.23s (warm).
+  - All Python lints clean. Backend boots clean.
+
 - **2026-02-10 — iter 322x Login Reliability Fix (P0) ✅**
   - User report: "same correct credentials sometimes return invalid on first attempt, work on retry — intermittent auth failure"
   - **Root cause** isolated by 4-phase timing instrumentation: Atlas M0 cold-start can return `None` from `db.users.find_one(...)` on the first read after a >5min idle window even when the row exists. Real-world latency proof: synthetic 3-login sequence pre-fix showed 546ms → 228ms → 234ms (318ms cold-vs-warm gap = the failure window).
