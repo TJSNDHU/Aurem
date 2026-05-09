@@ -68,6 +68,66 @@ TIER_1_AUTO_EXECUTE_DELAY_MIN = 5
 TIER_1_AUTO_BATCH_LIMIT = 10
 
 
+# ─────────────────────────────────────────────────────────────────────
+# SAFETY-LEVEL TAXONOMY (iter 322t)
+# ─────────────────────────────────────────────────────────────────────
+# Used by the founder-friendly UI banner. HIGH overrides tier
+# classification — even a 0.99-confidence config_change marked HIGH
+# (e.g., it touches auth.config) flips to tier_2 = founder approval.
+SAFETY_LOW_KINDS = frozenset({
+    "config_change", "cache_clear", "rate_limit_adjust", "mark_safe_apply",
+})
+SAFETY_HIGH_KINDS = frozenset({
+    "db_migration", "billing_change", "run_migration_iter322",
+})
+SAFETY_MEDIUM_KINDS = frozenset({
+    "code_change", "agent_deploy",
+})
+
+
+import re as _re
+
+# Word-boundary regex (compiled once) so "auth" doesn't match "architecture",
+# "credential" doesn't match anything inside "credentials_for_x", etc.
+# We keep "schema" as conservative — even discussing schema changes should
+# get a HIGH-risk founder review.
+_SAFETY_HIGH_PATTERNS = _re.compile(
+    r"\b("
+    r"auth|authentication|authorization|"
+    r"credential|password|passwd|"
+    r"jwt_secret|stripe|billing|"
+    r"schema_change|drop_collection|drop_index|"
+    r"alter_table|run_migration"
+    r")\b",
+    _re.IGNORECASE,
+)
+
+
+def _classify_safety_level(
+    action_kind: Optional[str],
+    source_kind: Optional[str],
+    request_text: str,
+    proposal_text: str,
+) -> str:
+    """Returns 'LOW' | 'MEDIUM' | 'HIGH'. Conservative — when in doubt,
+    upgrades to a stricter level."""
+    k = (action_kind or "").lower()
+    blob = f"{action_kind or ''} {source_kind or ''} {request_text} {proposal_text}"
+
+    # HIGH wins over everything — auth/billing/schema land here even if
+    # the kind itself is a "tier-1" name.
+    if k in SAFETY_HIGH_KINDS:
+        return "HIGH"
+    if _SAFETY_HIGH_PATTERNS.search(blob):
+        return "HIGH"
+    if k in SAFETY_LOW_KINDS:
+        return "LOW"
+    if k in SAFETY_MEDIUM_KINDS:
+        return "MEDIUM"
+    # Unknown / no kind = MEDIUM by default (not LOW — conservative)
+    return "MEDIUM"
+
+
 def _classify_tier(action_kind: Optional[str], confidence: float) -> Tuple[str, str]:
     """Returns (tier, reason). Conservative default = tier_2."""
     k = (action_kind or "").lower()
@@ -78,6 +138,99 @@ def _classify_tier(action_kind: Optional[str], confidence: float) -> Tuple[str, 
     if k in TIER_2_KINDS:
         return "tier_2", f"human_required:{k}"
     return "tier_2", f"default_human:{k or 'no_kind'}"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Plain-Hinglish translation layer (iter 322t)
+# ─────────────────────────────────────────────────────────────────────
+# Every proposal carries a `plain_language` dict that the founder UI
+# renders by default. Technical detail (proposal_text) is hidden behind
+# a "Details" toggle. Translation is best-effort — if the LLM is slow
+# or unavailable, we store a safe fallback so proposal creation never
+# fails because of i18n.
+_TRANSLATE_TIMEOUT_S = 10
+_TRANSLATE_SYSTEM = (
+    "You translate technical software-engineering proposals into simple "
+    "Hinglish (Hindi-English mix in Latin script) so a non-technical "
+    "business owner can decide approve/reject. Output STRICT JSON only.\n\n"
+    "Schema (no markdown, no prose, no fences):\n"
+    "{\n"
+    '  "problem_found":      "1-2 line Hinglish — what problem was found",\n'
+    '  "what_will_change":   "1-2 line Hinglish — what will change",\n'
+    '  "impact_if_approved": "1-2 line Hinglish — business benefit if approved",\n'
+    '  "risk_if_rejected":   "1-2 line Hinglish — risk if rejected"\n'
+    "}\n\n"
+    "Rules:\n"
+    "• Each value max 2 lines. No technical jargon (file paths, function names, "
+    "code snippets) — replace with the user-facing thing it controls.\n"
+    "• Use natural Hinglish: 'Tera checkout page pe error aa raha hai', "
+    "not formal Hindi.\n"
+    "• If you cannot understand the proposal, return all fields as "
+    "'Translation unavailable — see technical details below.'"
+)
+
+
+async def _translate_to_plain_language(
+    request_text: str,
+    proposal_text: str,
+    severity: str,
+    action_kind: Optional[str],
+    safety_level: str,
+) -> Dict[str, str]:
+    """Best-effort Hinglish translation. Returns a dict matching the
+    founder-spec schema (problem_found / what_will_change /
+    impact_if_approved / risk_if_rejected / safety_level).
+    Falls back to safe defaults if the LLM call fails or times out."""
+    fallback = {
+        "problem_found":      "Translation unavailable — see technical details below.",
+        "what_will_change":   "Translation unavailable — see technical details below.",
+        "impact_if_approved": "Translation unavailable — see technical details below.",
+        "risk_if_rejected":   "Translation unavailable — see technical details below.",
+        "safety_level":       safety_level,
+    }
+    try:
+        import asyncio as _asyncio
+        import json as _json
+        from services.llm_gateway_v2 import route
+
+        compact_request = (request_text or "")[:600]
+        compact_proposal = (proposal_text or "")[:1200]
+        prompt = (
+            f"Severity: {severity or 'P2'}\n"
+            f"Safety level: {safety_level}\n"
+            f"Action kind: {action_kind or 'unspecified'}\n\n"
+            f"Original request:\n{compact_request}\n\n"
+            f"Technical proposal:\n{compact_proposal}\n"
+        )
+
+        async def _do():
+            return await route(
+                task_type="ora_brain",
+                prompt=prompt,
+                system=_TRANSLATE_SYSTEM,
+                max_tokens=500,
+            )
+
+        result = await _asyncio.wait_for(_do(), timeout=_TRANSLATE_TIMEOUT_S)
+        if not result.get("ok") or not result.get("text"):
+            return fallback
+        raw = str(result["text"]).strip()
+        s, e = raw.find("{"), raw.rfind("}")
+        if s == -1 or e == -1:
+            return fallback
+        parsed = _json.loads(raw[s : e + 1])
+        out: Dict[str, str] = {}
+        for key in ("problem_found", "what_will_change",
+                    "impact_if_approved", "risk_if_rejected"):
+            v = parsed.get(key)
+            out[key] = (str(v).strip() if v else fallback[key])[:400]
+        # Always stamp safety_level inside plain_language too — UI reads
+        # both top-level (for filtering/badges) and inline (for context).
+        out["safety_level"] = safety_level
+        return out
+    except Exception as ex:
+        logger.debug(f"[translate] plain-language failed: {ex}")
+        return fallback
 
 
 def _now_iso() -> str:
@@ -119,13 +272,34 @@ async def _publish_proposal(
         return None
     pid = str(uuid.uuid4())
     action_kind = (approve_action or {}).get("kind") if approve_action else None
+
+    # iter 322t — safety-level classification (HIGH overrides tier)
+    safety_level = _classify_safety_level(
+        action_kind, source_kind, request_text, proposal_text,
+    )
+
     tier, tier_reason = _classify_tier(action_kind, confidence)
+    # HIGH risk overrides — even a 0.99 cache_clear that touches "auth.cache"
+    # will be flagged HIGH and forced to tier_2 (founder-only).
+    if safety_level == "HIGH" and tier == "tier_1":
+        tier, tier_reason = "tier_2", f"forced_human_high_risk:{action_kind}"
+
     auto_execute_at = None
     if tier == "tier_1":
         auto_execute_at = (
             datetime.now(timezone.utc)
             + timedelta(minutes=TIER_1_AUTO_EXECUTE_DELAY_MIN)
         )
+
+    # iter 322t — plain-Hinglish translation (best-effort, ≤10s timeout)
+    plain_language = await _translate_to_plain_language(
+        request_text=request_text,
+        proposal_text=proposal_text,
+        severity=severity,
+        action_kind=action_kind,
+        safety_level=safety_level,
+    )
+
     doc = {
         "proposal_id": pid,
         "user": "auto_bridge",
@@ -150,8 +324,29 @@ async def _publish_proposal(
         "tier": tier,
         "tier_reason": tier_reason,
         "auto_execute_at": auto_execute_at,  # None for tier_2
+        # iter 322t — founder-friendly fields
+        "safety_level": safety_level,        # LOW | MEDIUM | HIGH
+        "plain_language": plain_language,    # 5-field Hinglish dict
     }
     await db.ora_dev_actions.insert_one(doc)
+
+    # iter 322u — STEP 4: HIGH-RISK auto-notification to founder.
+    if safety_level == "HIGH":
+        try:
+            await db.founder_notifications.insert_one({
+                "type": "HIGH_RISK_PROPOSAL",
+                "title": (plain_language.get("problem_found")
+                          or request_text[:160]
+                          or "High-risk proposal awaiting review"),
+                "proposal_id": pid,
+                "safety_level": "HIGH",
+                "severity": severity,
+                "created_at": _now_iso(),
+                "read": False,
+            })
+        except Exception as e:
+            logger.debug(f"[publish] founder_notifications insert skipped: {e}")
+
     return pid
 
 
@@ -518,7 +713,103 @@ async def ora_bridge_tick(db=None) -> Dict[str, Any]:
              + summary["persistent_red"])
     if total > 0 or summary["tier1_auto"].get("executed", 0):
         logger.info(f"[ora_bridge] published={total} tier1_auto={summary['tier1_auto']}")
+
+    # iter 322u — heartbeat for the watchdog.
+    try:
+        await db.scheduler_heartbeats.update_one(
+            {"job_id": "ora_proposal_bridge"},
+            {"$set": {
+                "job_id": "ora_proposal_bridge",
+                "last_ok_ts": datetime.now(timezone.utc),
+                "last_summary": summary,
+            }},
+            upsert=True,
+        )
+    except Exception as e:
+        logger.debug(f"[ora_bridge] heartbeat write skipped: {e}")
     return {"ok": True, "summary": summary, "total_published": total, "ts": _now_iso()}
+
+
+# ─── iter 322u — Watchdog (re-arms a dead bridge job) ───────────────────────
+async def ora_bridge_watchdog(db=None) -> Dict[str, Any]:
+    """Runs every 5 minutes from the scheduler. Reads the bridge's
+    `last_ok_ts` heartbeat — if it's stale by >5 min, the bridge is
+    considered dead/hung. We:
+      1. Try to re-add the APScheduler job (replace_existing=True)
+      2. Append to truth_ledger with reason
+      3. Emit one row to db.founder_notifications
+
+    Idempotent — re-adding an already-live job is a no-op for our state.
+    """
+    if db is None:
+        db = _get_db()
+    if db is None:
+        return {"ok": False, "reason": "db_unavailable"}
+
+    now = datetime.now(timezone.utc)
+    hb = await db.scheduler_heartbeats.find_one(
+        {"job_id": "ora_proposal_bridge"}, {"_id": 0}
+    )
+    last_ok = hb.get("last_ok_ts") if hb else None
+    if isinstance(last_ok, datetime) and last_ok.tzinfo is None:
+        last_ok = last_ok.replace(tzinfo=timezone.utc)
+
+    stale = (last_ok is None) or ((now - last_ok).total_seconds() > 300)
+    if not stale:
+        return {"ok": True, "stale": False, "last_ok": last_ok.isoformat() if last_ok else None}
+
+    last_ok_iso = last_ok.isoformat() if last_ok else "never"
+    reason = f"bridge_heartbeat_stale: last_ok={last_ok_iso}"
+    restart_ok = False
+    try:
+        # `aurem_scheduler` is exported via globals() at runtime in
+        # registry.py — use getattr (the module reference is module-global,
+        # but the symbol is set dynamically so a `from ... import` would
+        # capture an unbound stale reference).
+        from routers import registry as _registry  # type: ignore
+        sched = getattr(_registry, "aurem_scheduler", None)
+        if sched is None:
+            raise RuntimeError("aurem_scheduler not yet bound")
+        from apscheduler.triggers.interval import IntervalTrigger
+        sched.add_job(
+            ora_bridge_tick,
+            IntervalTrigger(seconds=60),
+            id="ora_proposal_bridge",
+            name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        restart_ok = True
+    except Exception as e:
+        reason = f"{reason} | restart_failed: {str(e)[:200]}"
+
+    try:
+        await db.truth_ledger.insert_one({
+            "ts": _now_iso(),
+            "actor": "ora_bridge_watchdog",
+            "kind": "bridge_restart",
+            "description": (
+                f"ora_proposal_bridge {'restarted' if restart_ok else 'restart attempt failed'}"
+            ),
+            "evidence": {"reason": reason, "restart_ok": restart_ok,
+                         "last_ok_ts": last_ok_iso},
+        })
+    except Exception:
+        pass
+    try:
+        await db.founder_notifications.insert_one({
+            "type": "BRIDGE_RESTART",
+            "title": ("ORA Bridge restarted by watchdog"
+                      if restart_ok else "ORA Bridge restart FAILED — manual check needed"),
+            "reason": reason,
+            "severity": "P1" if not restart_ok else "P2",
+            "created_at": _now_iso(),
+            "read": False,
+        })
+    except Exception:
+        pass
+    return {"ok": True, "stale": True, "restart_ok": restart_ok, "reason": reason}
 
 
 # ─── Approve action executor (called from approve endpoint) ─────────────────

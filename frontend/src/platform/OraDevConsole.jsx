@@ -103,12 +103,70 @@ const StatPill = ({ label, value, tone = "default", testid }) => {
   );
 };
 
-const ProposalCard = ({ p, onAct, busyId }) => {
+// ── iter 322t — Safety badge palette
+const SAFETY_STYLE = {
+  LOW: {
+    cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    label: "🔒 LOW RISK",
+    desc: "config / cache / rate-limit only",
+  },
+  MEDIUM: {
+    cls: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    label: "⚠️ MEDIUM RISK",
+    desc: "new feature or new route",
+  },
+  HIGH: {
+    cls: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+    label: "🚨 HIGH RISK",
+    desc: "database / billing / auth",
+  },
+};
+
+const PlainBlock = ({ icon, label, body, tone = "default" }) => {
+  const toneCls = tone === "bad"
+    ? "border-rose-700/40 bg-rose-950/30"
+    : tone === "good"
+    ? "border-emerald-700/40 bg-emerald-950/30"
+    : tone === "warn"
+    ? "border-amber-700/40 bg-amber-950/30"
+    : "border-zinc-800 bg-zinc-950/50";
+  return (
+    <div className={`rounded-lg border ${toneCls} p-3`}>
+      <div className="text-[11px] uppercase tracking-wider text-zinc-400 mb-1 flex items-center gap-1">
+        <span>{icon}</span><span>{label}</span>
+      </div>
+      <div className="text-[13px] text-zinc-100 leading-relaxed">
+        {body || "—"}
+      </div>
+    </div>
+  );
+};
+
+const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
   const id = p.proposal_id;
   const short = id ? id.slice(0, 8) : "??";
   const statusKey = (p.status || "pending").toLowerCase();
   const sealed = !!p.sealed_blocked;
   const busy = busyId === id;
+  const [showDetails, setShowDetails] = React.useState(false);
+  const [translating, setTranslating] = React.useState(false);
+
+  const plain = p.plain_language || null;
+  const safety = (p.safety_level || "MEDIUM").toUpperCase();
+  const safetyStyle = SAFETY_STYLE[safety] || SAFETY_STYLE.MEDIUM;
+  const tier = p.tier || "tier_2";
+  const autoExecAt = p.auto_execute_at;
+
+  const handleTranslate = async () => {
+    if (translating) return;
+    setTranslating(true);
+    try {
+      await onTranslate(id);
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   return (
     <div
       data-testid={`ora-dev-card-${short}`}
@@ -116,8 +174,9 @@ const ProposalCard = ({ p, onAct, busyId }) => {
         sealed ? "border-rose-700/60" : "border-zinc-800"
       }`}
     >
+      {/* Header row: id, status, safety, tier, sealed */}
       <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Code2 className="w-4 h-4 text-amber-400" />
           <span className="font-mono text-sm text-amber-300">#{short}</span>
           <span
@@ -128,6 +187,22 @@ const ProposalCard = ({ p, onAct, busyId }) => {
           >
             {statusKey.replace("_", " ")}
           </span>
+          <span
+            data-testid={`ora-dev-card-${short}-safety`}
+            className={`text-[10px] uppercase px-2 py-0.5 rounded border ${safetyStyle.cls}`}
+            title={safetyStyle.desc}
+          >
+            {safetyStyle.label}
+          </span>
+          {tier === "tier_1" && statusKey === "pending" && autoExecAt && (
+            <span
+              data-testid={`ora-dev-card-${short}-tier1-auto`}
+              className="text-[10px] uppercase px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-200"
+              title={`Will auto-execute at ${autoExecAt}`}
+            >
+              ⏱ AUTO @ {new Date(autoExecAt).toLocaleTimeString()}
+            </span>
+          )}
           {sealed && (
             <span className="text-[10px] uppercase px-2 py-0.5 rounded border border-rose-500/50 bg-rose-500/10 text-rose-300 flex items-center gap-1">
               <ShieldAlert className="w-3 h-3" /> sealed-blocked
@@ -139,18 +214,38 @@ const ProposalCard = ({ p, onAct, busyId }) => {
         </div>
       </div>
 
-      <div className="mt-3 text-[12px] text-zinc-400 italic line-clamp-2">
-        {p.request_text || "—"}
-      </div>
+      {/* Plain-Hinglish founder view (default visible) */}
+      {plain ? (
+        <div
+          data-testid={`ora-dev-card-${short}-plain`}
+          className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2"
+        >
+          <PlainBlock icon="🔴" label="Issue Found"        body={plain.problem_found}      tone="bad" />
+          <PlainBlock icon="🔧" label="What Will Change"   body={plain.what_will_change}   tone="good" />
+          <PlainBlock icon="⚡" label="Impact If Approved" body={plain.impact_if_approved} tone="good" />
+          <PlainBlock icon="⚠️" label="Risk If Rejected"   body={plain.risk_if_rejected}   tone="warn" />
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
+          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">
+            Plain-language translation not yet generated
+          </div>
+          <div className="text-[12px] text-zinc-400 italic">
+            {p.request_text || "—"}
+          </div>
+          <button
+            onClick={handleTranslate}
+            disabled={translating}
+            data-testid={`ora-dev-translate-${short}`}
+            className="mt-2 text-[11px] px-3 py-1 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 disabled:opacity-50"
+          >
+            {translating ? "Translating…" : "🇮🇳 Translate to Hinglish"}
+          </button>
+        </div>
+      )}
 
-      <pre
-        data-testid={`ora-dev-card-${short}-proposal`}
-        className="mt-3 max-h-72 overflow-auto bg-black/60 border border-zinc-900 rounded p-3 text-[12px] text-zinc-200 whitespace-pre-wrap"
-      >
-        {p.proposal_text || "(no proposal body)"}
-      </pre>
-
-      <div className="mt-3 flex flex-wrap gap-2">
+      {/* Action row */}
+      <div className="mt-4 flex flex-wrap gap-2 items-center">
         {statusKey === "pending" && !sealed && (
           <button
             onClick={() => onAct(id, "approve")}
@@ -169,6 +264,18 @@ const ProposalCard = ({ p, onAct, busyId }) => {
             className="text-[12px] px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium flex items-center gap-1 disabled:opacity-40"
           >
             <X className="w-3.5 h-3.5" /> Reject
+          </button>
+        )}
+        {/* Tier-1 cancel-auto button */}
+        {statusKey === "pending" && tier === "tier_1" && autoExecAt && (
+          <button
+            onClick={() => onAct(id, "cancel-auto")}
+            disabled={busy}
+            data-testid={`ora-dev-cancel-auto-${short}`}
+            className="text-[12px] px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 flex items-center gap-1 disabled:opacity-40"
+            title="Cancel auto-execute window"
+          >
+            ⏱ Cancel Auto
           </button>
         )}
         {statusKey === "approved" && (
@@ -210,8 +317,45 @@ const ProposalCard = ({ p, onAct, busyId }) => {
             <RotateCcw className="w-3.5 h-3.5" /> Rollback
           </button>
         )}
+        {/* Details toggle */}
+        <button
+          onClick={() => setShowDetails((s) => !s)}
+          data-testid={`ora-dev-details-${short}`}
+          className="text-[12px] px-3 py-1.5 rounded bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 ml-auto flex items-center gap-1"
+        >
+          🔍 {showDetails ? "Hide" : "Details"}
+        </button>
         {busy && <Loader2 className="w-4 h-4 animate-spin text-zinc-400 ml-1" />}
       </div>
+
+      {/* Technical details — collapsed by default */}
+      {showDetails && (
+        <div
+          data-testid={`ora-dev-card-${short}-tech`}
+          className="mt-3 rounded-lg border border-zinc-800 bg-black/60 p-3"
+        >
+          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">
+            Technical request
+          </div>
+          <div className="text-[12px] text-zinc-300 italic mb-3">
+            {p.request_text || "—"}
+          </div>
+          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">
+            Technical proposal
+          </div>
+          <pre
+            data-testid={`ora-dev-card-${short}-proposal`}
+            className="max-h-72 overflow-auto bg-zinc-950 border border-zinc-900 rounded p-3 text-[12px] text-zinc-200 whitespace-pre-wrap"
+          >
+            {p.proposal_text || "(no proposal body)"}
+          </pre>
+          {p.tier_reason && (
+            <div className="text-[10px] text-zinc-500 mt-2">
+              tier: <span className="text-amber-300">{tier}</span> · {p.tier_reason}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -295,6 +439,27 @@ const OraDevConsole = () => {
         showToast(`✗ ${action}: ${e.message || e}`, "bad");
       } finally {
         setBusyId(null);
+      }
+    },
+    [fetchAll]
+  );
+
+  const onTranslate = useCallback(
+    async (id) => {
+      try {
+        const r = await fetch(`${API}/api/admin/ora-dev/${id}/translate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          showToast(`✗ translate: ${body?.detail || r.status}`, "bad");
+        } else {
+          showToast(`✓ translated (${id.slice(0, 8)})`, "good");
+          fetchAll();
+        }
+      } catch (e) {
+        showToast(`✗ translate: ${e.message || e}`, "bad");
       }
     },
     [fetchAll]
@@ -388,7 +553,7 @@ const OraDevConsole = () => {
         )}
 
         {items.map((p) => (
-          <ProposalCard key={p.proposal_id} p={p} onAct={onAct} busyId={busyId} />
+          <ProposalCard key={p.proposal_id} p={p} onAct={onAct} busyId={busyId} onTranslate={onTranslate} />
         ))}
       </div>
 

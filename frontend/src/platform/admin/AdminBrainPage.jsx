@@ -60,18 +60,21 @@ const ACCENT = '#D4AF7A';
 export default function AdminBrainPage() {
   const [overview, setOverview] = useState(null);
   const [flow, setFlow] = useState(null);
+  const [notif, setNotif] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
   const refresh = useCallback(async () => {
     try {
       setErr('');
-      const [o, f] = await Promise.all([
+      const [o, f, n] = await Promise.all([
         fetchJSON('/api/admin/autonomous/overview'),
         fetchJSON('/api/admin/autonomous/pipeline-flow?limit=10'),
+        fetchJSON('/api/admin/autonomous/notifications?limit=10&unread_only=true'),
       ]);
       setOverview(o);
       setFlow(f);
+      setNotif(n);
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
@@ -94,8 +97,35 @@ export default function AdminBrainPage() {
         <h1 style={{
           fontSize: 'clamp(20px, 3.5vw, 28px)', margin: 0, fontWeight: 600,
           letterSpacing: '-0.01em',
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
           🧠 Autonomous Stack — Pipeline View
+          {notif?.high_risk_unread > 0 && (
+            <span
+              data-testid="admin-brain-high-risk-badge"
+              style={{
+                background: '#5A1A18', border: '1px solid #E0524A',
+                color: '#FF8B85', fontSize: 12, padding: '4px 10px',
+                borderRadius: 999, fontWeight: 600, letterSpacing: '0.02em',
+              }}
+              title="Unread HIGH-RISK proposals awaiting your review"
+            >
+              🚨 {notif.high_risk_unread} HIGH RISK
+            </span>
+          )}
+          {notif?.unread_total > (notif?.high_risk_unread || 0) && (
+            <span
+              data-testid="admin-brain-other-unread-badge"
+              style={{
+                background: '#2A2317', border: '1px solid #D4AF7A',
+                color: '#D4AF7A', fontSize: 12, padding: '4px 10px',
+                borderRadius: 999, fontWeight: 600,
+              }}
+              title="Other unread notifications"
+            >
+              {(notif.unread_total || 0) - (notif.high_risk_unread || 0)} new
+            </span>
+          )}
         </h1>
         <p style={{ color: '#8B8475', margin: '6px 0 0 0', fontSize: 13 }}>
           Read-only single-pane snapshot of the 11-component A2A → Council → ORA loop.

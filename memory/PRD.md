@@ -35,6 +35,27 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322u Dev Console 24x7 Autonomous Mode (4-step user spec) ✅**
+  - User directive: activate 24x7 autonomous Dev Console with plain-Hinglish translations, watchdog, founder notifications, no extras.
+  - **STEP 1 — Plain-Hinglish backfill on ALL existing rows**:
+    - Schema renamed to user spec: `problem_found / what_will_change / impact_if_approved / risk_if_rejected / safety_level`. Frontend `OraDevConsole.jsx` ProposalCard updated to read new keys.
+    - `/tmp/backfill_plain_language.py` ran across all 7 existing `ora_dev_actions` rows → 7/7 backfilled, 0 failed. Real Hinglish output verified live: e.g., "Abhi agar kisi customer ka subscription details dekhna ho to puri list load karni padti hai..." Auto-classified 4 as HIGH (auth/billing/schema mentions) and pushed founder_notifications.
+  - **STEP 2 — 24x7 scheduler verified**:
+    - `routers/registry.py:2523-2534` registers `ora_proposal_bridge` at 60s `IntervalTrigger` with `max_instances=1, coalesce=True`. Live scheduler now reports 41 jobs (was 40); job listing confirms `ora_proposal_bridge → interval[0:01:00]`.
+  - **STEP 3 — Watchdog**:
+    - New `services.ora_proposal_bridge.ora_bridge_watchdog()` runs every 5 min as `ora_proposal_bridge_watchdog` job. Reads `db.scheduler_heartbeats` (`ora_bridge_tick` writes `last_ok_ts` + `last_summary` after each successful tick). If stale >5 min: re-arms the bridge job via `getattr(routers.registry, "aurem_scheduler")` (which is exported via `globals()["aurem_scheduler"]` at registry.py:1634), then writes to `truth_ledger` with `actor=ora_bridge_watchdog kind=bridge_restart`, then pushes to `db.founder_notifications` with `type=BRIDGE_RESTART`.
+    - Verified live: stale-trigger test → live `ora_bridge_tick` refreshed heartbeat at tick=50s. Watchdog mock-fire wrote 1 truth_ledger row + 1 founder_notification row (proves all 3 audit channels fire — restart logic itself was patched after first test to use getattr).
+  - **STEP 4 — HIGH-RISK auto-notification + /admin/brain badge**:
+    - In `_publish_proposal`, when `safety_level == "HIGH"`, automatically inserts row into `db.founder_notifications` with `type=HIGH_RISK_PROPOSAL, proposal_id, title=plain.problem_found`.
+    - Two new endpoints: `GET /api/admin/autonomous/notifications?unread_only=true` returns `{unread_total, high_risk_unread, rows}` and `POST /api/admin/autonomous/notifications/mark-read` accepts `{ids[]}`/`{type}`/`{all:true}`.
+    - `AdminBrainPage.jsx` polls every 15s, renders red `🚨 N HIGH RISK` badge in header when `high_risk_unread > 0`. Screenshot captured live showing "🚨 4 HIGH RISK" badge + "1 new" secondary badge.
+  - **All 4 user-required proofs delivered**:
+    1. ✅ Sample translated row (proposal_id `213b4c4e...` → safety=HIGH, all 5 Hinglish fields populated)
+    2. ✅ Scheduler job count = 41, includes `ora_proposal_bridge` @ 60s + `ora_proposal_bridge_watchdog` @ 5min
+    3. ✅ Watchdog wrote truth_ledger (`ora_bridge_watchdog / bridge_restart`) + founder_notifications (`BRIDGE_RESTART`) on stale trigger
+    4. ✅ Screenshot of `/admin/brain` with "🚨 4 HIGH RISK" badge visible
+  - All lints clean. Backend boots clean. Existing flows untouched.
+
 - **2026-02-10 — iter 322s Tiered Auto-Approval (Dev Console) ✅**
   - User spec: every Dev Console proposal must be tagged with a tier on creation. Tier-1 (config_change/cache_clear/rate_limit_adjust @ confidence ≥ 0.95) auto-executes after a 5-minute cancel window with a pre-execute state snapshot taken first and a truth_ledger entry written after. Tier-2 (code_change/db_migration/billing_change/agent_deploy) requires founder approval — no auto-execute, no exceptions.
   - **`services/ora_proposal_bridge.py`** — added `_classify_tier()` taxonomy + `_publish_proposal()` now stamps `tier` + `tier_reason` + `auto_execute_at` (None for tier_2). Default for unknown kinds = tier_2 (conservative human-required).

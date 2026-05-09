@@ -2535,6 +2535,25 @@ def register_all_routers(app, db):
         except Exception as ob_e:
             logger.warning(f"[REGISTRY] ORA proposal bridge schedule failed: {ob_e}")
 
+        # iter 322u — Watchdog for the bridge itself (every 5 min).
+        # Re-arms the job if its heartbeat is stale; logs to truth_ledger
+        # and pushes a founder_notification.
+        try:
+            from services.ora_proposal_bridge import ora_bridge_watchdog
+            from apscheduler.triggers.interval import IntervalTrigger as _IT4
+            aurem_scheduler.add_job(
+                ora_bridge_watchdog,
+                _IT4(seconds=300),
+                id="ora_proposal_bridge_watchdog",
+                name="ORA Bridge Watchdog (5min stale-heartbeat re-arm)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] ORA proposal bridge watchdog scheduled (every 5min)")
+        except Exception as wd_e:
+            logger.warning(f"[REGISTRY] ORA proposal bridge watchdog schedule failed: {wd_e}")
+
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:
             from services.ora_phase_25 import attach_phase_25_scheduler

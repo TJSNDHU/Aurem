@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -85,3 +86,59 @@ async def recent_decisions(
     return await get_recent_decisions(
         db, limit=limit, action_filter=action, verdict_filter=verdict,
     )
+
+
+# ─── iter 322u — Founder notifications (HIGH-risk + watchdog events) ───
+@router.get("/notifications")
+async def notifications(
+    request: Request, limit: int = 25, unread_only: bool = False,
+) -> Dict[str, Any]:
+    """List recent founder notifications. Used by /admin/brain badge +
+    list. unread_only=true returns only unread rows."""
+    await _require_admin(request)
+    db = _get_db()
+    limit = max(1, min(100, limit))
+    q: Dict[str, Any] = {}
+    if unread_only:
+        q["read"] = False
+    rows = []
+    cur = db.founder_notifications.find(
+        q, {"_id": 0},
+    ).sort("created_at", -1).limit(limit)
+    async for r in cur:
+        rows.append(r)
+    unread = await db.founder_notifications.count_documents({"read": False})
+    high_risk_unread = await db.founder_notifications.count_documents(
+        {"read": False, "type": "HIGH_RISK_PROPOSAL"}
+    )
+    return {
+        "ok": True,
+        "unread_total": unread,
+        "high_risk_unread": high_risk_unread,
+        "count": len(rows),
+        "rows": rows,
+    }
+
+
+@router.post("/notifications/mark-read")
+async def mark_notifications_read(
+    request: Request, body: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Mark notifications as read. body={"ids":[...]} marks specific
+    rows; body={"all":true} marks all unread; body={"type":"HIGH_RISK_PROPOSAL"}
+    marks all unread of that type."""
+    await _require_admin(request)
+    db = _get_db()
+    body = body or {}
+    q: Dict[str, Any] = {"read": False}
+    ids = body.get("ids") if isinstance(body.get("ids"), list) else None
+    if ids:
+        q["proposal_id"] = {"$in": ids}
+    elif body.get("type"):
+        q["type"] = body["type"]
+    elif not body.get("all"):
+        return {"ok": False, "error": "must supply ids[], type, or all=true"}
+    res = await db.founder_notifications.update_many(
+        q, {"$set": {"read": True, "read_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"ok": True, "modified": res.modified_count}

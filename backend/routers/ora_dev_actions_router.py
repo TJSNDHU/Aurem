@@ -270,6 +270,54 @@ async def cancel_auto_approval(
     return {"ok": True, "proposal": _serialize(refreshed or {})}
 
 
+# ─── iter 322t — Plain-Hinglish translation (retro-fill for old proposals) ─
+@router.post("/{proposal_id}/translate")
+async def translate_proposal(
+    proposal_id: str, authorization: Optional[str] = Header(None),
+):
+    """Retro-translate an existing proposal's request_text + proposal_text
+    into plain Hinglish. Useful for proposals created before iter 322t
+    that don't yet carry `plain_language`. Idempotent — overwrites any
+    existing translation."""
+    verify_admin(authorization)
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database not wired")
+    existing = await db.ora_dev_actions.find_one({"proposal_id": proposal_id})
+    if not existing:
+        raise HTTPException(404, "Proposal not found")
+
+    from services.ora_proposal_bridge import (
+        _classify_safety_level, _translate_to_plain_language,
+    )
+    action_kind = ((existing.get("approve_action") or {}).get("kind")
+                   if existing.get("approve_action") else None)
+    # Always recompute fresh on retro-translate — don't reuse stale values.
+    safety_level = _classify_safety_level(
+        action_kind,
+        existing.get("source_kind"),
+        existing.get("request_text") or "",
+        existing.get("proposal_text") or "",
+    )
+    plain = await _translate_to_plain_language(
+        request_text=existing.get("request_text") or "",
+        proposal_text=existing.get("proposal_text") or "",
+        severity=existing.get("severity") or "P2",
+        action_kind=action_kind,
+        safety_level=safety_level,
+    )
+    await db.ora_dev_actions.update_one(
+        {"proposal_id": proposal_id},
+        {"$set": {
+            "plain_language": plain,
+            "safety_level": safety_level,
+            "translated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    refreshed = await db.ora_dev_actions.find_one({"proposal_id": proposal_id})
+    return {"ok": True, "proposal": _serialize(refreshed or {})}
+
+
 # ─── iter 281.3 — Apply via PR (Phase 2.3 add-on) ──────────────────
 def _slugify(s: str, n: int = 32) -> str:
     import re
