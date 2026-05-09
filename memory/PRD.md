@@ -26,6 +26,17 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — AUREM Dogfood account fully activated (admin@aurem.live = Lifetime Enterprise FREE) ✅**
+  - User to drive all paid services through their own dogfood customer account instead of admin account going forward
+  - Extended `services/founder_provision.py` with `LIFETIME_FREE_PERKS` block applied on every startup (idempotent):
+    - `lifetime_free=True`, `billing_exempt=True` (Stripe never charges this account)
+    - `subscription_status=lifetime_active`, `subscription_renews_at=null`
+    - `services_unlocked=["*"]` — wildcard so every feature-gate passes
+    - `dogfood=True` flag for analytics/segmentation
+    - `primary_domain=aurem.live`, `allowed_domains=["aurem.live"]`
+  - Bumped `ENTERPRISE_LIMITS` 10× across the board to ensure no quota gate ever throttles dogfood usage: 100K crew, 5K voice, 50K whatsapp/sms, 1M emails, 10K campaigns, 1K agents/websites/domains, 1M leads, 1M AI calls
+  - Pixel `AURE-FNDR-002` now bound to `aurem.live` domain: `verified=True`, `domain=aurem.live`, `allowed_domains=[aurem.live]`, `lifetime_free=True`
+  - Verified live: `admin@aurem.live` returns all flags correctly post-restart; founder_provision idempotent so prod redeploy preserves state across Atlas
 - **2026-02-08 — Escalation framework extended to P2 / P3 / P4 (every pillar self-heals) ✅**
   - Same 3-tier ladder (yellow→yellow→red) now applies to all 4 pillars, each with its own `_PN_CONSECUTIVE_FAILS` counter and `_PN_LAST_GREEN_TS` sticky window
   - Per-pillar liveness signal: env-var presence AND no relevant circuit breaker is OPEN. Real flapping scenarios (Twilio A2P throttle, Stripe key invalid, OpenRouter rate-limit) now trigger autonomous recovery instead of manifesting as silent gaps.

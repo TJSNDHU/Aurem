@@ -25,13 +25,35 @@ _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DEFAULT_FOUNDERS = [
     {"email": "teji.ss1986@gmail.com", "password": "ul4Fb*u^l^Nuazh@B%Q8", "business_id": "AURE-FNDR-001", "full_name": "AUREM Admin"},
-    {"email": "admin@aurem.live",      "password": "o2VmqItgD3STdLlHWX^u", "business_id": "AURE-FNDR-002", "full_name": "AUREM Founder"},
+    {"email": "admin@aurem.live",      "password": "o2VmqItgD3STdLlHWX^u", "business_id": "AURE-FNDR-002", "full_name": "AUREM Founder", "domain": "aurem.live", "dogfood": True},
 ]
 
+# iter 322 — Founder Lifetime Free perks: bypass billing, unlock every
+# service, never throttle. Applied to platform_users on every startup
+# (idempotent) so `admin@aurem.live` (the AUREM dogfood account) acts as
+# the operational customer used to drive every paid feature without
+# touching the payment rails.
+LIFETIME_FREE_PERKS = {
+    "lifetime_free": True,
+    "billing_exempt": True,
+    "subscription_status": "lifetime_active",
+    "subscription_renews_at": None,
+    "services_unlocked": ["*"],  # wildcard — every gated feature passes the gate
+}
+
 ENTERPRISE_LIMITS = {
-    "crew_limit": 10000,
-    "voice_limit": 500,
-    "whatsapp_limit": 5000,
+    # iter 322 — bumped 10× so dogfood usage never trips a quota gate.
+    "crew_limit": 100000,
+    "voice_limit": 5000,
+    "whatsapp_limit": 50000,
+    "sms_limit": 50000,
+    "email_limit": 1000000,
+    "campaigns_limit": 10000,
+    "agents_limit": 1000,
+    "websites_limit": 1000,
+    "domains_limit": 1000,
+    "leads_limit": 1000000,
+    "ai_calls_limit": 1000000,
 }
 
 
@@ -96,9 +118,16 @@ async def ensure_founders(db) -> dict:
             "usage": ENTERPRISE_LIMITS,
             "trial_ends_at": None,
             "updated_at": now,
+            # iter 322 — Lifetime Free perks (bypass billing + unlock all)
+            **LIFETIME_FREE_PERKS,
         }
+        if fdr.get("dogfood"):
+            update_set["dogfood"] = True
         if fdr.get("business_id"):
             update_set["business_id"] = fdr["business_id"]
+        if fdr.get("domain"):
+            update_set["primary_domain"] = fdr["domain"]
+            update_set["allowed_domains"] = [fdr["domain"]]
         # Apply the resolved password hash (if any) to platform_users.
         update_on_insert = {"created_at": now, "company_name": "AUREM Platform"}
         if new_hash:
@@ -166,6 +195,12 @@ async def ensure_founders(db) -> dict:
                     "tenant_id": user_id,
                     "founder": True,
                     "installed": True,
+                    "verified": True,
+                    # iter 322 — bind aurem.live domain to the dogfood pixel
+                    # so events from the live site land against this account.
+                    **({"domain": fdr["domain"], "allowed_domains": [fdr["domain"]]}
+                       if fdr.get("domain") else {}),
+                    "lifetime_free": True,
                 }, "$setOnInsert": {"created_at": now, "events_received": 0}},
                 upsert=True,
             )
