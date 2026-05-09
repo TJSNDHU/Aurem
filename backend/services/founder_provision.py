@@ -25,7 +25,12 @@ _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DEFAULT_FOUNDERS = [
     {"email": "teji.ss1986@gmail.com", "password": "ul4Fb*u^l^Nuazh@B%Q8", "business_id": "AURE-FNDR-001", "full_name": "AUREM Admin"},
-    {"email": "admin@aurem.live",      "password": "o2VmqItgD3STdLlHWX^u", "business_id": "AURE-FNDR-002", "full_name": "AUREM Founder", "domain": "aurem.live", "dogfood": True},
+    # iter 322 — dogfood identity migrated from admin@aurem.live to the
+    # founder's personal Gmail alias. Same business_id + user_id preserved
+    # so all historical data (billing, pixel, workspaces, onboarding) stays
+    # intact under the new identity. The +dogfood alias delivers to the
+    # same inbox, making it easier to manage.
+    {"email": "teji.ss1986+dogfood@gmail.com", "password": "o2VmqItgD3STdLlHWX^u", "business_id": "AURE-FNDR-002", "full_name": "AUREM Founder", "domain": "aurem.live", "dogfood": True},
 ]
 
 # iter 322 — Founder Lifetime Free perks: bypass billing, unlock every
