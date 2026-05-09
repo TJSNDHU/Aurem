@@ -204,8 +204,12 @@ async def sovereign_health() -> dict:
                 "models": models[:10],
             }
     except Exception as e:
-        return {"ok": False, "status": "red",
-                "detail": f"{type(e).__name__}: {str(e)[:140]}",
+        # iter 322 — Sovereign is fallback infra (LLM_PROVIDER_ORDER has
+        # 3 backups), so an unreachable tunnel is a DEGRADED state, not
+        # an outage. Surface as yellow so the admin tile shows the right
+        # operational severity instead of a scary red dot.
+        return {"ok": False, "status": "yellow",
+                "detail": f"unreachable — {type(e).__name__}: {str(e)[:120]}",
                 "url": url, "models": []}
 
 
