@@ -691,6 +691,16 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] {label} error: {e}")
 
+    # iter 322 — One-shot DB migration ops endpoints (founder-only).
+    if not _should_skip("routers.db_migrate_router"):
+        try:
+            from routers.db_migrate_router import router as db_migrate_router, set_db as set_db_migrate_db
+            app.include_router(db_migrate_router)
+            if db is not None:
+                set_db_migrate_db(db)
+        except Exception as e:
+            logger.warning(f"[REGISTRY] db_migrate_router not loaded: {e}")
+
     # Panic Takeover (separate from settings)
     if not _should_skip("routers.panic_takeover_router"):
         try:
