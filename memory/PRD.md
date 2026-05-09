@@ -35,6 +35,24 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322s Tiered Auto-Approval (Dev Console) ✅**
+  - User spec: every Dev Console proposal must be tagged with a tier on creation. Tier-1 (config_change/cache_clear/rate_limit_adjust @ confidence ≥ 0.95) auto-executes after a 5-minute cancel window with a pre-execute state snapshot taken first and a truth_ledger entry written after. Tier-2 (code_change/db_migration/billing_change/agent_deploy) requires founder approval — no auto-execute, no exceptions.
+  - **`services/ora_proposal_bridge.py`** — added `_classify_tier()` taxonomy + `_publish_proposal()` now stamps `tier` + `tier_reason` + `auto_execute_at` (None for tier_2). Default for unknown kinds = tier_2 (conservative human-required).
+  - **`_run_auto_approvals()`** worker (called from `ora_bridge_tick` every 60s): finds tier_1 proposals where `auto_execute_at <= now`, re-verifies confidence floor, captures a focused per-kind snapshot in `db.tier1_pre_exec_snapshots`, runs `execute_approve_action`, persists outcome on the proposal (`status=auto_approved | auto_failed | auto_aborted`), writes a `truth_ledger` row for immutable audit. Snapshot failure aborts auto-exec for that proposal only — others in the batch still run.
+  - **NOT used `db_backup_service.run_backup_async`** (the daily DR mirror) — it takes ~11min per the May 2026 verified run, which would blow past the 5-min cancel window. Instead a microsecond-fast per-action snapshot captures only the resources the action touches (config row, rate_limit row, etc.). Daily DR mirror still runs at 03:00 UTC for the global safety net.
+  - **`execute_approve_action`** extended with 3 tier-1 executors:
+    - `config_change`: upserts `app_config` / `system_config` / `settings` (action-selectable collection)
+    - `cache_clear`: flushes a Redis prefix OR a Mongo cache collection
+    - `rate_limit_adjust`: upserts `db.rate_limits` row with rps/burst/window
+  - **`routers/ora_dev_actions_router.py`** — added `POST /api/admin/ora-dev/{id}/cancel-auto` for the founder's 5-min cancel window. Validates: status=pending, tier=tier_1, auto_execute_at still in future. Sets status=cancelled with founder email.
+  - **E2E verified — 5/5 green** (`/tmp/e2e_tier_approval.py`):
+    1) Classifier 11/11 cases correct (incl. tier-1 kinds at conf<0.95 → tier_2 fallback) ✅
+    2) Publish stamps tier_1 with future `auto_execute_at`; tier_2 with None ✅
+    3) Worker respects 5-min cancel window (status stays pending) ✅
+    4) Past-window FIRES: `executed=1, aborted=0, failed=0`, status=auto_approved, truth_ledger +1 ✅
+    5) Cancel endpoint transition: pending → cancelled ✅
+  - All lints clean. Backend boots clean.
+
 - **2026-02-10 — iter 322r Tasks 2 + 3: /admin/brain + /admin/council-audit ✅**
   - User skipped Task 1 (prod E2E) after verifying prod alive via `/api/admin/scheduler/count` (40 jobs) + `/api/public/status` (99.99% autonomy, 781 watchdog heals/24h, 700 council closed/24h). Moved straight to Tasks 2+3 in single session per user instruction.
   - **Task 2 — Autonomous Stack Façade + `/admin/brain` page**:

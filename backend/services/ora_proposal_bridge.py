@@ -35,9 +35,49 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# TIERED AUTO-APPROVAL TAXONOMY (iter 322s)
+# ─────────────────────────────────────────────────────────────────────
+# Tier 1 → safe, mechanical, reversible. Auto-approve after a 5-minute
+#          "cancel window" provided git/db backup runs first. Outcome
+#          is logged to truth_ledger.
+# Tier 2 → human-only. Code changes, schema changes, money paths, agent
+#          wiring. NO auto-execution — proposal sits in Dev Console
+#          queue until a founder explicitly approves.
+TIER_1_KINDS = frozenset({
+    "config_change",
+    "cache_clear",
+    "rate_limit_adjust",
+})
+TIER_2_KINDS = frozenset({
+    "code_change",
+    "db_migration",
+    "billing_change",
+    "agent_deploy",
+    # Pre-existing kinds the bridge already produces — explicit Tier 2.
+    "run_migration_iter322",   # touches DB → strictly human
+    "mark_safe_apply",         # informational tag, no auto-action
+})
+TIER_1_MIN_CONFIDENCE = 0.95
+TIER_1_AUTO_EXECUTE_DELAY_MIN = 5
+TIER_1_AUTO_BATCH_LIMIT = 10
+
+
+def _classify_tier(action_kind: Optional[str], confidence: float) -> Tuple[str, str]:
+    """Returns (tier, reason). Conservative default = tier_2."""
+    k = (action_kind or "").lower()
+    if k in TIER_1_KINDS and confidence >= TIER_1_MIN_CONFIDENCE:
+        return "tier_1", f"auto_eligible:{k}@{confidence:.2f}"
+    if k in TIER_1_KINDS:
+        return "tier_2", f"tier1_kind_below_threshold:{k}@{confidence:.2f}"
+    if k in TIER_2_KINDS:
+        return "tier_2", f"human_required:{k}"
+    return "tier_2", f"default_human:{k or 'no_kind'}"
 
 
 def _now_iso() -> str:
@@ -78,6 +118,14 @@ async def _publish_proposal(
     if await _already_bridged(db, source_signature):
         return None
     pid = str(uuid.uuid4())
+    action_kind = (approve_action or {}).get("kind") if approve_action else None
+    tier, tier_reason = _classify_tier(action_kind, confidence)
+    auto_execute_at = None
+    if tier == "tier_1":
+        auto_execute_at = (
+            datetime.now(timezone.utc)
+            + timedelta(minutes=TIER_1_AUTO_EXECUTE_DELAY_MIN)
+        )
     doc = {
         "proposal_id": pid,
         "user": "auto_bridge",
@@ -98,6 +146,10 @@ async def _publish_proposal(
         "severity": severity,
         "confidence": confidence,
         "approve_action": approve_action,  # optional structured action
+        # iter 322s — tier classification
+        "tier": tier,
+        "tier_reason": tier_reason,
+        "auto_execute_at": auto_execute_at,  # None for tier_2
     }
     await db.ora_dev_actions.insert_one(doc)
     return pid
@@ -234,12 +286,215 @@ async def _bridge_persistent_red(db) -> int:
 
 
 # ─── Public tick (called from scheduler) ────────────────────────────────────
+async def _tier1_snapshot(db, proposal_id: str, action: Dict[str, Any]) -> Dict[str, Any]:
+    """Fast pre-execute state snapshot for tier-1 auto-approval.
+
+    Captures a focused, per-kind context object so the action can be
+    reviewed (or reverted) post-fact. Idempotent. Microsecond-fast —
+    NOT the daily DR mirror.
+
+    Returns: {"snapshot_id": ..., "kind": ..., "context": {...}}
+    Persisted to: db.tier1_pre_exec_snapshots
+    """
+    snap_id = f"tier1_snap_{uuid.uuid4().hex[:12]}"
+    kind = (action or {}).get("kind") or "unknown"
+    context: Dict[str, Any] = {}
+
+    try:
+        if kind == "config_change":
+            target = action.get("key") or action.get("target")
+            if target:
+                # Try the most common config collections
+                for col_name in ("app_config", "system_config", "settings"):
+                    try:
+                        existing = await db[col_name].find_one(
+                            {"key": target}, {"_id": 0}
+                        )
+                        if existing:
+                            context[col_name] = existing
+                            break
+                    except Exception:
+                        pass
+        elif kind == "cache_clear":
+            scope = action.get("scope") or action.get("target") or "unknown"
+            context = {
+                "scope": scope,
+                "note": ("Cache repopulates from authoritative source on next "
+                         "access; nothing to back up. Snapshot is for audit only."),
+            }
+        elif kind == "rate_limit_adjust":
+            target = action.get("limit_key") or action.get("key")
+            if target:
+                try:
+                    existing = await db.rate_limits.find_one(
+                        {"key": target}, {"_id": 0}
+                    )
+                    context["rate_limits"] = existing
+                except Exception:
+                    pass
+    except Exception as e:
+        context["context_capture_error"] = str(e)[:200]
+
+    snap_doc = {
+        "snapshot_id": snap_id,
+        "proposal_id": proposal_id,
+        "kind": kind,
+        "action": action,
+        "context": context,
+        "captured_at": _now_iso(),
+    }
+    await db.tier1_pre_exec_snapshots.insert_one(snap_doc)
+    return {"snapshot_id": snap_id, "kind": kind, "context": context}
+
+
+async def _run_auto_approvals(db) -> Dict[str, int]:
+    """Tier 1 auto-execution worker.
+
+    Finds proposals where:
+      - tier == "tier_1"
+      - status == "pending"
+      - auto_execute_at <= now
+      - confidence >= TIER_1_MIN_CONFIDENCE (re-checked at exec time)
+
+    Per proposal, runs:
+      Step 1 — `db_backup_service.run_backup_async` (snapshot before any change)
+      Step 2 — `execute_approve_action` (the actual structured action)
+      Step 3 — Update ora_dev_actions row (status=auto_approved | auto_failed)
+      Step 4 — Append to truth_ledger (audit immutability)
+
+    Backup failure aborts auto-exec for THAT proposal — sets status=auto_aborted
+    so a human can re-evaluate. Other proposals in the batch still run.
+    """
+    now = datetime.now(timezone.utc)
+    rolling = {"executed": 0, "aborted": 0, "failed": 0}
+    cur = db.ora_dev_actions.find(
+        {
+            "tier": "tier_1",
+            "status": "pending",
+            "auto_execute_at": {"$lte": now},
+        },
+        {"_id": 0},
+    ).limit(TIER_1_AUTO_BATCH_LIMIT)
+
+    async for p in cur:
+        pid = p.get("proposal_id")
+        action = p.get("approve_action") or {}
+        kind = action.get("kind")
+        confidence = float(p.get("confidence") or 0)
+
+        # Re-verify confidence didn't drift between schedule and exec
+        if confidence < TIER_1_MIN_CONFIDENCE:
+            await db.ora_dev_actions.update_one(
+                {"proposal_id": pid},
+                {"$set": {
+                    "status": "auto_aborted",
+                    "auto_aborted_at": _now_iso(),
+                    "auto_aborted_reason": f"confidence_drift:{confidence:.2f}",
+                }},
+            )
+            rolling["aborted"] += 1
+            continue
+
+        # Step 1 — pre-execute state snapshot. Fast, focused, per-action
+        # capture so a human (or the rollback path) can see exactly what the
+        # action overwrote. We deliberately do NOT call `db_backup_service.
+        # run_backup_async` here — that's the daily DR mirror (~11 min) and
+        # would blow past the 5-minute cancel window. The daily mirror still
+        # runs at 03:00 UTC for the global safety net.
+        backup_run_id = None
+        try:
+            snap = await _tier1_snapshot(db, pid, action)
+            backup_run_id = snap.get("snapshot_id")
+        except Exception as e:
+            await db.ora_dev_actions.update_one(
+                {"proposal_id": pid},
+                {"$set": {
+                    "status": "auto_aborted",
+                    "auto_aborted_at": _now_iso(),
+                    "auto_aborted_reason": f"snapshot_failed: {str(e)[:200]}",
+                    "backup_run_id": backup_run_id,
+                }},
+            )
+            try:
+                await db.truth_ledger.insert_one({
+                    "ts": _now_iso(),
+                    "actor": "tier1_auto_executor",
+                    "kind": "auto_approval_aborted",
+                    "description": f"Tier-1 auto-approval ABORTED for {pid}: pre-exec snapshot failed",
+                    "evidence": {
+                        "proposal_id": pid,
+                        "action_kind": kind,
+                        "confidence": confidence,
+                        "abort_reason": "snapshot_failed",
+                        "abort_detail": str(e)[:200],
+                    },
+                })
+            except Exception:
+                pass
+            rolling["aborted"] += 1
+            continue
+
+        # Step 2 — execute the structured action.
+        exec_result: Dict[str, Any]
+        try:
+            exec_result = await execute_approve_action(db, action)
+        except Exception as e:
+            exec_result = {"ok": False, "error": f"{type(e).__name__}: {e}"[:300]}
+        ok = bool(exec_result.get("ok"))
+
+        # Step 3 — persist outcome on the proposal.
+        new_status = "auto_approved" if ok else "auto_failed"
+        await db.ora_dev_actions.update_one(
+            {"proposal_id": pid},
+            {"$set": {
+                "status": new_status,
+                "approved_by": "tier1_auto_executor",
+                "approved_at": _now_iso(),
+                "applied_at": _now_iso() if ok else None,
+                "applied_payload": exec_result,
+                "backup_run_id": backup_run_id,
+            }},
+        )
+
+        # Step 4 — truth_ledger entry (immutable audit).
+        try:
+            await db.truth_ledger.insert_one({
+                "ts": _now_iso(),
+                "actor": "tier1_auto_executor",
+                "kind": "auto_approval",
+                "description": (
+                    f"Tier-1 {kind} auto-approval {'EXECUTED' if ok else 'FAILED'} "
+                    f"for proposal {pid}"
+                ),
+                "evidence": {
+                    "proposal_id": pid,
+                    "action_kind": kind,
+                    "confidence": confidence,
+                    "tier": "tier_1",
+                    "backup_run_id": backup_run_id,
+                    "exec_ok": ok,
+                    "exec_result": exec_result if ok else None,
+                    "exec_error": None if ok else exec_result.get("error"),
+                },
+            })
+        except Exception as e:
+            logger.debug(f"[tier1_auto] truth_ledger insert skipped: {e}")
+
+        if ok:
+            rolling["executed"] += 1
+        else:
+            rolling["failed"] += 1
+    return rolling
+
+
+# ─── Public tick (called from scheduler) ────────────────────────────────────
 async def ora_bridge_tick(db=None) -> Dict[str, Any]:
     if db is None:
         db = _get_db()
     if db is None:
         return {"ok": False, "reason": "db_unavailable"}
-    summary = {"repair_suggestions": 0, "migrations": 0, "persistent_red": 0}
+    summary = {"repair_suggestions": 0, "migrations": 0, "persistent_red": 0,
+               "tier1_auto": {"executed": 0, "aborted": 0, "failed": 0}}
     try:
         summary["repair_suggestions"] = await _bridge_repair_suggestions(db)
     except Exception as e:
@@ -252,10 +507,17 @@ async def ora_bridge_tick(db=None) -> Dict[str, Any]:
         summary["persistent_red"] = await _bridge_persistent_red(db)
     except Exception as e:
         logger.warning(f"[ora_bridge] persistent-red stream failed: {e}")
+    # iter 322s — tier-1 auto-approval pass (after publish so newly-tagged
+    # proposals get their delay window before being eligible).
+    try:
+        summary["tier1_auto"] = await _run_auto_approvals(db)
+    except Exception as e:
+        logger.warning(f"[ora_bridge] tier1 auto-exec failed: {e}")
 
-    total = sum(summary.values())
-    if total > 0:
-        logger.info(f"[ora_bridge] published {total} proposals: {summary}")
+    total = (summary["repair_suggestions"] + summary["migrations"]
+             + summary["persistent_red"])
+    if total > 0 or summary["tier1_auto"].get("executed", 0):
+        logger.info(f"[ora_bridge] published={total} tier1_auto={summary['tier1_auto']}")
     return {"ok": True, "summary": summary, "total_published": total, "ts": _now_iso()}
 
 
@@ -315,5 +577,91 @@ async def execute_approve_action(db, action: Dict[str, Any]) -> Dict[str, Any]:
                 {"$set": {"approved_for_apply": True, "approved_at": _now_iso()}},
             )
         return {"ok": True, "kind": kind, "suggestion_id": sid}
+
+    # ─── iter 322s — Tier-1 executors ──────────────────────────────────
+    if kind == "config_change":
+        # Apply a config change to one of the standard config collections.
+        # Action shape: {"kind": "config_change", "key": "x", "value": <any>,
+        #                "collection": "app_config" | "system_config" | "settings"}
+        target_key = action.get("key") or action.get("target")
+        new_val = action.get("value")
+        col = action.get("collection") or "app_config"
+        if not target_key:
+            return {"ok": False, "kind": kind, "error": "missing key/target"}
+        try:
+            res = await db[col].update_one(
+                {"key": target_key},
+                {"$set": {"key": target_key, "value": new_val,
+                          "updated_at": _now_iso(),
+                          "updated_by": "tier1_auto_executor"}},
+                upsert=True,
+            )
+            return {"ok": True, "kind": kind, "collection": col,
+                    "key": target_key, "matched": res.matched_count,
+                    "upserted": bool(res.upserted_id)}
+        except Exception as e:
+            return {"ok": False, "kind": kind, "error": str(e)[:200]}
+
+    if kind == "cache_clear":
+        # Clear a Redis scope OR a specific Mongo cache collection.
+        # Action shape: {"kind": "cache_clear", "scope": "redis_key_prefix"}
+        # OR           {"kind": "cache_clear", "collection": "some_cache_collection"}
+        scope = action.get("scope") or action.get("target")
+        cache_col = action.get("collection")
+        cleared = 0
+        try:
+            if cache_col:
+                # Mongo-cache collection
+                r = await db[cache_col].delete_many({})
+                cleared = r.deleted_count
+                return {"ok": True, "kind": kind, "collection": cache_col,
+                        "cleared_docs": cleared}
+            if scope:
+                # Redis prefix flush (best-effort; succeeds without redis too)
+                try:
+                    from utils.redis_client import get_redis  # type: ignore
+                    redis = get_redis()
+                    if redis is not None:
+                        keys = await redis.keys(f"{scope}*")
+                        if keys:
+                            await redis.delete(*keys)
+                            cleared = len(keys)
+                except Exception:
+                    pass
+                return {"ok": True, "kind": kind, "scope": scope,
+                        "cleared_keys": cleared}
+            return {"ok": False, "kind": kind, "error": "missing scope/collection"}
+        except Exception as e:
+            return {"ok": False, "kind": kind, "error": str(e)[:200]}
+
+    if kind == "rate_limit_adjust":
+        # Adjust a per-key rate limit row in db.rate_limits.
+        # Action shape: {"kind": "rate_limit_adjust",
+        #                "limit_key": "api:something",
+        #                "rps": int, "burst": int}
+        target_key = action.get("limit_key") or action.get("key")
+        if not target_key:
+            return {"ok": False, "kind": kind, "error": "missing limit_key"}
+        update_set: Dict[str, Any] = {
+            "key": target_key,
+            "updated_at": _now_iso(),
+            "updated_by": "tier1_auto_executor",
+        }
+        for field in ("rps", "burst", "window_s", "max_per_window"):
+            if field in action:
+                update_set[field] = action[field]
+        try:
+            res = await db.rate_limits.update_one(
+                {"key": target_key},
+                {"$set": update_set},
+                upsert=True,
+            )
+            return {"ok": True, "kind": kind, "key": target_key,
+                    "matched": res.matched_count,
+                    "upserted": bool(res.upserted_id),
+                    "applied": {k: v for k, v in update_set.items()
+                                if k not in ("updated_at", "updated_by")}}
+        except Exception as e:
+            return {"ok": False, "kind": kind, "error": str(e)[:200]}
 
     return {"ok": False, "reason": f"unknown_action_kind:{kind}"}

@@ -232,6 +232,44 @@ async def rollback(proposal_id: str, authorization: Optional[str] = Header(None)
     return {"ok": True, "proposal": doc}
 
 
+# ─── iter 322s — Tier-1 auto-approval cancel window ─────────────────
+@router.post("/{proposal_id}/cancel-auto")
+async def cancel_auto_approval(
+    proposal_id: str, authorization: Optional[str] = Header(None),
+):
+    """Cancel a tier_1 proposal during its 5-minute auto-execute window.
+
+    Only succeeds if:
+      - status == "pending"
+      - tier == "tier_1"
+      - auto_execute_at is in the future (still in cancel window)
+    """
+    payload = verify_admin(authorization)
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database not wired")
+    existing = await db.ora_dev_actions.find_one({"proposal_id": proposal_id})
+    if not existing:
+        raise HTTPException(404, "Proposal not found")
+    if existing.get("status") != "pending":
+        raise HTTPException(409, f"Cannot cancel — current status is {existing.get('status')}")
+    if existing.get("tier") != "tier_1":
+        raise HTTPException(409, "Cancel-auto is tier_1 only — use /reject for tier_2")
+    aex = existing.get("auto_execute_at")
+    if aex and isinstance(aex, datetime) and aex < datetime.now(timezone.utc):
+        raise HTTPException(409, "Auto-execute window has already elapsed")
+    await db.ora_dev_actions.update_one(
+        {"proposal_id": proposal_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancelled_by": payload.get("email"),
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    refreshed = await db.ora_dev_actions.find_one({"proposal_id": proposal_id})
+    return {"ok": True, "proposal": _serialize(refreshed or {})}
+
+
 # ─── iter 281.3 — Apply via PR (Phase 2.3 add-on) ──────────────────
 def _slugify(s: str, n: int = 32) -> str:
     import re
