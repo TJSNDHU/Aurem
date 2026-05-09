@@ -169,6 +169,30 @@ async def approve(proposal_id: str, authorization: Optional[str] = Header(None))
             doc["execution_result"] = exec_result
         except Exception as e:
             doc["execution_result"] = {"ok": False, "error": str(e)[:200]}
+    # iter 322 — auto_bridge proposals carry a structured `approve_action`
+    # the executor knows how to run server-side (e.g., run_migration_iter322,
+    # mark_safe_apply). When admin clicks Approve, fire the action and
+    # transition status to "applied" + capture the audit payload.
+    elif doc.get("source") == "auto_bridge" and doc.get("approve_action"):
+        try:
+            from services.ora_proposal_bridge import execute_approve_action
+            db = _get_db()
+            exec_result = await execute_approve_action(db, doc["approve_action"])
+            doc["execution_result"] = exec_result
+            if exec_result.get("ok"):
+                await db.ora_dev_actions.update_one(
+                    {"proposal_id": proposal_id},
+                    {"$set": {
+                        "status": "applied",
+                        "applied_at": datetime.now(timezone.utc).isoformat(),
+                        "applied_payload": exec_result,
+                    }},
+                )
+                doc["status"] = "applied"
+                doc["applied_at"] = datetime.now(timezone.utc).isoformat()
+                doc["applied_payload"] = exec_result
+        except Exception as e:
+            doc["execution_result"] = {"ok": False, "error": str(e)[:200]}
     return {"ok": True, "proposal": doc}
 
 

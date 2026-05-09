@@ -2501,6 +2501,26 @@ def register_all_routers(app, db):
         except Exception as ur_e:
             logger.warning(f"[REGISTRY] Usage snapshot schedule failed: {ur_e}")
 
+        # iter 322 — Autonomous ORA proposal bridge (every 60s).
+        # Drains repair_suggestions + migration signals + persistent_red into
+        # the existing ORA Dev Console queue, so founder one-click approves
+        # instead of running curl/console blocks manually.
+        try:
+            from services.ora_proposal_bridge import ora_bridge_tick
+            from apscheduler.triggers.interval import IntervalTrigger as _IT3
+            aurem_scheduler.add_job(
+                ora_bridge_tick,
+                _IT3(seconds=60),
+                id="ora_proposal_bridge",
+                name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] ORA proposal bridge scheduled (every 60s)")
+        except Exception as ob_e:
+            logger.warning(f"[REGISTRY] ORA proposal bridge schedule failed: {ob_e}")
+
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:
             from services.ora_phase_25 import attach_phase_25_scheduler
