@@ -82,6 +82,8 @@ import SystemPulseLive from './platform/SystemPulseLive';
 // components. Imports removed to drop dead code from the App.js bundle.
 import AvatarManager from './platform/admin/AvatarManager';
 import CustomerHealthPanel from './platform/admin/CustomerHealthPanel';
+import AdminBrainPage from './platform/admin/AdminBrainPage';
+import CouncilAuditPage from './platform/admin/CouncilAuditPage';
 import MonitorFreeLanding from './platform/MonitorFreeLanding';
 import AdminSiteMonitor from './platform/AdminSiteMonitor';
 import PublicStatusPage from './platform/PublicStatusPage';
@@ -311,6 +313,8 @@ function AppRouter() {
         <Route path="/admin/brain-graph" element={<AdminBrainGraph />} />
         <Route path="/admin/avatar-manager" element={<AvatarManager />} />
         <Route path="/admin/customer-health" element={<CustomerHealthPanel />} />
+        <Route path="/admin/brain" element={<AdminBrainPage />} />
+        <Route path="/admin/council-audit" element={<CouncilAuditPage />} />
         <Route path="/admin/links" element={<AdminLinksHub />} />
         <Route path="/admin/site-monitor" element={<AdminSiteMonitor />} />
         <Route path="/admin/system-audit" element={<AdminSystemAudit />} />

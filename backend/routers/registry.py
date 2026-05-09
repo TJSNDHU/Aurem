@@ -723,6 +723,20 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] admin_ora_router not loaded: {e}")
 
+    # iter 322r — Autonomous Stack façade for /admin/brain page
+    if not _should_skip("routers.autonomous_stack_router"):
+        try:
+            from routers.autonomous_stack_router import (
+                router as autonomous_stack_router,
+                set_db as set_autonomous_db,
+            )
+            app.include_router(autonomous_stack_router)
+            if db is not None:
+                set_autonomous_db(db)
+            logger.info("[REGISTRY] autonomous_stack_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] autonomous_stack_router not loaded: {e}")
+
     # iter 322 — Service gate E2E probe endpoints
     if not _should_skip("routers.gate_test_router"):
         try:

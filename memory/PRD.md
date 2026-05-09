@@ -35,6 +35,20 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322r Tasks 2 + 3: /admin/brain + /admin/council-audit ✅**
+  - User skipped Task 1 (prod E2E) after verifying prod alive via `/api/admin/scheduler/count` (40 jobs) + `/api/public/status` (99.99% autonomy, 781 watchdog heals/24h, 700 council closed/24h). Moved straight to Tasks 2+3 in single session per user instruction.
+  - **Task 2 — Autonomous Stack Façade + `/admin/brain` page**:
+    - `services/autonomous_stack.py` (~165 LOC) — read-only aggregator for the 11 components: client_errors, sentinel_repair_loop, sentinel_ai_diagnose, llm_response_cache, llm_costs, council_decisions_detailed, council_decisions, ora_proposal_bridge, repair_suggestions, ora_dev_actions, ora_brain_thoughts. Returns totals + 24h rollups + diag-path breakdown (cache_hit/triage_short_circuit/claude_full) + verdict split (APPROVED/REJECTED) + pending Dev Console proposals.
+    - `routers/autonomous_stack_router.py` — `GET /api/admin/autonomous/{overview,pipeline-flow,recent-decisions}`. Founder-JWT-gated. Wired into registry.py.
+    - `frontend/src/platform/admin/AdminBrainPage.jsx` (~290 LOC) — single-pane 11-card pipeline grid + "Recent Pipeline Flow" timeline showing suggestion → council verdict → dev_action chain. Auto-refresh 15s. Routed at `/admin/brain` in App.js.
+  - **Task 3 — Council Audit UI at `/admin/council-audit`**:
+    - `frontend/src/platform/admin/CouncilAuditPage.jsx` (~245 LOC) — filterable table over `council_decisions_detailed`. Filters: action (regex), verdict (APPROVED/REJECTED/all), limit (25/50/100/200). Per-row voter-level breakdown (casl/qa/security/pricing each with vote+reason). CSV export from current view (client-side, no extra server hit). Routed at `/admin/council-audit`.
+  - **E2E verified live** (preview, full Playwright load):
+    - `/admin/brain` rendered with real data: 29,375 cumulative council, 2,918 in 24h, 1,005 APPROVED + 1 REJECTED, Dev Console showing 3 pending proposals, real flow suggestion `rs_44aef14c628` showing P1 / root_cause / APPROVED Council conf=1.00.
+    - `/admin/council-audit` rendered audit rows including the iter 322r Hunter + Followup Council gates: `hunter_outbound_hunt` (2x) and `followup_arm` (1x) at the top, with full voter breakdown (casl APPROVE / qa APPROVE).
+    - Backend health 200, all lints clean (Python + ESLint).
+  - All 4 files lint clean. Zero extras (no token-savings tile, no CASL feed — user explicitly said "zero enhancements").
+
 - **2026-02-10 — iter 322r Reality-Check + Council-gating closure (Hunter + Followup) ✅**
   - User triggered an 8-point reality check on prod-mirrored data. Two findings forced this fix:
     1. **Scout / Envoy as "OODA agents" never existed** — `scout_ora.py` and `envoy.py` are not in the codebase. Only `services/total_scout.py` (discovery library) and `routers/scout_sources_router.py` (admin endpoints) exist. Going forward, "Scout" in this repo refers ONLY to the **discovery library** — there is no Scout *agent*. "Envoy" is removed from all canonical docs.
