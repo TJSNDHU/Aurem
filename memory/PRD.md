@@ -26,6 +26,18 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Tiered autonomous pillar escalation (A2A → Council → ORA per fail cycle) ✅**
+  - User explicitly demanded: each pillar fail cycle should auto-trigger the autonomous stack progressively
+  - Created `services/pillar_escalation.py` with 3 tiers, fire-and-forget dispatch, 60s per-tier rate-limit:
+    - **T1 (1st fail / yellow) → DIAGNOSE**: emit A2A `PILLAR_DEGRADED_T1_DIAGNOSE` → council deliberate(qa+security) → APPROVED → reuse `services.sentinel_ai_diagnose.diagnose_and_store` with synthetic pillar-error doc → Claude root-cause + suggested fix stored as `repair_suggestion` tagged `source=pillar_escalation_t1` → A2A `ORA_PILLAR_DIAGNOSED` + ORA brain ingest
+    - **T2 (2nd fail / yellow) → AUTO-FIX**: emit A2A `PILLAR_DEGRADED_T2_AUTOFIX` → council ratify → safe built-in repair sequence (motor `list_database_names()` topology refresh + ping verify + open/half-open breakers reset + pillars-health cache invalidate) → `repair_requests` row with `actions` list + `status: repaired|best_effort` → A2A `PILLAR_T2_AUTO_REPAIRED` + ORA ingest
+    - **T3 (3rd fail / red) → DR SYNC**: emit A2A `PILLAR_OUTAGE_T3_DR_SYNC` → bypass council gating (outage protection) → fire `services.db_backup_service.run_backup_async(triggered_by="pillar_t3_outage")` background task → record `truth_ledger.persistent_red` entry → A2A `PILLAR_T3_DR_DISPATCHED` + ORA ingest
+  - Wired dispatcher into `routers/pillars_health_router._check_p1_infrastructure` after `_P1_CONSECUTIVE_FAILS` increment — calls `schedule_escalation(db, "P1", consec)` fire-and-forget so health endpoint never blocks
+  - **E2E verified live**:
+    - T2 → executed motor refresh + cache invalidate, status: repaired ✅
+    - T3 → DR backup queued, ORA brain ingested with backup_outcome=queued ✅
+    - T1 → Claude returned P1 severity 0.82 confidence with accurate root-cause ("Atlas M0 burst-credit exhaustion + stale connection pooling") and concrete suggested_fix ("maxIdleTimeMS=45000, exponential backoff, consider M10 upgrade") ✅
+  - **No new buttons / no new endpoints** — fully baked into the existing autonomous stack as user demanded
 - **2026-02-08 — Pillar anti-flap hardening (system "always live", never offline) ✅**
   - User reported pillars going offline every few mins on prod. Diagnosed 4 root causes: (1) Atlas M0 burst-credit ping spikes, (2) APScheduler missed ticks, (3) external API breakers tripping, (4) backend transient 5xx (already fixed earlier today)
   - **A — P1 latency hardening** (`routers/pillars_health_router.py`):

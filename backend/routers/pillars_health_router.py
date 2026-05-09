@@ -192,6 +192,19 @@ async def _check_p1_infrastructure(db) -> str:
     # after N consecutive cycles fail. Single/double blips → YELLOW so the
     # system stays "live" with a degraded label rather than offline.
     _P1_CONSECUTIVE_FAILS += 1
+
+    # iter 322 — autonomous A2A → Council → ORA escalation per fail cycle:
+    #   1st fail (yellow)  → DIAGNOSE   (Claude root-cause + suggested fix)
+    #   2nd fail (yellow)  → AUTO-FIX   (motor refresh + breaker reset + cache)
+    #   3rd fail (red)     → DR SYNC    (DR mirror snapshot + outage broadcast)
+    # Fire-and-forget; never blocks the health endpoint. Per-tier 60s rate
+    # limit prevents cascading task creation on a 10s polling cycle.
+    try:
+        from services.pillar_escalation import schedule_escalation
+        schedule_escalation(db, "P1", _P1_CONSECUTIVE_FAILS)
+    except Exception as e:
+        logger.debug(f"[pillar-p1] escalation dispatch skipped: {e}")
+
     if _P1_CONSECUTIVE_FAILS >= _P1_FAIL_THRESHOLD_FOR_RED:
         return "red"
     return "yellow"
