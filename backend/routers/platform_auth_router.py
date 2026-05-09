@@ -47,11 +47,30 @@ class LoginRequest(BaseModel):
     password: str
 
 class RegisterRequest(BaseModel):
+    """Signup payload — accepts both legacy (full_name + company_name)
+    and the live frontend shape (first_name + last_name + company).
+    Optional fields keep backward compatibility with existing API callers
+    while the live PlatformAuth.jsx form uses the split fields."""
     email: EmailStr
     password: str
-    full_name: str
-    company_name: str
+    full_name: Optional[str] = None
+    company_name: Optional[str] = None
+    # iter 322z — accept the live frontend shape
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    company: Optional[str] = None
+    phone: Optional[str] = None
     terms_accepted: bool = False
+
+    def normalized_full_name(self) -> str:
+        if self.full_name:
+            return self.full_name.strip()
+        parts = [self.first_name or "", self.last_name or ""]
+        joined = " ".join(p.strip() for p in parts if p and p.strip())
+        return joined or "Customer"
+
+    def normalized_company(self) -> str:
+        return (self.company_name or self.company or "").strip()
 
 class TokenResponse(BaseModel):
     token: str
@@ -254,8 +273,11 @@ async def register(request: RegisterRequest, req: Request = None):
         user_data = {
             "email": email,
             "password_hash": hash_password(request.password),
-            "full_name": request.full_name,
-            "company_name": request.company_name,
+            "full_name": request.normalized_full_name(),
+            "company_name": request.normalized_company(),
+            "first_name": (request.first_name or "").strip(),
+            "last_name": (request.last_name or "").strip(),
+            "phone": (request.phone or "").strip(),
             "role": "user",
             "created_at": datetime.utcnow().isoformat(),
             "terms_accepted": True,
@@ -322,7 +344,7 @@ async def register(request: RegisterRequest, req: Request = None):
             tc_doc = {
                 "tenant_id": tenant_id,
                 "business_id": (final_user or {}).get("business_id", ""),
-                "business_name": request.company_name or request.full_name or email,
+                "business_name": request.normalized_company() or request.normalized_full_name() or email,
                 "email": email,
                 "plan": "trial",
                 "status": "onboarding",
@@ -435,8 +457,8 @@ async def register(request: RegisterRequest, req: Request = None):
         return TokenResponse(
             token=token,
             email=email,
-            full_name=request.full_name,
-            company_name=request.company_name,
+            full_name=request.normalized_full_name(),
+            company_name=request.normalized_company(),
             role="user"
         )
 

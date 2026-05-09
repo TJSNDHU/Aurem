@@ -118,14 +118,48 @@ async def send_welcome_package(tenant_id: str, user_doc: dict = None):
             f'<script src="{base_url}/api/pixel/aurem-pixel.js" '
             f'data-aurem-key="{api_key_display}"></script>'
         )
+
+    # iter 322z — pull trial_ends_at from billing for the welcome template.
+    # This is what the user opens the email to see ("how long do I have?").
+    trial_ends_iso = ""
+    trial_ends_human = ""
+    try:
+        from datetime import timedelta as _td
+        billing = await _db.aurem_billing.find_one(
+            {"$or": [{"business_id": bid}, {"email": email}]},
+            {"_id": 0, "trial_ends_at": 1},
+        )
+        ttl = (billing or {}).get("trial_ends_at")
+        if isinstance(ttl, str):
+            try:
+                ttl = datetime.fromisoformat(ttl.replace("Z", "+00:00"))
+            except Exception:
+                ttl = None
+        if not isinstance(ttl, datetime):
+            ttl = now + _td(days=7)  # fallback to today + 7d per spec
+        trial_ends_iso = ttl.isoformat()
+        trial_ends_human = ttl.strftime("%B %d, %Y")
+    except Exception:
+        from datetime import timedelta as _td
+        ttl = now + _td(days=7)
+        trial_ends_iso = ttl.isoformat()
+        trial_ends_human = ttl.strftime("%B %d, %Y")
+
     email_data = {
         "first_name": first_name,
         "business_name": business_name,
         "business_id": bid,
-        "dashboard_url": f"{base_url}/login",
+        # iter 322z — link directly to /dashboard so a freshly-signed-up
+        # customer doesn't bounce through /login (we already auto-issued
+        # the JWT in the register response and the SPA picks it up from
+        # localStorage).
+        "dashboard_url": f"{base_url}/dashboard",
         "ora_url": f"{base_url}/ora?id={bid}",
         "api_key": api_key_display or "(already issued — check dashboard)",
         "pixel_snippet": pixel_snippet or "(already issued — retrieve from your dashboard → Settings → API Keys)",
+        "trial_ends_at": trial_ends_iso,
+        "trial_ends_human": trial_ends_human,
+        "support_email": "ora@aurem.live",
     }
     html_body = _render_email_template(email_data)
 

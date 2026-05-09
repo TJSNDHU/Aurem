@@ -35,6 +35,21 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322z Signup Flow Fix (P0) ✅**
+  - User report: "Customer completes signup but no password field, lands on login page can't login. Welcome email never received."
+  - **Root cause** = schema mismatch swallowed by frontend. Backend `RegisterRequest` required `full_name` + `company_name`. Frontend `PlatformAuth.jsx` (line 47-50) sends `first_name`, `last_name`, `company`, `phone`. Every signup → HTTP 422 `Field required`. Customer never got created → so login also failed (no row to authenticate against) → no welcome email (call never reached).
+  - **Fix #1** (`routers/platform_auth_router.py`): `RegisterRequest` model now accepts BOTH shapes — legacy (`full_name`, `company_name`) AND live frontend (`first_name`, `last_name`, `company`, `phone`). Added `normalized_full_name()` and `normalized_company()` helpers; all 4 internal usages migrated. Backwards compatible — old API callers keep working.
+  - **Fix #2** (`services/welcome_package.py`): `dashboard_url` template variable now points to `/dashboard` (was `/login`) — customer lands directly post-signup, no login bounce. Confirmed by E2E `dashboard_url: https://aurem.live/dashboard`.
+  - **Fix #3** (`services/welcome_package.py`): Welcome email now pulls `trial_ends_at` from `db.aurem_billing` (fallback: `now + 7d`) and stamps both `trial_ends_iso` + human-formatted `trial_ends_human` (`May 16, 2026`). New `support_email: ora@aurem.live` template field per spec.
+  - **Fix #4** (`templates/welcome_email.html`): Added trial-countdown + support-email block right under CTA buttons. Live render verified in `db.sent_emails.data` snapshot.
+  - **Auto-login post-signup** already correct in PlatformAuth.jsx (line 44) — `navigate('/dashboard')` immediately after token is stored. No login page in between.
+  - **All 4 user-required proofs**:
+    1. ✅ RESEND_API_KEY = `re_6paYq...` (set in prod)
+    2. ✅ Welcome email call wired in register handler with try/except guard
+    3. ✅ E2E signup via `/api/platform/auth/register` → HTTP 200 with `token` + correct user fields
+    4. ✅ `db.sent_emails` row: subject="Welcome to AUREM — Your Business ID: BHAI-W5C4", status="sent", resend_id="128a1bb2-...", dashboard_url="/dashboard", trial_ends_human="May 16, 2026", support_email="ora@aurem.live"
+  - All Python lints clean. Backend boots clean.
+
 - **2026-02-10 — iter 322y Auth Path Redis Removal ✅**
   - User directive: "Redis dependency remove karo completely from auth path. MongoDB only."
   - **Rewrote `shared/auth/jwt_blocklist.py`** — was Redis SETEX, now uses `db.token_blocklist` collection with TTL index (`expireAfterSeconds=0` on `expires_at`) for auto-purge + unique index on `jti`. Same public API (`block_token`, `is_blocked`, `unblock_token`, new `blocklist_size` diagnostic). All 4 callers (`platform_auth_router`, `aurem_routes`, `bootstrap/middlewares`, server) work zero-change.
