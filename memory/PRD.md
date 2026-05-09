@@ -26,6 +26,47 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322q ORA Token Optimization + Refusal-over-Hallucination ✅**
+  - User priority directive: drastically reduce Claude token spend on Sentinel
+    diagnose loop + lock Admin ORA against fabricating answers when grounding is thin.
+  - **3-step token optimization** in `services/sentinel_ai_diagnose.py`:
+    1. **Triage layer** (`services/sentinel_triage.py`) — cheap free model
+       (`openai/gpt-oss-20b:free` via OpenRouter, 200-token budget) classifies
+       errors as TRIVIAL / ESCALATE / SKIP before Claude is invoked. Verified
+       live: a Cloudflare 503 transient classifies as `SKIP cdn_5xx confidence=0.95`
+       in ~600ms — Claude is never called for this category.
+    2. **Context compression** (`compress_stack`) — trims stack traces to top-5
+       frames + 900 char head. Most signal lives in frames 0-5; rest is framework
+       boilerplate that bloated prompts without adding diagnostic value. Verified:
+       50-frame stack → 5 frames.
+    3. **Response cache** (`services/llm_response_cache.py`) — keyed on
+       sha1(scope+signature+prompt_seed), 24h TTL, mongo TTL index auto-purges.
+       Identical error signatures within 24h reuse the cached suggestion at
+       zero LLM cost. Verified live: 2nd identical-signature call returns
+       `diagnose_path=cache_hit` (1st was `claude_full`).
+  - **Refusal-over-Hallucination** in `routers/admin_ora_router.py`:
+    - New env-controlled `GROUNDING_REQUIRED=1` (default ON) + `GROUNDING_MIN_EVENTS=5` floor.
+    - When telemetry pool has <5 service events AND 0 tenants in the 30-day window,
+      the endpoint short-circuits to a structured `INSUFFICIENT_DATA` refusal
+      WITHOUT calling Claude. Refusal row persisted to `admin_ora_qa` with `refused: true`.
+    - Even when grounding passes the floor, the Claude prompt now carries an
+      explicit `GROUNDING DIRECTIVE` block forcing Claude to set
+      `root_cause=INSUFFICIENT_DATA` + `confidence ≤ 0.3` rather than fabricate.
+  - **Routing table extension** (`services/llm_gateway_v2.py`): added
+    `triage_classify` task type. Note: `qwen/qwen3-next-80b:free` and
+    `meta-llama/llama-3.3-70b:free` are throttled at OpenRouter provider level
+    on burst, so we settled on `openai/gpt-oss-20b:free` which has reliable
+    availability + clean JSON output for our 200-token triage prompt.
+  - **Diagnose path observability**: every `repair_suggestions` row now carries
+    `diagnose_path: triage_short_circuit | cache_hit | claude_full` so we can
+    measure cache hit rate + token-savings ratio over time.
+  - **E2E verified — 4/4 green** (`/tmp/e2e_token_opt.py`):
+    1) Stack compression 50→5 frames ✅
+    2) LLM cache miss→put→2 hits ✅
+    3) `diagnose_and_store` triage SKIP path drops cdn_5xx noise (returns None) ✅
+    4) GROUNDING_REQUIRED gate refuses on empty pool, answers on real pool ✅
+  - All lints clean. Backend boots in 8s with all 1922+ routes mounted.
+
 - **2026-02-09 — All P0/P1 backlog SHIPPED in one pass (Phase E + F + G + Layer Agents + Pixel Stack) ✅**
   - **Phase E — BIN Data Isolation**:
     - `services/db_indexes.py` — compound `(business_id, _id)` and `(business_id, time_field DESC)` on 22 BIN-scoped collections, idempotent at startup + admin endpoint `POST /api/admin/db-migrate/ensure-indexes`

@@ -33,6 +33,10 @@ ROUTING_TABLE: Dict[str, tuple] = {
     "sentiment":        ("openrouter", "google/gemma-4-26b-it:free"),
     "heartbeat_check":  ("openrouter", "minimax/minimax-m2.5:free"),
     "pattern_match":    ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+    # Cheap pre-Claude triage. Tried Qwen but qwen/qwen3-next-80b:free and
+    # llama-3.3-70b:free are throttled at provider level on burst; gpt-oss-20b
+    # has higher availability and produces clean JSON for our 200-token budget.
+    "triage_classify":  ("openrouter", "openai/gpt-oss-20b:free"),
     # PAID — Claude Sonnet via Emergent (complex only)
     "repair_diagnose":  ("anthropic",  "claude-sonnet-4-5-20250929"),
     "ora_brain":        ("anthropic",  "claude-sonnet-4-5-20250929"),

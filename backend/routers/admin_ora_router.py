@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 _db = None
 
+# Refusal-over-Hallucination: every Admin ORA answer MUST be grounded in
+# real telemetry. If the grounding pool is empty (no service usage in
+# window AND no tenant data), we refuse to answer rather than let Claude
+# fabricate plausible-sounding numbers. Override via env for emergency
+# debugging only — production should keep this hard-on.
+GROUNDING_REQUIRED = os.environ.get("ADMIN_ORA_GROUNDING_REQUIRED", "1") == "1"
+# Minimum signal floor — at least this many telemetry rows must exist
+# before we let Claude attempt a synthesis.
+GROUNDING_MIN_EVENTS = int(os.environ.get("ADMIN_ORA_GROUNDING_MIN_EVENTS", "5"))
+
 
 def set_db(db):
     global _db
@@ -128,15 +138,60 @@ async def admin_ora_ask(body: AskReq, request: Request):
         "trial_funnel": {"trialing": trialing, "expired": expired, "converted": converted},
     }
 
+    # ── Refusal-over-Hallucination gate ─────────────────────────────────
+    # If there's effectively no grounding signal, refuse with a structured
+    # INSUFFICIENT_DATA response instead of letting Claude make things up.
+    total_signal_events = sum(by_service.values()) + sum(by_plan.values())
+    has_tenant_signal = tenants > 0
+    if GROUNDING_REQUIRED and total_signal_events < GROUNDING_MIN_EVENTS and not has_tenant_signal:
+        refusal = {
+            "severity": "P3",
+            "root_cause": "INSUFFICIENT_DATA — telemetry pool empty for this window.",
+            "suggested_fix": (
+                "Cannot answer without grounding. Need at least "
+                f"{GROUNDING_MIN_EVENTS} service_usage events or 1 tenant in the "
+                "30-day window before this question can be answered honestly."
+            ),
+            "confidence": 0.0,
+            "requires_deploy": False,
+            "safe_auto_apply": False,
+            "refused": True,
+            "refusal_reason": "grounding_unavailable",
+        }
+        try:
+            await _db.admin_ora_qa.insert_one({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "question": q,
+                "answer": refusal,
+                "grounding_snapshot": grounding,
+                "refused": True,
+            })
+        except Exception:
+            pass
+        return {"ok": True, "answer": refusal, "grounding": grounding, "refused": True}
+
     # Claude diagnose using shared service
     try:
         from services.sentinel_ai_diagnose import diagnose_error
         # Reuse the LLM helper with a tailored grounding doc
         import json as _json
+        grounding_directive = (
+            "GROUNDING DIRECTIVE: You may ONLY use facts present in the "
+            "'Aggregated grounding' block below. If the data is "
+            "insufficient to answer the founder's question with high "
+            "confidence, you MUST set 'root_cause' to 'INSUFFICIENT_DATA' "
+            "and return confidence <= 0.3. Never invent numbers, BIN names, "
+            "or tenant identities. Refusal is preferred over hallucination."
+        )
         synthetic = {
             "type": "admin_ora_question",
             "classification": "admin_query",
-            "message": f"Founder question: {q}\n\nAggregated grounding (30d):\n{_json.dumps(grounding, indent=2)}",
+            "message": (
+                f"{grounding_directive}\n\n"
+                f"Founder question: {q}\n\n"
+                f"Aggregated grounding (30d, anonymized):\n"
+                f"{_json.dumps(grounding, indent=2)}"
+            ),
             "status_code": 0,
             "url": "/api/admin/ora/ask",
             "method": "POST",

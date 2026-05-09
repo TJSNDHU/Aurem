@@ -7,9 +7,14 @@ structured `repair_suggestion` row. Used by:
   • services/sentinel_repair_loop                       (autonomous: A2A → Council → ORA)
 
 iter 322 STEP 1 — routes through `services.llm_gateway_v2.route` so EVERY
-call is cost-tracked in db.llm_costs (tokens + latency + provider). This
-is the ONLY path Claude is hit from Sentinel; manual + autonomous both
-flow through the same gateway, so spend visibility is now total.
+call is cost-tracked in db.llm_costs (tokens + latency + provider).
+
+iter 322q — Token Optimization (3-step):
+  STEP A · Triage layer (cheap Qwen) classifies BEFORE Claude. Trivial /
+           known-pattern / CDN-noise short-circuits without burning Claude.
+  STEP B · Context compression — top-5 stack frames only, message capped.
+  STEP C · Response cache (db.llm_response_cache) keyed on signature so
+           identical errors within 24h reuse the cached suggestion.
 """
 from __future__ import annotations
 
@@ -19,7 +24,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from services.llm_response_cache import cache_get, cache_put
+from services.sentinel_triage import compress_stack, triage
+
 logger = logging.getLogger(__name__)
+
+# Bumped when the system prompt or schema changes — invalidates cache.
+_PROMPT_SEED = "v2-triage-2026-02-10"
+_CACHE_SCOPE = "sentinel_diagnose"
 
 _SYSTEM_PROMPT = (
     "You are AUREM's senior SRE. Given a captured client-side error, "
@@ -42,28 +54,31 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _compact_payload(err: Dict[str, Any]) -> Dict[str, Any]:
+    """STEP B — context compression. Trim message + stack aggressively."""
+    return {
+        "type": err.get("type"),
+        "classification": err.get("classification"),
+        "message": (err.get("message") or "")[:600],
+        "status_code": err.get("status_code"),
+        "url": err.get("url"),
+        "method": err.get("method"),
+        "stack_top": compress_stack(err.get("stack") or "", max_frames=5, head_chars=900),
+        "page_url": err.get("page_url"),
+        "hostname": err.get("hostname"),
+    }
+
+
 async def diagnose_error(err: Dict[str, Any]) -> Dict[str, Any]:
     """Call Claude with the compact error payload, return parsed JSON.
     Raises on LLM failure / unparseable response so caller can decide.
 
-    iter 322 — STEP 1 wired through `services.llm_gateway_v2.route`
-    (task_type='repair_diagnose'). All calls now logged to db.llm_costs
-    with token counts + latency, and the gateway will (in subsequent steps)
-    enforce per-BIN budget caps + free-LLM-first triage.
+    NOTE: This is the LOW-LEVEL Claude call. Callers that want triage +
+    cache short-circuiting should use `diagnose_and_store` instead.
     """
     from services.llm_gateway_v2 import route
 
-    compact = {
-        "type": err.get("type"),
-        "classification": err.get("classification"),
-        "message": err.get("message"),
-        "status_code": err.get("status_code"),
-        "url": err.get("url"),
-        "method": err.get("method"),
-        "stack_head": (err.get("stack") or "")[:1200],
-        "page_url": err.get("page_url"),
-        "hostname": err.get("hostname"),
-    }
+    compact = _compact_payload(err)
     user_prompt = f"Error:\n{json.dumps(compact, indent=2)}"
     result = await route(
         task_type="repair_diagnose",
@@ -81,6 +96,36 @@ async def diagnose_error(err: Dict[str, Any]) -> Dict[str, Any]:
     if start == -1 or end == -1:
         raise ValueError(f"LLM did not return JSON: {raw[:200]}")
     return json.loads(raw[start : end + 1])
+
+
+def _suggestion_from_triage(triage_out: Dict[str, Any], err: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a Claude-skipping suggestion when triage marks the error
+    TRIVIAL with high confidence. We still flag `safe_auto_apply=False`
+    so a human reviews before any code change."""
+    cat = triage_out.get("category") or "unknown_runtime"
+    severity_map = {
+        "auth_expired": "P3",
+        "network_transient": "P3",
+        "cdn_5xx": "P3",
+        "validation_error": "P2",
+        "npe_or_undefined": "P2",
+        "unknown_runtime": "P2",
+        "novel": "P1",
+    }
+    return {
+        "severity": severity_map.get(cat, "P2"),
+        "root_cause": triage_out.get("reason") or f"Pattern-classified: {cat}",
+        "suggested_fix": triage_out.get("quick_fix_hint")
+            or "Triage classifier matched a known pattern. Review before applying.",
+        "code_hint": "",
+        "affected_files": [],
+        "test_hint": "Reproduce via the captured URL and verify the error no longer recurs.",
+        "confidence": float(triage_out.get("confidence") or 0.6),
+        "requires_deploy": False,
+        "safe_auto_apply": False,
+        "_diagnose_path": "triage_short_circuit",
+        "_triage_category": cat,
+    }
 
 
 def build_suggestion_doc(
@@ -106,6 +151,8 @@ def build_suggestion_doc(
         "confidence": float(parsed.get("confidence") or 0),
         "requires_deploy": bool(parsed.get("requires_deploy")),
         "safe_auto_apply": bool(parsed.get("safe_auto_apply")),
+        "diagnose_path": parsed.get("_diagnose_path") or "claude_full",
+        "triage_category": parsed.get("_triage_category"),
         "error_snapshot": {
             "classification": err.get("classification"),
             "message": err.get("message"),
@@ -118,14 +165,23 @@ def build_suggestion_doc(
 async def diagnose_and_store(
     db, err: Dict[str, Any], *, source: str = "manual"
 ) -> Optional[Dict[str, Any]]:
-    """Full pipeline: dedup → Claude diagnose → persist suggestion → mark
-    client_error as analyzed. Returns the stored suggestion (without _id),
-    or the existing one if already pending. Returns None on failure.
+    """Full pipeline with triage + cache:
+       1. existing-pending-suggestion dedup (cheapest)
+       2. response-cache hit (cheap — bypasses both LLMs)
+       3. triage classify (cheap LLM)
+          • SKIP     → drop, no row
+          • TRIVIAL  → store low-conf suggestion from triage
+          • ESCALATE → fall through to Claude
+       4. Claude diagnose → store
+       5. mark sibling client_errors as ai_diagnosed (dedup downstream)
+    Returns the stored suggestion (without _id) or None on failure / SKIP.
     """
     if db is None:
         raise RuntimeError("db_unavailable")
 
     sig = err.get("signature")
+
+    # --- Layer 1: existing suggestion dedup ---
     if sig:
         existing = await db.repair_suggestions.find_one(
             {"source_signature": sig, "status": "pending"}, {"_id": 0}
@@ -133,7 +189,56 @@ async def diagnose_and_store(
         if existing:
             return existing
 
-    parsed = await diagnose_error(err)
+    # --- Layer 2: response-cache hit ---
+    cached = await cache_get(db, scope=_CACHE_SCOPE, signature=sig or "", prompt_seed=_PROMPT_SEED) if sig else None
+    parsed: Optional[Dict[str, Any]] = None
+    if cached:
+        parsed = dict(cached)
+        # Force-mark this run as a cache hit (override the original
+        # path label that was cached from the 1st execution).
+        parsed["_diagnose_path"] = "cache_hit"
+    else:
+        # --- Layer 3: triage ---
+        triage_out: Dict[str, Any] = {}
+        try:
+            triage_out = await triage(err)
+        except Exception as e:
+            logger.debug(f"[sentinel-diagnose] triage soft-fail → escalating: {e}")
+            triage_out = {"verdict": "ESCALATE", "confidence": 0.0}
+
+        verdict = triage_out.get("verdict") or "ESCALATE"
+        confidence = float(triage_out.get("confidence") or 0)
+
+        if verdict == "SKIP" and confidence >= 0.75:
+            # Drop noise. Mark error so we don't re-triage it forever.
+            try:
+                match = {"signature": sig} if sig else {"error_id": err.get("error_id")}
+                await db.client_errors.update_many(
+                    {**match, "status": {"$in": ["new", "council_rejected"]}},
+                    {"$set": {"status": "triage_skipped",
+                              "triage_reason": triage_out.get("reason", "")[:200]}},
+                )
+            except Exception:
+                pass
+            return None
+
+        if verdict == "TRIVIAL" and confidence >= 0.80:
+            parsed = _suggestion_from_triage(triage_out, err)
+        else:
+            # ESCALATE → full Claude
+            parsed = await diagnose_error(err)
+            parsed["_diagnose_path"] = "claude_full"
+
+        # Persist to cache (only successful, non-empty parses).
+        if sig and parsed and parsed.get("root_cause"):
+            await cache_put(
+                db,
+                scope=_CACHE_SCOPE,
+                signature=sig,
+                payload=parsed,
+                prompt_seed=_PROMPT_SEED,
+            )
+
     suggestion = build_suggestion_doc(err, parsed, source=source)
     await db.repair_suggestions.insert_one(dict(suggestion))
 
