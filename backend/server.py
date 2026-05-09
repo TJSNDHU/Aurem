@@ -1173,7 +1173,7 @@ async def startup_event():
                     pw_t0 = time.time()
                     pw_results = await asyncio.wait_for(_prewarm(), timeout=8.0)
                     n_ok = sum(1 for r in pw_results if not isinstance(r, Exception))
-                    logging.info(
+                    logging.warning(
                         f"[STARTUP] auth-pool prewarm done in {(time.time()-pw_t0)*1000:.0f}ms "
                         f"({n_ok}/{len(pw_results)} ok)"
                     )

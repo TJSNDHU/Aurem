@@ -334,7 +334,9 @@ async def login(credentials: UserLogin):
 
         _t["response_built"] = _time.monotonic()
         # iter 322x — single structured log line per successful login
-        logging.info(
+        # (WARNING level so it survives default root config; this is a
+        #  ops-critical signal, not a debug detail).
+        logging.warning(
             f"[AUTH][{_attempt_id}] OK email={credentials.email} "
             f"db_lookup_ms={int((_t['db_lookup_done']-_t['received'])*1000)} "
             f"jwt_ms={int((_t['jwt_issued']-_t['db_lookup_done'])*1000)} "

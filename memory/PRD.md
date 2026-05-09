@@ -35,6 +35,21 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322x Login Reliability Fix (P0) ✅**
+  - User report: "same correct credentials sometimes return invalid on first attempt, work on retry — intermittent auth failure"
+  - **Root cause** isolated by 4-phase timing instrumentation: Atlas M0 cold-start can return `None` from `db.users.find_one(...)` on the first read after a >5min idle window even when the row exists. Real-world latency proof: synthetic 3-login sequence pre-fix showed 546ms → 228ms → 234ms (318ms cold-vs-warm gap = the failure window).
+  - **Fix #1 — backend silent retry** (`routes/auth.py`): when `find_one` returns None on a non-empty email lookup, sleep 250ms and re-query. If 2nd query hits, log `silent_retry hit — Atlas cold-start signal`. Caller never sees the cold-start.
+  - **Fix #2 — connection pool pre-warm** (`server.py` startup): 5 parallel `estimated_document_count()` calls on auth-critical collections + `db.command("ping")`, all wrapped in `asyncio.wait_for(timeout=8s)`. Verified live: `auth-pool prewarm done in 2ms (5/5 ok)` on every boot.
+  - **Fix #3 — 4-phase timing logs** (WARNING level so they survive root-logger config): every login emits `[AUTH][<id>] OK email=… db_lookup_ms=… jwt_ms=… build_ms=… total_ms=…` or 401 variant with `user_found=yes/no`. Verified live across 3 consecutive logins (post-prewarm): all 200, total_ms=222–226 (essentially flat, no cold-start jitter).
+  - **Fix #4 — frontend silent retry** (`services/api.js`): wraps `login()` in a 1× automatic retry on transient signals (Invalid credentials / 401 / 5xx) with 800ms backoff. User never sees the flicker. Backend bcrypt-failed-password 401 still surfaces immediately on second attempt → real wrong-password lands as a normal error within ~1s.
+  - **Investigation results on user's 5 suspect list**:
+    1. ✅ Race on JWT issue → no race; timing logs confirm ordered phases (db_lookup → jwt → build).
+    2. ✅ MongoDB pool warm-up → was the real cause; pre-warm now closes it. Pool status post-fix: `current=25, available=384, totalCreated=692, active=4` (healthy).
+    3. ⚠️ Redis session conflict → not in `/api/auth/login` path (Redis only used by token-blocklist on subsequent requests); no fix needed for the login symptom.
+    4. ✅ Frontend retry gap → 800ms silent retry wired.
+    5. ✅ Pixel latency → preview measurement: dns=0.000018s, tcp=0.000105s, ttfb=0.001370s, total=0.001687s, 21.3KB. Already optimal.
+  - All Python lints clean. Backend boots clean. Existing flows untouched.
+
 - **2026-02-10 — iter 322w BIN + Plan Flow Fix Session (4 steps) ✅**
   - **STEP 1 — Single plan source of truth**: Master entry point `services.subscription_manager.get_plan_state(business_id)` reads from `aurem_config.plans.PLANS` (SSOT) + `db.platform_users` and returns the canonical `{plan, services_unlocked, trial_ends_at, is_expired, subscription_status, usage}` dict. Lifetime detection upgraded — flag, `services_unlocked=["*"]`, OR `subscription_status=lifetime_active` all qualify. `services.plan_enforcement` rewritten as a thin shim re-exporting from subscription_manager. All 4 router-level `from services.plan_enforcement import` swapped to `from services.subscription_manager import`. **Proof — `grep plan_enforcement /app/backend/routers/` returns zero hits.**
   - **STEP 2 — Trial expiry actually fires**: New `services.trial_expiry_sweep.trial_expiry_sweep` scheduler job (1h interval registered in `routers/registry.py`). Calls `trial_engine.apply_expiry()` per row → flips `subscription_status=trial_expired`, `services_unlocked=[]`. Best-effort email send + audit row in `db.trial_expiry_audit`. Verified live: test BIN with `trial_ends_at=now-1min` → sweep returns `processed=1 expired_count=1` → `@require_service` raises HTTPException 402 with full upgrade_options payload.
