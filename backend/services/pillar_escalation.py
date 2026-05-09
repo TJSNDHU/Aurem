@@ -37,17 +37,25 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
-# Per-tier last-fire timestamps (monotonic seconds)
-_LAST_FIRED: Dict[int, float] = {1: 0.0, 2: 0.0, 3: 0.0}
-_RATE_LIMIT_SECONDS = 60.0  # max one fire per tier per 60s
+# Per-(pillar, tier) last-fire timestamps (monotonic seconds). Was per-tier
+# only — that incorrectly blocked P2's T1 if P1 had just fired its T1.
+# iter 322 — keyed by (pillar, tier) so each pillar escalates independently.
+_LAST_FIRED: Dict[tuple, float] = {}
+_RATE_LIMIT_SECONDS = 60.0  # max one fire per (pillar, tier) per 60s
 
 
-def _can_fire(tier: int) -> bool:
+def _can_fire_for(tier: int, pillar_key: str) -> bool:
     now = time.monotonic()
-    if (now - _LAST_FIRED.get(tier, 0.0)) < _RATE_LIMIT_SECONDS:
+    key = (pillar_key, tier)
+    if (now - _LAST_FIRED.get(key, 0.0)) < _RATE_LIMIT_SECONDS:
         return False
-    _LAST_FIRED[tier] = now
+    _LAST_FIRED[key] = now
     return True
+
+
+# Backward-compat shim — older tests/imports referenced _can_fire(tier).
+def _can_fire(tier: int) -> bool:
+    return _can_fire_for(tier, "P1")
 
 
 async def _emit_a2a(event: str, payload: Dict[str, Any]) -> None:
@@ -89,30 +97,48 @@ async def _council_deliberate(action: str, payload: Dict[str, Any]) -> str:
 
 
 # ─── Tier 1 — Diagnose ──────────────────────────────────────────────────────
+# Per-pillar Claude prompt context — root-cause hint depends on pillar type.
+_PILLAR_DIAGNOSE_HINT = {
+    "P1": ("Pillar P1 (Infrastructure / MongoDB). Likely cause: Atlas M0 burst-credit "
+           "throttling, motor pool stale connection, or genuine network outage."),
+    "P2": ("Pillar P2 (Intelligence / LLM gateway). Likely cause: provider rate-limit "
+           "(OpenRouter/Groq/Anthropic/OpenAI), API key revoked, or breaker tripped "
+           "after sustained 5xx from upstream."),
+    "P3": ("Pillar P3 (Outreach / Email+SMS). Likely cause: Twilio A2P 10DLC "
+           "throttling, Resend domain not verified, breaker open after delivery "
+           "failures, or carrier-side block."),
+    "P4": ("Pillar P4 (Revenue / Stripe). Likely cause: Stripe API key invalid "
+           "(test vs live mismatch), webhook signature mismatch, or breaker open "
+           "after charge failures / disputes spike."),
+}
+
+
 async def tier1_diagnose(db, pillar_key: str = "P1") -> None:
     """Yellow → diagnose: emit A2A, council deliberate, prepare a fix
     suggestion via the shared sentinel_ai_diagnose service. Stores a row in
     repair_suggestions tagged source='pillar_escalation_t1'.
     """
-    if not _can_fire(1):
+    if not _can_fire_for(1, pillar_key):
         return
     payload = {"pillar": pillar_key, "tier": 1, "phase": "diagnose"}
     await _emit_a2a("PILLAR_DEGRADED_T1_DIAGNOSE", payload)
     verdict = await _council_deliberate(f"pillar_t1_diagnose:{pillar_key}", payload)
     if verdict != "APPROVED":
-        await _record_ora(db, 1, "council_rejected", {"verdict": verdict})
+        await _record_ora(db, 1, "council_rejected", {"verdict": verdict, "pillar": pillar_key})
         return
 
-    # Synthesize a pseudo-error doc so we can reuse sentinel_ai_diagnose
-    # without duplicating Claude prompt logic.
+    hint = _PILLAR_DIAGNOSE_HINT.get(
+        pillar_key, f"Pillar {pillar_key} reported transient health failure."
+    )
     pseudo = {
         "error_id": f"pillar_{pillar_key}_t1_{int(time.time())}",
         "signature": f"pillar_{pillar_key}_degraded",
         "type": "pillar_degraded",
-        "classification": "pillar_p1_latency" if pillar_key == "P1" else f"pillar_{pillar_key.lower()}_degraded",
-        "message": f"Pillar {pillar_key} reported a transient ping failure. "
-                   "Likely cause: Atlas M0 burst-credit throttling or motor pool stale connection. "
-                   "Need root-cause diagnosis + actionable fix recommendation.",
+        "classification": f"pillar_{pillar_key.lower()}_degraded",
+        "message": (
+            f"{hint} Need root-cause diagnosis + actionable fix recommendation. "
+            "Be specific about which subsystem to inspect."
+        ),
         "status_code": 0,
         "url": "/api/pillars/health",
         "method": "INTERNAL",
@@ -136,28 +162,29 @@ async def tier1_diagnose(db, pillar_key: str = "P1") -> None:
         logger.info(f"[pillar-escalation] T1 diagnose complete for {pillar_key}")
     except Exception as e:
         logger.warning(f"[pillar-escalation] T1 diagnose failed: {e}")
-        await _record_ora(db, 1, "diagnose_failed", {"error": str(e)[:160]})
+        await _record_ora(db, 1, "diagnose_failed", {"error": str(e)[:160], "pillar": pillar_key})
 
 
 # ─── Tier 2 — Auto-fix ──────────────────────────────────────────────────────
 async def tier2_autofix(db, pillar_key: str = "P1") -> None:
-    """Yellow → auto-fix: motor topology refresh + breaker reset + cache
-    invalidate + record fix attempt. This runs the SAFE built-in repair
-    sequence; non-mechanical fixes from T1 suggestions remain admin-gated.
+    """Yellow → auto-fix. Pillar-aware safe repair sequence:
+       P1 → motor topology refresh (forces Atlas reconnect)
+       P2/P3/P4 → reset OPEN/half-open breakers relevant to that pillar
+       ALL → invalidate pillars-health cache so next poll re-checks live
     """
-    if not _can_fire(2):
+    if not _can_fire_for(2, pillar_key):
         return
     payload = {"pillar": pillar_key, "tier": 2, "phase": "auto_fix"}
     await _emit_a2a("PILLAR_DEGRADED_T2_AUTOFIX", payload)
     verdict = await _council_deliberate(f"pillar_t2_autofix:{pillar_key}", payload)
     if verdict != "APPROVED":
-        await _record_ora(db, 2, "council_rejected", {"verdict": verdict})
+        await _record_ora(db, 2, "council_rejected", {"verdict": verdict, "pillar": pillar_key})
         return
 
     repaired = False
     actions: list = []
 
-    # 1) Motor topology refresh (forces reconnect to Atlas)
+    # P1-only: motor topology refresh (forces Atlas reconnect)
     if pillar_key == "P1" and db is not None:
         try:
             client = getattr(db, "client", None)
@@ -170,23 +197,34 @@ async def tier2_autofix(db, pillar_key: str = "P1") -> None:
             logger.warning(f"[pillar-escalation] T2 motor refresh failed: {e}")
             actions.append(f"mongo_refresh_failed:{type(e).__name__}")
 
-    # 2) Reset half-open breakers so traffic can probe upstream again
+    # P2/P3/P4: reset only the breakers relevant to this pillar.
+    # P1 ALSO benefits from this when Atlas issues tripped mongodb_breaker.
+    pillar_breaker_hints = {
+        "P1": ("mongo",),
+        "P2": ("openrouter", "groq", "anthropic", "openai"),
+        "P3": ("twilio", "resend"),
+        "P4": ("stripe",),
+    }
+    relevant = pillar_breaker_hints.get(pillar_key, ())
     try:
         from services.breakers import ALL_BREAKERS
         reset_count = 0
         for b in ALL_BREAKERS:
             try:
-                if getattr(b, "current_state", "") in ("open", "half_open"):
-                    b.close()
-                    reset_count += 1
+                if not relevant or any(r in b.name.lower() for r in relevant):
+                    if getattr(b, "current_state", "") in ("open", "half_open"):
+                        b.close()
+                        reset_count += 1
             except Exception:
                 pass
         if reset_count:
             actions.append(f"breakers_reset:{reset_count}")
+            if pillar_key != "P1":  # for non-P1, breaker reset = repair
+                repaired = True
     except Exception as e:
         logger.debug(f"[pillar-escalation] breaker reset skipped: {e}")
 
-    # 3) Invalidate the pillar-health cache so the next poll re-checks live
+    # Invalidate the pillar-health cache so the next poll re-checks live
     try:
         from routers.pillars_health_router import _cache as _ph_cache
         _ph_cache["ts"] = 0.0
@@ -195,7 +233,7 @@ async def tier2_autofix(db, pillar_key: str = "P1") -> None:
     except Exception:
         pass
 
-    # 4) Persist the fix attempt
+    # Persist the fix attempt
     if db is not None:
         try:
             await db.repair_requests.insert_one({
@@ -214,58 +252,60 @@ async def tier2_autofix(db, pillar_key: str = "P1") -> None:
         "pillar": pillar_key, "actions": actions, "repaired": repaired,
     })
     await _record_ora(db, 2, outcome, {"actions": actions, "pillar": pillar_key})
-    logger.info(f"[pillar-escalation] T2 autofix complete: {actions}")
+    logger.info(f"[pillar-escalation] T2 autofix complete for {pillar_key}: {actions}")
 
 
-# ─── Tier 3 — DR sync ───────────────────────────────────────────────────────
+# ─── Tier 3 — Outage protection ─────────────────────────────────────────────
 async def tier3_dr_sync(db, pillar_key: str = "P1") -> None:
-    """Red → data synchronize: trigger DR backup snapshot + record persistent_red
-    truth ledger entry + broadcast outage event. This protects data even if
-    Atlas primary keeps failing — the M0 mirror is fresh.
+    """Red → outage protection. Pillar-aware:
+       P1 → DR mirror snapshot (data is at risk)
+       P2/P3/P4 → record persistent_red + outage broadcast (data not at risk,
+                  but operators must be alerted to switch to fallback channels)
     """
-    if not _can_fire(3):
+    if not _can_fire_for(3, pillar_key):
         return
-    payload = {"pillar": pillar_key, "tier": 3, "phase": "dr_sync"}
-    await _emit_a2a("PILLAR_OUTAGE_T3_DR_SYNC", payload)
-    # T3 runs even on REJECTED — outage protection bypasses normal gating.
-    await _council_deliberate(f"pillar_t3_dr_sync:{pillar_key}", payload)
+    payload = {"pillar": pillar_key, "tier": 3, "phase": "outage_protection"}
+    await _emit_a2a("PILLAR_OUTAGE_T3", payload)
+    # Outage protection bypasses normal council gating.
+    await _council_deliberate(f"pillar_t3:{pillar_key}", payload)
 
-    # 1) Fire DR backup
-    backup_outcome = "skipped"
-    try:
-        from services.db_backup_service import run_backup_async
-        # Don't block on a 5-min backup — fire-and-forget with a timeout guard
-        async def _bg_backup():
-            try:
-                res = await run_backup_async(triggered_by="pillar_t3_outage")
-                logger.info(f"[pillar-escalation] T3 DR backup result: {res}")
-            except Exception as e:
-                logger.warning(f"[pillar-escalation] T3 DR backup failed: {e}")
-        asyncio.create_task(_bg_backup())
-        backup_outcome = "queued"
-    except Exception as e:
-        logger.warning(f"[pillar-escalation] T3 DR backup not available: {e}")
-        backup_outcome = f"unavailable:{type(e).__name__}"
+    backup_outcome = "skipped_non_p1"
+    if pillar_key == "P1":
+        try:
+            from services.db_backup_service import run_backup_async
 
-    # 2) Truth ledger persistent_red entry
+            async def _bg_backup():
+                try:
+                    res = await run_backup_async(triggered_by="pillar_t3_outage")
+                    logger.info(f"[pillar-escalation] T3 DR backup result: {res}")
+                except Exception as e:
+                    logger.warning(f"[pillar-escalation] T3 DR backup failed: {e}")
+
+            asyncio.create_task(_bg_backup())
+            backup_outcome = "queued"
+        except Exception as e:
+            logger.warning(f"[pillar-escalation] T3 DR backup not available: {e}")
+            backup_outcome = f"unavailable:{type(e).__name__}"
+
+    # Truth ledger persistent_red entry — applies to ALL pillars
     try:
         from services import truth_ledger
         await truth_ledger.record_persistent_red(
             actor="pillar_escalation_t3",
-            description=f"{pillar_key} declared OUTAGE after 3 consecutive failures — DR sync queued",
+            description=f"{pillar_key} declared OUTAGE after 3 consecutive failures",
             evidence={"pillar": pillar_key, "tier": 3, "backup_outcome": backup_outcome},
-            outcome="dr_sync_triggered",
+            outcome="outage_dispatched",
         )
     except Exception as e:
         logger.debug(f"[pillar-escalation] truth_ledger record skipped: {e}")
 
-    await _emit_a2a("PILLAR_T3_DR_DISPATCHED", {
+    await _emit_a2a("PILLAR_T3_OUTAGE_DISPATCHED", {
         "pillar": pillar_key, "backup_outcome": backup_outcome,
     })
-    await _record_ora(db, 3, "dr_sync_dispatched", {
+    await _record_ora(db, 3, "outage_dispatched", {
         "pillar": pillar_key, "backup_outcome": backup_outcome,
     })
-    logger.info(f"[pillar-escalation] T3 DR-sync dispatched for {pillar_key}")
+    logger.info(f"[pillar-escalation] T3 outage handler complete for {pillar_key}")
 
 
 # ─── Public dispatcher ──────────────────────────────────────────────────────

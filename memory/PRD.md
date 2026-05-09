@@ -26,6 +26,15 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-08 — Escalation framework extended to P2 / P3 / P4 (every pillar self-heals) ✅**
+  - Same 3-tier ladder (yellow→yellow→red) now applies to all 4 pillars, each with its own `_PN_CONSECUTIVE_FAILS` counter and `_PN_LAST_GREEN_TS` sticky window
+  - Per-pillar liveness signal: env-var presence AND no relevant circuit breaker is OPEN. Real flapping scenarios (Twilio A2P throttle, Stripe key invalid, OpenRouter rate-limit) now trigger autonomous recovery instead of manifesting as silent gaps.
+  - Pillar→breaker mapping: P1→mongo, P2→openrouter/groq/anthropic/openai, P3→twilio/resend, P4→stripe
+  - **T1 Diagnose** now uses pillar-specific Claude prompt hints: P2 = "provider rate-limit / API key revoked / breaker tripped", P3 = "Twilio A2P 10DLC throttling / Resend domain not verified / carrier block", P4 = "Stripe test-vs-live mismatch / webhook signature / charge failures spike"
+  - **T2 Auto-fix** is now pillar-aware: P1 = motor topology refresh (Atlas reconnect); P2/P3/P4 = reset only the breakers relevant to that pillar (e.g., P3 only resets twilio/resend, not openrouter); ALL pillars invalidate the pillars-health cache so next poll re-checks live
+  - **T3 Outage** is now pillar-aware: P1 = DR mirror snapshot (data is at risk); P2/P3/P4 = persistent_red truth-ledger entry + outage broadcast only (no DB backup, since data isn't at risk for non-infrastructure pillars)
+  - Rate-limit refactored from per-tier to per-(pillar, tier) dict — P2 escalation no longer blocks P1 escalation
+  - **E2E verified live**: triggered T2 + T3 for all 3 of P2/P3/P4 → 6 distinct escalation events recorded in ORA brain with correct per-pillar tagging; non-P1 T3 correctly reported `backup_outcome: skipped_non_p1` ✅
 - **2026-02-08 — Tiered autonomous pillar escalation (A2A → Council → ORA per fail cycle) ✅**
   - User explicitly demanded: each pillar fail cycle should auto-trigger the autonomous stack progressively
   - Created `services/pillar_escalation.py` with 3 tiers, fire-and-forget dispatch, 60s per-tier rate-limit:

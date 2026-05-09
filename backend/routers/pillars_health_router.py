@@ -210,32 +210,105 @@ async def _check_p1_infrastructure(db) -> str:
     return "yellow"
 
 
+# iter 322 — generic per-pillar consecutive-fail tracker for P2/P3/P4. Same
+# anti-flap ladder as P1: yellow→yellow→red, sticky-green window, escalation
+# dispatch on every increment. Liveness signal for P2/P3/P4 is "env present
+# AND no relevant breaker is OPEN" — purely env-var checks would never flap,
+# but breaker state DOES flap during real upstream throttling, which is the
+# scenario user wants the autonomous loop to handle.
+_PN_LAST_GREEN_TS: dict = {"P2": 0.0, "P3": 0.0, "P4": 0.0}
+_PN_CONSECUTIVE_FAILS: dict = {"P2": 0, "P3": 0, "P4": 0}
+_PN_GREEN_STICKY_SEC = 90.0
+_PN_FAIL_THRESHOLD_FOR_RED = 3
+
+
+def _pillar_breakers_open(pillar: str) -> list[str]:
+    """Return list of OPEN breaker names relevant to a pillar. Empty = healthy."""
+    try:
+        from services.breakers import breaker_status
+        statuses = breaker_status()
+    except Exception:
+        return []
+    rel = {
+        "P2": ("openrouter", "groq", "anthropic", "openai"),
+        "P3": ("twilio", "resend"),
+        "P4": ("stripe",),
+    }.get(pillar, ())
+    open_names: list[str] = []
+    for b_name, b_state in statuses.items():
+        if isinstance(b_state, dict) and b_state.get("state") == "open":
+            if any(r in b_name.lower() for r in rel):
+                open_names.append(b_name)
+    return open_names
+
+
+def _ladder_resolve(pillar: str, healthy: bool, db) -> str:
+    """Apply the yellow→yellow→red ladder + dispatch escalation."""
+    now_ts = time.time()
+    if healthy:
+        _PN_LAST_GREEN_TS[pillar] = now_ts
+        _PN_CONSECUTIVE_FAILS[pillar] = 0
+        return "green"
+    # Sticky-green: brief blip while we were recently healthy → degraded but live
+    if (now_ts - _PN_LAST_GREEN_TS.get(pillar, 0.0)) < _PN_GREEN_STICKY_SEC:
+        # Still record the fail cycle so we can escalate even from sticky window
+        _PN_CONSECUTIVE_FAILS[pillar] += 1
+    else:
+        _PN_CONSECUTIVE_FAILS[pillar] += 1
+
+    consec = _PN_CONSECUTIVE_FAILS[pillar]
+    try:
+        from services.pillar_escalation import schedule_escalation
+        schedule_escalation(db, pillar, consec)
+    except Exception as e:
+        logger.debug(f"[pillar-{pillar}] escalation dispatch skipped: {e}")
+
+    if consec >= _PN_FAIL_THRESHOLD_FOR_RED:
+        return "red"
+    return "yellow"
+
+
 async def _check_p2_intelligence(db) -> str:
-    """Has at least one LLM key configured."""
+    """Healthy when an LLM key is configured AND no provider breaker is OPEN."""
     has_key = bool(
         os.environ.get("EMERGENT_LLM_KEY")
         or os.environ.get("OPENAI_API_KEY")
         or os.environ.get("ANTHROPIC_API_KEY")
         or os.environ.get("GROQ_API_KEY")
     )
-    return "green" if has_key else "red"
+    open_breakers = _pillar_breakers_open("P2")
+    healthy = has_key and not open_breakers
+    return _ladder_resolve("P2", healthy, db)
 
 
 async def _check_p3_outreach(db) -> str:
-    """Has at least one outreach channel configured (Resend OR Twilio)."""
+    """Healthy when at least one outreach channel is configured AND its breaker
+    is not OPEN. Both channels throttled → degraded → escalates."""
     has_resend = bool(os.environ.get("RESEND_API_KEY"))
-    has_twilio = bool(os.environ.get("TWILIO_ACCOUNT_SID") and os.environ.get("TWILIO_AUTH_TOKEN"))
-    if has_resend and has_twilio:
-        return "green"
-    if has_resend or has_twilio:
-        return "yellow"
-    return "red"
+    has_twilio = bool(
+        os.environ.get("TWILIO_ACCOUNT_SID") and os.environ.get("TWILIO_AUTH_TOKEN")
+    )
+    if not (has_resend or has_twilio):
+        return _ladder_resolve("P3", False, db)
+    open_breakers = _pillar_breakers_open("P3")
+    # If BOTH channels are throttled (or the only available one is) → unhealthy
+    available_channels = sum([has_resend, has_twilio])
+    throttled_channels = sum(
+        1 for b in open_breakers
+        if any(c in b.lower() for c in ("twilio", "resend"))
+    )
+    healthy = throttled_channels < available_channels  # at least one path live
+    return _ladder_resolve("P3", healthy, db)
 
 
 async def _check_p4_revenue(db) -> str:
-    """Stripe key configured."""
-    has_stripe = bool(os.environ.get("STRIPE_API_KEY") or os.environ.get("STRIPE_SECRET_KEY"))
-    return "green" if has_stripe else "red"
+    """Healthy when Stripe key is configured AND its breaker is not OPEN."""
+    has_stripe = bool(
+        os.environ.get("STRIPE_API_KEY") or os.environ.get("STRIPE_SECRET_KEY")
+    )
+    open_breakers = _pillar_breakers_open("P4")
+    healthy = has_stripe and not open_breakers
+    return _ladder_resolve("P4", healthy, db)
 
 
 async def _gather_status(db) -> dict:
