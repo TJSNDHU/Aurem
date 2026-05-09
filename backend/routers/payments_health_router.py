@@ -71,23 +71,42 @@ async def _last_doc_ts(collection_name: str, ts_fields: list[str]) -> Optional[s
 
 
 async def _webhook_alias_reachable() -> tuple[bool, str]:
-    """Best-effort self-check: POST a synthetic event to /api/stripe/webhook
-    on the loopback, expect 200. The canonical handler accepts unsigned
-    events (logs a warning) so this works without a live Stripe signature.
+    """Best-effort self-check: POST a synthetic event to the canonical
+    Stripe webhook path. Tries the alias `/api/stripe/webhook` first, then
+    falls back to the canonical `/api/payments/webhook/stripe` so the
+    health gate stays accurate even if one path is mid-redeploy.
+
+    iter 322 — boot-grace aware: if the loopback returns 204 (the health
+    probe shim's first-90s short-circuit), retry once after a brief sleep.
     """
     import httpx
-    url = "http://localhost:8001/api/stripe/webhook"
-    try:
-        async with httpx.AsyncClient(timeout=2.5) as client:
-            r = await client.post(
-                url,
-                headers={"Content-Type": "application/json", "Stripe-Signature": "t=0,v1=ping"},
-                json={"id": "evt_pillars_map_health_ping", "type": "ping",
-                      "data": {"object": {}}},
-            )
-        return (r.status_code == 200, f"HTTP {r.status_code}")
-    except Exception as e:
-        return (False, f"unreachable: {str(e)[:60]}")
+    import asyncio
+    paths = ["/api/stripe/webhook", "/api/payments/webhook/stripe"]
+    last_err = ""
+    for path in paths:
+        url = f"http://localhost:8001{path}"
+        for attempt in range(2):  # 1 retry for boot-grace 204
+            try:
+                async with httpx.AsyncClient(timeout=3.0) as client:
+                    r = await client.post(
+                        url,
+                        headers={"Content-Type": "application/json",
+                                 "Stripe-Signature": "t=0,v1=ping"},
+                        json={"id": "evt_pillars_map_health_ping",
+                              "type": "ping", "data": {"object": {}}},
+                    )
+                if r.status_code == 200:
+                    return (True, f"HTTP 200 via {path}")
+                if r.status_code == 204 and attempt == 0:
+                    # Boot-grace shim — wait and retry once
+                    await asyncio.sleep(0.4)
+                    continue
+                last_err = f"{path} → HTTP {r.status_code}"
+                break  # try next path
+            except Exception as e:
+                last_err = f"{path} → {str(e)[:60]}"
+                break
+    return (False, f"webhook alias broken ({last_err})")
 
 
 @router.get("/health")
