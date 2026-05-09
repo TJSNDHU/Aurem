@@ -26,6 +26,29 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-09 — All P0/P1 backlog SHIPPED in one pass (Phase E + F + G + Layer Agents + Pixel Stack) ✅**
+  - **Phase E — BIN Data Isolation**:
+    - `services/db_indexes.py` — compound `(business_id, _id)` and `(business_id, time_field DESC)` on 22 BIN-scoped collections, idempotent at startup + admin endpoint `POST /api/admin/db-migrate/ensure-indexes`
+    - `services/backfill_business_id.py` — joins existing tenant_id/user_id/email→business_id from platform_users, rewrites missing fields. One-shot endpoint `POST /api/admin/db-migrate/backfill-business-id` (live test: backfilled 4, identified 1470 orphans for cleanup)
+  - **Phase F — Usage Display + Reset**:
+    - `routers/usage_router.py` `GET /api/billing/usage` — returns per-service usage with limit/pct color thresholds (live test: 11 metered services tracked accurately, crm_starter showed 3/50 = 6%)
+    - `services/usage_reset_scheduler.py` — daily 03:00 UTC snapshot job into `usage_snapshots` collection (period-keyed, audit-preserving). Wired in aurem_scheduler (39 jobs total)
+  - **Layer Agents (8 specialists + per-BIN ORA)**:
+    - `services/layer_agents/base.py` — `LAYERS` registry (L1 Identity, L2 Plan, L3 Billing, L4 Trial, L5 Gate, L6 Data, L7 Usage, L8 UX), `route_keyword_to_layer`, `record_layer_event`, `initialize_layer_agents` (subscribes to A2A topics)
+    - `routers/bin_ora_router.py` — `POST /api/bin/ora/ask` strict per-BIN Q&A (Claude grounded ONLY on this BIN's own data + anonymized best-practice trend), `GET /api/bin/ora/recent`. Verified: routes "upgrade my plan" → L2_plan, persists Q&A in BIN-scoped `bin_ora_qa`
+  - **PIXEL Stack agent fan-out**:
+    - `services/pixel_agents/__init__.py` — 3 agents: `visitor_intel` (page_view+scroll+click → lead_score in `visitor_intel`), `form_capture` (form_submit → `campaign_leads` upsert with full intent payload), `error_healer` (error events → `client_errors` for sentinel_repair_loop). Wired into existing `routers/pixel_patches_router.py` POST handler
+  - **Frontend Phase G**:
+    - `pages/MyBilling.jsx` — full `/my/billing`: current plan card, color-coded per-service usage bars (green→amber→red at 70/90%), 4-tier plan comparison with "Choose" CTAs that fire Stripe Checkout. Routed in App.js
+  - **E2E verified — 7/7 tests passed** (`/tmp/e2e_iter322_full.py`):
+    1) `/api/billing/usage` → 11 metered services with quota %s ✅
+    2) `/api/bin/ora/ask` → Claude routed L2_plan, returned grounded answer ✅
+    3) `/api/bin/ora/recent` → 1 prior Q&A ✅
+    4) `backfill-business-id` → 4 backfilled, 1470 orphans flagged ✅
+    5) `ensure-indexes` → 22 collections indexed ✅
+    6) Pixel fan-out → visitor_intel score=6, form_capture=campaign_lead, error_healer=client_error ✅
+    7) LayerAgent record + keyword routing ✅
+  - All 9 new files lint clean. Frontend `/my/billing` route visible (sign-in gated correctly).
 - **2026-02-09 — Hybrid pricing + service gating + admin ORA learning (full Phase A+D+B+C end-to-end) ✅**
   - User locked: counter-proposal A→D→B→C→E→F→G→Agents→Pixel build order. Hybrid pricing CAD: $97/$197/$447/$997. Trial bundle: crm_starter+email_campaigns+cwv_monitor+daily_intel.
   - **Foundation files**: `aurem_config/plans.py` (SSOT), `services/plan_resolver.py` (kills 3 fragmented plan systems), `middleware/bin_context.py` (decodes JWT once → request.state.bin_ctx), `utils/service_gate.py` (`@require_service` decorator: 402 lock / 429 quota / auto-log usage / anonymized admin telemetry), `utils/bin_repo.py` (BinScopedRepo wrapper)

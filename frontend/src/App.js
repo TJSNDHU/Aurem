@@ -31,6 +31,7 @@ import BoardroomPage from './platform/BoardroomPage';
 import AdminShell from './platform/AdminShell';
 import UpgradeModal from './components/UpgradeModal';
 import TrialBanner from './components/TrialBanner';
+import MyBilling from './pages/MyBilling';
 import AdminSSOT from './platform/AdminSSOT';
 import AdminConsole from './platform/AdminConsole';
 import AWBCockpit from './platform/AWBCockpit';
@@ -378,6 +379,7 @@ function AppRouter() {
 
       {/* Customer Portal — 8-item dedicated experience (isolated from /dashboard admin) */}
       <Route path="/my" element={<LuxeDashboardPreview />} />
+      <Route path="/my/billing" element={<MyBilling />} />
       <Route path="/my/*" element={<LuxeDashboardPreview />} />
       
       {/* Catch-all redirect */}

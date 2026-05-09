@@ -732,6 +732,44 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] gate_test_router not loaded: {e}")
 
+    # iter 322 — Per-BIN usage breakdown endpoint
+    if not _should_skip("routers.usage_router"):
+        try:
+            from routers.usage_router import router as usage_router, set_db as set_usage_db
+            app.include_router(usage_router)
+            if db is not None:
+                set_usage_db(db)
+            logger.info("[REGISTRY] usage_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] usage_router not loaded: {e}")
+
+    # iter 322 — Per-BIN ORA Q&A (customer-facing, strict isolation)
+    if not _should_skip("routers.bin_ora_router"):
+        try:
+            from routers.bin_ora_router import router as bin_ora_router, set_db as set_bin_ora_db
+            app.include_router(bin_ora_router)
+            if db is not None:
+                set_bin_ora_db(db)
+            logger.info("[REGISTRY] bin_ora_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] bin_ora_router not loaded: {e}")
+
+    # iter 322 — BIN compound indexes + layer agent A2A subscriptions
+    if db is not None:
+        try:
+            from services.db_indexes import ensure_bin_indexes
+            import asyncio as _aio
+            _aio.create_task(ensure_bin_indexes(db))
+            logger.info("[REGISTRY] BIN compound index ensure dispatched")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] BIN index ensure failed: {e}")
+        try:
+            from services.a2a_bus import bus as _a2a
+            from services.layer_agents.base import initialize_layer_agents
+            initialize_layer_agents(_a2a)
+        except Exception as e:
+            logger.warning(f"[REGISTRY] layer_agents init skipped: {e}")
+
     # Panic Takeover (separate from settings)
     if not _should_skip("routers.panic_takeover_router"):
         try:
@@ -2445,6 +2483,23 @@ def register_all_routers(app, db):
             logger.info("[REGISTRY] Trial reminder scheduler attached (hourly)")
         except Exception as tr_e:
             logger.warning(f"[REGISTRY] Trial reminder schedule failed: {tr_e}")
+
+        # iter 322 — Daily usage snapshot (3am UTC)
+        try:
+            from services.usage_reset_scheduler import usage_reset_tick
+            from apscheduler.triggers.cron import CronTrigger as _CT
+            aurem_scheduler.add_job(
+                usage_reset_tick,
+                _CT(hour=3, minute=0),
+                id="usage_reset_tick",
+                name="Daily Usage Snapshot",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] Usage snapshot scheduler attached (daily 03:00 UTC)")
+        except Exception as ur_e:
+            logger.warning(f"[REGISTRY] Usage snapshot schedule failed: {ur_e}")
 
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:

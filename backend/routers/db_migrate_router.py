@@ -355,3 +355,23 @@ async def _cascade_rename_bins(db) -> Dict[str, Any]:
                 except Exception:
                     pass
     return {"renamed_total": sum(summary.values()), "by_path": summary}
+
+
+# iter 322 — Phase E support endpoint: backfill business_id everywhere it
+# is missing (BIN-scoped collections only). Idempotent and safe to re-run.
+@router.post("/api/admin/db-migrate/backfill-business-id")
+async def backfill_bin_endpoint(request: Request):
+    await _require_founder(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    from services.backfill_business_id import backfill_business_id
+    return await backfill_business_id(_db)
+
+
+@router.post("/api/admin/db-migrate/ensure-indexes")
+async def ensure_indexes_endpoint(request: Request):
+    await _require_founder(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    from services.db_indexes import ensure_bin_indexes
+    return await ensure_bin_indexes(_db)

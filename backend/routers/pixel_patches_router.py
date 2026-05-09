@@ -308,6 +308,21 @@ async def ingest_pixel_event(body: PixelEvent):
     except Exception as e:
         logger.warning(f"[PixelIngest] buffer path failed: {e} — using direct insert fallback")
         await db.pixel_events.insert_one(doc)
+    # iter 322 — pixel agent fan-out (visitor_intel, form_capture, error_healer)
+    try:
+        # Set business_id on the event so agent collections stay BIN-scoped.
+        # tenant_id and business_id are aliases at this layer; pixel ingest
+        # historically uses tenant_id, but downstream BIN-scoped tables key
+        # off business_id.
+        agent_doc = dict(doc)
+        if owner.get("business_id"):
+            agent_doc["business_id"] = owner["business_id"]
+        elif tenant_id:
+            agent_doc["business_id"] = tenant_id
+        from services.pixel_agents import fan_out as _pixel_fan_out
+        await _pixel_fan_out(db, agent_doc)
+    except Exception as _agent_err:
+        logger.debug(f"[PixelIngest] agent fan-out skipped: {_agent_err}")
     # Update last seen on the workspace
     if tenant_id:
         await db.aurem_workspaces.update_one(
