@@ -43,11 +43,25 @@ DEFAULT = ("anthropic", "claude-sonnet-4-5-20250929")
 
 
 def _get_db():
+    """Resolve db handle. Prefer the running server's app-state handle;
+    fall back to a fresh AsyncIOMotorClient using env config so cost
+    logging works from background tasks, scripts, and tests too."""
     try:
         import server
-        return getattr(server, "db", None)
+        d = getattr(server, "db", None)
+        if d is not None:
+            return d
     except Exception:
-        return None
+        pass
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+        url = os.environ.get("MONGO_URL")
+        name = os.environ.get("DB_NAME")
+        if url and name:
+            return AsyncIOMotorClient(url)[name]
+    except Exception:
+        pass
+    return None
 
 
 async def _call_openrouter(

@@ -6,14 +6,15 @@ structured `repair_suggestion` row. Used by:
   • routers/sentinel_client_router.admin_analyze_error  (manual: admin click)
   • services/sentinel_repair_loop                       (autonomous: A2A → Council → ORA)
 
-The function does NOT modify code, NEVER deploys, only stores a
-suggestion in `db.repair_suggestions` for admin review.
+iter 322 STEP 1 — routes through `services.llm_gateway_v2.route` so EVERY
+call is cost-tracked in db.llm_costs (tokens + latency + provider). This
+is the ONLY path Claude is hit from Sentinel; manual + autonomous both
+flow through the same gateway, so spend visibility is now total.
 """
 from __future__ import annotations
 
 import json
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -44,18 +45,13 @@ _SYSTEM_PROMPT = (
 async def diagnose_error(err: Dict[str, Any]) -> Dict[str, Any]:
     """Call Claude with the compact error payload, return parsed JSON.
     Raises on LLM failure / unparseable response so caller can decide.
+
+    iter 322 — STEP 1 wired through `services.llm_gateway_v2.route`
+    (task_type='repair_diagnose'). All calls now logged to db.llm_costs
+    with token counts + latency, and the gateway will (in subsequent steps)
+    enforce per-BIN budget caps + free-LLM-first triage.
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-
-    key = os.environ.get("EMERGENT_LLM_KEY", "")
-    if not key:
-        raise RuntimeError("EMERGENT_LLM_KEY not configured")
-
-    chat = LlmChat(
-        api_key=key,
-        session_id=f"sentinel-{uuid.uuid4().hex[:8]}",
-        system_message=_SYSTEM_PROMPT,
-    ).with_model("anthropic", "claude-sonnet-4-5")
+    from services.llm_gateway_v2 import route
 
     compact = {
         "type": err.get("type"),
@@ -68,10 +64,19 @@ async def diagnose_error(err: Dict[str, Any]) -> Dict[str, Any]:
         "page_url": err.get("page_url"),
         "hostname": err.get("hostname"),
     }
-    reply = await chat.send_message(
-        UserMessage(text=f"Error:\n{json.dumps(compact, indent=2)}")
+    user_prompt = f"Error:\n{json.dumps(compact, indent=2)}"
+    result = await route(
+        task_type="repair_diagnose",
+        prompt=user_prompt,
+        system=_SYSTEM_PROMPT,
+        max_tokens=1500,
     )
-    raw = str(reply).strip()
+    if not result.get("ok") or not result.get("text"):
+        raise RuntimeError(
+            f"LLM gateway failed: {result.get('error') or 'no_text'} "
+            f"(provider={result.get('provider')} model={result.get('model')})"
+        )
+    raw = str(result["text"]).strip()
     start, end = raw.find("{"), raw.rfind("}")
     if start == -1 or end == -1:
         raise ValueError(f"LLM did not return JSON: {raw[:200]}")
