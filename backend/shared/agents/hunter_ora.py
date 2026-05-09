@@ -105,6 +105,12 @@ class HunterORA(AuremAgent):
         stats.setdefault("hunts_started", 0)
 
         from services.hunt_live import start_hunt
+        # Lazy heartbeat/log_action — mirror Closer's pattern.
+        try:
+            from services.agent_registry import heartbeat, log_action
+            await heartbeat("hunter_ora")
+        except Exception:
+            log_action = None
 
         for (territory, industry) in targets:
             # Remaining room under the cap for real outbound work.
@@ -121,6 +127,46 @@ class HunterORA(AuremAgent):
             if not self.can_send():
                 logger.info("[HunterORA] can_send() blocked — cap reached")
                 break
+
+            # ── Council gate (CASL required, advisory: qa) ─────────────
+            # Hunter discovers + queues outbound — CASL must approve the
+            # territory/industry combo before we burn discovery API calls
+            # AND before any subsequent blast goes out. REJECTED skips this
+            # target only; the cycle continues to the next.
+            council_payload = {
+                "territory": territory,
+                "industry": industry,
+                "count": count,
+                "daily_limit": daily_limit,
+                "country": next(
+                    (t["country"] for t in TERRITORY_DISTRIBUTION
+                     if t["territory"] == territory), "CA",
+                ),
+            }
+            try:
+                from services.council_deliberate import deliberate
+                verdict = await deliberate(
+                    "hunter_outbound_hunt", "hunter_ora", council_payload,
+                    required=["casl"], advisory=["qa"],
+                )
+            except Exception as e:
+                verdict = {"verdict": "APPROVED", "votes": {},
+                           "confidence": 0.5, "_council_error": str(e)}
+            if verdict.get("verdict") == "REJECTED":
+                stats["council_rejected"] = stats.get("council_rejected", 0) + 1
+                if log_action:
+                    await log_action(
+                        "hunter_ora", "REJECTED_BY_COUNCIL",
+                        f"{territory}/{industry}: {verdict.get('votes')}",
+                        success=False,
+                        metadata={"territory": territory, "industry": industry,
+                                  "votes": verdict.get("votes")},
+                    )
+                logger.info(
+                    f"[HunterORA] Council REJECTED {territory}/{industry} — "
+                    f"votes={verdict.get('votes')}"
+                )
+                continue
 
             self.mark_task(f"Hunting {territory} {industry} ({count})")
 

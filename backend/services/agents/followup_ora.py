@@ -60,6 +60,38 @@ async def arm(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not lead_id:
         return {"ok": False, "error": "lead_id missing"}
 
+    # ── Council gate (CASL required, advisory: qa) ─────────────────────
+    # Arming a follow-up chain commits us to multi-touch outbound. CASL
+    # must approve the lead's contact eligibility before we schedule any
+    # touches; QA advises on cadence quality.
+    try:
+        # Lightweight context — pull just the consent + dnc fields if available.
+        lead_ctx = await db.campaign_leads.find_one(
+            {"lead_id": lead_id},
+            {"_id": 0, "lead_id": 1, "consent": 1, "dnc": 1, "country": 1,
+             "channel": 1, "email": 1, "phone": 1},
+        ) or {"lead_id": lead_id}
+    except Exception:
+        lead_ctx = {"lead_id": lead_id}
+    try:
+        from services.council_deliberate import deliberate
+        verdict = await deliberate(
+            "followup_arm", "followup_ora", lead_ctx,
+            required=["casl"], advisory=["qa"],
+        )
+    except Exception as e:
+        verdict = {"verdict": "APPROVED", "votes": {},
+                   "confidence": 0.5, "_council_error": str(e)}
+    if verdict.get("verdict") == "REJECTED":
+        if log_action:
+            await log_action(
+                "followup", "REJECTED_BY_COUNCIL",
+                f"arm rejected: {verdict.get('votes')}",
+                lead_id=lead_id, success=False,
+                metadata={"votes": verdict.get("votes")},
+            )
+        return {"ok": False, "rejected": True, "verdict": verdict}
+
     armed_at = _utc_now()
     docs = [{
         "lead_id": lead_id,
@@ -119,24 +151,66 @@ async def tick() -> Dict[str, Any]:
     leads = {ld["lead_id"]: ld async for ld in leads_cur}
 
     emit_count = 0
+    rejected_count = 0
     update_ids: List[Any] = []
+    rejected_ids: List[Any] = []
     try:
         from services.a2a_bus import bus
     except Exception:
         bus = None
+    try:
+        from services.council_deliberate import deliberate as _deliberate
+    except Exception:
+        _deliberate = None
 
     for row in rows:
-        update_ids.append(row["_id"])
         lead = leads.get(row["lead_id"]) or {}
         # Skip if hot or DNC
         if lead.get("hot_lead_flag") or lead.get("dnc"):
+            update_ids.append(row["_id"])
             continue
         # Skip if chain already halted
         chain = lead.get("blast_chain") or {}
         if chain.get("halted_reason"):
+            update_ids.append(row["_id"])
             continue
         day = int(row.get("scheduled_day") or 0)
         event = f"NO_REPLY_DAY{day}"
+
+        # ── Council gate per emit (CASL required, advisory: qa) ────────
+        # Each NO_REPLY_DAY{N} signal triggers another outbound touch
+        # (blast, email, or call). CASL re-validates because consent /
+        # DNC state can change between Day-0 arm and Day-N touch.
+        if _deliberate is not None:
+            council_payload = {
+                "lead_id": row["lead_id"],
+                "scheduled_day": day,
+                "event": event,
+                "lead_status": lead.get("status"),
+                "consent": lead.get("consent"),
+                "dnc": lead.get("dnc"),
+            }
+            try:
+                verdict = await _deliberate(
+                    f"followup_emit_day{day}", "followup_ora", council_payload,
+                    required=["casl"], advisory=["qa"],
+                )
+            except Exception as e:
+                verdict = {"verdict": "APPROVED", "votes": {},
+                           "confidence": 0.5, "_council_error": str(e)}
+            if verdict.get("verdict") == "REJECTED":
+                rejected_ids.append(row["_id"])
+                rejected_count += 1
+                if log_action:
+                    await log_action(
+                        "followup", "REJECTED_BY_COUNCIL",
+                        f"day{day} emit rejected: {verdict.get('votes')}",
+                        lead_id=row["lead_id"], success=False,
+                        metadata={"day": day, "votes": verdict.get("votes")},
+                    )
+                continue
+
+        update_ids.append(row["_id"])
         if bus is not None:
             try:
                 await bus.emit("followup", event, {
@@ -153,11 +227,18 @@ async def tick() -> Dict[str, Any]:
             {"_id": {"$in": update_ids}},
             {"$set": {"status": "done", "checked_at": now}},
         )
+    if rejected_ids:
+        await db.scheduled_followups.update_many(
+            {"_id": {"$in": rejected_ids}},
+            {"$set": {"status": "council_rejected", "checked_at": now}},
+        )
 
-    if log_action and emit_count:
+    if log_action and (emit_count or rejected_count):
         await log_action("followup", "TICK",
-                         f"checked={len(rows)} emitted={emit_count}")
-    return {"ok": True, "checked": len(rows), "emitted": emit_count}
+                         f"checked={len(rows)} emitted={emit_count} "
+                         f"council_rejected={rejected_count}")
+    return {"ok": True, "checked": len(rows),
+            "emitted": emit_count, "council_rejected": rejected_count}
 
 
 # ─────────────────────────────────────────────────────────────────────

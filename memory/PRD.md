@@ -1,5 +1,14 @@
 # AUREM Platform — PRD
 
+> **HONESTY BANNER (2026-02-10)**: Earlier sections of this doc reference
+> `scout_ora` and `envoy_ora` as if they were running agents. They are NOT.
+> Those files do not exist in the codebase. The real outbound pipeline is
+> **Hunter → Followup → Closer** — all three Council-gated as of iter 322r.
+> "Scout" anywhere below should be read as the **discovery library**
+> (`services/total_scout.py`), never as an agent. Older `scout_ora`/`envoy_ora`
+> references in iter 322o/322p sections are historical lies left from a
+> previous fork's handoff and have been corrected in iter 322r notes.
+
 ## Original Problem Statement
 AUREM is an autonomous-intelligence AI orchestration platform targeting Canadian
 trades businesses. Goal: finalize the platform for first paying client. Core
@@ -26,6 +35,23 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322r Reality-Check + Council-gating closure (Hunter + Followup) ✅**
+  - User triggered an 8-point reality check on prod-mirrored data. Two findings forced this fix:
+    1. **Scout / Envoy as "OODA agents" never existed** — `scout_ora.py` and `envoy.py` are not in the codebase. Only `services/total_scout.py` (discovery library) and `routers/scout_sources_router.py` (admin endpoints) exist. Going forward, "Scout" in this repo refers ONLY to the **discovery library** — there is no Scout *agent*. "Envoy" is removed from all canonical docs.
+    2. **Outbound flow was 70% un-Council-gated** — only Closer (`services/agents/closer_ora.py`) imported `services.council_deliberate.deliberate`. Hunter and Followup did NOT. CASL voter never saw the territory/industry decisions or the per-day re-touch decisions. CASL violation risk on prod.
+  - **Fix — Hunter Council gate** (`shared/agents/hunter_ora.py` `run_cycle`):
+    - Per (territory, industry) target, calls `deliberate("hunter_outbound_hunt", "hunter_ora", payload, required=["casl"], advisory=["qa"])` BEFORE invoking `start_hunt`.
+    - REJECTED → skip target only, log `REJECTED_BY_COUNCIL`, increment `stats["council_rejected"]`, continue cycle.
+    - Live verified: 2 hunter_ora council rows inserted on test invocation, both `APPROVED confidence=1.0` (CASL APPROVE + QA APPROVE for Ontario auto shops + US Eastern dental).
+  - **Fix — Followup Council gate** (`services/agents/followup_ora.py`):
+    - `arm()`: gates BLAST_SENT scheduling. CASL re-validates lead consent + dnc + country before any 3-touch chain is scheduled. REJECTED → no scheduled_followups inserted.
+    - `tick()`: gates per NO_REPLY_DAY{N} emit. CASL re-runs because consent state can drift between Day-0 arm and Day-N touch. REJECTED rows marked `status=council_rejected` (vs. `done`) for audit trail; tick return now includes `council_rejected` count.
+    - Live verified: `arm()` on a fresh test lead produced 1 new row in `council_decisions_detailed` with `action=followup_arm requesting_agent=followup_ora verdict=APPROVED confidence=1.0`.
+  - **New endpoint — `GET /api/admin/diagnostics/db-counts`** (`routers/customer_diagnostic_router.py`):
+    - Founder JWT-gated. Returns raw counts for 13 collections + 24h rollups + per-collection error map. Live tested via public preview URL — returned 29,263 council_decisions, 4,279 ora_brain_thoughts, 16 llm_costs, 1,003 council_decisions_detailed, 1,201 campaign_leads. Replaces the previous "trust me bro" prod verification path.
+  - **Honesty correction** — earlier PRD entries used "Scout/Envoy/Closer OODA loop" language. That was inaccurate. The real outbound stack is **Hunter (discovery via `total_scout.py` library) → Followup (3-touch chain) → Closer (Retell call)**. All three are now Council-gated end-to-end.
+  - All lints clean. Backend boots clean. Live counts via diag endpoint visible from outside the pod.
+
 - **2026-02-10 — iter 322q ORA Token Optimization + Refusal-over-Hallucination ✅**
   - User priority directive: drastically reduce Claude token spend on Sentinel
     diagnose loop + lock Admin ORA against fabricating answers when grounding is thin.

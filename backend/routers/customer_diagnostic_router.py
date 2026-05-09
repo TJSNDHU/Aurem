@@ -221,3 +221,63 @@ async def customer_detail(business_id: str, request: Request) -> Dict[str, Any]:
         "tenant": tenant,
         "health": health,
     }
+
+
+
+# ─────────────────────────────────────────────────────────────
+# /db-counts — raw collection counts for ground-truth verification
+# ─────────────────────────────────────────────────────────────
+# Founder reality-check endpoint. Returns the live document count for
+# the canonical observability collections so we can prove from outside
+# the pod (curl https://aurem.live/...) that the autonomous stack is
+# actually running and accumulating data — not mocked/seeded.
+@router.get("/db-counts")
+async def get_db_counts(request: Request) -> Dict[str, Any]:
+    await _require_admin(request)
+    db = _get_db()
+    from datetime import datetime, timezone
+
+    collections = [
+        "council_decisions",
+        "council_decisions_detailed",
+        "ora_brain_thoughts",
+        "llm_costs",
+        "llm_response_cache",
+        "agent_actions",
+        "repair_suggestions",
+        "client_errors",
+        "ora_dev_actions",
+        "platform_users",
+        "campaign_leads",
+        "scheduled_followups",
+        "auto_call_log",
+    ]
+    counts: Dict[str, int] = {}
+    errors: Dict[str, str] = {}
+    for name in collections:
+        try:
+            counts[name] = await db[name].count_documents({})
+        except Exception as e:
+            errors[name] = f"{type(e).__name__}: {e}"
+    # 24h rollups for the most-active autonomous-stack tables.
+    cutoff_24h = (datetime.now(timezone.utc).timestamp() - 86400)
+    last24h: Dict[str, int] = {}
+    try:
+        last24h["council_decisions"] = await db.council_decisions.count_documents(
+            {"ts": {"$gte": datetime.fromtimestamp(cutoff_24h, tz=timezone.utc)}}
+        )
+    except Exception:
+        last24h["council_decisions"] = -1
+    try:
+        last24h["llm_costs"] = await db.llm_costs.count_documents(
+            {"ts": {"$gte": datetime.fromtimestamp(cutoff_24h, tz=timezone.utc)}}
+        )
+    except Exception:
+        last24h["llm_costs"] = -1
+    return {
+        "ok": True,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "counts": counts,
+        "last_24h": last24h,
+        "errors": errors,
+    }
