@@ -1045,6 +1045,16 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] scout_sources_router skipped: {e}")
 
+    # Customer Scout Run (gated /api/scout/run — dogfood + dashboard entry point)
+    if not _should_skip("routers.scout_run_router"):
+        try:
+            from routers.scout_run_router import router as scout_run_router
+            app.include_router(scout_run_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] scout_run_router skipped: {e}")
+
+
     # Blast-Chain (Section 7 — staggered 4-touch chains + reply webhook)
     if not _should_skip("routers.blast_chain_router"):
         try:

@@ -88,7 +88,7 @@ def verify_password_hash(password: str, stored_hash: str) -> bool:
         return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
     return hashlib.sha256(password.encode()).hexdigest() == stored_hash
 
-def create_token(email: str, role: str = "user") -> str:
+def create_token(email: str, role: str = "user", *, extra: dict | None = None) -> str:
     import uuid as _uuid
     payload = {
         "email": email,
@@ -97,6 +97,13 @@ def create_token(email: str, role: str = "user") -> str:
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRY_HOURS),
         "iat": datetime.utcnow()
     }
+    if extra:
+        # Allow callers to embed BIN context (business_id / plan /
+        # services_unlocked) so BinContextMiddleware + service_gate can
+        # gate routes without a per-request DB round-trip.
+        for k in ("business_id", "plan", "services_unlocked", "user_id", "is_admin"):
+            if k in extra and extra[k] is not None:
+                payload[k] = extra[k]
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def verify_token(token: str) -> dict:
@@ -213,7 +220,16 @@ async def login(request: LoginRequest):
                         {"$set": {"password_hash": new_hash}}
                     )
                     logger.info(f"[PLATFORM AUTH] Migrated {email} password to bcrypt")
-                token = create_token(email, user_role)
+                token = create_token(
+                    email, user_role,
+                    extra={
+                        "business_id": user.get("business_id") or "",
+                        "plan": user.get("plan") or "trial",
+                        "services_unlocked": user.get("services_unlocked") or [],
+                        "user_id": user.get("user_id") or user.get("id") or "",
+                        "is_admin": False,
+                    },
+                )
                 return TokenResponse(
                     token=token,
                     email=email,

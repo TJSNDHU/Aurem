@@ -27,7 +27,7 @@ DEFAULT_FOUNDERS = [
     # iter 322 — final BIN names. Old AURE-FNDR-001/AURE-FNDR-002 are
     # cascade-renamed by the db_migrate iter322-cleanup endpoint.
     {"email": "teji.ss1986@gmail.com", "password": "ul4Fb*u^l^Nuazh@B%Q8", "business_id": "AURE-ADMIN", "full_name": "AUREM Admin"},
-    {"email": "teji.ss1986+dogfood@gmail.com", "password": "o2VmqItgD3STdLlHWX^u", "business_id": "AURE-SUPER", "full_name": "AUREM Founder", "domain": "aurem.live", "dogfood": True},
+    {"email": "teji.ss1986+dogfood@gmail.com", "password": "AuremFounder2026!", "business_id": "AUR-FNDR-001", "full_name": "AUREM Founder (Dogfood)", "domain": "aurem.live", "dogfood": True},
 ]
 
 # iter 322 — Founder Lifetime Free perks: bypass billing, unlock every
@@ -125,6 +125,15 @@ async def ensure_founders(db) -> dict:
         }
         if fdr.get("dogfood"):
             update_set["dogfood"] = True
+            # iter 322ai — Dogfood = real Enterprise customer. No admin shortcuts.
+            # Force role=user + plan=lifetime_free here so platform_auth login
+            # passes (admin-collision guard rejects admin role on /api/platform/auth).
+            update_set["role"] = "user"
+            update_set["plan"] = "lifetime_free"
+            update_set["is_dogfood"] = True
+            update_set["is_founder"] = True
+            update_set["is_locked"] = False
+            update_set["failed_attempts"] = 0
         if fdr.get("business_id"):
             update_set["business_id"] = fdr["business_id"]
         if fdr.get("domain"):
@@ -173,7 +182,14 @@ async def ensure_founders(db) -> dict:
         )
 
         # Also keep `aurem_users` (legacy customer-login fallback) in sync.
-        aurem_set = {"email": email, "role": "super_admin", "is_admin": True}
+        aurem_set = {
+            "email": email,
+            "role": "user" if is_dogfood else "super_admin",
+            "is_admin": False if is_dogfood else True,
+        }
+        if is_dogfood:
+            aurem_set["plan"] = "lifetime_free"
+            aurem_set["services_unlocked"] = ["*"]
         if new_hash:
             aurem_set["password_hash"] = new_hash
         await db.aurem_users.update_one(
