@@ -564,6 +564,9 @@ function DetailPane({ data, busy, onClose, onRunNow, onRepair, onManualFix }) {
         </div>
       </div>
 
+      {/* iter 322an — Enhanced BIN Detail (5 sections + actions) */}
+      <BinDetailSection businessId={data.business_id} />
+
       {/* ─── Repair history ─── */}
       <div style={{ padding: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#7A7468',
@@ -603,6 +606,292 @@ function DetailPane({ data, busy, onClose, onRunNow, onRepair, onManualFix }) {
     </div>
   );
 }
+
+
+
+// ═══════════════════════════════════════════════════════════════════
+// iter 322an — Enhanced BIN Detail Section
+// 5 sections + 4 action buttons (Force Unlock, Reset Password, Save Edit,
+// Run Promote Now). Lives below the diagnostic checks, above Repair History.
+// ═══════════════════════════════════════════════════════════════════
+function BinDetailSection({ businessId }) {
+  const [detail, setDetail] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState({ plan: '', status: '', trial_ends_at: '', notes: '' });
+  const [msg, setMsg] = useState(null);
+  const [newPw, setNewPw] = useState(null);
+
+  const load = useCallback(async () => {
+    if (!businessId) return;
+    try {
+      const r = await authedFetch(`/api/admin/customer-health/bin-detail/${businessId}`);
+      const d = await r.json();
+      if (r.ok) {
+        setDetail(d);
+        setEdit({
+          plan: d.account?.plan || '',
+          status: d.account?.status || '',
+          trial_ends_at: d.account?.trial_ends_at?.slice(0, 10) || '',
+          notes: d.account?.notes || '',
+        });
+      }
+    } catch { /* ignore */ }
+  }, [businessId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const callAction = async (label, fn) => {
+    setBusy(true); setMsg(null); setNewPw(null);
+    try {
+      const r = await fn();
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+      setMsg({ kind: 'ok', text: `${label} ✓` });
+      if (d.new_password) setNewPw(d.new_password);
+      await load();
+    } catch (e) {
+      setMsg({ kind: 'err', text: `${label} failed: ${e.message}` });
+    }
+    setBusy(false);
+  };
+
+  const copy = (txt) => {
+    navigator.clipboard?.writeText(txt);
+    setMsg({ kind: 'ok', text: `Copied: ${txt.slice(0, 40)}` });
+    setTimeout(() => setMsg(null), 2000);
+  };
+
+  if (!detail) {
+    return (
+      <div style={{ padding: 18, borderBottom: '1px solid #ECE9E2', color: '#7A7468', fontSize: 13 }}>
+        Loading BIN detail…
+      </div>
+    );
+  }
+
+  const acct = detail.account || {};
+  const px = detail.pixel || {};
+  const acc = detail.access || {};
+  const svc = detail.services || {};
+  const fmtT = (iso) => iso ? new Date(iso).toLocaleString() : '—';
+
+  return (
+    <div data-testid="bin-detail-section" style={{ borderBottom: '1px solid #ECE9E2' }}>
+      {/* SECTION 1 — BIN Info */}
+      <div style={{ padding: 18, borderBottom: '1px solid #ECE9E2' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#7A7468', letterSpacing: '0.1em', marginBottom: 10 }}>
+          SECTION 1 · BIN INFO
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: 13 }}>
+          <span style={{ color: '#7A7468' }}>Business ID</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+            {detail.bin_id}
+            <button data-testid="bin-detail-copy-bin"
+              onClick={() => copy(detail.bin_id)}
+              style={pillBtn()}>Copy</button>
+          </span>
+          <span style={{ color: '#7A7468' }}>Email</span>
+          <span style={{ fontFamily: 'monospace' }}>{acct.email || '—'}</span>
+          <span style={{ color: '#7A7468' }}>Plan</span>
+          <span style={{ fontWeight: 600, color: '#0F1115' }}>
+            {(acct.plan || '').toUpperCase()}
+          </span>
+          <span style={{ color: '#7A7468' }}>Status</span>
+          <span style={{
+            color: acct.status === 'active' ? '#2A7A55' :
+                   acct.status === 'locked' ? '#7A2E2A' : '#7A7468',
+            fontWeight: 600, textTransform: 'uppercase', fontSize: 12,
+          }}>{acct.status || '—'}</span>
+          <span style={{ color: '#7A7468' }}>Lock Status</span>
+          <span data-testid="bin-detail-lock-status" style={{ fontWeight: 600 }}>
+            {acct.is_locked ? '🔴 LOCKED' : '🟢 UNLOCKED'}
+          </span>
+          <span style={{ color: '#7A7468' }}>Failed attempts</span>
+          <span>{acct.failed_attempts}</span>
+          <span style={{ color: '#7A7468' }}>Last login</span>
+          <span>{fmtT(acct.last_login)}</span>
+        </div>
+      </div>
+
+      {/* SECTION 2 — Pixel Status */}
+      <div style={{ padding: 18, borderBottom: '1px solid #ECE9E2' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#7A7468', letterSpacing: '0.1em', marginBottom: 10 }}>
+          SECTION 2 · PIXEL STATUS
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: 13 }}>
+          <span style={{ color: '#7A7468' }}>Pixel Installed</span>
+          <span data-testid="bin-detail-pixel-installed" style={{ fontWeight: 600 }}>
+            {px.installed ? '🟢 YES' : '🔴 NO'}
+            {px.auto_installed && <span style={{ marginLeft: 8, color: '#7A7468', fontSize: 11 }}>(auto)</span>}
+          </span>
+          <span style={{ color: '#7A7468' }}>Pixel Verified</span>
+          <span style={{ fontWeight: 600 }}>{px.verified ? '🟢 YES' : '🔴 NO'}</span>
+          <span style={{ color: '#7A7468' }}>Last event</span>
+          <span>{fmtT(px.last_event_at)}</span>
+          <span style={{ color: '#7A7468' }}>Events (24h)</span>
+          <span data-testid="bin-detail-pixel-events-24h" style={{ fontFamily: 'monospace' }}>{px.events_24h}</span>
+        </div>
+        {!px.installed && (
+          <button
+            data-testid="bin-detail-copy-pixel-code"
+            onClick={() => copy(`<script src="${API}/api/pixel/aurem-pixel.js" data-aurem-bin="${detail.bin_id}"></script>`)}
+            style={{ ...pillBtn(), marginTop: 10, padding: '6px 12px' }}>
+            Copy Pixel Code
+          </button>
+        )}
+      </div>
+
+      {/* SECTION 3 — Platform Access */}
+      <div style={{ padding: 18, borderBottom: '1px solid #ECE9E2' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#7A7468', letterSpacing: '0.1em', marginBottom: 10 }}>
+          SECTION 3 · PLATFORM ACCESS
+        </div>
+        <div data-testid="bin-detail-access-state" style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+          Can login to customer portal: {acc.can_login ? '🟢 YES' : '🔴 NO'}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, fontSize: 12, marginBottom: 10 }}>
+          {Object.entries(acc.checks || {}).map(([k, ok]) => (
+            <div key={k} style={{
+              padding: '6px 10px', background: '#FAF9F6', borderRadius: 6,
+              border: `1px solid ${ok ? '#D6EFE3' : '#F4D2CE'}`,
+              color: ok ? '#2A7A55' : '#7A2E2A',
+            }}>
+              {ok ? '✓' : '✗'} {k}
+            </div>
+          ))}
+        </div>
+        {(acc.blockers || []).length > 0 && (
+          <div style={{
+            padding: 10, background: '#FDEEEC', borderRadius: 6,
+            border: '1px solid #F4D2CE', color: '#7A2E2A', fontSize: 12, marginBottom: 10,
+          }}>
+            <strong>Blocked:</strong> {acc.blockers.join('; ')}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            data-testid="bin-detail-force-unlock"
+            onClick={() => callAction('Force Unlock',
+              () => authedFetch(`/api/admin/customer-health/force-unlock/${detail.bin_id}`, { method: 'POST' }))}
+            disabled={busy}
+            style={{ ...btnPrimary(busy), background: '#0F1115', color: '#F0A030', borderColor: '#0F1115' }}>
+            Force Unlock
+          </button>
+          <button
+            data-testid="bin-detail-reset-pw"
+            onClick={() => {
+              if (!window.confirm('Reset password? A new password will be shown ONCE.')) return;
+              callAction('Reset Password',
+                () => authedFetch(`/api/admin/customer-health/reset-password/${detail.bin_id}`, { method: 'POST' }));
+            }}
+            disabled={busy} style={btnSecondary(busy)}>
+            Reset Password
+          </button>
+          <button
+            data-testid="bin-detail-promote-now"
+            onClick={() => callAction('Run Promote Now',
+              () => authedFetch(`/api/admin/promote-now/${detail.bin_id}`, { method: 'POST' }))}
+            disabled={busy}
+            style={{ ...btnSecondary(busy), background: '#F0A030', color: '#0F1115', borderColor: '#F0A030' }}>
+            Run Promote Now
+          </button>
+        </div>
+        {newPw && (
+          <div data-testid="bin-detail-new-pw" style={{
+            marginTop: 10, padding: 10, background: '#FFFAEC',
+            border: '1px solid #F0A030', borderRadius: 6, fontFamily: 'monospace',
+            fontSize: 13, display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            🔑 New password: <strong>{newPw}</strong>
+            <button style={pillBtn()} onClick={() => copy(newPw)}>Copy</button>
+          </div>
+        )}
+        {msg && (
+          <div style={{
+            marginTop: 8, padding: '6px 10px', borderRadius: 6, fontSize: 12,
+            background: msg.kind === 'ok' ? '#E8F6EE' : '#FDEEEC',
+            color: msg.kind === 'ok' ? '#2A7A55' : '#7A2E2A',
+          }}>{msg.text}</div>
+        )}
+      </div>
+
+      {/* SECTION 4 — Quick Edit */}
+      <div style={{ padding: 18, borderBottom: '1px solid #ECE9E2' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#7A7468', letterSpacing: '0.1em', marginBottom: 10 }}>
+          SECTION 4 · QUICK EDIT
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 12px', fontSize: 13 }}>
+          <label style={{ color: '#7A7468', alignSelf: 'center' }}>Plan</label>
+          <select data-testid="bin-detail-edit-plan"
+            value={edit.plan} onChange={(e) => setEdit({ ...edit, plan: e.target.value })}
+            style={inputStyle()}>
+            {['starter', 'growth', 'enterprise', 'lifetime_free', 'trial'].map(p =>
+              <option key={p} value={p}>{p}</option>)}
+          </select>
+          <label style={{ color: '#7A7468', alignSelf: 'center' }}>Status</label>
+          <select data-testid="bin-detail-edit-status"
+            value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}
+            style={inputStyle()}>
+            {['active', 'locked', 'suspended', 'cancelled'].map(s =>
+              <option key={s} value={s}>{s}</option>)}
+          </select>
+          <label style={{ color: '#7A7468', alignSelf: 'center' }}>Trial ends</label>
+          <input data-testid="bin-detail-edit-trial" type="date"
+            value={edit.trial_ends_at} onChange={(e) => setEdit({ ...edit, trial_ends_at: e.target.value })}
+            style={inputStyle()} />
+          <label style={{ color: '#7A7468', alignSelf: 'flex-start', paddingTop: 8 }}>Notes</label>
+          <textarea data-testid="bin-detail-edit-notes"
+            value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
+            rows={2} style={{ ...inputStyle(), resize: 'vertical' }} />
+        </div>
+        <button
+          data-testid="bin-detail-save"
+          onClick={() => callAction('Save Changes',
+            () => authedFetch(`/api/admin/customer-health/update/${detail.bin_id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                plan: edit.plan, status: edit.status,
+                trial_ends_at: edit.trial_ends_at || null,
+                notes: edit.notes,
+              }),
+            }))}
+          disabled={busy} style={{ ...btnPrimary(busy), marginTop: 12 }}>
+          Save Changes
+        </button>
+      </div>
+
+      {/* SECTION 5 — Services */}
+      <div style={{ padding: 18, borderBottom: '1px solid #ECE9E2' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#7A7468', letterSpacing: '0.1em', marginBottom: 10 }}>
+          SECTION 5 · SERVICES
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: 13 }}>
+          <span style={{ color: '#7A7468' }}>services_unlocked</span>
+          <span data-testid="bin-detail-services-unlocked" style={{ fontFamily: 'monospace' }}>
+            {(svc.services_unlocked || []).includes('*')
+              ? '["*"] · ALL ✅'
+              : `${(svc.services_unlocked || []).length} specific service${(svc.services_unlocked || []).length === 1 ? '' : 's'}`}
+          </span>
+          <span style={{ color: '#7A7468' }}>Active subscriptions</span>
+          <span style={{ fontWeight: 600 }}>{svc.active_subscriptions}</span>
+          <span style={{ color: '#7A7468' }}>Last service used</span>
+          <span>{svc.last_service_used || '—'} · {fmtT(svc.last_service_used_at)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const pillBtn = () => ({
+  marginLeft: 8, padding: '2px 8px', fontSize: 11,
+  background: 'transparent', border: '1px solid #E5E2DD',
+  borderRadius: 999, cursor: 'pointer', color: '#0F1115',
+});
+
+const inputStyle = () => ({
+  padding: '8px 10px', border: '1px solid #E5E2DD',
+  borderRadius: 6, fontSize: 13, background: '#FAF9F6', outline: 'none',
+});
 
 
 // ─── styling helpers ──────────────────────────────────────────

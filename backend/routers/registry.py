@@ -1100,6 +1100,21 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] customer_intelligence_router skipped: {e}")
 
 
+    # Admin BIN Detail (right-panel enhanced view + manual promote)
+    if not _should_skip("routers.admin_bin_detail_router"):
+        try:
+            from routers.admin_bin_detail_router import (
+                router as admin_bin_detail_router,
+                set_db as set_admin_bin_detail_db,
+            )
+            app.include_router(admin_bin_detail_router)
+            if db is not None:
+                set_admin_bin_detail_db(db)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] admin_bin_detail_router skipped: {e}")
+
+
     # Blast-Chain (Section 7 — staggered 4-touch chains + reply webhook)
     if not _should_skip("routers.blast_chain_router"):
         try:
