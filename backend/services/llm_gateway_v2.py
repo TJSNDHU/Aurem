@@ -4,10 +4,13 @@ AUREM LLM Gateway — Phase 0 (Sovereign Routing)
 Single entrypoint for every LLM call in the platform.
 
 Routes by **task_type** to the cheapest model that can do the job:
-  • Free OpenRouter models for routine work (scout/council/blast)
-  • Claude Sonnet (via Emergent) for complex reasoning (repair/brain)
+  • Groq (free, sub-300ms) — preferred for chat/triage/review/service-copy
+  • Free OpenRouter models — fallback when Groq is rate-limited or key absent
+  • Claude Sonnet (via Emergent) — paid last-resort for complex reasoning
 
 Every call is **persisted** in `db.llm_costs` (no try/except swallow).
+Each task_type may declare a **fallback chain** (list of (provider, model)
+tuples). The chain is walked top-to-bottom until one succeeds.
 
 Public:
   await llm_gateway.route(task_type, prompt, system=None, max_tokens=1500)
@@ -18,32 +21,77 @@ import os
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
-# ─── Routing table — task_type → (provider, model_id) ────────────────
-ROUTING_TABLE: Dict[str, tuple] = {
-    # FREE — OpenRouter (zero cost)
-    "scout_filter":     ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
-    "lead_qualify":     ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
-    "blast_compose":    ("openrouter", "zai-org/glm-5.1"),
-    "council_vote":     ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
-    "content_qa":       ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
-    "sentiment":        ("openrouter", "google/gemma-4-26b-it:free"),
-    "heartbeat_check":  ("openrouter", "minimax/minimax-m2.5:free"),
-    "pattern_match":    ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
-    # Cheap pre-Claude triage. Tried Qwen but qwen/qwen3-next-80b:free and
-    # llama-3.3-70b:free are throttled at provider level on burst; gpt-oss-20b
-    # has higher availability and produces clean JSON for our 200-token budget.
-    "triage_classify":  ("openrouter", "openai/gpt-oss-20b:free"),
-    # PAID — Claude Sonnet via Emergent (complex only)
-    "repair_diagnose":  ("anthropic",  "claude-sonnet-4-5-20250929"),
-    "ora_brain":        ("anthropic",  "claude-sonnet-4-5-20250929"),
-    "code_fix":         ("anthropic",  "claude-sonnet-4-5-20250929"),
-    "learning_digest":  ("anthropic",  "claude-sonnet-4-5-20250929"),
+# ─── Routing table — task_type → CHAIN of (provider, model) ─────────
+# A "chain" is just a list of attempts. The first that returns a
+# non-empty text wins. A single tuple value is also accepted for
+# backwards compatibility and treated as a one-entry chain.
+#
+# Convention:
+#   - Groq llama-3.1-8b  → fast triage / short JSON / quick classifications
+#   - Groq llama-3.3-70b → chat / review writing / service copy / Q&A
+#   - OpenRouter free    → fallback when Groq missing/429ed
+#   - Emergent Claude    → last resort for reasoning-heavy tasks only
+Chain = Union[Tuple[str, str], List[Tuple[str, str]]]
+
+ROUTING_TABLE: Dict[str, Chain] = {
+    # ─── FAST CHAT / TRIAGE ─────────────────────────────────────────
+    # iter 322ag — Groq-first for sub-300ms latency. OpenRouter
+    # gpt-oss-20b kept as fallback (existing field-tested behaviour).
+    "triage_classify": [
+        ("groq",       "llama-3.1-8b-instant"),
+        ("openrouter", "openai/gpt-oss-20b:free"),
+        ("openrouter", "google/gemma-4-26b-it:free"),
+    ],
+    "triage": [
+        ("groq",       "llama-3.1-8b-instant"),
+        ("openrouter", "openai/gpt-oss-20b:free"),
+    ],
+    "ora_chat": [
+        ("groq",       "llama-3.3-70b-versatile"),
+        ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+        ("openrouter", "openai/gpt-oss-20b:free"),
+    ],
+
+    # ─── CONTENT GENERATION ─────────────────────────────────────────
+    # iter 322ag — Groq llama-3.3-70b is the fastest decent-quality
+    # path for review/service copy (used by website_enrich since 322ad).
+    "content_qa": [
+        ("groq",       "llama-3.3-70b-versatile"),
+        ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+        ("openrouter", "openai/gpt-oss-20b:free"),
+        ("openrouter", "google/gemma-4-26b-it:free"),
+    ],
+    "review_generate": [
+        ("groq",       "llama-3.3-70b-versatile"),
+        ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+        ("openrouter", "openai/gpt-oss-20b:free"),
+    ],
+    "service_describe": [
+        ("groq",       "llama-3.1-8b-instant"),
+        ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+        ("openrouter", "openai/gpt-oss-20b:free"),
+    ],
+
+    # ─── EXISTING ROUTES (kept on OpenRouter free tier) ────────────
+    "scout_filter":    ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+    "lead_qualify":    ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+    "blast_compose":   ("openrouter", "zai-org/glm-5.1"),
+    "council_vote":    ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+    "sentiment":       ("openrouter", "google/gemma-4-26b-it:free"),
+    "heartbeat_check": ("openrouter", "minimax/minimax-m2.5:free"),
+    "pattern_match":   ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
+
+    # ─── PAID — Claude Sonnet via Emergent (complex reasoning only) ─
+    "repair_diagnose": ("anthropic",  "claude-sonnet-4-5-20250929"),
+    "ora_brain":       ("anthropic",  "claude-sonnet-4-5-20250929"),
+    "code_fix":        ("anthropic",  "claude-sonnet-4-5-20250929"),
+    "learning_digest": ("anthropic",  "claude-sonnet-4-5-20250929"),
 }
-DEFAULT = ("anthropic", "claude-sonnet-4-5-20250929")
+DEFAULT: Tuple[str, str] = ("anthropic", "claude-sonnet-4-5-20250929")
 
 
 def _get_db():
@@ -66,6 +114,43 @@ def _get_db():
     except Exception:
         pass
     return None
+
+
+async def _call_groq(
+    model: str, prompt: str, system: Optional[str], max_tokens: int,
+) -> Dict[str, Any]:
+    """Groq Cloud chat completion (OpenAI-compatible endpoint).
+
+    Free tier: very generous rate limits + sub-300ms typical latency
+    (Groq runs on LPU hardware, not GPU). Raises if GROQ_API_KEY is
+    missing so the route() fallback chain can try the next provider.
+    """
+    import httpx
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY missing")
+    msgs = []
+    if system:
+        msgs.append({"role": "system", "content": system})
+    msgs.append({"role": "user", "content": prompt})
+    async with httpx.AsyncClient(timeout=30.0) as c:
+        r = await c.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={"model": model, "messages": msgs, "max_tokens": max_tokens},
+        )
+        r.raise_for_status()
+        data = r.json()
+    text = data["choices"][0]["message"]["content"]
+    usage = data.get("usage") or {}
+    return {
+        "text": text,
+        "input_tokens": int(usage.get("prompt_tokens", 0)),
+        "output_tokens": int(usage.get("completion_tokens", 0)),
+    }
 
 
 async def _call_openrouter(
@@ -122,6 +207,21 @@ async def _call_emergent(
     }
 
 
+_PROVIDER_DISPATCH = {
+    "groq":       _call_groq,
+    "openrouter": _call_openrouter,
+    "anthropic":  _call_emergent,
+}
+
+
+def _chain_for(task_type: str) -> List[Tuple[str, str]]:
+    """Normalize ROUTING_TABLE entries (tuple or list) into a chain."""
+    entry = ROUTING_TABLE.get(task_type, DEFAULT)
+    if isinstance(entry, tuple):
+        return [entry]
+    return list(entry)
+
+
 async def route(
     task_type: str,
     prompt: str,
@@ -129,44 +229,67 @@ async def route(
     system: Optional[str] = None,
     max_tokens: int = 1500,
 ) -> Dict[str, Any]:
-    """Dispatch to the right model. Logs cost. Never silent."""
-    provider, model = ROUTING_TABLE.get(task_type, DEFAULT)
+    """Dispatch to the right model. Walks fallback chain. Logs cost on
+    final outcome only (whatever succeeded — or last failure)."""
+    chain = _chain_for(task_type)
     start = time.monotonic()
-    err: Optional[str] = None
-    result: Dict[str, Any] = {"text": "", "input_tokens": 0, "output_tokens": 0}
+    final: Dict[str, Any] = {"text": "", "input_tokens": 0, "output_tokens": 0}
+    final_provider, final_model = chain[0]
+    final_err: Optional[str] = None
+    attempts: List[str] = []
 
-    try:
-        if provider == "openrouter":
-            result = await _call_openrouter(model, prompt, system, max_tokens)
-        else:
-            result = await _call_emergent(model, prompt, system, max_tokens)
-    except Exception as e:
-        err = f"{type(e).__name__}: {e}"
-        logger.warning(f"[gateway] {task_type}/{model} failed: {err}")
+    for provider, model in chain:
+        call = _PROVIDER_DISPATCH.get(provider)
+        if call is None:
+            final_err = f"unknown provider: {provider}"
+            attempts.append(f"{provider}/{model}:unknown-provider")
+            continue
+        try:
+            res = await call(model, prompt, system, max_tokens)
+            if (res.get("text") or "").strip():
+                final = res
+                final_provider, final_model = provider, model
+                final_err = None
+                break
+            attempts.append(f"{provider}/{model}:empty-text")
+            final_err = f"{provider}/{model} returned empty text"
+        except Exception as e:
+            err_msg = f"{type(e).__name__}: {e}"
+            attempts.append(f"{provider}/{model}:{type(e).__name__}")
+            final_err = err_msg
+            final_provider, final_model = provider, model
+            logger.info(f"[gateway] {task_type} {provider}/{model} failed → "
+                        f"trying next in chain: {err_msg[:120]}")
+            continue
 
     latency_ms = round((time.monotonic() - start) * 1000.0, 1)
 
     db = _get_db()
     if db is not None:
-        await db.llm_costs.insert_one({
-            "provider": provider,
-            "model": model,
-            "task_type": task_type,
-            "tokens_in": result["input_tokens"],
-            "tokens_out": result["output_tokens"],
-            "latency_ms": latency_ms,
-            "ok": err is None,
-            "error": err,
-            "ts": datetime.now(timezone.utc),
-        })
+        try:
+            await db.llm_costs.insert_one({
+                "provider": final_provider,
+                "model": final_model,
+                "task_type": task_type,
+                "tokens_in": final["input_tokens"],
+                "tokens_out": final["output_tokens"],
+                "latency_ms": latency_ms,
+                "ok": final_err is None,
+                "error": final_err,
+                "chain_attempts": attempts,
+                "ts": datetime.now(timezone.utc),
+            })
+        except Exception as e:
+            logger.debug(f"[gateway] cost log failed: {e}")
 
     return {
-        "text": result["text"],
-        "model": model,
-        "provider": provider,
+        "text": final["text"],
+        "model": final_model,
+        "provider": final_provider,
         "latency_ms": latency_ms,
-        "ok": err is None,
-        "error": err,
-        "tokens_in": result["input_tokens"],
-        "tokens_out": result["output_tokens"],
+        "ok": final_err is None,
+        "error": final_err,
+        "tokens_in": final["input_tokens"],
+        "tokens_out": final["output_tokens"],
+        "chain_attempts": attempts,
     }

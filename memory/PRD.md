@@ -61,6 +61,23 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322ag Groq Integration + Fallback Chain ✅**
+  - User request: add Groq to LLM gateway free-model rotation for <300ms latency on chat/triage/review/service tasks.
+  - **Architectural upgrade**: `ROUTING_TABLE` values now accept either a single `(provider, model)` tuple OR a **list of tuples** (fallback chain). `route()` walks the chain top-to-bottom until one attempt returns non-empty text. Each call logs `chain_attempts: ['groq/...:RuntimeError', 'openrouter/...:HTTPStatusError', ...]` to `db.llm_costs` for full transparency.
+  - **New provider: `_call_groq()`** — Groq Cloud chat completion via OpenAI-compatible endpoint (`https://api.groq.com/openai/v1/chat/completions`). Raises `RuntimeError` when `GROQ_API_KEY` empty so fallback chain advances to OpenRouter.
+  - **Routes updated (Groq-first)**:
+    - `triage_classify` → groq llama-3.1-8b → openrouter gpt-oss-20b → openrouter gemma-4-26b
+    - `triage` (new alias) → groq llama-3.1-8b → openrouter gpt-oss-20b
+    - `ora_chat` (new) → groq llama-3.3-70b → openrouter llama-3.3-70b → openrouter gpt-oss-20b
+    - `content_qa` → groq llama-3.3-70b → openrouter llama-3.3-70b → openrouter gpt-oss-20b → openrouter gemma-4-26b
+    - `review_generate` (new) → groq llama-3.3-70b → openrouter llama-3.3-70b → openrouter gpt-oss-20b
+    - `service_describe` (new) → groq llama-3.1-8b → openrouter llama-3.3-70b → openrouter gpt-oss-20b
+  - **Backwards-compat**: existing call sites that use `triage_classify` or `content_qa` (website_enrich, sentinel_triage, ora_command_center, etc.) now auto-route to Groq-first without code changes.
+  - **`.env`**: `GROQ_API_KEY=` placeholder added (empty). Once TJ pastes the key from console.groq.com, every Groq-first task instantly speeds up.
+  - **Graceful-fallback E2E verified** (with empty key — current state): all 6 Groq-first tasks succeed via OpenRouter fallback, chain_attempts logged correctly. Existing non-Groq routes (`sentiment`, `scout_filter`) untouched.
+  - **Latency proof PENDING**: TJ needs to add `GROQ_API_KEY=gsk_xxxxx` from console.groq.com. Once added, restart backend → rerun `/tmp/test_gateway_groq_322ag.py` → expected <300ms per Groq-first task.
+  - All Python lints clean.
+
 - **2026-02-10 — iter 322af Stack Hardening (Playwright + Camoufox install) ✅**
   - User request: install Playwright Python pkg + Camoufox + verify Google Places key after TJ re-enables in GCP.
   - **Playwright pkg installed** (`pip install playwright`, v1.59.0). Chromium binaries already at `/pw-browsers` so `playwright install chromium` step skipped. Live launch verified: `await browser.new_page() → goto('https://example.com') → title='Example Domain'`.
