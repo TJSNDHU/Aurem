@@ -73,9 +73,20 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
     - `review_generate` (new) → groq llama-3.3-70b → openrouter llama-3.3-70b → openrouter gpt-oss-20b
     - `service_describe` (new) → groq llama-3.1-8b → openrouter llama-3.3-70b → openrouter gpt-oss-20b
   - **Backwards-compat**: existing call sites that use `triage_classify` or `content_qa` (website_enrich, sentinel_triage, ora_command_center, etc.) now auto-route to Groq-first without code changes.
-  - **`.env`**: `GROQ_API_KEY=` placeholder added (empty). Once TJ pastes the key from console.groq.com, every Groq-first task instantly speeds up.
-  - **Graceful-fallback E2E verified** (with empty key — current state): all 6 Groq-first tasks succeed via OpenRouter fallback, chain_attempts logged correctly. Existing non-Groq routes (`sentiment`, `scout_filter`) untouched.
-  - **Latency proof PENDING**: TJ needs to add `GROQ_API_KEY=gsk_xxxxx` from console.groq.com. Once added, restart backend → rerun `/tmp/test_gateway_groq_322ag.py` → expected <300ms per Groq-first task.
+  - **`.env`**: `GROQ_API_KEY=gsk_ojaTpEo0...` (TJ provided 2026-02-10). Working live.
+  - **Live latency proof (3-run benchmark, all 6 Groq-first tasks)**:
+    - `triage_classify` → 296.0ms ✅
+    - `triage` → 137.4ms ✅
+    - `ora_chat` → 161.1ms ✅
+    - `content_qa` → 161.9ms ✅
+    - `review_generate` → 156.9ms ✅
+    - `service_describe` → 124.1ms ✅
+    - Every task wins on FIRST attempt (`chain_attempts=[]`).
+  - **Comparison benchmark** (3 runs, `ora_chat`):
+    - Groq llama-3.3-70b: best=163ms, avg=335ms
+    - Groq llama-3.1-8b: best=152ms, avg=196ms (fastest)
+    - OpenRouter gpt-oss-20b: best=8994ms, avg=14407ms (**~90x slower** due to constant 429s on free tier)
+  - **Side benefit**: iter 322ad sample-site generation (AI reviews + service descriptions via `content_qa`) drops from ~10-15s to ~1-2s total since both LLM calls now win on Groq first attempt.
   - All Python lints clean.
 
 - **2026-02-10 — iter 322af Stack Hardening (Playwright + Camoufox install) ✅**
