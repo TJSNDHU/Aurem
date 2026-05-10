@@ -39,14 +39,25 @@ from collections import OrderedDict
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-_OK_BODY = b'{"status":"ok"}'
+_OK_BODY = b'{"status":"ok","platform":"aurem"}'
 _OK_HEADERS = [
     (b"content-type", b"application/json"),
     (b"cache-control", b"no-store"),
     (b"content-length", str(len(_OK_BODY)).encode()),
 ]
 
-_PROBE_PATHS = frozenset({"/health", "/ready", "/live"})
+# iter 322aa — K8s probe paths that MUST always reply <50ms.
+# Nginx rewrites GET /health → http://127.0.0.1:8001/api/platform/health,
+# so /api/platform/health gets the same outermost-ASGI fast path or the
+# pod gets killed when scheduler ticks (Sentinel/Bridge/A2A) saturate the
+# event loop with 60s Claude calls. Production observed 15+ consecutive
+# upstream timeouts on this path → this short-circuit prevents that.
+_PROBE_PATHS = frozenset({
+    "/health", "/ready", "/live",
+    "/api/health",            # alt mount used by some routers
+    "/api/platform/health",   # K8s liveness/readiness target (nginx rewrite)
+    "/api/ready",             # alt readiness mount
+})
 
 # ─────────────────────────────────────────────────────────────────────
 # Startup self-flood gate — during the first 90s of pod life the

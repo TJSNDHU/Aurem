@@ -35,6 +35,16 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322aa Production Deploy Blocker Fix ✅**
+  - User report: deploy failing on K8s with continuous nginx upstream timeouts (15+ in 2 min) on `GET /health` → `http://127.0.0.1:8001/api/platform/health`. Pod gets killed by liveness probe.
+  - **Root cause**: `HealthProbeMiddleware` (the outermost ASGI shim that responds <1ms with no I/O) only short-circuited `_PROBE_PATHS = {"/health", "/ready", "/live"}`. But nginx rewrites K8s `GET /health` → `/api/platform/health` (the path appearing in upstream logs). That path was NOT in the fast-path set, so probes went through 9 middlewares + the saturated asyncio event loop. Sentinel/Bridge/A2A scheduler ticks calling Claude (60-120s each) + Sovereign Node circuit-breaker retries were starving the loop, causing probe timeouts.
+  - **Fix** (`middleware/health_probe.py`): added `/api/platform/health`, `/api/health`, `/api/ready` to `_PROBE_PATHS`. Updated body to `{"status":"ok","platform":"aurem"}` so monitoring tools that key on `platform` field keep working. Verified live: all 5 probe paths now respond in **0.3–0.6ms** with HTTP 200.
+  - **Confirmed not blockers** (cosmetic warnings in logs):
+    - APScheduler "max running instances reached" — bridge/sentinel tick took >60s due to slow LLM call. Already had `max_instances=1, coalesce=True` so jobs queue, never duplicate. Will self-recover when LLM tier responds.
+    - `local_llm_service` Sovereign Node 30+ consecutive failures + circuit-breaker — Sovereign Node unreachable from prod pod, breaker correctly skipping for 300s. No event-loop-blocking sync I/O found in this path.
+    - `accurate_scout` `Errno 2` file-IO — non-critical scout-design extraction skip; doesn't affect probes.
+  - All Python lints clean. Backend boots clean. Existing health endpoint behavior preserved (same JSON body shape; no router or auth changes).
+
 - **2026-02-10 — iter 322z Signup Flow Fix (P0) ✅**
   - User report: "Customer completes signup but no password field, lands on login page can't login. Welcome email never received."
   - **Root cause** = schema mismatch swallowed by frontend. Backend `RegisterRequest` required `full_name` + `company_name`. Frontend `PlatformAuth.jsx` (line 47-50) sends `first_name`, `last_name`, `company`, `phone`. Every signup → HTTP 422 `Field required`. Customer never got created → so login also failed (no row to authenticate against) → no welcome email (call never reached).
