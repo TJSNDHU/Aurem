@@ -162,81 +162,49 @@ export default function ORAWidget() {
         return sid;
       })();
 
-    // iter 322ah — text-only messages go through the streaming Groq path
-    // (<100ms first token). Attachments still use the legacy FormData
-    // multipart endpoint because Groq doesn't ingest files yet.
+    // iter 322am — Support-mode: per-BIN, Hinglish 3-4 line replies via
+    // /api/bin/ora/ask. Non-streaming (smaller payloads, simpler error UX).
     if (filesToSend.length === 0 && text) {
-      // Insert empty placeholder bubble that we will mutate as tokens land.
-      setMessages((m) => [...m, { role: "ora", text: "" }]);
       try {
-        const res = await fetch(`${apiBase}/api/aurem/chat/stream`, {
+        const token = localStorage.getItem("aurem_customer_token")
+          || localStorage.getItem("platform_token")
+          || localStorage.getItem("token")
+          || "";
+        const res = await fetch(`${apiBase}/api/bin/ora/ask`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, session_id: sessionId }),
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ question: text, support_mode: true }),
         });
-        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
-        let assistantText = "";
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          let idx;
-          // eslint-disable-next-line no-cond-assign
-          while ((idx = buf.indexOf("\n\n")) !== -1) {
-            const frame = buf.slice(0, idx);
-            buf = buf.slice(idx + 2);
-            const line = frame.replace(/^data:\s?/, "").trim();
-            if (!line) continue;
-            let evt;
-            try { evt = JSON.parse(line); } catch { continue; }
-            if (typeof evt.token === "string") {
-              assistantText += evt.token;
-              setMessages((m) => {
-                const next = [...m];
-                for (let i = next.length - 1; i >= 0; i--) {
-                  if (next[i].role === "ora") {
-                    next[i] = { ...next[i], text: assistantText };
-                    break;
-                  }
-                }
-                return next;
-              });
-            }
-            if (evt.done) break;
-          }
-        }
-        if (!assistantText) {
-          setMessages((m) => {
-            const next = [...m];
-            for (let i = next.length - 1; i >= 0; i--) {
-              if (next[i].role === "ora") {
-                next[i] = {
-                  ...next[i],
-                  text: "Got it — I've noted this. (Live chat backend not yet wired; we'll follow up by email if you signed in.)",
-                };
-                break;
-              }
-            }
-            return next;
-          });
+        if (res.ok) {
+          const data = await res.json();
+          // bin_ora_router returns Sentinel's diagnose_error structure
+          // where the human reply is under .root_cause or .summary or
+          // .resolution. Fall through to the first non-empty string.
+          const reply =
+            data?.root_cause ||
+            data?.summary ||
+            data?.resolution ||
+            data?.message ||
+            data?.answer ||
+            data?.response ||
+            "Bhai, samjha. Founder se confirm karta hoon — WhatsApp pe ping karo agar urgent ho.";
+          setMessages((m) => [...m, { role: "ora", text: reply }]);
+        } else if (res.status === 401 || res.status === 403) {
+          setMessages((m) => [...m, {
+            role: "ora",
+            text: "Bhai, login karke pucho — yeh feature signed-in customers ke liye hai.",
+          }]);
+        } else {
+          throw new Error(`HTTP ${res.status}`);
         }
       } catch (err) {
-        setMessages((m) => {
-          const next = [...m];
-          for (let i = next.length - 1; i >= 0; i--) {
-            if (next[i].role === "ora") {
-              next[i] = {
-                ...next[i],
-                text: "I couldn't reach the support brain just now — please email teji@aurem.live and we'll respond fast.",
-              };
-              break;
-            }
-          }
-          return next;
-        });
+        setMessages((m) => [...m, {
+          role: "ora",
+          text: "Network down lag raha hai — teji@aurem.live pe email karo, fast respond karte hain.",
+        }]);
       } finally {
         setSending(false);
       }
@@ -435,6 +403,49 @@ export default function ORAWidget() {
               );
             })()}
             <div ref={messagesEndRef} />
+          </div>
+
+          {/* iter 322am — Quick chips for common Hinglish support questions */}
+          <div
+            data-testid="ora-widget-quick-chips"
+            style={{
+              padding: "8px 12px 0",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              borderTop: messages.length > 1 ? `1px solid ${BORDER}` : "none",
+            }}
+          >
+            {[
+              { label: "Plan kya hai?", q: "Mera current plan kya hai aur kya features unlocked hain?" },
+              { label: "Inbox kaise check?", q: "Inbox messages kahan dekhun? SMS, WhatsApp, email sab ek jagah?" },
+              { label: "Pricing", q: "AUREM ki pricing kya hai? Plan options batao." },
+              { label: "Support", q: "Kuch toot raha hai — bug report karna hai. Kahan likhun?" },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                data-testid={`ora-widget-chip-${chip.label.replace(/\s/g, '-').toLowerCase()}`}
+                onClick={() => {
+                  setInput(chip.q);
+                  // Auto-send after a microtask so the input state flushes.
+                  setTimeout(() => handleSend(), 0);
+                }}
+                disabled={sending}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  background: "rgba(212,175,55,0.08)",
+                  border: `1px solid ${BORDER}`,
+                  color: ACCENT,
+                  cursor: sending ? "not-allowed" : "pointer",
+                  fontWeight: 500,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {chip.label}
+              </button>
+            ))}
           </div>
 
           {/* Attachments preview */}

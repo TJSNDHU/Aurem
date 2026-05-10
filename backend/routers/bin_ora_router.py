@@ -36,6 +36,7 @@ def set_db(db):
 
 class AskReq(BaseModel):
     question: str
+    support_mode: bool = False  # When True → Hinglish, 3-4 line concise answer
 
 
 @router.post("/api/bin/ora/ask")
@@ -89,13 +90,82 @@ async def bin_ora_ask(body: AskReq, request: Request):
     except Exception:
         pass
 
+    # 4) Answer — fork by mode.
+    # Support-mode = plain Hinglish text via llm_gateway (3-4 lines).
+    # Diagnostic mode = structured Sentinel JSON (legacy default).
+    if body.support_mode:
+        try:
+            from services.llm_gateway_v2 import route as llm_route
+            system_prompt = (
+                "You are AUREM Support — a friendly Indian SaaS founder's helper. "
+                "Reply in casual Hinglish (mix of Hindi + English in Roman script, "
+                "like: 'Bhai, login fix kar diya' or 'Plan $97/mo se start hota hai'). "
+                "Keep replies to 3-4 lines MAX. Direct and practical. No bullets, no markdown. "
+                "If you don't know, say: 'Bhai, founder ke saath check karna padega — "
+                "WhatsApp pe ping karo.'"
+            )
+            user_prompt = (
+                f"Customer question: {q}\n\n"
+                f"This customer's grounding (use as facts):\n"
+                f"  • Plan: {bin_grounding.get('plan')}\n"
+                f"  • Services unlocked: {len(bin_grounding.get('services_unlocked') or [])}\n"
+                f"  • Leads in pipeline: {bin_grounding.get('leads_count')}\n"
+                f"  • Recent usage: {bin_grounding.get('recent_usage', [])[:3]}\n"
+            )
+            res = await llm_route(
+                "support_chat",
+                user_prompt,
+                system=system_prompt,
+                max_tokens=200,
+            )
+            reply_text = (res.get("text") or "").strip() or (
+                "Bhai, samjha. Founder se confirm karta hoon — "
+                "WhatsApp pe ping karo agar urgent ho."
+            )
+        except Exception as e:
+            logger.warning(f"[bin_ora_ask] support_mode LLM failed: {e}")
+            reply_text = (
+                "Network thoda slow hai — teji@aurem.live pe email karo, "
+                "fast respond karte hain."
+            )
+        # Persist
+        try:
+            await _db.bin_ora_qa.insert_one({
+                "business_id": ctx.business_id,
+                "question": q,
+                "mode": "support",
+                "reply": reply_text,
+                "ts": datetime.now(timezone.utc),
+            })
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "reply": reply_text,
+            "answer": reply_text,
+            "layer_id": layer_id,
+            "layer_name": layer.get("name"),
+        }
+
     # 4) Claude answer
     try:
         from services.sentinel_ai_diagnose import diagnose_error
+        # iter 322am — Support-mode tone: Hinglish, 3-4 lines max.
+        support_preamble = ""
+        if body.support_mode:
+            support_preamble = (
+                "TONE OVERRIDE (CRITICAL): You are AUREM Support. Reply in casual "
+                "Hinglish (mix of Hindi + English, like how Indian SaaS founders "
+                "talk: 'Bhai, login fix kar diya' or 'Pricing $97/mo se start hota hai'). "
+                "Keep your answer to 3-4 lines max. No long explanations. No bullet lists. "
+                "If you don't know, say 'Bhai, isko founder ke saath check karna padega — "
+                "WhatsApp pe ping karo'.\n\n"
+            )
         synthetic = {
             "type": "bin_ora_question",
             "classification": f"layer_{layer_id}",
             "message": (
+                support_preamble +
                 f"Customer (BIN-scoped) question: {q}\n\n"
                 f"Layer: {layer.get('name')}\n\n"
                 f"This BIN's grounding:\n{json.dumps(bin_grounding, indent=2)}\n\n"

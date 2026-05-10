@@ -1997,15 +1997,17 @@ async def startup_event():
     except Exception as e:
         logging.warning(f"[InboxWriter] index ensure failed: {e}")
 
-    # BIN Intelligence — indexes + 15-min merge loop (Part 5)
+    # BIN Intelligence — indexes + 15-min merge loop + 30-min promote loop (Part 5)
     try:
         from services.bin_intelligence import (
             ensure_indexes as _ensure_intel_idx,
             merge_loop as _intel_merge_loop,
+            promote_loop as _intel_promote_loop,
         )
         await _ensure_intel_idx(db)
         asyncio.create_task(_intel_merge_loop(db))
-        logging.info("[BinIntelligence] indexes + merge loop attached (15 min)")
+        asyncio.create_task(_intel_promote_loop(db))
+        logging.info("[BinIntelligence] indexes + merge (15m) + promote (30m) loops attached")
     except Exception as e:
         logging.warning(f"[BinIntelligence] startup failed: {e}")
 

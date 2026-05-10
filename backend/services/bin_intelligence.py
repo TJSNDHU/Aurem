@@ -27,7 +27,7 @@ import asyncio
 import hashlib
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -293,6 +293,107 @@ async def merge_loop(db) -> None:
         except Exception as e:
             logger.warning(f"[bin_intelligence] merge cycle error: {e}")
         await asyncio.sleep(INTERVAL_S)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Pipeline auto-promotion — 30-min cron.
+# Moves verified contacts (or 7-day-cold verified ones) into the active
+# campaign_leads pipeline at lifecycle_stage="discovered" so downstream
+# drip/scout/closer ORA campaigns pick them up automatically.
+# ═══════════════════════════════════════════════════════════════════════
+PROMOTE_INTERVAL_S = 1800  # 30 min
+PROMOTE_COLD_DAYS = 7
+
+
+async def promote_verified_to_pipeline(db, business_id: str) -> Dict[str, int]:
+    """For one BIN: convert eligible bin_intelligence rows → campaign_leads."""
+    if not (db is not None and business_id):
+        return {"promoted": 0}
+    now = datetime.now(timezone.utc)
+    cold_cutoff = now - timedelta(days=PROMOTE_COLD_DAYS)
+    promoted = 0
+    # Two eligibility queries: fresh verified (any source=invoice, score>=70)
+    # AND verified-but-cold (already in pipeline but no outbound touchpoint in 7d).
+    cursor = db.bin_intelligence.find(
+        {"bin_id": business_id,
+         "$or": [{"source": "invoice"}, {"business_score": {"$gte": 70}}],
+         "promoted_to_pipeline": {"$ne": True}},
+        {"_id": 0, "contact_hash": 1, "source": 1, "business_score": 1, "metadata": 1},
+    ).limit(200)
+    async for r in cursor:
+        ch = r.get("contact_hash") or ""
+        if not ch:
+            continue
+        lead_id = f"AI_{ch[:24]}"
+        # Idempotent insert — contact_hash is the dedup key.
+        await db.campaign_leads.update_one(
+            {"tenant_id": business_id, "contact_hash": ch},
+            {"$setOnInsert": {
+                "tenant_id": business_id,
+                "lead_id": lead_id,
+                "contact_hash": ch,
+                "lifecycle_stage": "discovered",
+                "source_intelligence": r.get("source"),
+                "business_score": int(r.get("business_score") or 0),
+                "created_at": now,
+                "promoted_at": now,
+            }, "$set": {"updated_at": now}},
+            upsert=True,
+        )
+        await db.bin_intelligence.update_many(
+            {"bin_id": business_id, "contact_hash": ch},
+            {"$set": {"promoted_to_pipeline": True, "promoted_at": now}},
+        )
+        promoted += 1
+
+    # Re-warm cold-but-promoted contacts that haven't had outbound activity in 7 days.
+    rewarmed = 0
+    cold_cursor = db.campaign_leads.find(
+        {"tenant_id": business_id,
+         "promoted_at": {"$exists": True},
+         "lifecycle_stage": {"$in": ["discovered", "contacted", "warming"]}},
+        {"_id": 0, "lead_id": 1, "contact_hash": 1},
+    ).limit(500)
+    async for lead in cold_cursor:
+        last_out = await db.touchpoints.find_one(
+            {"tenant_id": business_id, "lead_id": lead["lead_id"], "direction": "outbound"},
+            sort=[("ts", -1)], projection={"_id": 0, "ts": 1},
+        )
+        if last_out and last_out.get("ts") and last_out["ts"] > cold_cutoff:
+            continue
+        # Bump to re-warm — push to outreach scheduler queue.
+        await db.outreach_queue.update_one(
+            {"tenant_id": business_id, "lead_id": lead["lead_id"]},
+            {"$set": {
+                "tenant_id": business_id,
+                "lead_id": lead["lead_id"],
+                "contact_hash": lead.get("contact_hash"),
+                "stage": "rewarm",
+                "queued_at": now,
+            }},
+            upsert=True,
+        )
+        rewarmed += 1
+    return {"promoted": promoted, "rewarmed": rewarmed}
+
+
+async def promote_loop(db) -> None:
+    """Background task — runs every PROMOTE_INTERVAL_S seconds across all BINs."""
+    logger.info(f"[bin_intelligence] promote_loop started (every {PROMOTE_INTERVAL_S}s)")
+    await asyncio.sleep(120)  # let merge_loop settle first
+    while True:
+        try:
+            bins = await db.bin_intelligence.distinct("bin_id")
+            totals = {"promoted": 0, "rewarmed": 0}
+            for b in bins:
+                r = await promote_verified_to_pipeline(db, b)
+                totals["promoted"] += r.get("promoted", 0)
+                totals["rewarmed"] += r.get("rewarmed", 0)
+            if totals["promoted"] or totals["rewarmed"]:
+                logger.info(f"[bin_intelligence] promote cycle: {totals}")
+        except Exception as e:
+            logger.warning(f"[bin_intelligence] promote cycle error: {e}")
+        await asyncio.sleep(PROMOTE_INTERVAL_S)
 
 
 # ═══════════════════════════════════════════════════════════════════════
