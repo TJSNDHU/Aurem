@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ShieldCheck, Zap, Globe2, Mail, Smartphone, Link2, FileSearch, CalendarDays, ArrowRight, Sparkles, Copy, Check } from "lucide-react";
+import { Loader2, ShieldCheck, Zap, Globe2, Mail, Smartphone, Link2, FileSearch, CalendarDays, ArrowRight, Sparkles, Check } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -99,21 +99,39 @@ const RepairQuote = () => {
       } else {
         // iter 322ab — auto-login: persist token so /dashboard opens
         // without bouncing through /login.
+        // iter 322ac — also set `aurem_customer_token` (LuxeAuthContext
+        // storage key) + `aurem_customer_remember=1` so when /dashboard
+        // internally redirects non-admin to /my, the customer portal
+        // recognizes the session and skips the login overlay.
         if (body?.token) {
           try {
             localStorage.setItem("token", body.token);
             localStorage.setItem("aurem_admin_token", body.token);
+            localStorage.setItem("aurem_customer_token", body.token);
+            localStorage.setItem("aurem_customer_remember", "1");
             sessionStorage.setItem("platform_token", body.token);
-          } catch {}
+            sessionStorage.setItem("aurem_customer_token", body.token);
+          } catch {
+            // storage unavailable — token still in JSON; user can refresh
+          }
         }
         setNwsResult(body);
+        // iter 322ac — auto-redirect to /dashboard after 4s so customer
+        // lands directly on their portal (no manual click, no login page).
+        setTimeout(() => {
+          try {
+            navigate("/dashboard");
+          } catch {
+            window.location.href = "/dashboard";
+          }
+        }, 4000);
       }
-    } catch (e) {
-      setNwsError(e.message || "Network error");
+    } catch (err) {
+      setNwsError(err.message || "Network error");
     } finally {
       setNwsLoading(false);
     }
-  }, [nwsForm]);
+  }, [nwsForm, navigate]);
 
   // iter 282al-13 — synthetic 0→100 progress bar that mirrors the
   // 6-step audit (SSL → speed → mobile → links → contact → social).
@@ -529,51 +547,38 @@ const RepairQuote = () => {
           </form>
         )}
 
-        {/* ── NO-WEBSITE SUCCESS ── */}
+        {/* ── NO-WEBSITE SUCCESS — customer chose own password, JWT auto-stored,
+             auto-redirect to /dashboard in 4s. ZERO temp-password leak. ── */}
         {nwsResult && (
           <div data-testid="nws-result" className="mt-6 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-zinc-950/70 p-6 space-y-5">
             <div>
               <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-300 mb-2">
-                <Sparkles className="w-3 h-3" /> Your starter site is live
+                <Check className="w-3 h-3" /> You're signed in
               </div>
               <h3 className="text-2xl font-semibold">Welcome to AUREM 👋</h3>
               <p className="text-zinc-400 text-sm mt-2">
-                Your sample website is live for <strong className="text-amber-300">7 days</strong>. Save these credentials — you'll need them to sign in to your dashboard.
+                Your sample site is being built (live in 30–60s) and your <strong className="text-amber-300">7-day trial</strong> is active. Taking you to your dashboard…
               </p>
             </div>
 
             <div className="rounded-lg bg-black/40 border border-zinc-800 p-4 space-y-3 font-mono text-[13px]">
               <div className="flex justify-between gap-3">
                 <span className="text-zinc-500">Email</span>
-                <span data-testid="nws-result-email" className="text-zinc-100">{nwsResult.email}</span>
+                <span data-testid="nws-result-email" className="text-zinc-100">{nwsResult.email || nwsResult?.user?.email || nwsForm.email}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-zinc-500">BIN</span>
+                <span className="text-zinc-500">Business ID</span>
                 <span data-testid="nws-result-bin" className="text-amber-300">{nwsResult.bin}</span>
-              </div>
-              <div className="flex justify-between gap-3 items-center">
-                <span className="text-zinc-500">Temp password</span>
-                <div className="flex items-center gap-2">
-                  <span data-testid="nws-result-password" className="text-zinc-100 select-all">{nwsResult.temp_password}</span>
-                  <button
-                    type="button"
-                    data-testid="nws-result-copy"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(nwsResult.temp_password);
-                      setPwdCopied(true);
-                      setTimeout(() => setPwdCopied(false), 1800);
-                    }}
-                    className="text-amber-300 hover:text-amber-200"
-                    aria-label="Copy password"
-                  >
-                    {pwdCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
               </div>
               <div className="flex justify-between gap-3">
                 <span className="text-zinc-500">Trial ends</span>
-                <span className="text-zinc-100">{new Date(nwsResult.trial_ends_at).toLocaleDateString()}</span>
+                <span className="text-zinc-100">{nwsResult.trial_ends_human || (nwsResult.trial_ends_at ? new Date(nwsResult.trial_ends_at).toLocaleDateString() : "")}</span>
               </div>
+            </div>
+
+            <div className="text-[12px] text-zinc-500 flex items-center gap-2">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Auto-redirecting to your dashboard…
             </div>
 
             <div className="grid sm:grid-cols-2 gap-3">
@@ -584,15 +589,16 @@ const RepairQuote = () => {
                 data-testid="nws-view-site"
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/15 text-amber-300 font-medium transition"
               >
-                <Globe2 className="w-4 h-4" /> View my site
+                <Globe2 className="w-4 h-4" /> View my sample site
               </a>
-              <a
-                href="/my"
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
                 data-testid="nws-go-dashboard"
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold transition"
               >
-                Sign in to dashboard <ArrowRight className="w-4 h-4" />
-              </a>
+                Go to dashboard now <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}

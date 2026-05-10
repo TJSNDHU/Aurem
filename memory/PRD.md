@@ -35,6 +35,26 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322ac Free Starter Site (No-Website) signup auto-login fix ✅**
+  - User report: "Free Starter Site" form (RepairQuote.jsx) — no password field, account created silently, no welcome email, sample site never generated, customer can't sign in later.
+  - **Discovery**: Backend `POST /api/website-builder/no-website` was already fully wired in iter 322ab (accepts customer-chosen password, hashes via bcrypt, creates `platform_users` + `users` + `tenants` rows, queues welcome email + sample site generation, returns JWT for auto-login). The bug was 100% in the frontend success card.
+  - **Fix #1 — RepairQuote.jsx success card** (`/app/frontend/src/pages/RepairQuote.jsx`):
+    - Removed dead references to `pwdCopied`/`setPwdCopied` (undeclared — would throw ReferenceError on success render) + `nwsResult.temp_password` (no longer in response — customer chose own password).
+    - Replaced "Save these credentials" misleading copy with "You're signed in — auto-redirecting to your dashboard" status.
+    - Added 4-second auto-redirect to `/dashboard` via `navigate("/dashboard")` after success.
+    - Removed `Copy` icon import (no longer needed).
+  - **Fix #2 — Storage key alignment for /my (LuxeAuthContext)**:
+    - LuxeAuthContext reads token from `aurem_customer_token` (NOT `token`/`aurem_admin_token`/`platform_token`).
+    - Submit handler now writes JWT to ALL needed keys: `token`, `aurem_admin_token`, `aurem_customer_token`, `platform_token` (sessionStorage), and sets `aurem_customer_remember=1`. So when `/dashboard` internally redirects non-admin to `/my`, customer portal recognizes the session and skips the login overlay.
+  - **Fix #3 — Missing `Navigate` import in AuremDashboard.jsx**:
+    - Line 2550 used `<Navigate to="/my" replace />` to redirect non-admin from `/dashboard` to `/my`, but only `useNavigate` and `useLocation` were imported. Added `Navigate` to the react-router-dom import. Pre-existing bug exposed by the new auto-redirect flow (no customer was hitting `/dashboard` directly before).
+  - **E2E verified — 4/4 proofs**:
+    1. ✅ Playwright: form → submit → success card (no temp_password leak in DOM, BIN visible, dashboard CTA present)
+    2. ✅ Playwright: auto-redirect chain `/repair-quote` → `/dashboard` → `/my` lands on **AUREM Pulse customer dashboard** (sidebar, KPIs, "STARTER · TRIAL" plan badge) — NO login overlay, NO runtime error
+    3. ✅ Mongo: `db.tenants` row created with all required fields (`bin_id`, `user_id`, `email`, `business_name`, `city`, `industry`, `phone`, `plan=trial`, `trial_ends_at`, `sample_site_slug`, `source=homepage_instant_trial`)
+    4. ✅ Mongo: `db.sent_emails` row with `status=sent`, real `resend_id` (e.g. `9bf7db0d-dcfe-40a8-b98a-4ece1cc807ad`), subject "Welcome to AUREM — Your Business ID: AURE-NWS-XXXXXX", `dashboard_url=/dashboard`, `trial_ends_human=May 17, 2026`, `support_email=ora@aurem.live`
+  - All Python + JS lints clean. Backend boots clean.
+
 - **2026-02-10 — iter 322aa Production Deploy Blocker Fix ✅**
   - User report: deploy failing on K8s with continuous nginx upstream timeouts (15+ in 2 min) on `GET /health` → `http://127.0.0.1:8001/api/platform/health`. Pod gets killed by liveness probe.
   - **Root cause**: `HealthProbeMiddleware` (the outermost ASGI shim that responds <1ms with no I/O) only short-circuited `_PROBE_PATHS = {"/health", "/ready", "/live"}`. But nginx rewrites K8s `GET /health` → `/api/platform/health` (the path appearing in upstream logs). That path was NOT in the fast-path set, so probes went through 9 middlewares + the saturated asyncio event loop. Sentinel/Bridge/A2A scheduler ticks calling Claude (60-120s each) + Sovereign Node circuit-breaker retries were starving the loop, causing probe timeouts.
