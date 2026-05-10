@@ -339,6 +339,11 @@ const AuremSampleWebsite = () => {
   }
 
   const { theme, business, tagline, services, why_points, reviews, legal, industry } = site;
+  // iter 322ad — never show "Real Google reviews will appear here..." placeholders.
+  // Show only AI-generated or real Google reviews. Hide section entirely when none.
+  const visibleReviews = (reviews || []).filter(
+    (r) => r && r.source !== 'placeholder' && (r.text || '').trim().length > 0,
+  );
   const phoneClean = (business.phone || '').replace(/[^0-9+]/g, '');
   const isDark = isDarkHex(theme.bg);
   const bodyText = theme.text;
@@ -374,8 +379,8 @@ const AuremSampleWebsite = () => {
         <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-10 pt-20 pb-16 md:pt-28 text-center">
           <div className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] font-semibold mb-6"
             style={{ color: theme.accent, border: `1px solid ${theme.accent}55`, borderRadius: 999, padding: '6px 16px' }}>
-            <Star className="w-3 h-3 fill-current" />
-            {business.rating}★ ({business.reviews_count || 'Many'} Reviews)
+            <MapPin className="w-3 h-3" />
+            SERVING {(business.city || 'YOUR AREA').toUpperCase()} &amp; SURROUNDING AREAS
           </div>
           <h1 className="font-bold mb-5" style={{ fontSize: 'clamp(2.4rem, 7vw, 5rem)', lineHeight: 1.08 }}>
             {business.name}
@@ -460,7 +465,8 @@ const AuremSampleWebsite = () => {
         </div>
       </section>
 
-      {/* REVIEWS */}
+      {/* REVIEWS — hidden when only placeholder rows exist (iter 322ad) */}
+      {visibleReviews.length > 0 && (
       <section data-testid="sample-reviews" className="py-20 md:py-24 px-6 md:px-10">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
@@ -468,7 +474,7 @@ const AuremSampleWebsite = () => {
             <h2 className="font-bold" style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)' }}>What Our Customers Say</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {reviews.slice(0, 6).map((r, i) => (
+            {visibleReviews.slice(0, 6).map((r, i) => (
               <div key={i} data-testid={`review-${i}`} className="p-6 rounded-xl border"
                 style={{ background: cardBg, borderColor: borderCol }}>
                 <div className="flex gap-0.5 mb-3">
@@ -477,14 +483,16 @@ const AuremSampleWebsite = () => {
                   ))}
                 </div>
                 <p className="text-sm mb-3 italic" style={{ color: muted }}>"{r.text}"</p>
-                <div className="text-[11px] tracking-wider" style={{ color: theme.accent }}>
-                  — {r.author}{r.source === 'google' ? ' · Google' : ''}
+                <div className="text-[11px] tracking-wider flex items-center justify-between" style={{ color: theme.accent }}>
+                  <span>— {r.author}{r.source === 'google' ? ' · Google' : ''}</span>
+                  {r.time_ago && <span style={{ opacity: 0.7 }}>{r.time_ago}</span>}
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
       {/* CONTACT + MAP */}
       <section data-testid="sample-contact" className="py-20 md:py-24 px-6 md:px-10" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' }}>

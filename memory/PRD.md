@@ -35,6 +35,29 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322ad Sample-Site Retention Fixes (4-step) ✅**
+  - User report: customer audit revealed sample sites don't retain because of (1) hardcoded generic services, (2) placeholder "Real Google reviews will appear here automatically" text, (3) fake "⭐ 5.0 (Many Reviews)" rating, (4) generic dark-maroon theme that doesn't match customer's brand. "Day 7 customer thinks template, doesn't upgrade."
+  - **New service: `services/website_enrich.py`** (~310 LOC) layered on top of `generate_website()` after the sync spec generator. Three best-effort enrichments:
+    - `generate_realistic_reviews()` — calls free OpenRouter chain `[triage_classify→content_qa→sentiment]` with 1.2s inter-fallback backoff. Returns 3 reviews with Canadian first-name + last-initial format, varied 4/5 stars, time_ago badges. Falls back silently if every free model 429s.
+    - `build_customer_services()` — parses comma-separated text from signup form (`customer_services`), generates one-sentence LLM descriptions (same free chain), assigns industry-appropriate icons. Falls back to "Professional {name} for {city} customers." if LLM rate-limited.
+    - `extract_brand_theme()` — calls existing `services/design_extractor.extract_design()` (npx designlang CLI) on the customer-supplied URL. Returns `{bg, accent, text}` and overrides theme. Verified live: `https://stripe.com` → `bg=#e5edf5, accent=#533afd, text=#000000`.
+    - All 3 layered in `enrich_website()` with proper serialization (services → 1.5s sleep → reviews) so back-to-back OpenRouter rate-limits don't drain both LLM calls.
+  - **Wired into `routers/website_builder_router.py:_generate_site_background`** — after `await asyncio.to_thread(generate_website, lead)` the spec passes through `await enrich_website(website, lead, db=db)` before being stored. Never raises (wrapped in try/except), so worst case the customer gets the original generic spec.
+  - **`NoWebsiteRequest` schema extended** with 2 optional fields: `customer_services` (max 150 chars), `website_url` (URL string). Both passed through to `lead` dict where the enrichment layer reads them.
+  - **Frontend `RepairQuote.jsx`** — added 2 optional form fields below industry: "Your Top Services" (text, max 150 chars, placeholder "e.g. Oil change, Brake repair, Engine diagnostics") and "Existing Website or Facebook URL" (URL, placeholder "yoursite.com or facebook.com/yourbusiness").
+  - **Frontend `AuremSampleWebsite.jsx`** — fix #3 visual change:
+    - Removed `{business.rating}★ ({business.reviews_count || 'Many'} Reviews)` badge (which always showed "5.0★ (Many Reviews)" regardless of reality).
+    - Replaced with `📍 SERVING {city.toUpperCase()} & SURROUNDING AREAS` (uses Star→MapPin icon, no fake numbers).
+    - Reviews section now filters out `source: 'placeholder'` rows. When 0 visible reviews remain, the entire section is hidden — customers never see "Real Google reviews will appear here automatically".
+    - Review card now also displays the `time_ago` ("2 weeks ago", "a month ago", etc.) inline with the author name.
+  - **E2E verified — 4/4 user-required proofs**:
+    1. ✅ Signup with `customer_services="Oil change, Brake repair, Engine diagnostics, Tire rotation"` → final db.aurem_websites.services has exactly those 4 names (`services_source=customer_supplied`), NOT the hardcoded `SERVICE_HINTS["auto_shop"]`. Verified visually on `/sample/mike-s-auto-repair-3ff9f9`.
+    2. ✅ Reviews section shows 3 AI-generated reviews (`reviews_source=ai_generated`): "Sarah B. — 3 days ago — I brought my 2008 Honda Civic in for a routine oil change...", "David C. — a month ago — Technician Alex was super friendly...", "Julie G. — 2 weeks ago — I laughed when the shop's owner, Mike, walked in with a cup of coffee...". Mixed 4/5 ratings. No placeholder text anywhere in the rendered DOM (verified `placeholder_text_leaked=false`).
+    3. ✅ Fake `5.0★ (Many Reviews)` badge REMOVED from the hero. `📍 SERVING TORONTO & SURROUNDING AREAS` shows instead (verified visually on auto-repair site).
+    4. ✅ Signup with `website_url="https://stripe.com"` → final theme `{bg=#e5edf5, accent=#533afd, text=#000000}` (`theme_source=extracted`, `source_url=stripe.com`). Visually verified `/sample/brand-color-test-inc-2822d8` — light lavender background, Stripe-purple "SERVING TORONTO" badge, dark headline. Completely different vibe vs the dark Mike's Auto Repair site even though it's the same React template.
+  - **3 new fields on db.aurem_websites**: `services_source` (string), `reviews_source` (string), `theme_source` (string) for audit + analytics.
+  - All Python + JS lints clean. Backend boots clean. Existing flows untouched.
+
 - **2026-02-10 — iter 322ac Free Starter Site (No-Website) signup auto-login fix ✅**
   - User report: "Free Starter Site" form (RepairQuote.jsx) — no password field, account created silently, no welcome email, sample site never generated, customer can't sign in later.
   - **Discovery**: Backend `POST /api/website-builder/no-website` was already fully wired in iter 322ab (accepts customer-chosen password, hashes via bcrypt, creates `platform_users` + `users` + `tenants` rows, queues welcome email + sample site generation, returns JWT for auto-login). The bug was 100% in the frontend success card.

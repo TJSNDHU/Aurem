@@ -46,6 +46,7 @@ const RepairQuote = () => {
 
   // ── "I don't have a website" instant-builder flow (7-day trial) ───
   // iter 322ab — customer chooses their OWN password (no temp generation).
+  // iter 322ad — added optional services + URL fields for retention.
   const [showNoSite, setShowNoSite] = useState(false);
   const [nwsForm, setNwsForm] = useState({
     business_name: "",
@@ -55,6 +56,8 @@ const RepairQuote = () => {
     category: "",
     password: "",
     confirm_password: "",
+    customer_services: "",
+    website_url: "",
     consent: true,
   });
   const [nwsLoading, setNwsLoading] = useState(false);
@@ -483,6 +486,41 @@ const RepairQuote = () => {
                   className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
                 />
               </div>
+            </div>
+
+            {/* iter 322ad — retention fix #1: customer-supplied services */}
+            <div>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500">
+                Your Top Services <span className="text-zinc-600 normal-case tracking-normal">(optional — helps personalise your site)</span>
+              </label>
+              <input
+                data-testid="nws-services"
+                type="text"
+                maxLength={150}
+                placeholder="e.g. Oil change, Brake repair, Engine diagnostics"
+                value={nwsForm.customer_services}
+                onChange={onNwsChange("customer_services")}
+                className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+              />
+              <div className="mt-1 text-[11px] text-zinc-600">
+                Comma-separated, max 6 services. Leave blank to use industry defaults.
+              </div>
+            </div>
+
+            {/* iter 322ad — retention fix #4: brand-color extraction URL */}
+            <div>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500">
+                Existing Website or Facebook URL <span className="text-zinc-600 normal-case tracking-normal">(optional — we'll match your brand colors)</span>
+              </label>
+              <input
+                data-testid="nws-website-url"
+                type="text"
+                inputMode="url"
+                placeholder="yoursite.com  or  facebook.com/yourbusiness"
+                value={nwsForm.website_url}
+                onChange={onNwsChange("website_url")}
+                className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+              />
             </div>
 
             {/* iter 322ab — customer-chosen password (no temp generation) */}

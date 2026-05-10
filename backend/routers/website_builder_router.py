@@ -126,16 +126,30 @@ class NoWebsiteRequest(BaseModel):
     phone: Optional[str] = ""
     city: Optional[str] = ""
     category: Optional[str] = ""  # e.g. "Roofing", "HVAC", "Realtor"
+    # iter 322ad — retention fixes:
+    customer_services: Optional[str] = ""  # e.g. "Oil change, Brake repair, Tires"
+    website_url: Optional[str] = ""        # existing site / facebook URL for brand match
     consent: bool = True
 
 
 async def _generate_site_background(db, lead: dict, final_slug: str) -> None:
     """Run the (synchronous) Playwright + Claude generator in a thread
     so it doesn't block the request response. Persists final state on
-    completion. Idempotent — re-runs upsert by slug."""
+    completion. Idempotent — re-runs upsert by slug.
+
+    iter 322ad: after the sync spec is built we run the async enrichment
+    layer (AI reviews + customer services + URL brand-color extraction)
+    so the final stored doc reflects what the customer actually told us
+    on signup instead of generic placeholder copy."""
     import asyncio as _asyncio
     try:
         website = await _asyncio.to_thread(generate_website, lead)
+        # iter 322ad — async enrichment (best-effort, never raises)
+        try:
+            from services.website_enrich import enrich_website
+            website = await enrich_website(website, lead, db=db)
+        except Exception as e:
+            logger.warning(f"[NO-WEBSITE bg] enrich failed for {final_slug}: {e}")
         website["lead_id"] = lead["lead_id"]
         website["slug"] = final_slug
         website["status"] = website.get("status") or "approved"
@@ -252,6 +266,9 @@ async def no_website_instant(
         "hours": {},
         "source": "no_website_signup",
         "created_at": now.isoformat(),
+        # iter 322ad — retention fixes (passed through to enrichment layer):
+        "customer_services": (body.customer_services or "").strip(),
+        "website_url": (body.website_url or "").strip(),
     }
     await db.campaign_leads.update_one(
         {"lead_id": lead_id}, {"$setOnInsert": lead}, upsert=True
