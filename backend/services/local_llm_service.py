@@ -23,7 +23,15 @@ _config = {
     "ollama_url": SOVEREIGN_URL,
     "model": SOVEREIGN_MODEL,
     "enabled": os.environ.get("LOCAL_LLM_ENABLED", "true").lower() == "true",
-    "timeout": int(os.environ.get("LOCAL_LLM_TIMEOUT_S", "5")),  # iter 322p — was 60, now 5s default
+    # iter 322ai — timeout split:
+    #   "connect_timeout": fast (5s) — TCP+TLS handshake to ngrok edge.
+    #       If this exceeds 5s the tunnel is effectively dead — fail fast
+    #       so we don't starve the asyncio loop.
+    #   "timeout" (read): generous (30s) — actual chat completion needs
+    #       3-15s on Legion's CPU/GPU when the model is cold. The old 5s
+    #       hard cap guaranteed every chat call timed out at ~5072ms.
+    "timeout": int(os.environ.get("LOCAL_LLM_TIMEOUT_S", "30")),
+    "connect_timeout": int(os.environ.get("LOCAL_LLM_CONNECT_TIMEOUT_S", "5")),
     "last_status": None,
     "last_check": None,
     "consecutive_failures": 0,
@@ -36,10 +44,15 @@ _config = {
 # × 2s sleep) kept the asyncio loop blocked for ~180s per call → APScheduler
 # missed jobs by 5-9s → /health probe queued → K8s killed pod. New defaults
 # fail FAST so the event loop never gets starved.
-MAX_RETRIES = 1                  # was 3 — extra retries serve no purpose if tunnel is dead
-RETRY_DELAY_S = 0.5              # was 2.0 — minimal back-off
-BACKOFF_AFTER_FAILURES = 1       # open the breaker after the very first miss
-BACKOFF_DURATION_S = 300         # 5-minute cool-down (was 120s) — fewer probe storms
+# iter 322ai — re-balanced: connect-timeout stays tight (5s, fails fast on
+# dead tunnel), but read-timeout bumped to 30s for slow Ollama generation,
+# and retries restored to 3 (with 5s gap) per user spec. Net worst-case
+# blocking time when tunnel is reachable but model is loading: ~45s.
+# When tunnel is dead: ~5s connect-fail × 3 = 15s before circuit opens.
+MAX_RETRIES = 3                  # user spec — 3 retries
+RETRY_DELAY_S = 5.0              # user spec — 5s apart
+BACKOFF_AFTER_FAILURES = 3       # open the breaker after 3 consecutive total failures
+BACKOFF_DURATION_S = 300         # 5-minute cool-down
 
 
 def is_backed_off() -> bool:
@@ -114,16 +127,24 @@ def _is_backed_off() -> bool:
 
 
 async def _request_with_retry(method: str, url: str, retries: int = MAX_RETRIES, **kwargs) -> Optional[httpx.Response]:
-    """HTTP request with retry for Cloudflare Tunnel cold starts."""
+    """HTTP request with retry for Cloudflare Tunnel cold starts.
+
+    iter 322ai — split timeout: connect timeout stays tight (default 5s)
+    so a dead tunnel fails fast and doesn't starve the asyncio loop, but
+    read timeout is generous (default 30s) so a live tunnel + cold Ollama
+    model loading from disk (3-15s) doesn't get killed mid-generation.
+    """
     if _is_backed_off():
         return None
 
-    kwargs.setdefault("timeout", 10.0)
+    read_timeout = kwargs.pop("timeout", _config["timeout"])
+    connect_timeout = kwargs.pop("connect_timeout", _config["connect_timeout"])
+    httpx_timeout = httpx.Timeout(read_timeout, connect=connect_timeout)
     last_err = None
 
     for attempt in range(retries):
         try:
-            async with httpx.AsyncClient(timeout=kwargs.pop("timeout", 10.0)) as client:
+            async with httpx.AsyncClient(timeout=httpx_timeout) as client:
                 if method == "GET":
                     resp = await client.get(url, **kwargs)
                 else:
@@ -135,20 +156,27 @@ async def _request_with_retry(method: str, url: str, retries: int = MAX_RETRIES,
                     return resp
 
                 if resp.status_code == 502 and attempt < retries - 1:
-                    logger.debug(f"[Sovereign] 502 on attempt {attempt+1}, retrying in {RETRY_DELAY_S}s (tunnel cold start)")
+                    logger.info(f"[Sovereign] 502 on attempt {attempt+1}, retrying in {RETRY_DELAY_S}s (tunnel cold start)")
                     await asyncio.sleep(RETRY_DELAY_S)
                     continue
 
                 return resp
 
         except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            # iter 322ai — connect failures mean the tunnel itself is unreachable
+            # (laptop offline / ngrok down). Don't waste retry budget — bail
+            # immediately so circuit breaker opens fast.
+            last_err = e
+            logger.info(f"[Sovereign] Connect error attempt {attempt+1}/{retries}: {e}")
+            break
+        except httpx.ReadTimeout as e:
+            # Read-timeouts mean Ollama is up but slow (model still loading).
+            # Worth retrying — next attempt may catch model already warm.
             last_err = e
             if attempt < retries - 1:
-                logger.debug(f"[Sovereign] Connect error attempt {attempt+1}/{retries}: {e}")
+                logger.info(f"[Sovereign] Read timeout attempt {attempt+1}/{retries}, retrying in {RETRY_DELAY_S}s")
                 await asyncio.sleep(RETRY_DELAY_S)
-            continue
-        except httpx.ReadTimeout as e:
-            last_err = e
+                continue
             break
         except Exception as e:
             last_err = e
@@ -162,14 +190,18 @@ async def _request_with_retry(method: str, url: str, retries: int = MAX_RETRIES,
         logger.warning(f"[Sovereign] {_config['consecutive_failures']} consecutive failures — backing off for {BACKOFF_DURATION_S}s")
 
     if last_err:
-        logger.debug(f"[Sovereign] All {retries} attempts failed: {last_err}")
+        logger.info(f"[Sovereign] All {retries} attempts failed: {last_err}")
     return None
 
 
 async def check_ollama_status() -> dict:
     """Check if Sovereign Node is running and which models are available."""
     url = _config["ollama_url"]
-    resp = await _request_with_retry("GET", f"{url}/api/tags", retries=2, timeout=5.0)
+    resp = await _request_with_retry(
+        "GET", f"{url}/api/tags",
+        retries=2, timeout=5.0,
+        headers={"ngrok-skip-browser-warning": "1"},
+    )
 
     if resp and resp.status_code == 200:
         data = resp.json()
@@ -236,6 +268,7 @@ async def chat_local(
         f"{url}/v1/chat/completions",
         retries=MAX_RETRIES,
         timeout=float(_config["timeout"]),
+        headers={"ngrok-skip-browser-warning": "1"},
         json={
             "model": model,
             "messages": messages,
