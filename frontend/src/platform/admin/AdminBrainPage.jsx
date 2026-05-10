@@ -62,6 +62,8 @@ export default function AdminBrainPage() {
   const [flow, setFlow] = useState(null);
   const [notif, setNotif] = useState(null);
   const [deploy, setDeploy] = useState(null);
+  const [dogfood, setDogfood] = useState(null);
+  const [dogfoodOpen, setDogfoodOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
@@ -69,16 +71,18 @@ export default function AdminBrainPage() {
     try {
       setErr('');
       // allSettled so one failing endpoint doesn't blank the whole page.
-      const [ro, rf, rn, rd] = await Promise.allSettled([
+      const [ro, rf, rn, rd, rdp] = await Promise.allSettled([
         fetchJSON('/api/admin/autonomous/overview'),
         fetchJSON('/api/admin/autonomous/pipeline-flow?limit=10'),
         fetchJSON('/api/admin/autonomous/notifications?limit=10&unread_only=true'),
         fetchJSON('/api/admin/deploy-readiness'),
+        fetchJSON('/api/admin/dogfood/pulse'),
       ]);
       if (ro.status === 'fulfilled') setOverview(ro.value);
       if (rf.status === 'fulfilled') setFlow(rf.value);
       if (rn.status === 'fulfilled') setNotif(rn.value);
       if (rd.status === 'fulfilled') setDeploy(rd.value);
+      if (rdp.status === 'fulfilled') setDogfood(rdp.value);
 
       // Surface only if EVERYTHING failed
       const allFailed = [ro, rf, rn, rd].every(r => r.status === 'rejected');
@@ -134,6 +138,20 @@ export default function AdminBrainPage() {
               title="Other unread notifications"
             >
               {(notif.unread_total || 0) - (notif.high_risk_unread || 0)} new
+            </span>
+          )}
+          {dogfood?.summary?.has_dead_zones && (
+            <span
+              data-testid="admin-brain-dogfood-dead-badge"
+              onClick={() => setDogfoodOpen(true)}
+              style={{
+                background: '#5A1A18', border: '1px solid #E0524A',
+                color: '#FF8B85', fontSize: 12, padding: '4px 10px',
+                borderRadius: 999, fontWeight: 600, cursor: 'pointer',
+              }}
+              title="Dogfood services with zero calls in 14 days"
+            >
+              🩺 {dogfood.summary.dead_zone} DEAD ZONE{dogfood.summary.dead_zone === 1 ? '' : 'S'}
             </span>
           )}
         </h1>
@@ -208,6 +226,160 @@ export default function AdminBrainPage() {
           {deploy.missing?.length > 0 && (
             <div style={{ color: '#E0524A', fontSize: 11, marginLeft: 'auto' }}>
               missing: {deploy.missing.join(', ')}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Dogfood Health — 14d health snapshot for BIN AUR-FNDR-001 */}
+      {dogfood?.summary && (
+        <section
+          data-testid="dogfood-health-tile"
+          style={{
+            background: COMP_BG,
+            border: `1px solid ${dogfood.summary.has_dead_zones ? '#5A1A18' : '#3A4A2A'}`,
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            onClick={() => setDogfoodOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+              cursor: 'pointer', userSelect: 'none',
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              color: dogfood.summary.has_dead_zones ? '#FF8B85' : '#4AD4A0',
+              fontWeight: 600, fontSize: 14,
+            }}>
+              {dogfood.summary.has_dead_zones ? '🩺' : '✅'} Dogfood Health
+              <span style={{ color: '#8B8475', fontWeight: 500, fontSize: 12 }}>
+                · {dogfood.bin} · last {dogfood.window_days}d
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 12, flexWrap: 'wrap' }}>
+              <span
+                data-testid="dogfood-active-pill"
+                style={{
+                  padding: '4px 10px', borderRadius: 999,
+                  background: '#14130F', border: '1px solid #3A4A2A',
+                  color: '#4AD4A0', fontWeight: 600,
+                }}
+              >
+                {dogfood.summary.active} active
+              </span>
+              {dogfood.summary.dead_zone > 0 ? (
+                <span
+                  data-testid="dogfood-dead-zone-badge"
+                  style={{
+                    padding: '4px 10px', borderRadius: 999,
+                    background: '#5A1A18', border: '1px solid #E0524A',
+                    color: '#FF8B85', fontWeight: 600,
+                  }}
+                  title="Services with zero calls in the last 14 days"
+                >
+                  🚨 {dogfood.summary.dead_zone} dead zone{dogfood.summary.dead_zone === 1 ? '' : 's'}
+                </span>
+              ) : (
+                <span
+                  data-testid="dogfood-all-green-pill"
+                  style={{
+                    padding: '4px 10px', borderRadius: 999,
+                    background: '#14130F', border: '1px solid #3A4A2A',
+                    color: '#4AD4A0', fontWeight: 600,
+                  }}
+                >
+                  no dead zones
+                </span>
+              )}
+              <span style={{
+                padding: '4px 10px', borderRadius: 999,
+                background: '#14130F', border: '1px solid #2A2317',
+                color: '#8B8475', fontWeight: 500,
+              }}>
+                {dogfood.summary.total_calls.toLocaleString()} calls
+              </span>
+            </div>
+            <span
+              data-testid="dogfood-toggle"
+              style={{ marginLeft: 'auto', color: ACCENT, fontSize: 12 }}
+            >
+              {dogfoodOpen ? '▾ hide' : '▸ details'}
+            </span>
+          </div>
+
+          {dogfoodOpen && (
+            <div
+              data-testid="dogfood-services-table"
+              style={{
+                marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COMP_BORDER}`,
+                maxHeight: 360, overflowY: 'auto',
+              }}
+            >
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1.8fr 0.7fr 0.7fr 1.3fr 0.7fr',
+                fontSize: 11, color: '#8B8475', padding: '4px 0',
+                borderBottom: `1px solid ${COMP_BORDER}`, fontWeight: 600,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}>
+                <div>Service</div>
+                <div style={{ textAlign: 'right' }}>Calls</div>
+                <div style={{ textAlign: 'right' }}>Success</div>
+                <div>Last Used</div>
+                <div style={{ textAlign: 'right' }}>Status</div>
+              </div>
+              {(dogfood.services || [])
+                .slice()
+                .sort((a, b) => {
+                  // dead zones first, then by calls desc
+                  if (a.status !== b.status) return a.status === 'dead_zone' ? -1 : 1;
+                  return (b.total_calls || 0) - (a.total_calls || 0);
+                })
+                .map((s) => (
+                  <div
+                    key={s.service_id}
+                    data-testid={`dogfood-row-${s.service_id}`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.8fr 0.7fr 0.7fr 1.3fr 0.7fr',
+                      fontSize: 12, padding: '8px 0',
+                      borderBottom: `1px solid ${COMP_BORDER}`,
+                      color: '#E8E2D4',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 500 }}>{s.service_name}</div>
+                      <div style={{ color: '#7A7468', fontSize: 10 }}>{s.service_id}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {(s.total_calls || 0).toLocaleString()}
+                    </div>
+                    <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                      color: s.success_rate >= 0.95 ? '#4AD4A0'
+                        : s.success_rate >= 0.7 ? '#F0A030'
+                        : s.total_calls > 0 ? '#E0524A' : '#7A7468' }}>
+                      {s.total_calls > 0 ? `${Math.round(s.success_rate * 100)}%` : '—'}
+                    </div>
+                    <div style={{ color: '#8B8475', fontSize: 11 }}>
+                      {s.last_used ? new Date(s.last_used).toLocaleString() : '—'}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 999, fontSize: 10,
+                        fontWeight: 600, letterSpacing: '0.04em',
+                        background: s.status === 'dead_zone' ? '#5A1A18' : '#1E3024',
+                        border: `1px solid ${s.status === 'dead_zone' ? '#E0524A' : '#3A4A2A'}`,
+                        color: s.status === 'dead_zone' ? '#FF8B85' : '#4AD4A0',
+                      }}>
+                        {s.status === 'dead_zone' ? 'DEAD' : 'ACTIVE'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
         </section>

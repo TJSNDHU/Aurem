@@ -1055,6 +1055,21 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] scout_run_router skipped: {e}")
 
 
+    # Dogfood Pulse — 14d health snapshot for BIN AUR-FNDR-001
+    if not _should_skip("routers.dogfood_pulse_router"):
+        try:
+            from routers.dogfood_pulse_router import (
+                router as dogfood_pulse_router,
+                set_db as set_dogfood_pulse_db,
+            )
+            app.include_router(dogfood_pulse_router)
+            if db is not None:
+                set_dogfood_pulse_db(db)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] dogfood_pulse_router skipped: {e}")
+
+
     # Blast-Chain (Section 7 — staggered 4-touch chains + reply webhook)
     if not _should_skip("routers.blast_chain_router"):
         try:
