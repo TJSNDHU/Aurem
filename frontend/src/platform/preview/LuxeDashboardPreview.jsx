@@ -382,9 +382,9 @@ const HomePage = ({ data }) => (
       <KpiTile testid="auto-fix-live" label="Auto Fix Live"
         value={(data.autoFix?.value ?? 0).toLocaleString()}
         sub="ORA repairs cumulative" />
-      <KpiTile testid="agents-active" label="Active Agents"
-        value={(data.agents || []).filter(a => /ACTIVE|SCANNING|ENGAGING|HUNTING|NURTURING|AMPLIFYING|SPEAKING|WATCHING/i.test(a.status)).length + ' / 8'}
-        sub="of 8 customer agents" />
+      <KpiTile testid="agents-active" label="Services Active"
+        value={`${data.services?.active ?? 0} / ${data.services?.total ?? 0}`}
+        sub={`${data.services?.active ?? 0} of ${data.services?.total ?? 0} services unlocked`} />
     </div>
     {/* Row 2: agents + Vanguard — stacks on mobile */}
     <div style={{

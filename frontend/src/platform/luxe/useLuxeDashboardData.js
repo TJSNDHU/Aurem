@@ -25,6 +25,7 @@ const DEFAULT = {
   websiteHealth: { value: 0, max: 100 },
   autoFix: { value: 0, max: 100 },
   agents: [],
+  services: { active: 0, total: 0 },
   growth: [],
   websiteScan: { geo: 0, sec: 0, acc: 0, seo: 0, lastScan: '—' },
   oraRepair: { successPct: 0, healed: 0, attempts: 0, deltaPct: 0, series: [] },
@@ -42,13 +43,15 @@ export const useLuxeDashboardData = (token) => {
     }
     const headers = { Authorization: `Bearer ${token}` };
 
-    const [leadStats, agentsStatus, repairLeaderboard, repairHistory, scanEvents] =
+    const [leadStats, agentsStatus, repairLeaderboard, repairHistory, scanEvents, subs, catalog] =
       await Promise.all([
         safeGet(`${API}/api/leads/stats`, headers),
         safeGet(`${API}/api/aurem/agents/status`, headers),
         safeGet(`${API}/api/repair/health/leaderboard`, headers),
         safeGet(`${API}/api/repair/history?limit=30`, headers),
         safeGet(`${API}/api/customer/pipeline/scan-events?limit=30`, headers),
+        safeGet(`${API}/api/customer/subscriptions`, headers),
+        safeGet(`${API}/api/catalog/services`, headers),
       ]);
 
     // Vanguard runs a live backlink scan that can take 10–30s on first hit.
@@ -163,6 +166,15 @@ export const useLuxeDashboardData = (token) => {
       websiteHealth: { value: compHealth, max: 100 },
       autoFix: { value: totalFixes, max: Math.max(100, totalFixes) },
       agents,
+      services: {
+        active: subs?.active_count ?? 0,
+        // Denominator = max(public catalog live count, active subs) so
+        // dogfood / wildcard customers never see a confusing "25/20".
+        total: Math.max(
+          (catalog?.services || []).length,
+          subs?.active_count ?? 0,
+        ),
+      },
       growth,
       websiteScan: {
         geo: scanGeo, sec: scanSec, acc: scanAcc, seo: scanSeo,
