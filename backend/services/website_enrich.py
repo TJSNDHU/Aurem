@@ -382,14 +382,72 @@ async def enrich_website(
         r.get("source") == "google" for r in existing_reviews
     )
     if not has_real_reviews:
+        # iter 322ae — try the FREE Birdeye scraper first. Two paths:
+        #   1. Customer pasted a direct Birdeye / Google Business URL into
+        #      the signup form (`reviews_url` lead field) — we skip DDG
+        #      discovery and scrape that URL directly. Most reliable.
+        #   2. No URL — fall back to DDG-based discovery for their biz.
+        # If either yields reviews we get REAL Google reviews (zero cost).
+        # Otherwise fall through to AI-generated reviews.
+        real_reviews: List[Dict[str, Any]] = []
+        aggregate_meta: Optional[Dict[str, Any]] = None
         try:
-            ai_reviews = await generate_realistic_reviews(name, industry, city)
+            direct_url = (lead.get("reviews_url") or "").strip()
+            from services.birdeye_scraper import (
+                pull_real_reviews,
+                scrape_birdeye_profile,
+            )
+            birdeye = None
+            if direct_url and "birdeye.com" in direct_url.lower():
+                # Path 1: direct scrape (no DDG, no rate-limit risk)
+                scrape = await asyncio.wait_for(
+                    scrape_birdeye_profile(direct_url, limit=5), timeout=20.0,
+                )
+                if scrape.get("ok") and scrape.get("reviews"):
+                    birdeye = {
+                        "found": True,
+                        "url": direct_url,
+                        "aggregate_rating": scrape.get("aggregate_rating"),
+                        "total_count": scrape.get("total_count"),
+                        "reviews": scrape.get("reviews"),
+                    }
+            if birdeye is None:
+                # Path 2: DDG-based discovery + scrape
+                birdeye = await asyncio.wait_for(
+                    pull_real_reviews(name, city, limit=5),
+                    timeout=25.0,
+                )
+            if birdeye and birdeye.get("found") and birdeye.get("reviews"):
+                real_reviews = birdeye["reviews"]
+                aggregate_meta = {
+                    "aggregate_rating": birdeye.get("aggregate_rating"),
+                    "total_count": birdeye.get("total_count"),
+                    "source_url": birdeye.get("url"),
+                }
+                logger.info(
+                    f"[enrich.reviews] birdeye HIT: {name} → "
+                    f"{len(real_reviews)} reviews, agg={aggregate_meta}"
+                )
+        except asyncio.TimeoutError:
+            logger.info("[enrich.reviews] birdeye timeout → AI fallback")
         except Exception as e:
-            logger.warning(f"[enrich.reviews] generation failed: {e}")
-            ai_reviews = []
-        if ai_reviews:
-            website["reviews"] = ai_reviews
-            website["reviews_source"] = "ai_generated"
+            logger.info(f"[enrich.reviews] birdeye error: {e} → AI fallback")
+
+        if real_reviews:
+            website["reviews"] = real_reviews
+            website["reviews_source"] = "birdeye_scraped"
+            if aggregate_meta:
+                website["reviews_aggregate"] = aggregate_meta
+        else:
+            # AI fallback path
+            try:
+                ai_reviews = await generate_realistic_reviews(name, industry, city)
+            except Exception as e:
+                logger.warning(f"[enrich.reviews] AI generation failed: {e}")
+                ai_reviews = []
+            if ai_reviews:
+                website["reviews"] = ai_reviews
+                website["reviews_source"] = "ai_generated"
 
     # ── 3) Await brand extraction (if running) ──
     if brand_task is not None:

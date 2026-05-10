@@ -129,6 +129,9 @@ class NoWebsiteRequest(BaseModel):
     # iter 322ad — retention fixes:
     customer_services: Optional[str] = ""  # e.g. "Oil change, Brake repair, Tires"
     website_url: Optional[str] = ""        # existing site / facebook URL for brand match
+    # iter 322ae — direct review-source URL (Google Business / Birdeye / Yelp).
+    # When provided we skip DDG discovery and scrape the listing directly.
+    reviews_url: Optional[str] = ""
     consent: bool = True
 
 
@@ -269,6 +272,8 @@ async def no_website_instant(
         # iter 322ad — retention fixes (passed through to enrichment layer):
         "customer_services": (body.customer_services or "").strip(),
         "website_url": (body.website_url or "").strip(),
+        # iter 322ae — direct review-source URL (Birdeye / Google / Yelp).
+        "reviews_url": (body.reviews_url or "").strip(),
     }
     await db.campaign_leads.update_one(
         {"lead_id": lead_id}, {"$setOnInsert": lead}, upsert=True

@@ -47,6 +47,7 @@ const RepairQuote = () => {
   // ── "I don't have a website" instant-builder flow (7-day trial) ───
   // iter 322ab — customer chooses their OWN password (no temp generation).
   // iter 322ad — added optional services + URL fields for retention.
+  // iter 322ae — added optional reviews_url for direct Birdeye/Google scrape.
   const [showNoSite, setShowNoSite] = useState(false);
   const [nwsForm, setNwsForm] = useState({
     business_name: "",
@@ -58,6 +59,7 @@ const RepairQuote = () => {
     confirm_password: "",
     customer_services: "",
     website_url: "",
+    reviews_url: "",
     consent: true,
   });
   const [nwsLoading, setNwsLoading] = useState(false);
@@ -521,6 +523,25 @@ const RepairQuote = () => {
                 onChange={onNwsChange("website_url")}
                 className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
               />
+            </div>
+
+            {/* iter 322ae — direct review-source URL for instant real reviews */}
+            <div>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-500">
+                Your Google Business or Birdeye URL <span className="text-zinc-600 normal-case tracking-normal">(optional — we'll pull your real reviews)</span>
+              </label>
+              <input
+                data-testid="nws-reviews-url"
+                type="text"
+                inputMode="url"
+                placeholder="reviews.birdeye.com/your-biz  or  g.page/your-biz"
+                value={nwsForm.reviews_url}
+                onChange={onNwsChange("reviews_url")}
+                className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+              />
+              <div className="mt-1 text-[11px] text-zinc-600">
+                Skip this and we'll auto-search. If we can't find it we'll write realistic sample reviews you can edit later.
+              </div>
             </div>
 
             {/* iter 322ab — customer-chosen password (no temp generation) */}

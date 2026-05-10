@@ -344,6 +344,12 @@ const AuremSampleWebsite = () => {
   const visibleReviews = (reviews || []).filter(
     (r) => r && r.source !== 'placeholder' && (r.text || '').trim().length > 0,
   );
+  // iter 322ae — when reviews were pulled from Birdeye we get an aggregate
+  // {aggregate_rating, total_count, source_url} so we can render a real
+  // "4.8 · 77 verified Google reviews" header above the cards.
+  const reviewsAggregate = site.reviews_aggregate || null;
+  const reviewsSource = site.reviews_source || null;
+  const isVerifiedReviews = reviewsSource === 'birdeye_scraped';
   const phoneClean = (business.phone || '').replace(/[^0-9+]/g, '');
   const isDark = isDarkHex(theme.bg);
   const bodyText = theme.text;
@@ -465,26 +471,48 @@ const AuremSampleWebsite = () => {
         </div>
       </section>
 
-      {/* REVIEWS — hidden when only placeholder rows exist (iter 322ad) */}
+      {/* REVIEWS — hidden when only placeholder rows exist (iter 322ad).
+          iter 322ae: when reviews_source=='birdeye_scraped' show a
+          "✓ Verified · {agg} stars · {count} Google reviews" header. */}
       {visibleReviews.length > 0 && (
       <section data-testid="sample-reviews" className="py-20 md:py-24 px-6 md:px-10">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <div className="text-[11px] tracking-[0.4em] font-semibold mb-3" style={{ color: theme.accent }}>REVIEWS</div>
             <h2 className="font-bold" style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)' }}>What Our Customers Say</h2>
+            {isVerifiedReviews && reviewsAggregate && (
+              <div data-testid="reviews-verified-badge" className="mt-4 inline-flex items-center gap-2 text-[11px] tracking-[0.2em] font-semibold"
+                style={{ color: theme.accent, border: `1px solid ${theme.accent}55`, borderRadius: 999, padding: '6px 16px' }}>
+                <Check className="w-3 h-3" />
+                VERIFIED
+                {reviewsAggregate.aggregate_rating && (
+                  <span>· {reviewsAggregate.aggregate_rating}</span>
+                )}
+                {reviewsAggregate.total_count && (
+                  <span>· {reviewsAggregate.total_count} GOOGLE REVIEWS</span>
+                )}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {visibleReviews.slice(0, 6).map((r, i) => (
               <div key={i} data-testid={`review-${i}`} className="p-6 rounded-xl border"
                 style={{ background: cardBg, borderColor: borderCol }}>
-                <div className="flex gap-0.5 mb-3">
-                  {Array.from({ length: r.rating || 5 }).map((_, k) => (
-                    <Star key={k} className="w-4 h-4 fill-current" style={{ color: theme.accent }} />
-                  ))}
+                <div className="flex gap-0.5 mb-3 items-center justify-between">
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: r.rating || 5 }).map((_, k) => (
+                      <Star key={k} className="w-4 h-4 fill-current" style={{ color: theme.accent }} />
+                    ))}
+                  </div>
+                  {r.source === 'google' && (
+                    <span data-testid={`review-source-${i}`} className="text-[10px] tracking-wider uppercase opacity-70" style={{ color: theme.accent }}>
+                      Google
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm mb-3 italic" style={{ color: muted }}>"{r.text}"</p>
                 <div className="text-[11px] tracking-wider flex items-center justify-between" style={{ color: theme.accent }}>
-                  <span>— {r.author}{r.source === 'google' ? ' · Google' : ''}</span>
+                  <span>— {r.author}</span>
                   {r.time_ago && <span style={{ opacity: 0.7 }}>{r.time_ago}</span>}
                 </div>
               </div>
