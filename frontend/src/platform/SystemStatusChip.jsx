@@ -74,15 +74,17 @@ function decodeJwtPayload(token) {
   }
 }
 
+// iter 322ai — DOGFOOD HARDENING: removed the email whitelist fallback.
+// Admin status now derives EXCLUSIVELY from JWT claims (is_admin /
+// is_super_admin / role). Email is never a source of truth for routing
+// or admin-vs-customer decisions anywhere in the frontend.
 function isAdminToken(token) {
   if (!token) return false;
   const payload = decodeJwtPayload(token);
   if (!payload) return false;
   if (payload.is_admin === true || payload.is_super_admin === true) return true;
   const role = String(payload.role || "").toLowerCase();
-  if (role === "admin" || role === "super_admin") return true;
-  const email = String(payload.email || "").trim().toLowerCase();
-  return ADMIN_EMAIL_WHITELIST.includes(email);
+  return role === "admin" || role === "super_admin";
 }
 
 export default function SystemStatusChip() {

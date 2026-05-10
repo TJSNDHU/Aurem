@@ -276,10 +276,20 @@ async def get_current_platform_user(authorization: str = Header(None)):
         
         # Support both user_id (legacy) and email-based lookup (platform_auth_router tokens)
         user = None
-        if payload.get("user_id"):
-            user = await db.platform_users.find_one({"_id": payload["user_id"]})
-        elif payload.get("email"):
-            # Lookup by email for tokens from platform_auth_router
+        uid = payload.get("user_id")
+        if uid:
+            # Try the `user_id` field first (platform_auth_router stores
+            # the `plat_…` business id here, NOT the Mongo `_id` ObjectId).
+            user = await db.platform_users.find_one({"user_id": uid})
+            if not user:
+                # Legacy fallback: some older rows stored the value as `_id`.
+                try:
+                    user = await db.platform_users.find_one({"_id": uid})
+                except Exception:
+                    user = None
+        if not user and payload.get("email"):
+            # Fallback to email lookup — covers tokens issued by routers
+            # that don't embed `user_id`.
             user = await db.platform_users.find_one({"email": payload["email"].lower()})
         
         if not user:
