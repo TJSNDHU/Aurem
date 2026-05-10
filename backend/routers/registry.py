@@ -1085,6 +1085,21 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] customer_results_router skipped: {e}")
 
 
+    # BIN Intelligence (Pixel/Invoice/Mobile/Unified Merge — Parts 1,3,4,5,7)
+    if not _should_skip("routers.customer_intelligence_router"):
+        try:
+            from routers.customer_intelligence_router import (
+                router as customer_intelligence_router,
+                set_db as set_intelligence_db,
+            )
+            app.include_router(customer_intelligence_router)
+            if db is not None:
+                set_intelligence_db(db)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] customer_intelligence_router skipped: {e}")
+
+
     # Blast-Chain (Section 7 — staggered 4-touch chains + reply webhook)
     if not _should_skip("routers.blast_chain_router"):
         try:

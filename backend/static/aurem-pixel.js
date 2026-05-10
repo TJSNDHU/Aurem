@@ -582,5 +582,129 @@
     version: '3.0.0',
   };
 
-  console.log('[AUREM Bridge v3.0] Initialized — HMAC-signed patches active. Session:', sessionId);
+  // ═══════════════════════════════════════════════════════════════════
+  // iter 322al — INTELLIGENCE STACK Part 1
+  // Per-visit beacon to /api/pixel/event with hashed identity.
+  // Customer BIN comes from data-aurem-bin (preferred) or data-aurem-key.
+  // Form fills auto-trigger identity hashing (email/phone via SHA-256).
+  // NEVER sends raw email/phone — only sha256 hashes.
+  // ═══════════════════════════════════════════════════════════════════
+  (function bootIntelligence() {
+    if (!currentScript) return;
+    var BIN = currentScript.getAttribute('data-aurem-bin') || API_KEY || '';
+    if (!BIN) return;
+    var INTEL_URL = ENDPOINT + '/api/pixel/event';
+    var entryTs = Date.now();
+    var visitorHash = '';
+    var isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+    var device = isMobile ? 'mobile' : 'desktop';
+
+    function sha256Hex(s) {
+      if (!s) return Promise.resolve('');
+      var enc = new TextEncoder().encode(s);
+      if (!(window.crypto && window.crypto.subtle)) return Promise.resolve('');
+      return window.crypto.subtle.digest('SHA-256', enc).then(function(buf) {
+        var b = Array.from(new Uint8Array(buf));
+        return b.map(function(x){return x.toString(16).padStart(2,'0');}).join('');
+      });
+    }
+
+    function fingerprint() {
+      // Visitor fingerprint without true IP. UA + screen + tz + lang.
+      var parts = [
+        navigator.userAgent || '',
+        screen.width + 'x' + screen.height,
+        (new Date()).getTimezoneOffset(),
+        (navigator.language || ''),
+      ].join('|');
+      return sha256Hex(parts);
+    }
+
+    function sendEvent(extra) {
+      var elapsed = Math.round((Date.now() - entryTs) / 1000);
+      var payload = {
+        bin_id: BIN,
+        visitor_hash: visitorHash,
+        page: window.location.href,
+        time_spent: elapsed,
+        referrer: document.referrer || '',
+        device: device,
+        form_filled: false
+      };
+      if (extra) {
+        for (var k in extra) { payload[k] = extra[k]; }
+      }
+      try {
+        var body = JSON.stringify(payload);
+        var url = INTEL_URL;
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+        } else {
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body, keepalive: true
+          }).catch(function(){});
+        }
+      } catch (e) { /* fail silent */ }
+    }
+
+    function extractFormContact(form) {
+      var email = '', phone = '';
+      try {
+        var inputs = form.querySelectorAll('input, textarea');
+        for (var i = 0; i < inputs.length; i++) {
+          var el = inputs[i];
+          var t = (el.type || '').toLowerCase();
+          var n = (el.name || el.id || '').toLowerCase();
+          var v = (el.value || '').trim();
+          if (!v) continue;
+          if (t === 'email' || /email|mail/.test(n)) email = email || v;
+          else if (t === 'tel' || /phone|mobile|cell/.test(n)) phone = phone || v;
+          else if (!email && /@/.test(v) && v.length < 80) email = v;
+          else if (!phone && /\d{3,}/.test(v) && v.replace(/\D/g, '').length >= 7) phone = v;
+        }
+      } catch (e) {}
+      return { email: email, phone: phone };
+    }
+
+    function onFormSubmit(ev) {
+      var f = ev && ev.target;
+      if (!f || f.tagName !== 'FORM') return;
+      var c = extractFormContact(f);
+      if (!c.email && !c.phone) {
+        sendEvent({ form_filled: true });
+        return;
+      }
+      // Hash email + phone client-side so raw values NEVER touch network.
+      Promise.all([
+        c.email ? sha256Hex(c.email.trim().toLowerCase()) : Promise.resolve(''),
+        c.phone ? sha256Hex(c.phone.replace(/\D/g, '')) : Promise.resolve(''),
+      ]).then(function(hashes) {
+        sendEvent({
+          form_filled: true,
+          // Backend re-hashes the raw fields it receives; for guaranteed
+          // privacy we send only the hashed form_data_hash here. Server
+          // also accepts plain form_email / form_phone but we never send
+          // them.
+          form_data_hash: hashes[0] || hashes[1] || '',
+        });
+      }).catch(function() {
+        sendEvent({ form_filled: true });
+      });
+    }
+
+    fingerprint().then(function(vh) {
+      visitorHash = vh;
+      // Initial page-load beacon.
+      sendEvent({});
+    });
+
+    // Hook every submit on the page (delegated).
+    document.addEventListener('submit', onFormSubmit, true);
+    // Heartbeat on unload (time_spent measurement).
+    window.addEventListener('beforeunload', function() { sendEvent({}); });
+  })();
+
+  console.log('[AUREM Bridge v3.0] Initialized — HMAC-signed patches + Intelligence Stack active. Session:', sessionId);
 })();

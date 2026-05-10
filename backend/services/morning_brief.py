@@ -409,6 +409,43 @@ async def generate_brief(scan: dict, auto_actions: list, tenant_id: str = None) 
         logger.debug(f"[BRIEF] webclaw usage unavailable: {e}")
         webclaw_line = "\nWEBCLAW:\n  • scans today: 0\n"
 
+    # iter 322al — Intelligence Update (Part 6: BIN intelligence summary)
+    # Counts + masked-hash actions only. NEVER names or contact data.
+    intel_section = ""
+    try:
+        from services.bin_intelligence import intelligence_summary
+        from server import db as _db  # type: ignore
+        # tenant_id can arrive as "system" / "default" / None for the
+        # admin invocation path; map those to the founder dogfood BIN so
+        # the morning brief shows live intelligence numbers.
+        _bin_id = tenant_id if (tenant_id and tenant_id not in ("system", "default")) else "AUR-FNDR-001"
+        intel = await intelligence_summary(_db, _bin_id)
+        px = intel.get("pixel", {})
+        em = intel.get("email", {})
+        ph = intel.get("phone", {})
+        iv = intel.get("invoice", {})
+        intel_lines = [
+            "\nINTELLIGENCE UPDATE:",
+            f"  • PIXEL: {px.get('visitors_today',0)} website visitors today · "
+            f"{px.get('forms_today',0)} forms filled · "
+            f"{px.get('matched_contacts',0)} matched to known contacts",
+            f"  • EMAIL: {em.get('identified',0)} business contacts identified from Gmail",
+            f"  • PHONE: {ph.get('verified',0)} contacts verified as business via call patterns",
+            f"  • INVOICE: {iv.get('past_clients',0)} past clients ready for re-engagement",
+        ]
+        top = intel.get("top_actions") or []
+        if top:
+            intel_lines.append("  TOP ACTIONS TODAY:")
+            for i, t in enumerate(top, start=1):
+                intel_lines.append(
+                    f"    {i}. {t.get('contact_hash','')[:8]}… — "
+                    f"{t.get('sources_count',0)} sources matched · "
+                    f"{t.get('intent_level','LOW')} — {t.get('recommended_action','Monitor')}"
+                )
+        intel_section = "\n".join(intel_lines) + "\n"
+    except Exception as e:
+        logger.debug(f"[BRIEF] intelligence update unavailable: {e}")
+
     # Template fallback
     econ_section = f"\nECONOMIC CONTEXT:\n  {economic_line}\n" if economic_line else ""
     brief_text = f"""AUREM MORNING BRIEF — {now.strftime('%B %d, %Y')} {now.strftime('%I:%M %p')} UTC
@@ -419,7 +456,7 @@ HANDLED OVERNIGHT (no action needed):
 
 NEEDS YOUR ATTENTION:
 {chr(10).join(f'  • {a}' for a in needs_attention) if needs_attention else '  • All clear — no items need attention'}
-{econ_section}{ssot_section}{webclaw_line}
+{econ_section}{ssot_section}{webclaw_line}{intel_section}
 TODAY'S PRIORITIES:
 {chr(10).join(f'  {i+1}. {p}' for i, p in enumerate(priorities[:3]))}
 
