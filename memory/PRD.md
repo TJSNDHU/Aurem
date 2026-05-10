@@ -1,5 +1,31 @@
 # AUREM Platform — PRD
 
+> **🟡 DEVELOPMENT PRINCIPLE — "Existing-stack-first" (added 2026-02-10)**
+>
+> Before suggesting ANY paid API or third-party service, first audit the
+> existing stack to see if a free/already-paid tool can do ≥80% of the job.
+>
+> **Currently available free / already-paid tools in this repo:**
+> - DuckDuckGo lite search (zero-key, server-rendered HTML, no rate limit)
+> - Birdeye.com direct scrape (zero-key, exposes Google + Birdeye reviews)
+> - `webclaw` SDK (key currently EMPTY — needs WEBCLAW_API_KEY to work)
+> - `website_scraper.py` (httpx + bs4, FREE, contact-only)
+> - `accurate_scout.py` (Firecrawl-backed, currently 0/1000 credits)
+> - `design_extractor.py` (npx designlang CLI, FREE for brand colors)
+> - `awb_themes.py` Playwright path (BUT playwright pkg NOT installed)
+> - OpenRouter free models via `llm_gateway_v2`:
+>     • `triage_classify` → openai/gpt-oss-20b:free (most reliable)
+>     • `content_qa` → llama-3.3-70b:free (often 429s)
+>     • `sentiment` → google/gemma-4-26b-it:free
+> - Resend (already paid, used for all transactional email)
+> - Cloudflare DNS API (already paid, used for tenant subdomains)
+>
+> **Paid integrations only ever called if they are already configured AND**
+> **have credits.** Always check credit/quota status before assuming a paid
+> API is usable. NEVER suggest a paid alternative when an in-stack free
+> tool works for the task. If forced to recommend a paid path, mark it
+> 🔴 PAID and explain why the free path fails.
+
 > **HONESTY BANNER (2026-02-10)**: Earlier sections of this doc reference
 > `scout_ora` and `envoy_ora` as if they were running agents. They are NOT.
 > Those files do not exist in the codebase. The real outbound pipeline is
