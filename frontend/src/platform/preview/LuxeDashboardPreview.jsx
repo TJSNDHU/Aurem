@@ -21,6 +21,7 @@ import {
   ProfilePage, LiveHealthPage, SecurityPage,
   AutomationPage, CRMPage, ORAPage, SettingsPage,
 } from '../luxe/LuxePages';
+import { CustomerResultsRow } from '../luxe/CustomerResultsRow';
 import {
   GOLD, GOLD_HI, INK, STROKE, TEXT_HI, TEXT_MD, TEXT_LO,
   fontDisplay, fontBody, fontMono,
@@ -405,6 +406,8 @@ const HomePage = ({ data }) => (
       <RepairTile data={data} />
       <AlertsTile data={data} />
     </div>
+    {/* Row 4 (iter 322ak) — Customer Results: outcomes only, zero PII */}
+    <CustomerResultsRow />
     <style>{`
       @keyframes luxe-pulse {
         0%, 100% { opacity: 1; transform: scale(1); }

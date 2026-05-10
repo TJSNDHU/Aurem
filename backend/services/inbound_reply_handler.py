@@ -307,6 +307,22 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
             await db.inbound_replies.insert_one(dict(record))
         except Exception as e:
             logger.debug(f"[inbound] insert failed: {e}")
+        # iter 322aj — Mirror to db.unified_inbox so customer-facing
+        # OmnichannelHub auto-displays inbound emails alongside SMS/WA.
+        try:
+            from services.inbox_writer import write_inbox
+            await write_inbox(
+                db,
+                channel="email",
+                direction="inbound",
+                sender=from_addr,
+                message=text or subject or "",
+                thread_id=(lead or {}).get("lead_id") or "",
+                business_id=(lead or {}).get("tenant_id")
+                            or (lead or {}).get("business_id"),
+            )
+        except Exception as e:
+            logger.debug(f"[inbound] unified_inbox mirror failed: {e}")
 
     # Always update lead → engaged + flame boost on any reply
     if lead and db is not None:

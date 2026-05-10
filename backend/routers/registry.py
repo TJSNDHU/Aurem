@@ -1070,6 +1070,21 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] dogfood_pulse_router skipped: {e}")
 
 
+    # Customer Results + Inbox (Tiles A/B/C + /api/customer/inbox/*)
+    if not _should_skip("routers.customer_results_router"):
+        try:
+            from routers.customer_results_router import (
+                router as customer_results_router,
+                set_db as set_customer_results_db,
+            )
+            app.include_router(customer_results_router)
+            if db is not None:
+                set_customer_results_db(db)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] customer_results_router skipped: {e}")
+
+
     # Blast-Chain (Section 7 — staggered 4-touch chains + reply webhook)
     if not _should_skip("routers.blast_chain_router"):
         try:

@@ -241,6 +241,50 @@ class WhatsAppSend(BaseModel):
     use_ai: bool = True  # Route through Sovereign Brain first
 
 
+@router.post("/sms/webhook")
+async def twilio_sms_webhook(request: Request):
+    """Twilio SMS inbound webhook — form-urlencoded.
+
+    Twilio sends: From, To, Body, MessageSid, SmsStatus.
+    Mirrors into db.unified_inbox so the customer-facing OmnichannelHub
+    displays inbound SMS alongside email + WhatsApp.
+    """
+    _db = _get_db()
+    sender = ""
+    body = ""
+    try:
+        form = await request.form()
+        sender = (form.get("From") or "").strip()
+        body = (form.get("Body") or "").strip()
+    except Exception:
+        try:
+            j = await request.json()
+            sender = j.get("From") or j.get("from") or ""
+            body = j.get("Body") or j.get("body") or ""
+        except Exception:
+            return {"ok": False, "error": "could not parse payload"}
+
+    if not sender or not body:
+        return {"ok": True, "skipped": "missing from/body"}
+
+    if _db is not None:
+        try:
+            from services.inbox_writer import write_inbox
+            await write_inbox(
+                _db, channel="sms", direction="inbound",
+                sender=sender, message=body, thread_id=sender,
+            )
+        except Exception as e:
+            logger.warning(f"[SMS] inbox write failed: {e}")
+
+    from fastapi.responses import Response
+    return Response(
+        content='<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        media_type="application/xml",
+    )
+
+
+
 @router.post("/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
     """
@@ -289,6 +333,18 @@ async def whatsapp_webhook(request: Request):
                     {"chat_id": sender, "role": "user", "content": text, "timestamp": now},
                     {"chat_id": sender, "role": "assistant", "content": result["response"], "source": result["source"], "timestamp": now},
                 ])
+            except Exception:
+                pass
+            # iter 322aj — Mirror inbound + outbound to db.unified_inbox so
+            # the customer-facing OmnichannelHub displays this thread.
+            try:
+                from services.inbox_writer import write_inbox
+                await write_inbox(_db, channel="whatsapp", direction="inbound",
+                                  sender=sender, message=text, thread_id=sender)
+                await write_inbox(_db, channel="whatsapp", direction="outbound",
+                                  sender="ora@aurem.live",
+                                  message=result.get("response") or "",
+                                  thread_id=sender, sent_via="whapi")
             except Exception:
                 pass
 

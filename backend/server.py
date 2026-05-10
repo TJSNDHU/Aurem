@@ -1982,13 +1982,20 @@ async def startup_event():
     except Exception as e:
         logging.warning(f"[AwbSafety] failed to start: {e}")
 
-    # ═══ Sovereign Warmer — keep Legion ngrok tunnel warm (cold ~20s → ~800ms) ═══
+    # Sovereign Warmer — keep Legion ngrok tunnel warm (cold ~20s → ~800ms)
     try:
         from services.sovereign_warmer import sovereign_warmer_loop
         asyncio.create_task(sovereign_warmer_loop())
         logging.info("[SovereignWarmer] scheduler attached — pings /api/tags every 4 min")
     except Exception as e:
         logging.warning(f"[SovereignWarmer] failed to start: {e}")
+
+    # Unified Inbox indexes (used by /api/customer/inbox/*)
+    try:
+        from services.inbox_writer import ensure_indexes as _ensure_inbox_idx
+        await _ensure_inbox_idx(db)
+    except Exception as e:
+        logging.warning(f"[InboxWriter] index ensure failed: {e}")
 
     # ═══ Iter 282al-15 — Site QA (test-lab.ai) TTL indexes ═══
     # iter 282al-19 — defer to background so cold Atlas can't push startup

@@ -118,6 +118,26 @@ async def inbound_webhook(request: Request) -> dict:
 
     db = _get_db()
     result = await handle_inbound_reply(db, payload)
+
+    # iter 322aj — Belt-and-suspenders: even if handle_inbound_reply skips
+    # the unified_inbox write (DB connection lost mid-call, etc.), guarantee
+    # at least one row lands so the customer-facing OmnichannelHub never
+    # misses an inbound email.
+    if db is not None and not result.get("inbox_mirrored"):
+        try:
+            from services.inbox_writer import write_inbox
+            await write_inbox(
+                db,
+                channel="email",
+                direction="inbound",
+                sender=payload.get("from") or "",
+                message=payload.get("text") or payload.get("subject") or "",
+                thread_id=result.get("lead_id") or "",
+                business_id=result.get("business_id"),
+            )
+        except Exception:
+            pass
+
     return result
 
 
