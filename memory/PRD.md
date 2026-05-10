@@ -61,6 +61,25 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 
 ## Implemented — Feb 2026 (Latest)
+- **2026-02-10 — iter 322af Stack Hardening (Playwright + Camoufox install) ✅**
+  - User request: install Playwright Python pkg + Camoufox + verify Google Places key after TJ re-enables in GCP.
+  - **Playwright pkg installed** (`pip install playwright`, v1.59.0). Chromium binaries already at `/pw-browsers` so `playwright install chromium` step skipped. Live launch verified: `await browser.new_page() → goto('https://example.com') → title='Example Domain'`.
+  - **Camoufox installed** (v0.4.11) with all deps (`browserforge`, `geoip2`, `apify_fingerprint_datapoints`, `rebrowser-playwright`, etc.). Required clearing /root caches (94MB) + rerouting browser cache to `/pw-browsers/camoufox-cache` because `/root` is only 9.8G with 96% used. Camoufox CLI fetched the 707MB stealth Firefox browser + 65MB GeoIP DB + uBO addon. Live launch verified: `AsyncCamoufox().new_page() → goto('https://example.com') → title='Example Domain'`.
+  - **scrapling now functional** — was previously broken on `import camoufox`. `StealthyFetcher` now imports cleanly.
+  - **Persisted XDG_CACHE_HOME=/pw-browsers/camoufox-cache** in /app/backend/.env so backend services find the camoufox browser binary after supervisor restarts.
+  - **requirements.txt updated** via `pip freeze` (added playwright, camoufox, browserforge, cssselect, w3lib, geoip2, maxminddb, screeninfo, language-tags, pysocks, apify_fingerprint_datapoints, rebrowser-playwright, ua_parser, ua-parser-builtins).
+  - **Google Places API**: still ❌ `REQUEST_DENIED — Google has disabled the use of APIs from this API project.` BLOCKED on TJ re-enabling in GCP console (billing or quota cap). Curl test stub stays in /tmp/probe_review_model.py for retest once enabled.
+  - **Full-batch regression** (322ab→322ae) on a single signup:
+    1. ✅ POST /api/website-builder/no-website → JWT issued, redirect=/dashboard
+    2. ✅ /api/platform/me with JWT → 200 (auto-login works)
+    3. ✅ db.tenants row created with all required fields
+    4. ✅ Welcome email queued via Resend (background task)
+    5. ✅ services_source=customer_supplied (Drain cleaning, Emergency repairs, Bathroom plumbing)
+    6. ✅ reviews_source=birdeye_scraped, aggregate=4.8/77, 5 real Google reviews (Jane Smith, Shanice Goulbourne, Kosal Sockhak, Caroline, Mr. Rooter Trina)
+    7. ✅ theme_source=extracted (Stripe.com colors: bg=#e5edf5, accent=#533afd, text=#000)
+    8. ✅ No fake "5.0★ (Many Reviews)" badge — replaced with "SERVING MISSISSAUGA & SURROUNDING AREAS"
+  - **Live site verified** at `/sample/mr-rooter-plumbing-of-mississauga-2fd5e7` — Stripe-purple theme, Mr Rooter branding, NO fake rating, real Mississauga plumber data.
+
 - **2026-02-10 — iter 322ae Free Real-Review Pulling via Birdeye Scrape ✅**
   - User mandate: "Existing-stack-first" rule (logged at top of PRD.md) — no paid Google Places API. Find a free path.
   - **Discovery**: WEBCLAW key empty, Yelp API restricted (401 on all endpoints), Firecrawl 0/1000 credits left, Tavily plan-limit hit, Playwright pkg not installed, scrapling broken (missing camoufox). The ONLY genuinely-free + working path: **DuckDuckGo lite + direct Birdeye scrape**. Live-proven on a real Mississauga plumber.
