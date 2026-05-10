@@ -153,11 +153,101 @@ export default function ORAWidget() {
     const filesToSend = attachments;
     setAttachments([]);
 
+    const apiBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+    const sessionId =
+      localStorage.getItem("aurem.ora_session") ||
+      (() => {
+        const sid = `ora-${Date.now()}`;
+        localStorage.setItem("aurem.ora_session", sid);
+        return sid;
+      })();
+
+    // iter 322ah — text-only messages go through the streaming Groq path
+    // (<100ms first token). Attachments still use the legacy FormData
+    // multipart endpoint because Groq doesn't ingest files yet.
+    if (filesToSend.length === 0 && text) {
+      // Insert empty placeholder bubble that we will mutate as tokens land.
+      setMessages((m) => [...m, { role: "ora", text: "" }]);
+      try {
+        const res = await fetch(`${apiBase}/api/aurem/chat/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, session_id: sessionId }),
+        });
+        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let assistantText = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let idx;
+          // eslint-disable-next-line no-cond-assign
+          while ((idx = buf.indexOf("\n\n")) !== -1) {
+            const frame = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            const line = frame.replace(/^data:\s?/, "").trim();
+            if (!line) continue;
+            let evt;
+            try { evt = JSON.parse(line); } catch { continue; }
+            if (typeof evt.token === "string") {
+              assistantText += evt.token;
+              setMessages((m) => {
+                const next = [...m];
+                for (let i = next.length - 1; i >= 0; i--) {
+                  if (next[i].role === "ora") {
+                    next[i] = { ...next[i], text: assistantText };
+                    break;
+                  }
+                }
+                return next;
+              });
+            }
+            if (evt.done) break;
+          }
+        }
+        if (!assistantText) {
+          setMessages((m) => {
+            const next = [...m];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].role === "ora") {
+                next[i] = {
+                  ...next[i],
+                  text: "Got it — I've noted this. (Live chat backend not yet wired; we'll follow up by email if you signed in.)",
+                };
+                break;
+              }
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        setMessages((m) => {
+          const next = [...m];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === "ora") {
+              next[i] = {
+                ...next[i],
+                text: "I couldn't reach the support brain just now — please email teji@aurem.live and we'll respond fast.",
+              };
+              break;
+            }
+          }
+          return next;
+        });
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Legacy attachment path — keeps the screenshot-upload feature alive.
     try {
-      const apiBase = process.env.REACT_APP_BACKEND_URL || window.location.origin;
       const fd = new FormData();
       fd.append("message", text);
-      fd.append("session_id", localStorage.getItem("aurem.ora_session") || `ora-${Date.now()}`);
+      fd.append("session_id", sessionId);
       fd.append("page_url", window.location.href);
       filesToSend.forEach((f) => fd.append("attachments", f, f.name));
       const res = await fetch(`${apiBase}/api/ora/support-chat`, {
@@ -171,7 +261,6 @@ export default function ORAWidget() {
           text: data.response || data.reply || "Got it — I've logged this. A human will follow up if needed.",
         }]);
       } else {
-        // Graceful fallback: still acknowledge without breaking UX.
         setMessages((m) => [...m, {
           role: "ora",
           text: "Got it — I've noted this. (Live chat backend not yet wired; we'll follow up by email if you signed in.)",
@@ -332,9 +421,19 @@ export default function ORAWidget() {
                 )}
               </div>
             ))}
-            {sending && (
-              <div style={{ alignSelf: "flex-start", color: "#888", fontSize: 12 }}>ORA is thinking…</div>
-            )}
+            {sending && (() => {
+              // iter 322ah — hide "thinking" once the streaming bubble has
+              // started receiving tokens (the LAST message will be an empty
+              // 'ora' bubble that we mutate as tokens land). If that bubble
+              // already has text, the stream is live — no need to also show
+              // a thinking spinner.
+              const last = messages[messages.length - 1];
+              const streamingStarted = last && last.role === "ora" && (last.text || "").length > 0;
+              if (streamingStarted) return null;
+              return (
+                <div style={{ alignSelf: "flex-start", color: "#888", fontSize: 12 }}>ORA is thinking…</div>
+              );
+            })()}
             <div ref={messagesEndRef} />
           </div>
 

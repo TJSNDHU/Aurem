@@ -207,6 +207,55 @@ async def _call_emergent(
     }
 
 
+async def _call_groq_stream(
+    model: str, prompt: str, system: Optional[str], max_tokens: int,
+):
+    """Async generator yielding raw token chunks from Groq.
+    Same provider chain semantics as `_call_groq` for the non-streaming
+    case — raises RuntimeError when GROQ_API_KEY is missing.
+    """
+    import httpx
+    import json as _json
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY missing")
+    msgs = []
+    if system:
+        msgs.append({"role": "system", "content": system})
+    msgs.append({"role": "user", "content": prompt})
+    body = {
+        "model": model, "messages": msgs,
+        "max_tokens": max_tokens, "stream": True,
+    }
+    async with httpx.AsyncClient(timeout=60.0) as c:
+        async with c.stream(
+            "POST",
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=body,
+        ) as resp:
+            resp.raise_for_status()
+            async for raw in resp.aiter_lines():
+                if not raw:
+                    continue
+                if not raw.startswith("data: "):
+                    continue
+                payload = raw[6:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    chunk = _json.loads(payload)
+                except Exception:
+                    continue
+                delta = (chunk.get("choices") or [{}])[0].get("delta", {})
+                token = delta.get("content")
+                if token:
+                    yield token
+
+
 _PROVIDER_DISPATCH = {
     "groq":       _call_groq,
     "openrouter": _call_openrouter,
@@ -293,3 +342,78 @@ async def route(
         "tokens_out": final["output_tokens"],
         "chain_attempts": attempts,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# STREAMING ROUTE (iter 322ah — Groq SSE first-token <100ms)
+# ─────────────────────────────────────────────────────────────────────
+async def route_stream(
+    task_type: str,
+    prompt: str,
+    *,
+    system: Optional[str] = None,
+    max_tokens: int = 1500,
+):
+    """Stream-mode dispatch. Currently only Groq supports first-token
+    streaming on the free tier with sub-100ms latency. We pick the FIRST
+    Groq entry in the chain for this task; if no Groq entry exists OR
+    the Groq call fails, we fall back to non-streaming `route()` and
+    yield the full text as a single chunk so the SSE consumer code-path
+    stays uniform from the caller's perspective."""
+    chain = _chain_for(task_type)
+    groq_entry = next(
+        ((p, m) for p, m in chain if p == "groq"), None
+    )
+    start = time.monotonic()
+    first_token_ms: Optional[float] = None
+    out_tokens = 0
+    used_provider = "groq"
+    used_model = "?"
+    err: Optional[str] = None
+
+    if groq_entry is not None:
+        used_provider, used_model = groq_entry
+        try:
+            async for tok in _call_groq_stream(used_model, prompt, system, max_tokens):
+                if first_token_ms is None:
+                    first_token_ms = round((time.monotonic() - start) * 1000.0, 1)
+                out_tokens += 1
+                yield tok
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            logger.info(f"[gateway.stream] {task_type} groq fail: {err[:120]}")
+            full = await route(task_type, prompt, system=system, max_tokens=max_tokens)
+            used_provider = full.get("provider", "fallback")
+            used_model = full.get("model", "?")
+            if first_token_ms is None:
+                first_token_ms = round((time.monotonic() - start) * 1000.0, 1)
+            yield full.get("text", "")
+            err = full.get("error")
+    else:
+        full = await route(task_type, prompt, system=system, max_tokens=max_tokens)
+        used_provider = full.get("provider", "fallback")
+        used_model = full.get("model", "?")
+        first_token_ms = round((time.monotonic() - start) * 1000.0, 1)
+        yield full.get("text", "")
+        err = full.get("error")
+
+    total_ms = round((time.monotonic() - start) * 1000.0, 1)
+    db = _get_db()
+    if db is not None:
+        try:
+            await db.llm_costs.insert_one({
+                "provider": used_provider,
+                "model": used_model,
+                "task_type": task_type,
+                "tokens_in": 0,
+                "tokens_out": out_tokens,
+                "latency_ms": total_ms,
+                "first_token_ms": first_token_ms,
+                "streamed": True,
+                "ok": err is None,
+                "error": err,
+                "ts": datetime.now(timezone.utc),
+            })
+        except Exception as e:
+            logger.debug(f"[gateway.stream] cost log failed: {e}")
+

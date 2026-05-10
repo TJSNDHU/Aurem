@@ -326,3 +326,94 @@ async def ora_stream_sse(req: StreamChatRequest, authorization: str = Header(Non
             "X-Accel-Buffering": "no",
         },
     )
+
+
+
+# ─────────────────────────────────────────────────────────────────────
+# iter 322ah — Groq-backed SSE for the customer ORA widget
+# ─────────────────────────────────────────────────────────────────────
+class GroqStreamReq(BaseModel):
+    message: str
+    session_id: str | None = None
+
+
+_GROQ_SYSTEM = (
+    "You are ORA, the AI sales co-pilot for the AUREM platform. "
+    "You help local business owners (plumbers, salons, auto shops, etc.) "
+    "manage their leads, campaigns, and customer outreach. "
+    "Be concise, friendly, and actionable. Reply in 2–4 sentences unless "
+    "the user explicitly asks for detail. Use plain English with light "
+    "Hinglish phrasing when the user does. Never invent specific lead "
+    "details, numbers, or names — if you need data, say so and offer to "
+    "look it up."
+)
+
+
+@router.post("/api/aurem/chat/stream")
+async def aurem_chat_stream_groq(body: GroqStreamReq, request: Request):
+    """SSE stream of ORA chat tokens via Groq llama-3.3-70b.
+    First token <100ms target. Falls back to OpenRouter chain on failure.
+
+    Frame format (one JSON per `data:` line):
+      • {session_id}                  — first frame, conversation id
+      • {ttfb_ms}                     — on first model token
+      • {token: "<chunk>"}            — each model chunk
+      • {done: true, total_ms, ttfb_ms}  — terminator
+      • {error: "..."}                — only on failure
+    """
+    from services.llm_gateway_v2 import route_stream
+
+    msg = (body.message or "").strip()
+    session_id = body.session_id or f"ora_{uuid.uuid4().hex[:12]}"
+    if not msg:
+        async def empty():
+            yield f"data: {json.dumps({'error': 'empty message'})}\n\n"
+        return StreamingResponse(empty(), media_type="text/event-stream")
+
+    start = time.monotonic()
+
+    async def gen():
+        ttfb_ms = None
+        full_text = ""
+        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
+        try:
+            async for tok in route_stream(
+                "ora_chat", msg, system=_GROQ_SYSTEM, max_tokens=600,
+            ):
+                if ttfb_ms is None:
+                    ttfb_ms = round((time.monotonic() - start) * 1000.0, 1)
+                    yield f"data: {json.dumps({'ttfb_ms': ttfb_ms})}\n\n"
+                full_text += tok
+                yield f"data: {json.dumps({'token': tok})}\n\n"
+                await asyncio.sleep(0)
+        except Exception as e:
+            logger.warning(f"[ora.stream.groq] crash: {e}")
+            yield f"data: {json.dumps({'error': str(e)[:200]})}\n\n"
+        total_ms = round((time.monotonic() - start) * 1000.0, 1)
+        yield f"data: {json.dumps({'done': True, 'ttfb_ms': ttfb_ms, 'total_ms': total_ms})}\n\n"
+
+        db = _get_db()
+        if db is not None:
+            try:
+                await db.ora_chat_history.insert_one({
+                    "session_id": session_id,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "user_message": msg,
+                    "assistant_text": full_text,
+                    "ttfb_ms": ttfb_ms,
+                    "total_ms": total_ms,
+                    "streamed": True,
+                    "model": "groq/llama-3.3-70b-versatile",
+                })
+            except Exception:
+                pass
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

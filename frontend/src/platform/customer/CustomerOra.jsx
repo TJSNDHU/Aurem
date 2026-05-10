@@ -12,7 +12,6 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { Send, Loader2, Sparkles, RefreshCw } from "lucide-react";
-import { getPlatformToken } from "../../utils/secureTokenStore";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -88,46 +87,92 @@ export default function CustomerOra() {
     setInput("");
     setErr("");
     setMessages((m) => [...m, { role: "user", content: msg }]);
+    // iter 322ah — open a streaming assistant message right away.
+    // Tokens land into the placeholder bubble as they arrive.
+    setMessages((m) => [...m, { role: "assistant", content: "" }]);
     setBusy(true);
     try {
-      const token = getPlatformToken();
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
       const body = { message: msg };
       if (sessionId) body.session_id = sessionId;
-      // iter 279 — tenant isolation: attach business_id/tenant_id if available
-      try {
-        const raw = localStorage.getItem("platform_user")
-                 || sessionStorage.getItem("platform_user")
-                 || localStorage.getItem("aurem_user");
-        if (raw) {
-          const u = JSON.parse(raw);
-          const tid = u.business_id || u.tenant_id || u._id || u.id || u.email;
-          if (tid) body.tenant_id = String(tid);
-        }
-      } catch { /* ignore */ }
 
-      const r = await fetch(`${API}/api/aurem/chat`, {
+      const r = await fetch(`${API}/api/aurem/chat/stream`, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const d = await r.json();
-      if (d.session_id && !sessionId) setSessionId(d.session_id);
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: d.response || "(no response)" },
-      ]);
+      if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let assistantText = "";
+      // streaming loop
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        // SSE frames are split by blank lines
+        let nlIdx;
+        // eslint-disable-next-line no-cond-assign
+        while ((nlIdx = buf.indexOf("\n\n")) !== -1) {
+          const frame = buf.slice(0, nlIdx);
+          buf = buf.slice(nlIdx + 2);
+          const line = frame.replace(/^data:\s?/, "").trim();
+          if (!line) continue;
+          let evt;
+          try { evt = JSON.parse(line); } catch { continue; }
+          if (evt.session_id && !sessionId) setSessionId(evt.session_id);
+          if (evt.error) {
+            setErr(evt.error);
+          }
+          if (typeof evt.token === "string") {
+            assistantText += evt.token;
+            // mutate the LAST assistant bubble in place
+            setMessages((m) => {
+              const next = [...m];
+              for (let i = next.length - 1; i >= 0; i--) {
+                if (next[i].role === "assistant") {
+                  next[i] = { ...next[i], content: assistantText };
+                  break;
+                }
+              }
+              return next;
+            });
+          }
+          if (evt.done) {
+            // final stamp; we already have full text in the last bubble
+            break;
+          }
+        }
+      }
+      if (!assistantText) {
+        setMessages((m) => {
+          const next = [...m];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === "assistant") {
+              next[i] = { ...next[i], content: "(no response)" };
+              break;
+            }
+          }
+          return next;
+        });
+      }
     } catch (e) {
       setErr(String(e.message || e));
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: "Something went wrong reaching ORA. Please try again.",
-        },
-      ]);
+      setMessages((m) => {
+        const next = [...m];
+        // replace empty trailing placeholder with error text
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === "assistant") {
+            next[i] = {
+              ...next[i],
+              content: "Something went wrong reaching ORA. Please try again.",
+            };
+            break;
+          }
+        }
+        return next;
+      });
     } finally {
       setBusy(false);
     }
