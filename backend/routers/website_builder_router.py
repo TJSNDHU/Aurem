@@ -22,7 +22,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
 from services.website_builder import generate_website
@@ -113,25 +113,107 @@ async def generate(body: GenerateRequest, request: Request):
 
 # ─────────────────────────────────────────────────────────────
 # PUBLIC: NO-WEBSITE INSTANT STARTER (7-day trial, no auth needed)
+# iter 322ab — customer chooses their OWN password (no temp generation),
+# website-generation runs in background, welcome email fires, JWT issued
+# for auto-login → redirect to /dashboard. NO password ever shown on
+# screen or stored in plaintext.
 # ─────────────────────────────────────────────────────────────
 class NoWebsiteRequest(BaseModel):
     business_name: str
     email: str
+    password: str  # iter 322ab — customer-chosen, min 8 chars
+    confirm_password: Optional[str] = None  # client validates; server re-checks
     phone: Optional[str] = ""
     city: Optional[str] = ""
     category: Optional[str] = ""  # e.g. "Roofing", "HVAC", "Realtor"
     consent: bool = True
 
 
+async def _generate_site_background(db, lead: dict, final_slug: str) -> None:
+    """Run the (synchronous) Playwright + Claude generator in a thread
+    so it doesn't block the request response. Persists final state on
+    completion. Idempotent — re-runs upsert by slug."""
+    import asyncio as _asyncio
+    try:
+        website = await _asyncio.to_thread(generate_website, lead)
+        website["lead_id"] = lead["lead_id"]
+        website["slug"] = final_slug
+        website["status"] = website.get("status") or "approved"
+        website["generation_state"] = "ready"
+        website["generated_at"] = datetime.now(timezone.utc).isoformat()
+        await db[COLLECTION].update_one(
+            {"slug": final_slug}, {"$set": website}, upsert=True,
+        )
+        logger.info(f"[NO-WEBSITE bg] site ready: {final_slug}")
+    except Exception as e:
+        logger.warning(f"[NO-WEBSITE bg] generation failed for {final_slug}: {e}")
+        await db[COLLECTION].update_one(
+            {"slug": final_slug},
+            {"$set": {
+                "generation_state": "failed",
+                "generation_error": str(e)[:300],
+                "failed_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+
+
+async def _send_starter_welcome_email(
+    email: str, business_name: str, bin_code: str,
+    final_slug: str, trial_ends_iso: str, trial_ends_human: str,
+    public_base: str,
+) -> None:
+    """Fire the welcome email to the new starter customer. Best-effort
+    — never raises (logged on failure so it surfaces in admin panel)."""
+    try:
+        from services.welcome_package import _render_email_template, _send_via_resend
+    except Exception as e:
+        logger.warning(f"[starter-welcome] email service import failed: {e}")
+        return
+
+    sample_url = f"{public_base}/sample/{final_slug}"
+    dashboard_url = f"{public_base}/dashboard"
+
+    email_data = {
+        "first_name": business_name.split()[0] if business_name else "Founder",
+        "business_name": business_name,
+        "business_id": bin_code,
+        "dashboard_url": dashboard_url,
+        "ora_url": f"{public_base}/ora?id={bin_code}",
+        "api_key": "(retrieve from your dashboard → Settings → API Keys)",
+        "pixel_snippet": f'<script src="{public_base}/api/pixel/aurem-pixel.js" data-aurem-key="YOUR_KEY"></script>',
+        "trial_ends_at": trial_ends_iso,
+        "trial_ends_human": trial_ends_human,
+        "support_email": "ora@aurem.live",
+        "sample_url": sample_url,
+    }
+    try:
+        html_body = _render_email_template(email_data)
+        subject = f"Welcome to AUREM — Your Business ID: {bin_code}"
+        await _send_via_resend(email, subject, html_body, email_data)
+        logger.info(f"[starter-welcome] sent to {email} ({bin_code})")
+    except Exception as e:
+        logger.warning(f"[starter-welcome] send failed for {email}: {e}")
+
+
 @router.post("/no-website")
-async def no_website_instant(body: NoWebsiteRequest, request: Request):
+async def no_website_instant(
+    body: NoWebsiteRequest, request: Request, background_tasks: BackgroundTasks,
+):
     """
     Public, no-auth endpoint for the homepage "I don't have a website" CTA.
-    Creates a self-service lead → generates a sample site → provisions a
-    7-day trial customer account → returns the slug + a one-time login URL.
+    iter 322ab flow:
+      1. Customer chooses their OWN password (min 8 chars) — NO temp password.
+      2. Account created in `tenants` + `platform_users` + `users` (mirrors).
+      3. Website generation queued as background task (non-blocking).
+      4. Welcome email queued as background task.
+      5. JWT issued for auto-login → frontend redirects to /dashboard.
+      6. Response carries `token`, `bin`, `sample_url`, `dashboard_url`,
+         `trial_ends_at`. Response does NOT carry any password.
     """
     import secrets as _secrets
     import bcrypt as _bcrypt
+    import jwt as _jwt
     from datetime import timedelta as _timedelta
 
     db = _get_db()
@@ -140,10 +222,16 @@ async def no_website_instant(body: NoWebsiteRequest, request: Request):
 
     business_name = (body.business_name or "").strip()
     email = (body.email or "").strip().lower()
+    password = (body.password or "").strip()
+
     if not business_name or not email or "@" not in email:
         raise HTTPException(400, "business_name and a valid email are required")
     if not body.consent:
         raise HTTPException(400, "Consent (CASL) is required")
+    if len(password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    if body.confirm_password is not None and body.confirm_password != password:
+        raise HTTPException(400, "Passwords do not match")
 
     now = datetime.now(timezone.utc)
     trial_ends = now + _timedelta(days=7)
@@ -169,44 +257,55 @@ async def no_website_instant(body: NoWebsiteRequest, request: Request):
         {"lead_id": lead_id}, {"$setOnInsert": lead}, upsert=True
     )
 
-    # 2) Re-use existing generator (sync, fast — runs in thread).
-    import asyncio as _asyncio
-    website = await _asyncio.to_thread(generate_website, lead)
-    website["lead_id"] = lead_id
-    website["trial_started_at"] = now.isoformat()
-    website["trial_ends_at"] = trial_ends.isoformat()
-    website["trial_expired"] = False
-    website["status"] = website.get("status") or "approved"
-    # Use lead_id as the slug suffix to guarantee uniqueness.
-    final_slug = f"{website.get('slug', slug) or slug}-{lead_id[-6:]}"
-    website["slug"] = final_slug
-
+    # 2) Reserve the slug + queue background generation. Pre-write a
+    #    placeholder doc so /sample/{slug} can render a "Building..."
+    #    state immediately instead of 404.
+    final_slug = f"{slug or 'site'}-{lead_id[-6:]}"
     await db[COLLECTION].update_one(
-        {"slug": final_slug}, {"$set": website}, upsert=True
+        {"slug": final_slug},
+        {"$set": {
+            "slug": final_slug,
+            "lead_id": lead_id,
+            "business": {"name": business_name,
+                         "category": lead["category"],
+                         "city": lead["location"]},
+            "status": "generating",
+            "generation_state": "in_progress",
+            "trial_started_at": now.isoformat(),
+            "trial_ends_at": trial_ends.isoformat(),
+            "trial_expired": False,
+            "queued_at": now.isoformat(),
+        }},
+        upsert=True,
     )
+    background_tasks.add_task(_generate_site_background, db, lead, final_slug)
 
-    # 3) Provision (or upsert) a customer account in platform_users.
-    #    Keep the password reset token short-lived; the email contains the
-    #    one-time login URL using the existing /my password-reset flow.
+    # 3) Provision (or upsert) a customer account with the customer's
+    #    OWN password. Stored as bcrypt hash. NEVER returned in plaintext.
     existing_user = await db.platform_users.find_one({"email": email}, {"_id": 0})
     user_id = (existing_user or {}).get("user_id") or f"u_{_secrets.token_hex(8)}"
     bin_code = (existing_user or {}).get("bin") or f"AURE-NWS-{_secrets.token_hex(3).upper()}"
-    temp_password = _secrets.token_urlsafe(12)
-    hashed = _bcrypt.hashpw(temp_password.encode(), _bcrypt.gensalt()).decode()
+    hashed = _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
 
     user_doc = {
         "user_id": user_id,
         "email": email,
         "password_hash": hashed,
         "bin": bin_code,
+        "business_id": bin_code,
         "full_name": business_name,
         "company_name": business_name,
+        "phone": (body.phone or "").strip(),
+        "city": (body.city or "").strip(),
+        "industry": (body.category or "").strip(),
         "tier": "starter",
         "tier_status": "trial",
+        "plan": "trial",
+        "subscription_status": "trialing",
         "trial_started_at": now.isoformat(),
         "trial_ends_at": trial_ends.isoformat(),
         "sample_site_slug": final_slug,
-        "source": "no_website_signup",
+        "source": "homepage_instant_trial",
         "created_at": (existing_user or {}).get("created_at", now.isoformat()),
         "updated_at": now.isoformat(),
     }
@@ -215,41 +314,92 @@ async def no_website_instant(body: NoWebsiteRequest, request: Request):
         {"$set": user_doc, "$setOnInsert": {"_first_seen": now.isoformat()}},
         upsert=True,
     )
-    # Mirror to legacy `users` collection so existing admin/login flows still see this account
+    # Mirror to legacy `users` collection so existing /api/auth/login works.
     await db.users.update_one(
         {"email": email},
         {"$set": {
+            "id": user_id,
             "email": email,
+            "first_name": business_name.split()[0] if business_name else "Founder",
+            "last_name": " ".join(business_name.split()[1:]) if len(business_name.split()) > 1 else "",
             "password": hashed,
             "password_hash": hashed,
             "name": business_name,
+            "is_admin": False,
             "tier": "starter",
             "tier_status": "trial",
             "trial_ends_at": trial_ends.isoformat(),
         }},
         upsert=True,
     )
+    # Mirror to `tenants` collection so /admin/customers panel sees them.
+    await db.tenants.update_one(
+        {"bin_id": bin_code},
+        {"$set": {
+            "bin_id": bin_code,
+            "user_id": user_id,
+            "email": email,
+            "business_name": business_name,
+            "city": (body.city or "").strip(),
+            "industry": (body.category or "").strip(),
+            "phone": (body.phone or "").strip(),
+            "plan": "trial",
+            "trial_ends_at": trial_ends.isoformat(),
+            "source": "homepage_instant_trial",
+            "sample_site_slug": final_slug,
+            "updated_at": now.isoformat(),
+        }, "$setOnInsert": {"created_at": now.isoformat()}},
+        upsert=True,
+    )
 
-    # 4) Return everything the frontend needs to redirect the visitor.
-    public_base = os.environ.get("PUBLIC_APP_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+    # 4) Issue JWT for auto-login (matches /api/auth/login claims).
+    jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not jwt_secret:
+        raise HTTPException(500, "JWT_SECRET not configured")
+    token = _jwt.encode(
+        {
+            "sub": user_id, "id": user_id, "email": email,
+            "is_admin": False,
+            "exp": int((now + _timedelta(hours=8)).timestamp()),
+            "iat": int(now.timestamp()),
+        },
+        jwt_secret, algorithm="HS256",
+    )
+
+    # 5) Queue welcome email — NEVER blocks the response.
+    public_base = (os.environ.get("PUBLIC_APP_URL")
+                   or os.environ.get("APP_BASE_URL")
+                   or "https://aurem.live").rstrip("/")
     sample_url = f"{public_base}/sample/{final_slug}"
-    login_url  = f"{public_base}/my"
+    dashboard_url = f"{public_base}/dashboard"
+    background_tasks.add_task(
+        _send_starter_welcome_email,
+        email, business_name, bin_code, final_slug,
+        trial_ends.isoformat(), trial_ends.strftime("%B %d, %Y"),
+        public_base,
+    )
 
     logger.info(f"[NO-WEBSITE] new starter site for {email} → /sample/{final_slug}")
 
+    # 6) Response — token + redirect info, ZERO password leak.
     return {
         "ok": True,
+        "token": token,
+        "user": {
+            "id": user_id, "email": email, "first_name": business_name,
+            "last_name": "", "is_admin": False,
+        },
+        "bin": bin_code,
         "slug": final_slug,
         "sample_url": sample_url,
-        "login_url": login_url,
-        "email": email,
-        "bin": bin_code,
-        "temp_password": temp_password,  # shown once on the success screen
+        "dashboard_url": dashboard_url,
         "trial_ends_at": trial_ends.isoformat(),
+        "trial_ends_human": trial_ends.strftime("%B %d, %Y"),
+        "site_status": "generating",
+        "redirect": "/dashboard",
         "message": (
-            "Your sample site is live for 7 days. Use the credentials below to "
-            "sign in to your dashboard. Subscribe before the trial ends to keep "
-            "the site live."
+            "Your starter site is being built — check back in 30-60 seconds. "
+            "Welcome email is on its way."
         ),
     }
 

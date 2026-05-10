@@ -50,6 +50,61 @@ def _render_email_template(data: dict) -> str:
         return ""
 
 
+# iter 322ab — reusable Resend sender so other handlers (e.g. the
+# homepage instant-trial flow) can fire the same welcome email without
+# duplicating the integration code.
+async def _send_via_resend(to: str, subject: str, html_body: str,
+                            email_data: dict | None = None) -> dict:
+    """Send an HTML email via Resend. Logs to db.sent_emails. Best-effort —
+    never raises. Returns {ok, status, resend_id, error}."""
+    resend_key = os.environ.get("RESEND_API_KEY", "").strip()
+    from_addr = os.environ.get("RESEND_FROM", "AUREM <welcome@aurem.live>")
+    send_status = "skipped_no_key"
+    resend_id = None
+    send_error = None
+    try:
+        if resend_key:
+            import resend as _resend
+            _resend.api_key = resend_key
+
+            def _do_send():
+                return _resend.Emails.send({
+                    "from": from_addr,
+                    "to": [to],
+                    "subject": subject,
+                    "html": html_body or f"<p>{subject}</p>",
+                })
+
+            import asyncio as _asyncio
+            result = await _asyncio.to_thread(_do_send)
+            resend_id = (result or {}).get("id")
+            send_status = "sent" if resend_id else "accepted_no_id"
+        else:
+            logger.warning("[email] RESEND_API_KEY missing — email not delivered")
+    except Exception as _e:
+        send_error = str(_e)[:200]
+        send_status = "send_error"
+        logger.warning(f"[email] Resend send failed: {_e}")
+
+    if _db is not None:
+        try:
+            await _db.sent_emails.insert_one({
+                "to": to,
+                "subject": subject,
+                "template": "welcome_email",
+                "data": email_data or {},
+                "html_preview": (html_body or "")[:500],
+                "status": send_status,
+                "resend_id": resend_id,
+                "error": send_error,
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            logger.debug(f"[email] sent_emails insert skipped: {e}")
+    return {"ok": send_status == "sent", "status": send_status,
+            "resend_id": resend_id, "error": send_error}
+
+
 async def send_welcome_package(tenant_id: str, user_doc: dict = None):
     """Send complete welcome package: email + notification + welcome card flag."""
     if _db is None:

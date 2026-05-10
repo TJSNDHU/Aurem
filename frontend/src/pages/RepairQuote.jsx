@@ -45,6 +45,7 @@ const RepairQuote = () => {
   const [error, setError] = useState("");
 
   // ── "I don't have a website" instant-builder flow (7-day trial) ───
+  // iter 322ab — customer chooses their OWN password (no temp generation).
   const [showNoSite, setShowNoSite] = useState(false);
   const [nwsForm, setNwsForm] = useState({
     business_name: "",
@@ -52,12 +53,13 @@ const RepairQuote = () => {
     phone: "",
     city: "",
     category: "",
+    password: "",
+    confirm_password: "",
     consent: true,
   });
   const [nwsLoading, setNwsLoading] = useState(false);
   const [nwsResult, setNwsResult] = useState(null);
   const [nwsError, setNwsError] = useState("");
-  const [pwdCopied, setPwdCopied] = useState(false);
 
   const onNwsChange = useCallback((k) => (e) => {
     const v = e?.target?.type === "checkbox" ? e.target.checked : e.target.value;
@@ -76,6 +78,14 @@ const RepairQuote = () => {
       setNwsError("CASL consent mark karo.");
       return;
     }
+    if (!nwsForm.password || nwsForm.password.length < 8) {
+      setNwsError("Password kam-se-kam 8 characters ka rakho.");
+      return;
+    }
+    if (nwsForm.password !== nwsForm.confirm_password) {
+      setNwsError("Confirm password match nahi kar raha.");
+      return;
+    }
     setNwsLoading(true);
     try {
       const r = await fetch(`${API}/api/website-builder/no-website`, {
@@ -87,6 +97,15 @@ const RepairQuote = () => {
       if (!r.ok) {
         setNwsError(body?.detail || `Failed (HTTP ${r.status})`);
       } else {
+        // iter 322ab — auto-login: persist token so /dashboard opens
+        // without bouncing through /login.
+        if (body?.token) {
+          try {
+            localStorage.setItem("token", body.token);
+            localStorage.setItem("aurem_admin_token", body.token);
+            sessionStorage.setItem("platform_token", body.token);
+          } catch {}
+        }
         setNwsResult(body);
       }
     } catch (e) {
@@ -443,6 +462,38 @@ const RepairQuote = () => {
                   placeholder="Roofing, HVAC, etc."
                   value={nwsForm.category}
                   onChange={onNwsChange("category")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* iter 322ab — customer-chosen password (no temp generation) */}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] uppercase tracking-widest text-zinc-500">
+                  Create Password<span className="text-rose-400 ml-0.5">*</span>
+                </label>
+                <input
+                  data-testid="nws-password"
+                  type="password"
+                  placeholder="Min 8 characters"
+                  autoComplete="new-password"
+                  value={nwsForm.password}
+                  onChange={onNwsChange("password")}
+                  className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-widest text-zinc-500">
+                  Confirm Password<span className="text-rose-400 ml-0.5">*</span>
+                </label>
+                <input
+                  data-testid="nws-confirm-password"
+                  type="password"
+                  placeholder="Re-enter password"
+                  autoComplete="new-password"
+                  value={nwsForm.confirm_password}
+                  onChange={onNwsChange("confirm_password")}
                   className="mt-1 w-full bg-black/60 border border-zinc-800 rounded-lg px-4 py-3 text-base focus:border-amber-500 outline-none"
                 />
               </div>

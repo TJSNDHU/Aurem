@@ -220,13 +220,27 @@ const AuremSampleWebsite = () => {
   const sessionRef = useRef(null);
   const engagedFiredRef = useRef(false);
 
+  // iter 322ab — if site is still being generated, auto-refresh every 5s
+  // until it's ready. Visitors land here right after the homepage form
+  // submit, so we want the page to come alive automatically.
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/api/website-builder/${slug}`)
-      .then((r) => r.ok ? r.json() : Promise.reject(r.status === 404 ? 'Website not found' : 'Failed to load'))
-      .then((d) => !cancelled && setSite(d))
-      .catch((e) => !cancelled && setError(String(e)));
-    return () => { cancelled = true; };
+    let pollTimer = null;
+    const fetchSite = () => {
+      fetch(`${API}/api/website-builder/${slug}`)
+        .then((r) => r.ok ? r.json() : Promise.reject(r.status === 404 ? 'Website not found' : 'Failed to load'))
+        .then((d) => {
+          if (cancelled) return;
+          setSite(d);
+          // Keep polling while still building (5s cadence).
+          if (d?.generation_state && d.generation_state !== 'ready') {
+            pollTimer = setTimeout(fetchSite, 5000);
+          }
+        })
+        .catch((e) => !cancelled && setError(String(e)));
+    };
+    fetchSite();
+    return () => { cancelled = true; if (pollTimer) clearTimeout(pollTimer); };
   }, [slug]);
 
   // Live viewer tracking: visit → heartbeat every 15s → engaged at 30s
@@ -281,6 +295,41 @@ const AuremSampleWebsite = () => {
       </div>
     );
   }
+  // iter 322ab — site exists but still generating → friendly building state
+  if (site && site.generation_state && site.generation_state !== 'ready') {
+    const isFailed = site.generation_state === 'failed';
+    return (
+      <div
+        data-testid="sample-building"
+        className="min-h-screen flex items-center justify-center text-white"
+        style={{ background: '#0A0A0A' }}
+      >
+        <div className="text-center p-8 max-w-md">
+          <div className="text-sm tracking-[0.4em] text-[#C9A227] mb-3">AUREM</div>
+          {isFailed ? (
+            <>
+              <h1 className="text-xl font-bold mb-2">Generation hiccup</h1>
+              <p className="text-sm text-white/60 mb-4">
+                We hit a snag building <code>{slug}</code>. Our team is on it —
+                check back in a few minutes or email{' '}
+                <a className="text-[#C9A227] underline" href="mailto:ora@aurem.live">ora@aurem.live</a>.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold mb-2">Building your site…</h1>
+              <p className="text-sm text-white/60 mb-4">
+                Hand-crafting <strong>{site?.business?.name || slug}</strong>. This takes 30–60 seconds.
+              </p>
+              <div className="w-10 h-10 mx-auto rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin" />
+              <p className="text-xs text-white/40 mt-6">Auto-refreshing every 5s.</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!site) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0A', color: '#fff' }} data-testid="sample-loading">
