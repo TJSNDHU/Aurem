@@ -147,19 +147,22 @@ export const ProfilePage = () => {
 
   const headers = { Authorization: `Bearer ${token}` };
   const fetchPipeline = async () => {
-    try { setPipelineStatus((await axios.get(`${API}/api/customer/pipeline/status`, { headers })).data); } catch {}
+    try { setPipelineStatus((await axios.get(`${API}/api/ora/pipeline/status`, { headers })).data); } catch {}
   };
   const fetchSubscription = async () => {
     try {
-      const { data } = await axios.get(`${API}/api/customer/me/subscription`, { headers });
+      const { data } = await axios.get(`${API}/api/customer/subscriptions`, { headers });
       setSubscription(data);
       if (data?.scan_schedule?.interval) setScanIntervalState(data.scan_schedule.interval);
     } catch {}
   };
   const fetchBugs = async () => {
     try {
-      const { data } = await axios.get(`${API}/api/customer/bugs?limit=10`, { headers });
-      setBugs(Array.isArray(data?.bugs) ? data.bugs : []);
+      // iter 322bm — uses /api/repair/history (bugs were renamed to repair items)
+      const { data } = await axios.get(`${API}/api/repair/history?limit=10`, { headers });
+      setBugs(Array.isArray(data?.history) ? data.history
+            : Array.isArray(data?.bugs) ? data.bugs
+            : Array.isArray(data?.fixes) ? data.fixes : []);
     } catch {}
   };
 
@@ -590,7 +593,8 @@ export const SecurityPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await axios.get(`${API}/api/sentinel/fixes-log?limit=20`, { headers: { Authorization: `Bearer ${token}` } });
+        // iter 322bm — sentinel/fixes-log was renamed; use /api/repair/history
+        const { data } = await axios.get(`${API}/api/repair/history?limit=20`, { headers: { Authorization: `Bearer ${token}` } });
         setAlerts(data?.fixes || []);
       } catch {}
     };
