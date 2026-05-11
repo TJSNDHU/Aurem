@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Home as HomeIcon, Activity, Shield, Bot, Users, Sparkles, Cog,
-  User as UserIcon, LogOut, Bell, Zap, Menu as MenuIcon, X as CloseIcon,
+  User as UserIcon, LogOut, Bell, Zap, Plug, Menu as MenuIcon, X as CloseIcon,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -19,7 +19,7 @@ import { useViewport } from '../luxe/useViewport';
 import {
   Card, StatusDot,
   ProfilePage, LiveHealthPage, SecurityPage,
-  AutomationPage, CRMPage, ORAPage, SettingsPage,
+  AutomationPage, CRMPage, ORAPage, SettingsPage, IntegrationsPage,
 } from '../luxe/LuxePages';
 import { CustomerResultsRow } from '../luxe/CustomerResultsRow';
 import {
@@ -28,14 +28,15 @@ import {
 } from '../luxe/tokens';
 
 const NAV = [
-  { k: 'home',        label: 'Home',        icon: HomeIcon },
-  { k: 'profile',     label: 'Profile',     icon: UserIcon },
-  { k: 'live-health', label: 'Live Health', icon: Activity },
-  { k: 'security',    label: 'Security',    icon: Shield },
-  { k: 'automation',  label: 'Automation',  icon: Bot },
-  { k: 'crm',         label: 'CRM',         icon: Users },
-  { k: 'ora',         label: 'ORA',         icon: Sparkles },
-  { k: 'settings',    label: 'Settings',    icon: Cog },
+  { k: 'home',         label: 'Home',         icon: HomeIcon },
+  { k: 'profile',      label: 'Profile',      icon: UserIcon },
+  { k: 'live-health',  label: 'Live Health',  icon: Activity },
+  { k: 'security',     label: 'Security',     icon: Shield },
+  { k: 'automation',   label: 'Automation',   icon: Bot },
+  { k: 'crm',          label: 'CRM',          icon: Users },
+  { k: 'ora',          label: 'ORA',          icon: Sparkles },
+  { k: 'integrations', label: 'Integrations', icon: Plug },
+  { k: 'settings',     label: 'Settings',     icon: Cog },
 ];
 
 // ── Sidebar ──────────────────────────────────────────────────────────
@@ -466,14 +467,15 @@ const Inner = () => {
 
   const Page = useMemo(() => {
     switch (active) {
-      case 'profile':     return <ProfilePage />;
-      case 'live-health': return <LiveHealthPage />;
-      case 'security':    return <SecurityPage />;
-      case 'automation':  return <AutomationPage />;
-      case 'crm':         return <CRMPage />;
-      case 'ora':         return <ORAPage />;
-      case 'settings':    return <SettingsPage />;
-      default:            return <HomePage data={data} />;
+      case 'profile':       return <ProfilePage />;
+      case 'live-health':   return <LiveHealthPage />;
+      case 'security':      return <SecurityPage />;
+      case 'automation':    return <AutomationPage />;
+      case 'crm':           return <CRMPage />;
+      case 'ora':           return <ORAPage />;
+      case 'integrations':  return <IntegrationsPage />;
+      case 'settings':      return <SettingsPage />;
+      default:              return <HomePage data={data} />;
     }
   }, [active, data]);
 

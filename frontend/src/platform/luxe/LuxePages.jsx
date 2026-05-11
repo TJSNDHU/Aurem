@@ -857,27 +857,47 @@ export const ORAPage = () => {
 };
 
 // ╔══════════════════════════════════════════════════════════════════════
-// ║ SettingsPage — onboarding + danger zone
+// ║ SettingsPage — onboarding + Branding + Voice + Booking + danger zone
+// ║ iter 322as — A·C·B exposed here directly inside /my
 // ╚══════════════════════════════════════════════════════════════════════
+const useCustomerBin = (token) => {
+  const [bin, setBin] = useState('');
+  useEffect(() => {
+    if (!token) return;
+    axios
+      .get(`${API}/api/bin-auth/customer-context`, {
+        headers: { Authorization: `Bearer ${token}` }, timeout: 10000,
+      })
+      .then(({ data }) => setBin(data?.bin || ''))
+      .catch(() => {});
+  }, [token]);
+  return bin;
+};
+
 export const SettingsPage = () => {
-  const { user, logout } = useLuxeAuth();
+  const { user, token, logout } = useLuxeAuth();
+  const bin = useCustomerBin(token);
+
   return (
-    <PageShell icon={Cog} title="Settings" subtitle="Onboarding, plan & danger zone." testid="page-settings" fitViewport>
+    <PageShell icon={Cog} title="Settings" subtitle="Branding · Voice · Booking · Plan · Danger zone." testid="page-settings">
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: 14, flex: '1 1 auto', minHeight: 0,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 14,
       }}>
-        <Card>
+        <Card testid="settings-onboarding">
           <SectionLabel>Onboarding</SectionLabel>
           <Row k="Email" v={user?.email || '—'} />
+          <Row k="BIN" v={bin || '—'} mono />
           <Row k="Plan" v={(user?.tier || 'starter').toUpperCase()} />
           <Row k="API key" v={user?.api_key || '—'} mono />
-          <div style={{ marginTop: 14, fontFamily: fontBody, color: TEXT_MD, fontSize: 12 }}>
-            Drop the AUREM pixel on your website to start capturing real-time runtime errors and lead conversions. The pixel snippet is in your Profile under Pixel.
-          </div>
         </Card>
-        <Card>
+
+        <BrandingCard bin={bin} token={token} />
+        <VoiceCard token={token} />
+        <BookingCard token={token} />
+
+        <Card testid="settings-session">
           <SectionLabel>Session</SectionLabel>
           <Row k="Status" v="Authenticated" />
           <Row k="Stored at" v="aurem_customer_token (LS)" mono small />
@@ -892,3 +912,315 @@ export const SettingsPage = () => {
     </PageShell>
   );
 };
+
+// ── Branding (A) ────────────────────────────────────────────────────
+const BrandingCard = ({ bin, token }) => {
+  const [branding, setBranding] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (!bin || !token) return;
+    axios
+      .get(`${API}/api/admin/branding/${bin}`, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+      .then(({ data }) => setBranding(data?.branding || null))
+      .catch((e) => setErr(e?.response?.data?.detail || e.message));
+  }, [bin, token]);
+
+  const save = async () => {
+    if (!branding || !bin) return;
+    setSaving(true); setErr(''); setSaved(false);
+    try {
+      const { data } = await axios.post(
+        `${API}/api/admin/branding/${bin}`,
+        {
+          brand_name: branding.brand_name || '',
+          logo_url: branding.logo_url || '',
+          primary_color: branding.primary_color || '#D4A373',
+          domain: branding.domain || '',
+        },
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 12000 },
+      );
+      if (data?.branding) setBranding(data.branding);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2400);
+    } catch (e) {
+      setErr(e?.response?.data?.detail || e.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Card testid="settings-branding">
+      <SectionLabel right={saved ? <span style={{ color: '#bef264', fontFamily: fontMono, fontSize: 10 }}>✓ Saved</span> : null}>
+        Branding (White-Label)
+      </SectionLabel>
+      {err && <div data-testid="branding-error" style={{ color: '#f87171', fontFamily: fontMono, fontSize: 10, marginBottom: 8 }}>{err}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <LuxeField label="Brand name" testid="branding-name"
+          value={branding?.brand_name || ''}
+          onChange={(v) => setBranding({ ...branding, brand_name: v })} />
+        <LuxeField label="Logo URL" testid="branding-logo"
+          value={branding?.logo_url || ''} placeholder="https://cdn…/logo.png"
+          onChange={(v) => setBranding({ ...branding, logo_url: v })} />
+        <div>
+          <div style={labelStyle}>Primary colour</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="color" data-testid="branding-color"
+              value={branding?.primary_color || '#D4A373'}
+              onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })}
+              style={{ width: 38, height: 36, background: 'transparent', border: 'none', padding: 0 }} />
+            <input data-testid="branding-color-hex" style={{ ...fieldStyle, flex: 1 }}
+              value={branding?.primary_color || ''}
+              onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })} />
+          </div>
+        </div>
+        <LuxeField label="Custom domain" testid="branding-domain"
+          value={branding?.domain || ''} placeholder="ai.yourcompany.com"
+          onChange={(v) => setBranding({ ...branding, domain: v })} />
+      </div>
+      <button data-testid="branding-save" onClick={save} disabled={saving || !bin}
+        style={{ ...buttonGold, marginTop: 12, opacity: (saving || !bin) ? 0.55 : 1 }}>
+        {saving ? 'Saving…' : 'Save branding'}
+      </button>
+    </Card>
+  );
+};
+
+// ── Inbound Voice (C) ──────────────────────────────────────────────
+const VoiceCard = ({ token }) => {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const refresh = () => {
+    if (!token) return;
+    setLoading(true);
+    axios.get(`${API}/api/customer/voice-agent/status`, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+      .then(({ data }) => setStatus(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+  useEffect(refresh, [token]);
+  const live = !!(status?.retell_ready || status?.retell_key_set);
+  return (
+    <Card testid="settings-voice">
+      <SectionLabel right={<StatusDot status={live ? 'GREEN' : 'YELLOW'} label={live ? 'LIVE' : 'IDLE'} />}>
+        Inbound Voice (Retell)
+      </SectionLabel>
+      <div style={{ fontFamily: fontBody, color: TEXT_HI, fontSize: 13 }} data-testid="voice-status-text">
+        {loading ? 'Checking…' : live ? '🟢 ORA can answer calls right now.' : '🔴 Not configured yet — add RETELL_API_KEY.'}
+      </div>
+      {live && status?.month_usage && (
+        <div style={{ marginTop: 10 }}>
+          <Row k="Minutes used"
+            v={`${status.month_usage.minutes_used ?? 0} / ${status.month_usage.minutes_included ?? '—'}`} mono />
+          <Row k="Remaining" v={status.month_usage.minutes_remaining ?? '—'} mono />
+        </div>
+      )}
+      {!live && (
+        <ol style={{ marginTop: 10, color: TEXT_MD, fontFamily: fontBody, fontSize: 12, lineHeight: 1.7, paddingLeft: 18 }}>
+          <li>Sign in to <a href="https://www.retellai.com" target="_blank" rel="noreferrer" style={{ color: GOLD_HI }}>retellai.com</a> and create an API key.</li>
+          <li>Open Emergent → Env Variables → add <code style={{ color: GOLD_HI }}>RETELL_API_KEY</code>.</li>
+          <li>Redeploy — ORA picks up calls 24×7.</li>
+        </ol>
+      )}
+      <button data-testid="voice-refresh" onClick={refresh}
+        style={{ ...buttonGold, marginTop: 12 }}>Refresh status</button>
+    </Card>
+  );
+};
+
+// ── Booking (B) ────────────────────────────────────────────────────
+const BookingCard = ({ token }) => {
+  const [info, setInfo] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!token) return;
+    axios.get(`${API}/api/customer/api-key`, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+      .then(({ data }) => setInfo(data))
+      .catch(() => {});
+  }, [token]);
+  const key = info?.key || info?.key_preview || 'sk_aurem_live_xxxxx';
+  const snippet = `<script src="${window.location.origin}/widget.js" data-api-key="${key}"></script>`;
+  const copy = () => {
+    navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+    toast.success('Embed code copied');
+  };
+  return (
+    <Card testid="settings-booking">
+      <SectionLabel>Booking Widget</SectionLabel>
+      <div style={{ color: TEXT_MD, fontFamily: fontBody, fontSize: 12, marginBottom: 10 }}>
+        Drop the AUREM widget on your site — visitors can book straight from the ORA chat (Name · Phone · Service · Slot).
+      </div>
+      <div data-testid="booking-snippet" style={{
+        padding: 12, borderRadius: 10, background: 'rgba(0,0,0,0.45)',
+        border: '1px solid rgba(212,163,115,0.18)', fontFamily: fontMono,
+        fontSize: 11, color: TEXT_MD, wordBreak: 'break-all', lineHeight: 1.5,
+      }}>{snippet}</div>
+      <button data-testid="booking-copy" onClick={copy}
+        style={{ ...buttonGold, marginTop: 10 }}>
+        {copied ? 'Copied ✓' : 'Copy embed code'}
+      </button>
+      <div style={{ marginTop: 12, fontFamily: fontMono, fontSize: 10, color: TEXT_LO, letterSpacing: '0.12em' }}>
+        Default services: Consultation · Follow-up · Standard · Premium
+      </div>
+    </Card>
+  );
+};
+
+
+// ╔══════════════════════════════════════════════════════════════════════
+// ║ IntegrationsPage — Shopify · Widget · Pixel · Booking preview (iter 322as)
+// ╚══════════════════════════════════════════════════════════════════════
+export const IntegrationsPage = () => {
+  const { token } = useLuxeAuth();
+  return (
+    <PageShell icon={Zap} title="Integrations" subtitle="Shopify · Widget · Pixel · Booking" testid="page-integrations">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 14,
+      }}>
+        <ShopifyCard token={token} />
+        <WidgetInstallCard token={token} />
+        <PixelStatusCard token={token} />
+        <BookingPreviewCard />
+      </div>
+    </PageShell>
+  );
+};
+
+const ShopifyCard = ({ token }) => {
+  const [status, setStatus] = useState(null);
+  const [shop, setShop] = useState('');
+  const [loading, setLoading] = useState(true);
+  const refresh = () => {
+    if (!token) return;
+    setLoading(true);
+    axios.get(`${API}/api/shopify/auth/status`, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+      .then(({ data }) => setStatus(data))
+      .catch(() => setStatus({ connected: false }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(refresh, [token]);
+  const connected = !!(status?.connected || status?.shop);
+  const url = shop ? `${API}/api/shopify/auth?shop=${encodeURIComponent(shop)}&token=${encodeURIComponent(token || '')}` : '#';
+  return (
+    <Card testid="integrations-shopify">
+      <SectionLabel right={<StatusDot status={connected ? 'GREEN' : 'YELLOW'} label={connected ? 'CONNECTED' : 'OFF'} />}>
+        Shopify
+      </SectionLabel>
+      <div style={{ fontFamily: fontBody, color: TEXT_HI, fontSize: 13, marginBottom: 8 }} data-testid="shopify-status-text">
+        {loading ? 'Checking…' : connected ? `Connected: ${status?.shop || status?.shop_domain}` : 'Sync products, orders & customers in one click.'}
+      </div>
+      {!connected && (
+        <>
+          <input data-testid="shopify-shop-input" value={shop} onChange={(e) => setShop(e.target.value)}
+            placeholder="yourstore.myshopify.com"
+            style={{ ...fieldStyle, marginBottom: 10 }} />
+          <a data-testid="shopify-connect-btn" href={url}
+            onClick={(e) => { if (!shop) { e.preventDefault(); toast.error('Enter your Shopify store domain first.'); } }}
+            style={{ ...buttonGold, textDecoration: 'none', display: 'inline-block',
+                     background: '#95BF47', color: '#0E0E0F', border: 'none' }}>
+            Connect Shopify Store
+          </a>
+        </>
+      )}
+      {connected && (
+        <button data-testid="shopify-manage-btn" onClick={refresh} style={buttonGold}>Refresh</button>
+      )}
+    </Card>
+  );
+};
+
+const WidgetInstallCard = ({ token }) => {
+  const [info, setInfo] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!token) return;
+    axios.get(`${API}/api/customer/api-key`, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+      .then(({ data }) => setInfo(data)).catch(() => {});
+  }, [token]);
+  const key = info?.key || info?.key_preview || 'sk_aurem_live_xxxxx';
+  const snippet = `<script src="${window.location.origin}/widget.js" data-api-key="${key}"></script>`;
+  const copy = () => {
+    navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+    toast.success('Embed code copied');
+  };
+  return (
+    <Card testid="integrations-widget">
+      <SectionLabel>Website Widget</SectionLabel>
+      <div style={{ color: TEXT_MD, fontFamily: fontBody, fontSize: 12, marginBottom: 10 }}>
+        Paste before <code style={{ color: GOLD_HI }}>&lt;/body&gt;</code>. Auto-detects your theme, opens ORA chat, books appointments.
+      </div>
+      <div data-testid="widget-snippet" style={{
+        padding: 12, borderRadius: 10, background: 'rgba(0,0,0,0.45)',
+        border: '1px solid rgba(212,163,115,0.18)', fontFamily: fontMono,
+        fontSize: 11, color: TEXT_MD, wordBreak: 'break-all', lineHeight: 1.5,
+      }}>{snippet}</div>
+      <button data-testid="widget-copy-btn" onClick={copy} style={{ ...buttonGold, marginTop: 10 }}>
+        {copied ? 'Copied ✓' : 'Copy embed code'}
+      </button>
+    </Card>
+  );
+};
+
+const PixelStatusCard = ({ token }) => {
+  const [pixel, setPixel] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const refresh = () => {
+    if (!token) return;
+    setLoading(true);
+    axios.get(`${API}/api/customer/pixel/status`, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 })
+      .then(({ data }) => setPixel(data))
+      .catch(() => setPixel({ status: 'not_installed' }))
+      .finally(() => setLoading(false));
+  };
+  useEffect(refresh, [token]);
+  const installed = pixel?.status === 'installed' || pixel?.connected || (pixel?.events_total > 0);
+  return (
+    <Card testid="integrations-pixel">
+      <SectionLabel right={<StatusDot status={installed ? 'GREEN' : 'RED'} label={installed ? 'INSTALLED' : 'OFF'} />}>
+        Pixel Tracking
+      </SectionLabel>
+      <div style={{ fontFamily: fontBody, color: TEXT_HI, fontSize: 13 }} data-testid="pixel-status-text">
+        {loading ? 'Checking…' : installed
+          ? `🟢 Active — ${pixel?.events_total || 0} events captured`
+          : '🔴 Not installed — paste the pixel snippet on your site.'}
+      </div>
+      <button data-testid="pixel-refresh-btn" onClick={refresh}
+        style={{ ...buttonGold, marginTop: 12 }}>Refresh</button>
+    </Card>
+  );
+};
+
+const BookingPreviewCard = () => (
+  <Card testid="integrations-booking">
+    <SectionLabel>Booking Widget</SectionLabel>
+    <div style={{ color: TEXT_MD, fontFamily: fontBody, fontSize: 12, lineHeight: 1.7 }}>
+      The widget includes a built-in booking modal. Visitors pick a service, date and slot — the booking lands in your{' '}
+      <code style={{ color: GOLD_HI }}>bookings</code> collection.
+    </div>
+    <ol style={{ color: TEXT_MD, fontFamily: fontBody, fontSize: 12, lineHeight: 1.7, paddingLeft: 18, marginTop: 8 }}>
+      <li>Embed the widget snippet on your site.</li>
+      <li>Visitor clicks the floating ORA bubble → 📅 Book.</li>
+      <li>Confirms instantly. You see it in CRM.</li>
+    </ol>
+    <div style={{ marginTop: 10, fontFamily: fontMono, fontSize: 10, color: TEXT_LO, letterSpacing: '0.12em' }}>
+      Public endpoints: /api/public/booking/{`{types,availability,book}`}
+    </div>
+  </Card>
+);
+
+// ── small helper field ──
+const LuxeField = ({ label, value, onChange, placeholder, testid }) => (
+  <div>
+    <div style={labelStyle}>{label}</div>
+    <input data-testid={testid} value={value || ''} placeholder={placeholder || ''}
+      onChange={(e) => onChange(e.target.value)} style={fieldStyle} />
+  </div>
+);

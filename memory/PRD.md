@@ -1,5 +1,16 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322as (2026-05-11) — A→B→C→D Frontend Batch + Customer /my upgrade SHIPPED**
+>
+> 1. **A. White-Label Branding** — `BrandingCard` in `/my/settings` (logo · color · domain · CNAME)
+> 2. **B. Booking Widget** — modal inside `widget.js`, backed by new public router `/api/public/booking/{types,availability,book}` (validates `sk_aurem_*` Bearer)
+> 3. **C. Inbound Voice (Retell)** — `VoiceCard` in `/my/settings` (live status via `/api/customer/voice-agent/status`)
+> 4. **D. Shopify Connect** — `ShopifyCard` in `/my/integrations` (1-click → `/api/shopify/auth`)
+>
+> Customer /my panel (LuxeDashboardPreview) NAV now has **Integrations** + **Settings** tabs with all 4 features visible. `/admin/system-overview` adds **Customer Features** + **Learning System** cards (5,887 brain thoughts · 11 hooks · hourly collective scan · $0 fix cost). Iteration bumped to `322as` in backend stats.
+
+# AUREM Platform — PRD
+
 > **🟡 DEVELOPMENT PRINCIPLE — "Existing-stack-first" (added 2026-02-10)**
 >
 > Before suggesting ANY paid API or third-party service, first audit the

@@ -169,7 +169,7 @@ async def get_system_overview(authorization: str = Header(None)):
             "wired_routers": audit["wired_routers"],
             "endpoint_count": audit["endpoint_count"],
             "scheduler_jobs": audit["scheduler_jobs"],
-            "iteration": "322ar",
+            "iteration": "322as",
         },
         "audit": {
             "council_decisions": council_decisions,
