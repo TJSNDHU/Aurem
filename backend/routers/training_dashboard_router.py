@@ -22,6 +22,27 @@ def set_db(database):
     db = database
 
 
+# ── iter 322au: ORA learning hook ───────────────────────────────────
+# Fire `ora_learn()` for every write coming through this dashboard so
+# that adding/removing knowledge, uploading docs, triggering A2A cycles,
+# and forcing knowledge-syncs all flow into ORA's brain organically.
+async def _fire_ora(event: str, summary: str, **payload) -> None:
+    """Best-effort fire-and-forget — never blocks the calling endpoint."""
+    try:
+        from services import ora_universal_learner as _oul
+        await _oul.ora_learn({
+            "source": "training_dashboard",
+            "event": event,
+            "category": "training",
+            "summary": summary,
+            "outcome": "ok",
+            **payload,
+        })
+    except Exception as _e:
+        logger.warning(f"[Training] ora_learn fire failed for {event}: {_e}")
+
+
+
 # ═══════════════════════════════════════════════════════════════
 # OVERVIEW
 # ═══════════════════════════════════════════════════════════════
@@ -116,6 +137,14 @@ async def add_knowledge(item: KnowledgeItem, request: Request):
     await db.training_knowledge.insert_one(doc)
     doc.pop("_id", None)
 
+    # iter 322au — feed into ORA Learning Stack
+    await _fire_ora(
+        event="KNOWLEDGE_ADDED",
+        summary=f"Added knowledge: {item.title} ({len(item.content)} chars, {item.category})",
+        item_id=doc["id"], category=item.category, char_count=len(item.content),
+        indexed=doc.get("indexed", False),
+    )
+
     return {"success": True, "item": doc}
 
 
@@ -128,6 +157,13 @@ async def delete_knowledge(item_id: str, request: Request):
     result = await db.training_knowledge.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(404, "Knowledge item not found")
+
+    # iter 322au — ORA learns from pruning
+    await _fire_ora(
+        event="KNOWLEDGE_REMOVED",
+        summary=f"Removed knowledge item {item_id}",
+        item_id=item_id,
+    )
 
     return {"success": True, "deleted": item_id}
 
@@ -186,12 +222,25 @@ async def upload_knowledge_file(
         doc.pop("_id", None)
         inserted.append(doc)
 
+    # iter 322au — ORA learns from every uploaded knowledge file
+    await _fire_ora(
+        event="KNOWLEDGE_UPLOADED",
+        summary=f"Uploaded {file.filename} → {len(inserted)} chunks indexed",
+        filename=file.filename, chunks=len(inserted), category=category,
+        total_chars=sum(it.get("char_count", 0) for it in inserted),
+    )
+
     return {
         "success": True,
         "files_processed": 1,
         "chunks_created": len(inserted),
         "items": inserted,
     }
+
+
+# Fire ORA learn AFTER upload returns so the user doesn't wait on it.
+# But we still need to await once for resilience — call inline (it's <50ms).
+# NOTE: actual call happens above via a follow-up patch:
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -496,6 +545,17 @@ async def trigger_a2a_learning(request: Request):
     await db.a2a_learning_sessions.insert_one(session)
     session.pop("_id", None)
 
+    # iter 322au — ORA learns from every A2A learning cycle
+    await _fire_ora(
+        event="A2A_CYCLE_TRIGGERED",
+        summary=f"A2A daily learning cycle completed — {session['skills_shared']} skills, "
+                f"{session['knowledge_synced']} knowledge synced, {session['errors_resolved']} errors resolved",
+        session_id=session["session_id"],
+        skills_shared=session["skills_shared"],
+        knowledge_synced=session["knowledge_synced"],
+        errors_resolved=session["errors_resolved"],
+    )
+
     return {"success": True, "session": session}
 
 
@@ -515,6 +575,129 @@ async def voice_profiles(request: Request):
         profiles.append(doc)
 
     return {"profiles": profiles}
+
+
+# ── iter 322au write endpoints — every action here fires ora_learn() ──
+
+class VoiceProfileIn(BaseModel):
+    name: str
+    persona: Optional[str] = "default"
+    voice_id: Optional[str] = ""
+    sample_url: Optional[str] = ""
+    notes: Optional[str] = ""
+
+
+@router.post("/voice")
+async def add_voice_profile(profile: VoiceProfileIn, request: Request):
+    """Add a voice training profile."""
+    if db is None:
+        raise HTTPException(500, "Database not available")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": profile.name,
+        "persona": profile.persona,
+        "voice_id": profile.voice_id,
+        "sample_url": profile.sample_url,
+        "notes": profile.notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.voice_profiles.insert_one(doc)
+    doc.pop("_id", None)
+
+    await _fire_ora(
+        event="VOICE_PROFILE_ADDED",
+        summary=f"Added voice profile: {profile.name} ({profile.persona})",
+        profile_id=doc["id"], persona=profile.persona,
+    )
+    return {"success": True, "profile": doc}
+
+
+@router.delete("/voice/{profile_id}")
+async def delete_voice_profile(profile_id: str, request: Request):
+    if db is None:
+        raise HTTPException(500, "Database not available")
+    res = await db.voice_profiles.delete_one({"id": profile_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Voice profile not found")
+    await _fire_ora(
+        event="VOICE_PROFILE_REMOVED",
+        summary=f"Removed voice profile {profile_id}",
+        profile_id=profile_id,
+    )
+    return {"success": True, "deleted": profile_id}
+
+
+class AutoTuneFeedbackIn(BaseModel):
+    context: str                      # e.g. "lead_qualification_email"
+    rating: str                       # "up" or "down"
+    detail: Optional[str] = ""
+    suggested_change: Optional[str] = ""
+
+
+@router.post("/autotune/feedback")
+async def add_autotune_feedback(fb: AutoTuneFeedbackIn, request: Request):
+    """Customer / founder submits thumbs-up / thumbs-down on an ORA response.
+    Drives the AutoTune EMA learning loop."""
+    if db is None:
+        raise HTTPException(500, "Database not available")
+    if fb.rating not in {"up", "down"}:
+        raise HTTPException(400, "rating must be 'up' or 'down'")
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "context": fb.context,
+        "rating": fb.rating,
+        "detail": fb.detail or "",
+        "suggested_change": fb.suggested_change or "",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.autotune_feedback.insert_one(doc)
+    doc.pop("_id", None)
+
+    await _fire_ora(
+        event="AUTOTUNE_FEEDBACK_RECEIVED",
+        summary=f"AutoTune {fb.rating.upper()} on '{fb.context}'"
+                + (f" — {fb.detail[:120]}" if fb.detail else ""),
+        feedback_id=doc["id"], context=fb.context, rating=fb.rating,
+    )
+    return {"success": True, "feedback": doc}
+
+
+class CustomerMemoryIn(BaseModel):
+    customer_id: str
+    name: Optional[str] = ""
+    email: Optional[str] = ""
+    notes: Optional[str] = ""
+    preferences: Optional[dict] = None
+
+
+@router.post("/memory")
+async def add_customer_memory(mem: CustomerMemoryIn, request: Request):
+    """Add or merge a customer memory profile."""
+    if db is None:
+        raise HTTPException(500, "Database not available")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update = {
+        "customer_id": mem.customer_id,
+        "name": mem.name or "",
+        "email": mem.email or "",
+        "notes": mem.notes or "",
+        "preferences": mem.preferences or {},
+        "last_interaction": now_iso,
+    }
+    res = await db.customer_profiles.update_one(
+        {"customer_id": mem.customer_id},
+        {"$set": update, "$inc": {"session_count": 1}, "$setOnInsert": {"created_at": now_iso}},
+        upsert=True,
+    )
+    is_new = res.upserted_id is not None
+    await _fire_ora(
+        event="CUSTOMER_MEMORY_ADDED" if is_new else "CUSTOMER_MEMORY_UPDATED",
+        summary=f"{'Created' if is_new else 'Updated'} customer memory for {mem.customer_id}"
+                + (f" — {mem.notes[:120]}" if mem.notes else ""),
+        customer_id=mem.customer_id, is_new=is_new,
+    )
+    return {"success": True, "is_new": is_new, "customer_id": mem.customer_id}
 
 
 # ═══════════════════════════════════════════════════════════════

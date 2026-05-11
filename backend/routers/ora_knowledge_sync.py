@@ -157,6 +157,23 @@ async def force_knowledge_sync(authorization: str = Header(None)):
         except Exception:
             pass
 
+        # 5. iter 322au — feed sync event into ORA Learning Stack
+        try:
+            from services import ora_universal_learner as _oul
+            await _oul.ora_learn({
+                "source": "training_dashboard",
+                "event": "KNOWLEDGE_FORCE_SYNC",
+                "category": "training",
+                "summary": f"Force-synced {synced} training docs ({errors} errors) in {duration_ms / 1000:.1f}s",
+                "outcome": "ok" if errors == 0 else "partial",
+                "docs_synced": synced,
+                "errors": errors,
+                "duration_ms": duration_ms,
+                "triggered_by": user_id,
+            })
+        except Exception as _e:
+            logger.warning(f"[KnowledgeSync] ora_learn fire failed: {_e}")
+
         return {
             "success": True,
             "docs_synced": synced,
