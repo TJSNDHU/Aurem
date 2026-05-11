@@ -2864,6 +2864,62 @@ def register_all_routers(app, db):
     except Exception as e:
         logger.warning(f"Build Journal router not loaded: {e}")
 
+    # iter 322av — Nightly Self-Check (runs every morning + night, autoheals)
+    try:
+        from routers.nightly_selfcheck_router import (
+            router as nsc_router, set_db as set_nsc_db,
+        )
+        set_nsc_db(db)
+        app.include_router(nsc_router)
+        from apscheduler.triggers.cron import CronTrigger as _SCCron
+        from apscheduler.triggers.interval import IntervalTrigger as _SCInterval
+
+        async def _selfcheck_morning():
+            from services.aurem_nightly_selfcheck import run_selfcheck
+            await run_selfcheck(db, slot="morning")
+
+        async def _selfcheck_nightly():
+            from services.aurem_nightly_selfcheck import run_selfcheck
+            await run_selfcheck(db, slot="nightly")
+
+        aurem_scheduler.add_job(_selfcheck_morning, _SCCron(hour=6, minute=30),
+                                id="aurem_selfcheck_morning", replace_existing=True,
+                                max_instances=1, coalesce=True)
+        aurem_scheduler.add_job(_selfcheck_nightly, _SCCron(hour=21, minute=30),
+                                id="aurem_selfcheck_nightly", replace_existing=True,
+                                max_instances=1, coalesce=True)
+        logger.info("[REGISTRY] Nightly self-check wired — morning 06:30 UTC, nightly 21:30 UTC")
+
+        # ── iter 322av — ORA Autonomous Driver (fully self-driving) ──
+        async def _daily_hunt_job():
+            from services.ora_autonomous_driver import daily_hunt_for_all_tenants
+            try:
+                res = await daily_hunt_for_all_tenants(db)
+                logger.info(f"[ora-driver] daily hunt — {res.get('leads_sourced')} leads across {res.get('tenants_scanned')} tenants")
+            except Exception as e:
+                logger.warning(f"[ora-driver] daily hunt failed: {e}")
+
+        async def _watchdog_job():
+            from services.ora_autonomous_driver import ora_watchdog
+            try:
+                await ora_watchdog(db)
+            except Exception as e:
+                logger.warning(f"[ora-driver] watchdog tick failed: {e}")
+
+        # Daily hunt — 06:00 UTC = 02:00 Toronto
+        aurem_scheduler.add_job(_daily_hunt_job, _SCCron(hour=6, minute=0),
+                                id="ora_daily_hunt", replace_existing=True,
+                                max_instances=1, coalesce=True)
+        # Watchdog — every 15 min, 24/7
+        aurem_scheduler.add_job(_watchdog_job, _SCInterval(minutes=15),
+                                id="ora_watchdog", replace_existing=True,
+                                max_instances=1, coalesce=True)
+        logger.info("[REGISTRY] ORA Autonomous Driver wired — daily hunt 06:00 UTC, watchdog every 15min")
+
+    except Exception as e:
+        logger.warning(f"Nightly self-check not wired: {e}")
+
+
     # ═══════════════════════════════════════════
     # LEAN MODE: Post-registration route cleanup
     # See routers/_registry_lean_prune.py for the full prune-list.

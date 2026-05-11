@@ -1,5 +1,32 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322av (2026-05-11) — FULLY AUTONOMOUS SCOUT + WATCHDOG SHIPPED**
+>
+> Zero manual triggers ever needed. ORA now operates the business 24/7 by itself.
+>
+> **Autonomous cron schedule (UTC):**
+> - 🦅 **06:00** — Daily Hunt across all `bins.active=True` tenants (5 industries × 5 cities, capped at 25 leads/tenant/day, idempotent)
+> - 🛡 **06:30** — Morning self-check (13 pillars, Resend digest, autoheal)
+> - 🌙 **21:30** — Nightly self-check (same, evening report)
+> - ⏱ **Every 15 min** — ORA Watchdog (6 checks: brain ticking, hunter active in business hours, outreach moving, booking funnel responsive, CASL healthy, scheduler alive)
+> - ⏱ **Every 10 min** — Build journal git → DB sync
+> - 🌙 **03:30** — Build journal pattern miner → `fix_patterns` + brain thought
+> - 🌙 **04:00** — Build journal daily digest email
+>
+> **Every action fires `ora_learn()`** → 13 distinct event types feed the brain organically: SELFCHECK_RAN, SELFCHECK_FAILED, WATCHDOG_TICK, WATCHDOG_HEARTBEAT, HUNTER_QUIET_IN_HOURS, OUTREACH_STALLED, BOOKING_FUNNEL_DOWN, SCHEDULER_DEGRADED, AUTO_HUNT_COMPLETED, AUTO_HUNT_CRASHED, AUTO_HUNT_LEAD_SOURCE_FAIL, NEEDS_FOUNDER_INPUT, BUILD_PATTERN_MINED.
+>
+> **Auto-heal**: any failure triggers autoheal cascade → ORA Code Fixer (L0→L3) or founder alert.
+>
+> **Endpoints (super_admin)**:
+> - `POST /api/admin/selfcheck/run` · `POST /api/admin/selfcheck/watchdog-tick` · `POST /api/admin/selfcheck/daily-hunt`
+> - `GET  /api/admin/selfcheck/latest` · `GET /api/admin/selfcheck/watchdog-log` · `GET /api/admin/selfcheck/history`
+>
+> **Live verification today**: 65 scheduler jobs alive · 13/13 pillars healthy · 7 SELFCHECK_RAN + 2 WATCHDOG_TICK + 389 thoughts/hour organic learning · founder digest email sent · `AUR-FNDR-001` BIN seeded (9 industries × 8 GTA cities).
+>
+> **Known upstream blocker (P2, not infra)**: Google Places returning 0 leads → billing/quota issue. Autoheal logs `AUTO_HUNT_LEAD_SOURCE_FAIL` to brain so it's never silent. Fix billing or swap to Yelp/Apollo (both keys valid).
+
+---
+
 > **🟢 ITER 322au (2026-05-11) — AUREM BUILD JOURNAL + Deployment Hardening SHIPPED**
 >
 > **5-phase Build Journal** (Day-1 build data → ORA Learning Stack, fully automatic):
