@@ -551,7 +551,7 @@ const AuremHomepage = () => {
           <span className="ca-trust-sep">·</span>
           <span className="ca-trust-item" data-testid="ca-trust-built">📍&nbsp;Built in Mississauga, Ontario</span>
           <span className="ca-trust-sep">·</span>
-          <span className="ca-trust-item" data-testid="ca-trust-casl">⚖️&nbsp;CASL Compliant — Always</span>
+          <span className="ca-trust-item" data-testid="ca-trust-casl">🛡&nbsp;5-Layer Security Suite</span>
           <span className="ca-trust-sep">·</span>
           <span className="ca-trust-item" data-testid="ca-trust-data">🔒&nbsp;Your Data Stays in Canada</span>
         </div>
@@ -800,11 +800,106 @@ const AuremHomepage = () => {
               <li>Manage all your clients from one place</li>
               <li>25 phone lines running at the same time</li>
               <li>Personal setup &amp; onboarding support</li>
+              <li><strong style={{color:"var(--gold)"}}>🛡 5-Layer Security Suite included</strong> <span style={{color:"var(--muted2)"}}>(worth $215/mo)</span></li>
             </ul>
             <a className="pcta outline" href="mailto:teji.ss1986@gmail.com" data-testid="cta-plan-enterprise">Talk to Us</a>
           </div>
         </div>
         <p className="pricing-foot">All plans include a 14-day free trial &nbsp;·&nbsp; No credit card needed to start &nbsp;·&nbsp; Cancel any time, no questions asked</p>
+      </section>
+
+      {/* SECURITY SUITE — iter 322aw (P1) */}
+      <section className="security-suite" id="security-suite" data-testid="security-suite-section" style={{
+        padding: "100px 5%", position: "relative", zIndex: 1,
+        background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(212,175,55,0.025) 50%, rgba(0,0,0,0) 100%)",
+      }}>
+        <div className="fade-up" style={{ textAlign: "center", maxWidth: 760, margin: "0 auto 50px" }}>
+          <span className="s-label">Built-In Protection</span>
+          <h2 className="s-title" data-testid="security-suite-title" style={{ marginTop: 10 }}>
+            🛡 AUREM Security Suite
+          </h2>
+          <p style={{ color: "var(--muted)", fontSize: 16, marginTop: 14, lineHeight: 1.6 }}>
+            Five layers of autonomous protection for your business.
+          </p>
+        </div>
+
+        <div className="suite-grid fade-up" style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 16, maxWidth: 1180, margin: "0 auto",
+        }}>
+          {[
+            {id:"shannon",  emoji:"🛠️", name:"Shannon Patcher",     price:"$39", desc:"Code vulnerabilities patched automatically — 24/7. No IT person needed."},
+            {id:"casl",     emoji:"⚖️", name:"CASL Compliance Auto", price:"$39", desc:"Every message checked against Canada's Anti-Spam Law before sending. Legal protection, always on."},
+            {id:"soc2",     emoji:"📋", name:"SOC2 Audit Chain",     price:"$49", desc:"Immutable audit logs for your business. Enterprise-grade compliance evidence, automated."},
+            {id:"autoheal", emoji:"♻️", name:"Auto-Heal Loop",       price:"$39", desc:"Backend or frontend issue? System detects and repairs itself before you notice."},
+            {id:"vanguard", emoji:"⚔️", name:"Vanguard Swarm",       price:"$49", desc:"Pipeline running dry? 4 AI agents fire simultaneously — Scout, Architect, Envoy, Closer — and refill your lead pipeline in 30 minutes. Autonomous.", featured:true},
+          ].map(c => (
+            <div key={c.id} data-testid={`suite-card-${c.id}`} className="plan" style={{
+              padding: "26px 22px",
+              border: c.featured ? "1px solid rgba(212,175,55,0.42)" : "1px solid var(--border-gold)",
+              background: c.featured
+                ? "linear-gradient(180deg, rgba(212,175,55,0.10), rgba(15,15,15,0.92))"
+                : "rgba(15,15,15,0.55)",
+              position: "relative", borderRadius: 14,
+            }}>
+              {c.featured && (
+                <div style={{
+                  position: "absolute", top: -10, right: 14,
+                  padding: "3px 10px", fontSize: 9, fontWeight: 700,
+                  letterSpacing: "0.18em", textTransform: "uppercase",
+                  background: "var(--gold)", color: "#000", borderRadius: 999,
+                }}>STAR</div>
+              )}
+              <div style={{ fontSize: 28, marginBottom: 8 }}>{c.emoji}</div>
+              <div className="plan-name" style={{ fontSize: 16, marginBottom: 4 }}>{c.name}</div>
+              <div style={{
+                fontSize: 22, color: "var(--gold)", fontWeight: 600,
+                marginBottom: 12, fontFamily: "'Cinzel',serif",
+              }}>{c.price}<sub style={{ fontSize: 11, color: "var(--muted2)", marginLeft: 4 }}>/mo CAD</sub></div>
+              <div style={{ color: "var(--muted)", fontSize: 12.5, lineHeight: 1.55 }}>{c.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* BUNDLE BUY-BOX */}
+        <div className="fade-up" data-testid="security-suite-bundle" style={{
+          maxWidth: 700, margin: "44px auto 0", padding: "28px 32px",
+          borderRadius: 18,
+          border: "1px solid rgba(212,175,55,0.35)",
+          background: "linear-gradient(135deg, rgba(212,175,55,0.10) 0%, rgba(0,0,0,0.4) 100%)",
+          textAlign: "center",
+        }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.2em",
+            color: "var(--gold)", textTransform: "uppercase", marginBottom: 6,
+          }}>Bundle &amp; save</div>
+          <div data-testid="suite-bundle-price" style={{
+            fontFamily: "'Cinzel',serif", fontSize: 38, color: "var(--white)",
+            fontWeight: 700, marginBottom: 4,
+          }}>
+            All 5 together: <span style={{ color: "var(--gold)" }}>$197</span>
+            <sub style={{ fontSize: 14, color: "var(--muted2)", marginLeft: 4 }}>/mo CAD</sub>
+          </div>
+          <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 4 }}>
+            vs <s>$215/mo</s> individually
+          </div>
+          <div style={{ color: "var(--gold)", fontSize: 13, marginBottom: 18, fontWeight: 600 }}>
+            Save $18/mo · Cancel anytime
+          </div>
+          <button
+            className="pcta solid"
+            data-testid="suite-bundle-cta"
+            onClick={() => navigate("/welcome?plan=security_suite")}
+            style={{ minWidth: 220 }}>
+            Add Security Suite
+          </button>
+          <p data-testid="suite-bundle-included-note" style={{
+            marginTop: 16, color: "var(--muted2)", fontSize: 12,
+          }}>
+            <strong style={{ color: "var(--gold)" }}>🛡 Security Suite included</strong> in
+            Enterprise plan ($997/mo)
+          </p>
+        </div>
       </section>
 
       {/* TRUST */}
