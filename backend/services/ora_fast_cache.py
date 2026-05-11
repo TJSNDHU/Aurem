@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Optional
+from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -216,12 +216,43 @@ async def _ans_customers_health() -> str:
 
 # ─── Public entry point ───────────────────────────────────────
 
-async def try_short_circuit(message: str) -> Optional[str]:
+async def try_short_circuit(message: str, user: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """If the message matches a known fast-path intent, return the
     templated answer. Otherwise return None and let normal chat run."""
     if not message:
         return None
     msg = message.strip()
+    msg_lower = msg.lower()
+
+    # iter 322bq — Founder pixel-state ground-truth (anti-hallucination).
+    # When the founder asks ANYTHING about pixel active/installed/enabled,
+    # answer directly from db.aurem_pixel — never let the LLM guess counts.
+    if user and user.get("is_admin") and (
+        "pixel" in msg_lower and any(k in msg_lower for k in (
+            "active", "activated", "enable", "enabled", "install", "status",
+            "on all", "my bin", "confirm",
+        ))
+    ):
+        try:
+            import server
+            db = getattr(server, "db", None)
+            if db is not None:
+                rows = []
+                async for d in db.aurem_pixel.find(
+                    {}, {"_id": 0, "bin": 1, "active": 1, "domain": 1, "enabled_at": 1, "enabled_by": 1}
+                ):
+                    rows.append(d)
+                active = [r for r in rows if r.get("active")]
+                lines = ", ".join(
+                    f"{r['bin']} ({'on' if r.get('active') else 'off'})" for r in rows
+                ) or "none"
+                return (
+                    f"AUREM pixel ground-truth from db.aurem_pixel: "
+                    f"**{len(active)}/{len(rows)} BINs active** → {lines}. "
+                    f"(Source: deterministic DB read, no LLM inference.)"
+                )
+        except Exception as e:
+            logger.debug(f"[ora-fast] pixel ground-truth err: {e}")
 
     # iter 322bn — BIN grounding (anti-hallucination). Matches any BIN-like
     # code anywhere in the message. Bypasses length limit because users

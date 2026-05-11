@@ -205,20 +205,53 @@ def _personalised_system(user: Optional[Dict[str, Any]]) -> str:
             trial_str = f"\n  Trial days left: {days}"
     except Exception:
         pass
-    return _DEMO_SYSTEM + (
-        f"\n\nLOGGED-IN USER CONTEXT (use this to answer who/BIN/admin/lead questions):\n"
-        f"  Name: {user.get('name')}\n"
-        f"  Business: {user.get('business_name') or '—'}\n"
-        f"  BIN: {bin_}\n"
-        f"  Plan: {user.get('plan')}\n"
-        f"  Email: {user.get('email')}\n"
-        f"  Role: {user.get('role')}\n"
-        f"  Admin: {'Yes — full admin access' if user.get('is_admin') else 'No'}"
-        f"{trial_str}\n"
-        f"\nWhen the user asks about leads, revenue, or signups: if they are admin, "
-        f"answer with platform-wide totals from the daily verification log; if they "
-        f"are a customer, answer ONLY with their own BIN's data (their reviews, "
-        f"their site, their subscription). Never quote platform totals to a customer."
+
+    # iter 322bq — FOUNDER SAVE / HARD-SAVE PROTOCOL.
+    # When the caller is authenticated, replace the public-demo prompt with
+    # an authenticated-mode prompt. ORA must NEVER ask "what kind of
+    # business do you run" — that information is already in DB. ORA must
+    # OBEY Founder Save commands without re-asking for confirmation.
+    name = user.get("name") or "the founder"
+    biz = user.get("business_name") or "their business"
+    plan = user.get("plan") or "Trial"
+    role_str = "AUREM Founder/Admin" if user.get("is_admin") else "AUREM customer"
+    admin_block = ""
+    if user.get("is_admin"):
+        admin_block = (
+            "\n\nFOUNDER-SAVE / HARD-SAVE PROTOCOL (this user is an AUREM Founder):\n"
+            "  • When the founder issues a command, OBEY it. Do NOT ask for "
+            "    re-confirmation. Do NOT re-explain the consequences.\n"
+            "  • You have full read access to db.users, db.platform_users, "
+            "    db.campaign_leads, db.invoices, db.customer_health_log, "
+            "    db.aurem_pixel, db.repair_log, db.truth_ledger.\n"
+            "  • For ANY question about a specific BIN, look it up directly "
+            "    (the fast-cache short-circuit handles this). Never guess.\n"
+            "  • You can execute admin actions: enable pixel, run scan, "
+            "    pause/resume agent, push deploy. Reply with a concise "
+            "    confirmation of what you did and the affected rows count.\n"
+            "  • Treat 'Founder Save', 'Founder Override', 'Hard Save' as "
+            "    equivalent: bypass the Council approval queue and ship.\n"
+        )
+    return (
+        f"You are ORA, the autonomous orchestration brain of AUREM.\n"
+        f"You are speaking with **{name}** from **{biz}** "
+        f"(BIN: {bin_}, role: {role_str}, plan: {plan}).{trial_str}\n\n"
+        f"RULES — NEVER VIOLATE:\n"
+        f"  1. NEVER ask 'what kind of business do you run' or 'tell me about "
+        f"     your business' — you already know. The user is {name} at {biz}.\n"
+        f"  2. NEVER ask for their BIN — it is {bin_}.\n"
+        f"  3. NEVER greet them like a stranger. They are already a customer "
+        f"     (or the founder) — get straight to the answer.\n"
+        f"  4. When they ask about leads, revenue, scans, or repairs: pull "
+        f"     from the data block injected below. Never make up numbers.\n"
+        f"  5. Keep replies tight: 2-4 sentences for routine questions, "
+        f"     longer only when they ask for analysis or a plan.\n"
+        f"  6. Speak Hinglish if they speak Hinglish. English if English. "
+        f"     Mirror their tone — formal vs casual.\n"
+        f"  7. Pasted content (errors, JSON, emails, snippets) — READ IT. "
+        f"     Reference specific lines/values. Never reply 'tell me what "
+        f"     you want' to a paste.\n"
+        f"{admin_block}"
     )
 
 
@@ -490,14 +523,16 @@ async def public_demo_chat(
     # Trivial deterministic queries (today's date, time, leads count,
     # customer health) bypass the LLM entirely — answer from wall-clock /
     # live DB in <50 ms. Authoritative; cannot hallucinate.
+    # iter 322bq — also handles founder pixel-state ground-truth.
+    _ora_user = await _resolve_user_context(authorization)
     try:
         from services.ora_fast_cache import try_short_circuit
-        _fast = await try_short_circuit(text)
+        _fast = await try_short_circuit(text, user=_ora_user)
         if _fast is not None:
             return {
                 "ok":            True,
                 "reply":         _fast,
-                "authenticated": False,
+                "authenticated": bool(_ora_user),
                 "llm_source":    "ora_fast_cache",
             }
     except Exception as _fce:
@@ -533,7 +568,7 @@ async def public_demo_chat(
             logger.warning(f"[public-ora-demo] dev mode failed: {e}")
             # Fall through to regular LLM chat on failure.
 
-    user = await _resolve_user_context(authorization)
+    user = _ora_user  # iter 322bq — reuse resolution from fast-cache step
     sys_prompt = _personalised_system(user)
     # ── LIVE DB CONTEXT INJECTION (P0 fix — was hallucinating "I don't
     # have access to your data yet" because the LLM had no real numbers).
