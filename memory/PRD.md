@@ -995,6 +995,63 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
     `council_rotation`, `pillar_fulfiller`, `council_sessions_24h`,
     `boundary_lint`, `ts`).
 
+### iter 322ar — Lean 3-Step Admin Batch + System Overview real-numbers update (2026-05-11)
+  - **Bug fix**: `services/founder_provision.py:187` — `is_dogfood` variable
+    was referenced but never defined → silent `name 'is_dogfood' is not
+    defined` warning on every startup, blocking `aurem_users` sync for the
+    dogfood founder. Fix: `is_dogfood = bool(fdr.get("dogfood"))` before the
+    aurem_set dict.
+  - **Auth resolver fix (P0)**: `routers/admin_bin_detail_router.py` +
+    `routers/dev_stack_health_router.py` `_require_admin` was rejecting
+    JWTs minted by `/api/auth/admin/login` with `401 "Token missing
+    email"`. Root cause: admin-portal JWT carries `user_id`/`role` only,
+    no `email` claim. Fix: dual-mode resolver — try `email` first, then
+    `user_id`/`sub`/`id` fallback against `db.users.id` or `user_id`.
+    This unblocked Admin Action Log tile + Dev Stack health grid for the
+    admin-portal login flow.
+  - **Lean 3-Step batch (verified end-to-end via testing_agent_v3_fork)**:
+    1. Admin Action Log tile on `/admin/brain` — reads
+       `db.admin_audit_log` via `GET /api/admin/audit-log?limit=20`,
+       renders recent actions with color-coded action tags. **VERIFIED**
+       rendering live with 1 entry (`reset_subscriber_password`).
+    2. Edit + Soft Delete on Customer Health Panel — type "DELETE" double
+       confirm; 30-day grace window; `restore_customer` endpoint reverses.
+       Audit row written on every action.
+    3. Dev Stack Section on `/admin/pillars-map` — 11 components probed
+       live via `/api/admin/dev-stack/health`. 10/11 green, 1 red
+       (Sentinel Repair Loop — pending its own backfill).
+  - **System Overview page (`/admin/system-overview`) — real-numbers update**:
+    - Header iter `256` → `322ar+ | MAY 2026`.
+    - New **Sovereign Audit tile** (12 cells): 331 router files / 102
+      wired / 2,138 endpoints / 59 jobs / 497 collections / 32,938
+      council decisions / 5,475 brain thoughts / 2,211 agent actions /
+      664 auto-heal runs / pixel events / BIN intel / unified inbox /
+      admin actions — all live from `/api/admin/system-overview/stats`.
+    - New **Live Stack Status grid** (auto-refresh 20s) bound to
+      `/api/admin/dev-stack/health`.
+    - **ITER 322 — FEB→MAY 2026 SHIPPED** card replaces stale "256"
+      block: Intelligence Stack · Unified Inbox · Founders Console
+      action dispatcher · Admin Action Log + BIN Ops · Sovereign Truth
+      Protocol · Dogfood Pulse · Dev Stack Health Grid · Public Status
+      Page · registry.py refactor.
+    - Stale strings fixed: "19 jobs" → "~60 jobs", "234 routers" → "331
+      files / 102 wired", "16 endpoints" → "2,138 endpoints".
+    - INFRASTRUCTURE card expanded: Public Status Page link, Lavela
+      vertical (3 routers), DR backup mention.
+  - **Backend `/api/admin/system-overview/stats` extended**: new
+    `platform.router_files`, `wired_routers`, `endpoint_count`,
+    `scheduler_jobs`, `iteration` fields + new `audit` block with
+    `council_decisions`, `ora_brain_thoughts`, `agent_actions`,
+    `pixel_events`, `bin_intelligence`, `unified_inbox`, `admin_actions`,
+    `auto_heal_runs` counters. Filesystem scan cached for process
+    lifetime (cheap on cold call).
+  - **Testing**: `iteration_322ar.json` — 11/11 backend tests passed,
+    frontend smoke screenshots verified all three tiles render.
+  - **Pending after this batch**: User to click Deploy in chat UI to push
+    aurem.live to the new build. Sentinel Repair Loop component shows
+    red on the live grid (0 repair runs in window) — non-blocking
+    surface signal, no production impact.
+
 ## Backlog / Roadmap
 
 ### P0 — Blocked on platform / founder action

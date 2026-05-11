@@ -53,20 +53,30 @@ async def _require_admin(request: Request) -> dict:
         raise HTTPException(401, "Authentication required")
     claims = _decode(auth[7:])
     email = (claims.get("email") or "").lower()
-    if not email:
-        raise HTTPException(401, "Token missing email")
+    user_id = claims.get("user_id") or claims.get("sub") or claims.get("id")
+    if not email and not user_id:
+        raise HTTPException(401, "Token missing email/user_id")
     if _db is None:
         raise HTTPException(503, "DB not ready")
-    user = await _db.users.find_one(
-        {"email": email},
-        {"_id": 0, "is_admin": 1, "is_super_admin": 1, "role": 1},
-    )
+    # iter 322ar — /api/auth/admin/login mints JWTs without `email`; resolve
+    # by user_id when email is absent so admin-only endpoints (audit-log,
+    # bin-detail, customer-health) work for the admin portal login path.
+    if email:
+        user = await _db.users.find_one(
+            {"email": email},
+            {"_id": 0, "email": 1, "is_admin": 1, "is_super_admin": 1, "role": 1},
+        )
+    else:
+        user = await _db.users.find_one(
+            {"$or": [{"id": user_id}, {"user_id": user_id}]},
+            {"_id": 0, "email": 1, "is_admin": 1, "is_super_admin": 1, "role": 1},
+        )
     if not user or not (
         user.get("is_admin") or user.get("is_super_admin")
         or user.get("role") in ("admin", "super_admin")
     ):
         raise HTTPException(403, "Admin access required")
-    return {"email": email, **user}
+    return {"email": email or user.get("email", ""), **user}
 
 
 async def _audit(actor_email: str, action: str, bin_id: str, details: dict = None) -> None:
