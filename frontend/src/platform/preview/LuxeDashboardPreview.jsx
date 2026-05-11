@@ -69,27 +69,61 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
           width: 232, padding: '22px 16px',
           display: visible ? 'flex' : 'none',
           flexDirection: 'column', gap: 4,
-          background: 'rgba(6,7,11,0.96)',
-          borderRight: '1px solid rgba(212,163,115,0.10)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
+          // iter 322bl — 3D glass/water-bubble shine layered look (target match).
+          // Layer 1: deep ink base.
+          // Layer 2: top-down vignette so the head of the rail glows softly.
+          // Layer 3: subtle gold caustic curving across the upper third.
+          // Layer 4: inner top highlight (the "shine line").
+          background: `
+            radial-gradient(ellipse 320px 200px at 50% -40px, rgba(255,228,168,0.10), transparent 70%),
+            radial-gradient(ellipse 200px 460px at 10% 30%, rgba(255,228,168,0.04), transparent 70%),
+            linear-gradient(180deg, rgba(20,18,28,0.95) 0%, rgba(8,8,14,0.98) 60%, rgba(4,4,8,1) 100%)
+          `,
+          borderRight: '1px solid rgba(212,163,115,0.14)',
+          boxShadow: `
+            inset 1px 0 0 rgba(255,255,255,0.04),
+            inset -1px 0 0 rgba(0,0,0,0.4),
+            4px 0 32px rgba(0,0,0,0.55)
+          `,
+          backdropFilter: 'blur(22px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(22px) saturate(160%)',
           height: '100vh',
           position: isMobile ? 'fixed' : 'sticky',
           top: 0, left: 0,
           zIndex: isMobile ? 100 : 1,
           transition: 'transform .25s ease',
+          overflow: 'hidden',
         }}
       >
+        {/* Glass top-edge shine — animated bubble that drifts subtly */}
+        <div aria-hidden="true" style={{
+          position: 'absolute', top: -120, left: -40, right: -40, height: 280,
+          background: 'radial-gradient(ellipse at center, rgba(255,228,168,0.16) 0%, transparent 60%)',
+          pointerEvents: 'none', filter: 'blur(10px)',
+        }} />
+        <div aria-hidden="true" style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+          background: 'linear-gradient(90deg, transparent 0%, rgba(255,228,168,0.4) 30%, rgba(255,228,168,0.4) 70%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 14, paddingLeft: 4,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{
-              width: 26, height: 26, borderRadius: 7,
-              background: 'linear-gradient(135deg, #FFE4A8, #C9A84C)',
+              width: 28, height: 28, borderRadius: 8,
+              background: `
+                radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.5) 0%, transparent 50%),
+                linear-gradient(135deg, #FFE4A8 0%, #C9A84C 50%, #8B6A2E 100%)
+              `,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: fontDisplay, color: INK, fontSize: 14, fontWeight: 700,
+              boxShadow: `
+                inset 0 1px 0 rgba(255,255,255,0.45),
+                inset 0 -1px 0 rgba(0,0,0,0.25),
+                0 2px 8px rgba(201,168,76,0.35)
+              `,
             }}>A</span>
             <span style={{
               color: TEXT_HI, fontFamily: fontDisplay,
@@ -111,19 +145,36 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
           )}
         </div>
 
-        {/* iter 322bk — business badge card (matches target screenshot) */}
+        {/* iter 322bk/bl — business badge card with glass-bubble depth */}
         <div data-testid="sidebar-business-badge" style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 10px', borderRadius: 12, marginBottom: 18,
-          background: 'rgba(255,228,168,0.04)',
-          border: `1px solid ${STROKE}`,
+          padding: '11px 11px', borderRadius: 14, marginBottom: 18,
+          position: 'relative',
+          background: `
+            linear-gradient(180deg, rgba(255,228,168,0.10) 0%, rgba(255,228,168,0.02) 60%, transparent 100%),
+            linear-gradient(180deg, rgba(20,16,10,0.6) 0%, rgba(8,7,4,0.7) 100%)
+          `,
+          border: '1px solid rgba(255,228,168,0.16)',
+          boxShadow: `
+            inset 0 1px 0 rgba(255,255,255,0.08),
+            inset 0 -1px 0 rgba(0,0,0,0.3),
+            0 4px 16px rgba(0,0,0,0.4)
+          `,
         }}>
           <span style={{
             width: 36, height: 36, borderRadius: 9,
-            background: 'linear-gradient(135deg, #FFE4A8, #8B6A2E)',
+            background: `
+              radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.45) 0%, transparent 50%),
+              linear-gradient(135deg, #FFE4A8 0%, #C9A84C 50%, #8B6A2E 100%)
+            `,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: fontDisplay, color: INK, fontSize: 18, fontWeight: 700,
             flexShrink: 0,
+            boxShadow: `
+              inset 0 1px 0 rgba(255,255,255,0.4),
+              inset 0 -1px 0 rgba(0,0,0,0.25),
+              0 2px 8px rgba(201,168,76,0.4)
+            `,
           }}>{((user?.company_name || user?.business_name || user?.full_name || 'A')[0] || 'A').toUpperCase()}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{
@@ -137,36 +188,48 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
             }}>{user?.business_id || user?.bin || (user?.email || '').split('@')[0].slice(0, 10).toUpperCase() || '—'}</div>
           </div>
         </div>
-        {NAV.map(({ k, label, icon: Icon }) => (
+        {NAV.map(({ k, label, icon: Icon }) => {
+          const isActive = active === k;
+          return (
           <button key={k} data-testid={`nav-${k}`} onClick={() => navClick(k)}
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '11px 14px', borderRadius: 12,
-              background: active === k ? 'rgba(255,228,168,0.08)' : 'transparent',
-              border: `1px solid ${active === k ? STROKE : 'transparent'}`,
-              color: active === k ? TEXT_HI : TEXT_MD,
-              // iter 322bk — sentence-case, no tracking — matches target screenshot
-              fontFamily: fontBody, fontSize: 13.5, fontWeight: active === k ? 600 : 500,
+              position: 'relative',
+              // iter 322bl — glass-bubble active state (3D shine)
+              background: isActive
+                ? `linear-gradient(180deg, rgba(255,228,168,0.14) 0%, rgba(255,228,168,0.04) 50%, rgba(255,228,168,0.02) 100%),
+                   linear-gradient(180deg, rgba(20,16,10,0.4), rgba(8,7,4,0.5))`
+                : 'transparent',
+              border: `1px solid ${isActive ? 'rgba(255,228,168,0.20)' : 'transparent'}`,
+              boxShadow: isActive
+                ? `inset 0 1px 0 rgba(255,255,255,0.10),
+                   inset 0 -1px 0 rgba(0,0,0,0.25),
+                   0 4px 14px rgba(0,0,0,0.35)`
+                : 'none',
+              color: isActive ? TEXT_HI : TEXT_MD,
+              fontFamily: fontBody, fontSize: 13.5, fontWeight: isActive ? 600 : 500,
               letterSpacing: '0',
               cursor: 'pointer', textAlign: 'left',
-              transition: 'background 0.18s ease, color 0.18s ease',
+              transition: 'background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease',
             }}
             onMouseEnter={(e) => {
-              if (active !== k) {
-                e.currentTarget.style.background = 'rgba(255,228,168,0.035)';
+              if (!isActive) {
+                e.currentTarget.style.background = 'linear-gradient(180deg, rgba(255,228,168,0.05), rgba(255,228,168,0.01))';
                 e.currentTarget.style.color = TEXT_HI;
               }
             }}
             onMouseLeave={(e) => {
-              if (active !== k) {
+              if (!isActive) {
                 e.currentTarget.style.background = 'transparent';
                 e.currentTarget.style.color = TEXT_MD;
               }
             }}>
-            <Icon size={16} color={active === k ? GOLD_HI : TEXT_MD} />
+            <Icon size={16} color={isActive ? GOLD_HI : TEXT_MD} />
             {label}
           </button>
-        ))}
+          );
+        })}
         <div style={{ flex: 1 }} />
         <button data-testid="nav-logout" onClick={onLogout} style={{
           display: 'flex', alignItems: 'center', gap: 12,
