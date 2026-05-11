@@ -406,6 +406,74 @@ async def health():
     return {"ok": True}
 
 
+# iter 322bo — Latency & speed dashboard for ORA chat.
+@router.get("/metrics/summary")
+async def metrics_summary(window_min: int = 60):
+    """Return aggregated ORA chat performance over the last `window_min`
+    minutes: p50/p95/p99 latency, requests/min, fallback rates, source mix.
+    """
+    if _db is None:
+        raise HTTPException(503, "DB unavailable")
+    from datetime import timedelta as _td
+    since = datetime.now(timezone.utc) - _td(minutes=max(1, int(window_min)))
+    cursor = _db.ora_chat_metrics.find(
+        {"ts": {"$gte": since}},
+        {"_id": 0, "total_ms": 1, "claude_ms": 1, "groq_ms": 1,
+         "llm_source": 1, "authenticated": 1, "ts": 1, "reply_len": 1},
+    ).sort("ts", -1).limit(2000)
+    rows = await cursor.to_list(length=2000)
+
+    def _pct(values, p):
+        if not values:
+            return 0
+        vs = sorted(values)
+        k = max(0, min(len(vs) - 1, int(round((p / 100.0) * (len(vs) - 1)))))
+        return vs[k]
+
+    by_source: Dict[str, List[int]] = {}
+    for r in rows:
+        by_source.setdefault(r.get("llm_source") or "unknown", []).append(int(r.get("total_ms") or 0))
+
+    total_latencies = [int(r.get("total_ms") or 0) for r in rows]
+    claude_lat = [int(r.get("claude_ms") or 0) for r in rows if r.get("claude_ms")]
+    groq_lat = [int(r.get("groq_ms") or 0) for r in rows if r.get("groq_ms")]
+
+    return {
+        "window_min": window_min,
+        "total_requests": len(rows),
+        "rps_avg": round(len(rows) / max(1, window_min * 60), 3),
+        "latency_ms": {
+            "p50": _pct(total_latencies, 50),
+            "p95": _pct(total_latencies, 95),
+            "p99": _pct(total_latencies, 99),
+            "avg": int(sum(total_latencies) / len(total_latencies)) if total_latencies else 0,
+            "max": max(total_latencies) if total_latencies else 0,
+        },
+        "claude": {
+            "calls": len(claude_lat),
+            "p50": _pct(claude_lat, 50),
+            "p95": _pct(claude_lat, 95),
+            "avg": int(sum(claude_lat) / len(claude_lat)) if claude_lat else 0,
+        },
+        "groq": {
+            "calls": len(groq_lat),
+            "p50": _pct(groq_lat, 50),
+            "p95": _pct(groq_lat, 95),
+            "avg": int(sum(groq_lat) / len(groq_lat)) if groq_lat else 0,
+        },
+        "by_source": {
+            k: {
+                "calls": len(v),
+                "share_pct": round((len(v) / len(rows)) * 100, 1) if rows else 0,
+                "avg_ms": int(sum(v) / len(v)) if v else 0,
+            } for k, v in by_source.items()
+        },
+        "claude_timeout_threshold_ms": int(float(os.environ.get("ORA_CLAUDE_TIMEOUT_S", "6.0")) * 1000),
+        "groq_configured": bool(os.environ.get("GROQ_API_KEY", "").strip()),
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.post("/chat")
 async def public_demo_chat(
     req: DemoChatReq,
@@ -487,22 +555,34 @@ async def public_demo_chat(
     history = await _load_history(sid, bin_for_session, limit=10)
     sys_prompt = sys_prompt + _history_block(history)
 
+    # iter 322bo — Speed-first routing. Groq is 5-10x faster than Claude
+    # (~500-1000ms vs 4-8s). Use it as PRIMARY for chat. Fall back to
+    # Claude only if Groq is unreachable. Set ORA_PROVIDER_ORDER=claude,groq
+    # in env to flip the priority if needed.
+    import time as _time
+    t_started = _time.monotonic()
     out: Optional[str] = None
-    llm_source = "claude"
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
-            session_id=sid,
-            system_message=sys_prompt,
-        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        out = (await chat.send_message(UserMessage(text=text))).strip() or None
-    except Exception as e:
-        logger.warning(f"[public-ora-demo] Claude failed → Groq fallback: {e}")
-        out = None
+    llm_source = "groq"
+    claude_ms = 0
+    groq_ms = 0
 
-    # iter 322bn — BUG 3: silent Groq fallback. No "warming up" message.
-    if not out:
+    order = (os.environ.get("ORA_PROVIDER_ORDER", "groq,claude")
+             .lower().replace(" ", "").split(","))
+
+    async def _try_claude() -> Optional[str]:
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = LlmChat(
+                api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
+                session_id=sid,
+                system_message=sys_prompt,
+            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+            return (await chat.send_message(UserMessage(text=text))).strip() or None
+        except Exception as e:
+            logger.warning(f"[public-ora-demo] Claude failed: {type(e).__name__}")
+            return None
+
+    async def _try_groq() -> Optional[str]:
         groq_messages = [{"role": "system", "content": sys_prompt}]
         for t in history[-6:]:
             groq_messages.append({
@@ -510,9 +590,23 @@ async def public_demo_chat(
                 "content": t.get("text", ""),
             })
         groq_messages.append({"role": "user", "content": text})
-        out = await _groq_fallback(groq_messages)
-        if out:
-            llm_source = "groq"
+        return await _groq_fallback(groq_messages)
+
+    for provider in order:
+        if provider == "groq":
+            _g0 = _time.monotonic()
+            out = await _try_groq()
+            groq_ms = int((_time.monotonic() - _g0) * 1000)
+            if out:
+                llm_source = "groq"
+                break
+        elif provider == "claude":
+            _c0 = _time.monotonic()
+            out = await _try_claude()
+            claude_ms = int((_time.monotonic() - _c0) * 1000)
+            if out:
+                llm_source = "claude"
+                break
 
     # If both providers are unreachable AND we know the user, give a
     # deterministic identity reply (zero LLM, zero hallucination).
@@ -538,10 +632,30 @@ async def public_demo_chat(
     # Persist this turn for future context (BUG 2 fix)
     await _save_turn(sid, bin_for_session, text, out)
 
+    # iter 322bo — write per-request latency metrics for the ops dashboard
+    total_ms = int((_time.monotonic() - t_started) * 1000)
+    try:
+        if _db is not None:
+            await _db.ora_chat_metrics.insert_one({
+                "session_id": sid,
+                "bin": bin_for_session,
+                "authenticated": bool(user),
+                "llm_source": llm_source,
+                "total_ms": total_ms,
+                "claude_ms": claude_ms,
+                "groq_ms": groq_ms,
+                "reply_len": len(out),
+                "history_size": len(history),
+                "ts": datetime.now(timezone.utc),
+            })
+    except Exception as _me:
+        logger.debug(f"[public-ora-demo] metrics write failed: {_me}")
+
     return {
         "ok": True,
         "reply": out,
         "authenticated": bool(user),
         "llm_source": llm_source,
         "session_id": sid,
+        "latency_ms": total_ms,
     }

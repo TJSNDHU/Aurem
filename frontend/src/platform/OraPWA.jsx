@@ -727,7 +727,10 @@ const OraPWA = () => {
         const body = await r.json().catch(() => ({}));
         const reply =
           (body?.reply || "").trim() ||
-          "I'm here to help — tell me what your business does and I'll show you what I can do.";
+          // iter 322bo — softer fallback. If we land here it means backend
+          // returned an empty body — usually a 502/timeout. Tell user it's
+          // a connectivity blip, not a feature limitation.
+          "One sec — connection blinked. Re-send your message and I'll pick up where we left off.";
         setMessages((p) =>
           p.map((m) => (m.id === placeholderId ? { ...m, text: reply, typing: false } : m))
         );
