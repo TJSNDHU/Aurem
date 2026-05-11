@@ -13,7 +13,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'reac
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home as HomeIcon, Globe, Star, Share2, MessageSquare,
-  FileText, CreditCard, Settings, LogOut, Menu, X, ChevronRight, Activity, Award
+  FileText, CreditCard, Settings, LogOut, Menu, X, ChevronRight, Activity, Award, Plug
 } from 'lucide-react';
 import { getPlatformToken, clearPlatformAuth as clearPlatformToken } from '../utils/secureTokenStore';
 import '../styles/portal-global.css';
@@ -31,6 +31,7 @@ const CustomerBilling = lazy(() => import('./customer/CustomerBilling'));
 const CustomerSettings = lazy(() => import('./customer/CustomerSettings'));
 const CustomerReferrals = lazy(() => import('./customer/CustomerReferrals'));
 const CustomerOnboarding = lazy(() => import('./customer/CustomerOnboarding'));
+const CustomerIntegrations = lazy(() => import('./customer/CustomerIntegrations'));
 // Site Monitor + Board Report — formerly mounted as standalone routes outside
 // CustomerPortal (which made every page look "blank" because the portal's
 // auth context + sidebar chrome never wrapped them). Now lazy-loaded as
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { to: '/my/ora',       label: 'ORA Chat',       icon: MessageSquare },
   { to: '/my/report',    label: 'Monthly Report', icon: FileText },
   { to: '/my/billing',   label: 'Billing',        icon: CreditCard },
+  { to: '/my/integrations', label: 'Integrations', icon: Plug },
   { to: '/my/settings',  label: 'Settings',       icon: Settings },
 ];
 
@@ -421,6 +423,7 @@ function AnimatedRoutes({ ctx, reload }) {
           <Route path="ora" element={<CustomerOra ctx={ctx} />} />
           <Route path="report" element={<CustomerReport ctx={ctx} />} />
           <Route path="billing" element={<CustomerBilling ctx={ctx} />} />
+          <Route path="integrations" element={<CustomerIntegrations ctx={ctx} />} />
           <Route path="settings" element={<CustomerSettings ctx={ctx} reload={reload} />} />
           <Route path="referrals" element={<CustomerReferrals ctx={ctx} />} />
           <Route path="onboarding" element={<CustomerOnboarding ctx={ctx} />} />

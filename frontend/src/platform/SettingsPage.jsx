@@ -1344,7 +1344,7 @@ function InboundVoiceTab({ token, user }) {
   }, [token]);
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
-  const live = !!(status?.retell_key_set || status?.live);
+  const live = !!(status?.retell_ready || status?.retell_key_set || status?.live);
 
   return (
     <div className="aurem-glass-card rounded-xl p-6 space-y-4" data-testid="settings-voice">

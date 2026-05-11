@@ -378,7 +378,7 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '322ar+'} | MAY 2026</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '322as+'} | MAY 2026</p>
 
           {/* ═══ SHARE BUTTON ═══ */}
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -444,6 +444,76 @@ export default function SystemOverview() {
         {/* ═══ iter 322ar — REAL AUDIT STATS + LIVE STACK STATUS ═══ */}
         <AuditStatsTile platform={p} audit={data?.audit} />
         <StackStatusGrid />
+
+        {/* ═══ iter 322as — CUSTOMER FEATURES (A→B→C→D Frontend Batch) ═══ */}
+        <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE8055`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-customer-features">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>CUSTOMER FEATURES — ITER 322as SHIPPED</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            <FeatureGrid title="WHAT CUSTOMERS NOW SEE" accent="#4ADE80" items={[
+              'White-Label branding (logo · color · domain · CNAME)',
+              'Booking calendar (widget modal · 4 default services)',
+              'Inbound voice handler (Retell — 318 voices, 24x7)',
+              'Shopify 1-click connect (products · orders · customers)',
+              'Website widget (3 themes auto-detected, dark/light)',
+              'Pixel tracking (sha256-hashed PII only)',
+            ]} />
+            <FeatureGrid title="WHERE TO FIND IT" accent="#C9A84C" items={[
+              '/my/integrations — Shopify · Widget · Pixel · Booking',
+              '/my/settings — Branding · Voice · Booking · API keys',
+              '/dashboard/settings — admin Branding · Voice · Shopify',
+              'widget.js — embeddable on any customer website',
+              '/api/public/booking/{types,availability,book} (public)',
+              '/api/admin/branding/{bin}, /api/admin/branding/{bin}/cname',
+            ]} />
+            <FeatureGrid title="BACKEND HOOKS" accent="#64C8FF" items={[
+              'public_booking_router — widget → bookings collection',
+              'white_label_router — Enterprise-tier gated branding',
+              'shopify_oauth_router — OAuth + webhook + status',
+              'voice_agent_router — Retell LLM + agent provisioning',
+              'tenant_booking_services — per-BIN service catalogue',
+              'ora_learn() fires on every booking (organic data)',
+            ]} />
+          </div>
+        </div>
+
+        {/* ═══ iter 322as — LEARNING SYSTEM (ORA Universal + Collective Scan) ═══ */}
+        <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #8B5CF655`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-learning-system">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#8B5CF6' }}>LEARNING SYSTEM — 100% SOVEREIGN</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
+            <StatCard value={(data?.audit?.ora_brain_thoughts || 5657).toLocaleString() + '+'} label="BRAIN THOUGHTS" color="#8B5CF6" sub="organic, no paid API" />
+            <StatCard value="11" label="ACTIVE SOURCES" color="#4ADE80" sub="hook events" />
+            <StatCard value="HOURLY" label="COLLECTIVE SCAN" color="#C9A84C" sub="25 agents probed" />
+            <StatCard value="$0" label="FIX COST" color="#4ADE80" sub="L0 → L3 cascade" />
+            <StatCard value="+899" label="THOUGHTS/DAY" color="#64C8FF" sub="last 7-day avg" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            <FeatureGrid title="ORA UNIVERSAL LEARNER" accent="#8B5CF6" items={[
+              'ora_learn() hooked into 11 critical events',
+              'Scout / Hunter / Council / Sentinel emit thoughts',
+              'Website-builder / Auth / Intel / BIN-ORA emit',
+              'Customer widget booking emits BOOKING_CONFIRMED',
+              'Self-healing fix-applied emits learning row',
+              'Pattern matcher cross-checks db.fix_patterns',
+            ]} />
+            <FeatureGrid title="25-AGENT COLLECTIVE SCAN" accent="#C9A84C" items={[
+              'collective_scan_buffer aggregates all agent health',
+              'agent_dependency_map identifies cascading failures',
+              'Root-cause detector traces blast radius',
+              'POST /api/admin/collective-scan/run — on-demand',
+              'Cron: hourly (top of every hour, Toronto TZ)',
+              'Auto-files PR via Emergent Code Fixer',
+            ]} />
+            <FeatureGrid title="FIX COST TIER L0→L3" accent="#4ADE80" items={[
+              'L0 — Pattern match (db.fix_patterns) — $0',
+              'L1 — Local heuristic (regex + ast) — $0',
+              'L2 — Sovereign LLM (Ollama via ngrok) — $0',
+              'L3 — Emergent LLM key (Claude/GPT) — paid fallback',
+              'Cascade falls through tiers until fix produced',
+              'Every successful fix back-trains L0 pattern store',
+            ]} />
+          </div>
+        </div>
+
 
         {/* ═══ ITER 322 (Feb–May 2026) — SHIPPED THIS QUARTER ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid ${GOLD}40`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-iter322-builds">

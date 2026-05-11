@@ -2760,6 +2760,18 @@ def register_all_routers(app, db):
     except Exception as e:
         logger.warning(f"White-Label router not loaded: {e}")
 
+    # iter 322as — Public booking router (used by embedded widget.js)
+    try:
+        from routers.public_booking_router import (
+            router as pub_book_router,
+            set_db as set_pub_book_db,
+        )
+        set_pub_book_db(db)
+        app.include_router(pub_book_router)
+        logger.info("[REGISTRY] Public booking router registered")
+    except Exception as e:
+        logger.warning(f"Public booking router not loaded: {e}")
+
     # ═══════════════════════════════════════════
     # LEAN MODE: Post-registration route cleanup
     # See routers/_registry_lean_prune.py for the full prune-list.
