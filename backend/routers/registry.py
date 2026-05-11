@@ -2676,6 +2676,24 @@ def register_all_routers(app, db):
         except Exception as te_e:
             logger.warning(f"[REGISTRY] trial expiry sweep schedule failed: {te_e}")
 
+        # iter 322ar — Collective Scan (25 agents, every 1 hour)
+        try:
+            from services import collective_scanner as _cs_mod
+            _cs_mod.set_db(db)
+            from apscheduler.triggers.interval import IntervalTrigger as _IT_cs
+            aurem_scheduler.add_job(
+                _cs_mod.run_cycle,
+                _IT_cs(hours=1),
+                id="collective_scan",
+                name="Collective Scan (25 agents, peer-review v2)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] Collective Scan scheduled (every 1h)")
+        except Exception as cs_e:
+            logger.warning(f"[REGISTRY] collective scan schedule failed: {cs_e}")
+
         # iter 281.5 — Phase 2.5 retention + upsell schedulers
         try:
             from services.ora_phase_25 import attach_phase_25_scheduler
@@ -2708,6 +2726,18 @@ def register_all_routers(app, db):
         app.include_router(ora_avatar_admin_router, prefix="/api")
     except Exception as e:
         logger.warning(f"ORA Avatar router not loaded: {e}")
+
+    # iter 322ar — Collective Scan router (POST /run, GET /last/recent/dependency-map)
+    try:
+        from routers.collective_scan_router import (
+            router as collective_scan_router,
+            set_db as set_collective_db,
+        )
+        set_collective_db(db)
+        app.include_router(collective_scan_router)
+        logger.info("[REGISTRY] Collective Scan router registered")
+    except Exception as e:
+        logger.warning(f"Collective Scan router not loaded: {e}")
 
     # ═══════════════════════════════════════════
     # LEAN MODE: Post-registration route cleanup

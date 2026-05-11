@@ -23,10 +23,15 @@ const getAdminToken = () =>
   localStorage.getItem('token') ||
   '';
 
-const fetchJSON = async (path) => {
+const fetchJSON = async (path, opts = {}) => {
   const t = getAdminToken();
   const r = await fetch(`${API}${path}`, {
-    headers: { Authorization: `Bearer ${t}` },
+    method: opts.method || 'GET',
+    headers: {
+      Authorization: `Bearer ${t}`,
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(opts.body ? { body: typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body) } : {}),
   });
   if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
   return r.json();
@@ -65,6 +70,8 @@ export default function AdminBrainPage() {
   const [dogfood, setDogfood] = useState(null);
   const [dogfoodOpen, setDogfoodOpen] = useState(false);
   const [auditLog, setAuditLog] = useState(null);
+  const [collective, setCollective] = useState(null);
+  const [collectiveRunning, setCollectiveRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
@@ -72,13 +79,14 @@ export default function AdminBrainPage() {
     try {
       setErr('');
       // allSettled so one failing endpoint doesn't blank the whole page.
-      const [ro, rf, rn, rd, rdp, ral] = await Promise.allSettled([
+      const [ro, rf, rn, rd, rdp, ral, rcs] = await Promise.allSettled([
         fetchJSON('/api/admin/autonomous/overview'),
         fetchJSON('/api/admin/autonomous/pipeline-flow?limit=10'),
         fetchJSON('/api/admin/autonomous/notifications?limit=10&unread_only=true'),
         fetchJSON('/api/admin/deploy-readiness'),
         fetchJSON('/api/admin/dogfood/pulse'),
         fetchJSON('/api/admin/audit-log?limit=20'),
+        fetchJSON('/api/admin/collective-scan/last'),
       ]);
       if (ro.status === 'fulfilled') setOverview(ro.value);
       if (rf.status === 'fulfilled') setFlow(rf.value);
@@ -86,6 +94,7 @@ export default function AdminBrainPage() {
       if (rd.status === 'fulfilled') setDeploy(rd.value);
       if (rdp.status === 'fulfilled') setDogfood(rdp.value);
       if (ral.status === 'fulfilled') setAuditLog(ral.value);
+      if (rcs.status === 'fulfilled') setCollective(rcs.value);
 
       // Surface only if EVERYTHING failed
       const allFailed = [ro, rf, rn, rd].every(r => r.status === 'rejected');
@@ -98,6 +107,20 @@ export default function AdminBrainPage() {
       setLoading(false);
     }
   }, []);
+
+  const runCollectiveScan = useCallback(async () => {
+    if (collectiveRunning) return;
+    setCollectiveRunning(true);
+    try {
+      const res = await fetchJSON('/api/admin/collective-scan/run', { method: 'POST' });
+      setCollective({ ok: true, exists: true, result: res });
+    } catch (e) {
+      // Surface via err state so the page banner shows it.
+      setErr(String(e?.message || e));
+    } finally {
+      setCollectiveRunning(false);
+    }
+  }, [collectiveRunning]);
 
   useEffect(() => {
     refresh();
@@ -384,6 +407,119 @@ export default function AdminBrainPage() {
                   </div>
                 ))}
             </div>
+          )}
+        </section>
+      )}
+
+      {/* Collective Scan tile (iter 322ar) — 25-agent peer-review v2 */}
+      {collective && (
+        <section
+          data-testid="collective-scan-tile"
+          style={{
+            background: COMP_BG,
+            border: `1px solid ${COMP_BORDER}`,
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ color: ACCENT, fontWeight: 600, fontSize: 14 }}>
+              🛰️ Collective Scan
+              <span style={{ color: '#8B8475', fontWeight: 500, fontSize: 12, marginLeft: 8 }}>
+                · 25 agents · every 1h
+              </span>
+            </div>
+            <button
+              data-testid="collective-scan-run-now"
+              onClick={runCollectiveScan}
+              disabled={collectiveRunning}
+              style={{
+                background: collectiveRunning ? '#3A3530' : ACCENT,
+                color: '#0E0E0F',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                cursor: collectiveRunning ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {collectiveRunning ? 'Scanning…' : 'Run Now'}
+            </button>
+          </div>
+          {!collective.exists ? (
+            <div style={{ color: '#7A7468', fontSize: 12 }}>
+              No cycles yet. Hit <strong>Run Now</strong> or wait for the hourly scheduler.
+            </div>
+          ) : (
+            (() => {
+              const r = collective.result || {};
+              const b = r.buckets || {};
+              const fp = r.fix_priority || [];
+              const routing = r.routing || {};
+              return (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 12 }}>
+                    <div data-testid="collective-scan-critical" style={{ padding: '10px 12px', background: 'rgba(255,80,80,0.06)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>CRITICAL</div>
+                      <div style={{ fontSize: 22, color: '#FF6F6F', fontWeight: 700, marginTop: 2 }}>{(b.critical || []).length}</div>
+                    </div>
+                    <div data-testid="collective-scan-warning" style={{ padding: '10px 12px', background: 'rgba(240,160,48,0.06)', border: '1px solid rgba(240,160,48,0.2)', borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>WARNING</div>
+                      <div style={{ fontSize: 22, color: '#F0A030', fontWeight: 700, marginTop: 2 }}>{(b.warning || []).length}</div>
+                    </div>
+                    <div data-testid="collective-scan-healthy" style={{ padding: '10px 12px', background: 'rgba(74,212,160,0.06)', border: '1px solid rgba(74,212,160,0.2)', borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>HEALTHY</div>
+                      <div style={{ fontSize: 22, color: '#4AD4A0', fontWeight: 700, marginTop: 2 }}>{(b.healthy || []).length}</div>
+                    </div>
+                    <div data-testid="collective-scan-approved" style={{ padding: '10px 12px', background: 'rgba(136,197,255,0.06)', border: '1px solid rgba(136,197,255,0.2)', borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>FIXES APPROVED</div>
+                      <div style={{ fontSize: 22, color: '#88C5FF', fontWeight: 700, marginTop: 2 }}>{routing.approved || 0}</div>
+                    </div>
+                    <div data-testid="collective-scan-duration" style={{ padding: '10px 12px', background: 'rgba(212,175,122,0.06)', border: '1px solid rgba(212,175,122,0.2)', borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>DURATION</div>
+                      <div style={{ fontSize: 22, color: ACCENT, fontWeight: 700, marginTop: 2 }}>{(r.duration_seconds || 0).toFixed(2)}s</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#7A7468', marginBottom: 6 }}>
+                    Last cycle: {r.finished_at ? new Date(r.finished_at).toLocaleString() : '—'} · scan_id {(r.scan_id || '').slice(0, 8)} · triggered by {r.triggered_by || 'scheduler'}
+                  </div>
+                  {fp.length > 0 && (
+                    <details style={{ marginTop: 8 }}>
+                      <summary style={{ cursor: 'pointer', fontSize: 12, color: '#D4AF7A', userSelect: 'none' }}>
+                        Fix priority queue ({fp.length})
+                      </summary>
+                      <div style={{ marginTop: 8, maxHeight: 260, overflowY: 'auto', fontSize: 11 }}>
+                        {fp.map((row, i) => (
+                          <div key={i}
+                            data-testid={`collective-scan-fix-${i}`}
+                            style={{
+                              padding: '7px 10px',
+                              borderBottom: `1px solid ${COMP_BORDER}`,
+                              display: 'grid',
+                              gridTemplateColumns: '30px 160px 90px 90px 1fr',
+                              alignItems: 'center',
+                              gap: 8,
+                              color: '#E8E2D4',
+                            }}>
+                            <div style={{ fontFamily: 'monospace', color: '#7A7468' }}>#{row.order}</div>
+                            <div style={{ fontWeight: 600, color: row.is_root_cause ? '#FF6F6F' : '#F0A030', fontFamily: 'monospace' }}>{row.agent}</div>
+                            <div style={{ color: row.is_root_cause ? '#FF6F6F' : '#7A7468', fontSize: 10, letterSpacing: '0.06em' }}>
+                              {row.is_root_cause ? 'ROOT CAUSE' : 'downstream'}
+                            </div>
+                            <div style={{ color: '#88C5FF', fontFamily: 'monospace' }}>cascade={row.cascade_size}</div>
+                            <div style={{ color: '#8B8475', fontSize: 10 }}>{row.reason}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              );
+            })()
           )}
         </section>
       )}

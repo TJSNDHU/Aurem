@@ -94,6 +94,7 @@ httplib2==0.31.2
 httptools==0.7.1
 httpx==0.28.1
 httpx-sse==0.4.3
+huggingface_hub==0.36.2
 idna==3.11
 importlib_metadata==8.7.1
 importlib_resources==6.5.2
@@ -234,6 +235,7 @@ ruamel.yaml==0.19.1
 ruamel.yaml.clib==0.2.14
 s3transfer==0.16.0
 s5cmd==0.2.0
+safetensors==0.7.0
 scikit-learn==1.8.0
 scipy==1.17.1
 scrapling==0.2.99
@@ -257,6 +259,7 @@ tiktoken==0.12.0
 tinycss2==1.5.1
 tinyhtml5==2.1.0
 tldextract==5.3.1
+tokenizers==0.22.2
 tomli==2.2.1
 tomli_w==1.2.0
 toolz==1.1.0
