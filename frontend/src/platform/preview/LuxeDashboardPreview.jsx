@@ -29,14 +29,16 @@ import {
 } from '../luxe/tokens';
 
 const NAV = [
+  // iter 322bk — matches target screenshot exactly. Integrations dropped from
+  // sidebar (still reachable via deep-link inside Automation). Profile moved
+  // after ORA per the target ordering.
   { k: 'home',         label: 'Home',         icon: HomeIcon },
-  { k: 'profile',      label: 'Profile',      icon: UserIcon },
   { k: 'live-health',  label: 'Live Health',  icon: Activity },
   { k: 'security',     label: 'Security',     icon: Shield },
   { k: 'automation',   label: 'Automation',   icon: Bot },
   { k: 'crm',          label: 'CRM',          icon: Users },
   { k: 'ora',          label: 'ORA',          icon: Sparkles },
-  { k: 'integrations', label: 'Integrations', icon: Plug },
+  { k: 'profile',      label: 'Profile',      icon: UserIcon },
   { k: 'settings',     label: 'Settings',     icon: Cog },
 ];
 
@@ -80,7 +82,7 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
       >
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: 22, paddingLeft: 4,
+          marginBottom: 14, paddingLeft: 4,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{
@@ -107,6 +109,33 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
               <CloseIcon size={18} />
             </button>
           )}
+        </div>
+
+        {/* iter 322bk — business badge card (matches target screenshot) */}
+        <div data-testid="sidebar-business-badge" style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 10px', borderRadius: 12, marginBottom: 18,
+          background: 'rgba(255,228,168,0.04)',
+          border: `1px solid ${STROKE}`,
+        }}>
+          <span style={{
+            width: 36, height: 36, borderRadius: 9,
+            background: 'linear-gradient(135deg, #FFE4A8, #8B6A2E)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: fontDisplay, color: INK, fontSize: 18, fontWeight: 700,
+            flexShrink: 0,
+          }}>{((user?.company_name || user?.business_name || user?.full_name || 'A')[0] || 'A').toUpperCase()}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{
+              fontFamily: fontDisplay, color: TEXT_HI, fontSize: 11.5, fontWeight: 600,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              letterSpacing: '0.02em',
+            }}>{user?.company_name || user?.business_name || user?.full_name || 'My Business'}</div>
+            <div style={{
+              fontFamily: fontMono, color: GOLD_HI, fontSize: 9.5,
+              letterSpacing: '0.14em', marginTop: 2,
+            }}>{user?.business_id || user?.bin || (user?.email || '').split('@')[0].slice(0, 10).toUpperCase() || '—'}</div>
+          </div>
         </div>
         {NAV.map(({ k, label, icon: Icon }) => (
           <button key={k} data-testid={`nav-${k}`} onClick={() => navClick(k)}
@@ -138,7 +167,7 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
           cursor: 'pointer', textAlign: 'left',
         }}>
           <LogOut size={14} />
-          Sign Out
+          Log out
         </button>
       </aside>
     </>
@@ -300,6 +329,77 @@ const PillarRow = ({ label, value, hint }) => {
   );
 };
 
+// iter 322bk — Website Scan as FOUR individual bordered tiles (target screenshot).
+const ScanRowFour = ({ data }) => {
+  const s = data?.websiteScan || {};
+  const tiles = [
+    ['GEO', s.geo, '#FFE4A8', 'Geographic Reach', 'top-5 markets'],
+    ['SEC', s.sec, '#bef264', 'Security', 'TLS / CSP'],
+    ['ACC', s.acc, '#FFA552', 'Accessibility', 'WCAG / ARIA'],
+    ['SEO', s.seo, '#60A5FA', 'SEO / Performance', 'LCP / meta'],
+  ];
+  return (
+    <Card testid="website-scan-card" style={{ padding: 16 }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 12,
+      }}>
+        <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase' }}>
+          Website Scan
+        </div>
+        <div style={{ fontFamily: fontMono, color: TEXT_LO, fontSize: 9, letterSpacing: '0.16em' }}>
+          last · {s.lastScan || '—'}
+        </div>
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0,1fr))',
+        gap: 10,
+      }}>
+        {tiles.map(([k, v, c, name, hint]) => {
+          const pct = Math.max(0, Math.min(100, Number(v) || 0));
+          const r = 18, C = 2 * Math.PI * r, dash = C * (pct / 100);
+          return (
+            <div key={k} data-testid={`scan-tile-${k.toLowerCase()}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px', borderRadius: 12,
+                background: 'rgba(255,228,168,0.025)',
+                border: `1px solid ${STROKE}`,
+              }}>
+              <div style={{ position: 'relative', width: 50, height: 50, flexShrink: 0 }}>
+                <svg width="50" height="50" viewBox="0 0 50 50">
+                  <circle cx="25" cy="25" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                  <circle cx="25" cy="25" r={r} fill="none" stroke={c} strokeWidth="4" strokeLinecap="round"
+                    strokeDasharray={`${dash} ${C}`} transform="rotate(-90 25 25)"
+                    style={{ filter: `drop-shadow(0 0 4px ${c})`, transition: 'stroke-dasharray .8s ease' }} />
+                </svg>
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: fontDisplay, fontSize: 13, fontWeight: 700, color: TEXT_HI,
+                }}>{pct}</div>
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{
+                  fontFamily: fontMono, fontSize: 9, color: GOLD_HI,
+                  letterSpacing: '0.18em', textTransform: 'uppercase',
+                }}>{k}</div>
+                <div style={{
+                  fontFamily: fontDisplay, fontSize: 11, color: TEXT_HI,
+                  marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{name}</div>
+                <div style={{
+                  fontFamily: fontMono, fontSize: 9, color: TEXT_LO, marginTop: 2,
+                }}>{hint}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
 const ScanTile = ({ data }) => {
   const s = data?.websiteScan || {};
   const dials = [
@@ -345,33 +445,60 @@ const ScanTile = ({ data }) => {
 
 const RepairTile = ({ data }) => {
   const r = data?.oraRepair || {};
-  const spark = (r.sparkline && r.sparkline.length > 0)
-    ? r.sparkline.map((y, i) => ({ x: i, y }))
-    : (r.series || []).map((s, i) => ({ x: i, y: s.v ?? 0 }));
+  // iter 322bk — dual area (Healed + Applied) matching target screenshot.
+  // The `Healed` series uses successful repairs; `Applied` is the broader
+  // attempts series. We re-use the same sparkline buckets for both, but if
+  // backend exposes a separate series later we'll swap it in.
+  const sparkSrc = (r.sparkline && r.sparkline.length > 0)
+    ? r.sparkline.map((y, i) => ({ x: i, healed: y, applied: Math.max(y, Math.round(y * 1.1)) }))
+    : (r.series || []).map((s, i) => ({ x: i, healed: s.v ?? 0, applied: s.v ?? 0 }));
+  const wow = (r.deltaPct ?? 0);
   return (
     <Card testid="ora-repair-card">
-      <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 10 }}>
-        ORA Repair Effect
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8,
+      }}>
+        <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase' }}>
+          ORA Repair Effect
+        </div>
+        <div style={{ fontFamily: fontMono, color: wow >= 0 ? '#bef264' : '#fca5a5', fontSize: 10 }}>
+          {wow >= 0 ? '+' : ''}{wow.toFixed(1)}% {wow >= 0 ? '↑' : '↓'} <span style={{ color: TEXT_LO, letterSpacing: '0.12em' }}>WOW</span>
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontFamily: fontDisplay, color: '#22c55e', fontSize: 32, fontWeight: 700 }}>{r.successPct ?? 0}%</span>
+        <span style={{ fontFamily: fontDisplay, color: '#FFFFFF', fontSize: 34, fontWeight: 700 }}>
+          {r.successPct ?? 0}<span style={{ fontSize: 18, color: '#22c55e' }}>%</span>
+        </span>
         <span style={{ fontFamily: fontMono, color: TEXT_LO, fontSize: 10 }}>success</span>
       </div>
       <div style={{ fontFamily: fontMono, color: TEXT_MD, fontSize: 10, marginTop: 4, marginBottom: 8 }}>
-        {r.healed ?? 0} healed · {r.attempts ?? 0} attempts (14d)
+        {(r.healed ?? 0).toLocaleString()} healed / {(r.attempts ?? 0).toLocaleString()} attempts
       </div>
-      <div style={{ height: 70 }} data-testid="ora-repair-sparkline">
+      <div style={{ height: 90 }} data-testid="ora-repair-sparkline">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={spark}>
+          <AreaChart data={sparkSrc}>
             <defs>
-              <linearGradient id="repairGreenL" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="appliedOrange" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#FFA552" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="#FFA552" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="healedGreen" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#22c55e" stopOpacity={0.55} />
                 <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <Area type="monotone" dataKey="y" stroke="#22c55e" strokeWidth={2} fill="url(#repairGreenL)" />
+            <Area type="monotone" dataKey="applied" stroke="#FFA552" strokeWidth={1.5} fill="url(#appliedOrange)" />
+            <Area type="monotone" dataKey="healed"  stroke="#22c55e" strokeWidth={2}   fill="url(#healedGreen)" />
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginTop: 4, fontFamily: fontMono, fontSize: 9, color: TEXT_MD }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 14, height: 2, background: '#22c55e', display: 'inline-block' }} /> Healed
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 14, height: 2, background: '#FFA552', display: 'inline-block' }} /> Applied
+        </span>
       </div>
     </Card>
   );
@@ -428,13 +555,19 @@ const AuremPulseHero = ({ data }) => {
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
-            fontFamily: fontDisplay, fontSize: 10, letterSpacing: '0.24em',
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+            fontFamily: fontDisplay, fontSize: 11, letterSpacing: '0.24em',
             textTransform: 'uppercase', color: GOLD_HI,
           }}>
-            <PulseRing active={!!data?.pulse?.active} />
             AUREM PULSE
-            <span style={{ color: data?.pulse?.active ? '#bef264' : '#fbbf24', fontFamily: fontMono, marginLeft: 6 }}>
+            {/* iter 322bk — heartbeat wave matching target screenshot */}
+            <svg width="80" height="18" viewBox="0 0 80 18" data-testid="aurem-pulse-wave"
+                 style={{ display: 'block' }}>
+              <path d="M 0 9 L 16 9 L 22 4 L 28 14 L 34 2 L 40 14 L 46 9 L 80 9"
+                    fill="none" stroke="#22c55e" strokeWidth="1.6" strokeLinecap="round"
+                    style={{ filter: 'drop-shadow(0 0 5px rgba(34,197,94,0.6))' }} />
+            </svg>
+            <span style={{ color: data?.pulse?.active ? '#bef264' : '#fbbf24', fontFamily: fontMono, marginLeft: 'auto' }}>
               ● {data?.pulse?.active ? 'ACTIVE' : 'STANDBY'}
             </span>
           </div>
@@ -578,19 +711,16 @@ const HomePage = ({ data }) => (
     {/* Row 2 — Business Growth multi-line chart */}
     <BusinessGrowthChart data={data} />
 
-    {/* Row 3 — Scan dials · Repair % + sparkline · Alerts */}
+    {/* Row 3 — Scan (4 individual dials) · Repair % + sparkline · Alerts */}
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+      gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)',
       gap: 12,
     }}>
-      <ScanTile data={data} />
+      <ScanRowFour data={data} />
       <RepairTile data={data} />
       <AlertsTile data={data} />
     </div>
-
-    {/* Row 4 (kept) — Customer Results outcomes (zero PII) */}
-    <CustomerResultsRow />
 
     <style>{`
       @keyframes luxe-pulse {

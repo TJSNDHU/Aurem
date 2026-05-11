@@ -509,6 +509,8 @@ async def get_current_user(authorization: str = Header(None)):
         "email": user.get("email", "admin@aurem.live"),
         "company_name": user.get("company_name", "AUREM Platform"),
         "full_name": user.get("full_name", "AUREM Admin"),
+        # iter 322bk — surface BIN for the sidebar business badge
+        "business_id": user.get("business_id") or user.get("bin") or "",
         "tier": tier_name,
         "tier_status": user.get("tier_status", "active"),
         "trial_ends_at": user.get("trial_ends_at"),
