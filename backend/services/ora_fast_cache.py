@@ -44,6 +44,57 @@ def _cache_put(key: str, answer: str, ttl_s: int) -> None:
 
 
 # ─── Intent patterns (compiled once) ──────────────────────────
+# ── iter 322bn — BIN grounding (anti-hallucination, P0 Founder Override)
+# When user asks about a BIN by its code (e.g. "AURE-XXXX" or "tell me
+# about BIN PINX-K3JN"), do NOT let the LLM guess. Query db.platform_users
+# (and db.users for admins) and return ONLY what the DB returns. If the
+# BIN is missing → say "not found in our records".
+_BIN_RX = re.compile(
+    r"\b([A-Z]{3,5}-[A-Z0-9]{3,6})\b"
+)
+
+
+async def _ans_bin_lookup(bin_value: str) -> Optional[str]:
+    """Deterministic BIN lookup. Returns a human reply or None."""
+    bid = (bin_value or "").upper().strip()
+    if not bid:
+        return None
+    try:
+        import server
+        db = getattr(server, "db", None)
+        if db is None:
+            return "I can't reach the customer database right now."
+        # Try platform_users first (customers), then users (admins/founders)
+        cust = await db.platform_users.find_one(
+            {"business_id": bid},
+            {"_id": 0, "email": 1, "first_name": 1, "company_name": 1,
+             "business_name": 1, "plan": 1, "plan_label": 1, "role": 1,
+             "created_at": 1},
+        )
+        if not cust:
+            cust = await db.users.find_one(
+                {"business_id": bid},
+                {"_id": 0, "email": 1, "name": 1, "company_name": 1,
+                 "business_name": 1, "plan": 1, "role": 1, "is_admin": 1},
+            )
+        if not cust:
+            return f"BIN `{bid}` is not in our records. I will not guess — confirm the code or search by email instead."
+        name = (cust.get("company_name") or cust.get("business_name")
+                or cust.get("first_name") or cust.get("name") or "—")
+        email = cust.get("email") or "—"
+        plan = cust.get("plan_label") or cust.get("plan") or "—"
+        is_admin = bool(cust.get("is_admin") or cust.get("role") in ("admin", "super_admin"))
+        role_str = "Founder/Admin" if is_admin else "Customer"
+        return (
+            f"BIN `{bid}` → {name} · {email} · {role_str} · plan: {plan}. "
+            f"(Source: db.{'users' if is_admin else 'platform_users'}, "
+            "ground-truth — no LLM inference.)"
+        )
+    except Exception as e:
+        logger.debug(f"[ora-fast] bin_lookup err: {e}")
+        return "I can't reach the customer database right now."
+
+
 # Date — bare "today / date / today's date / aaj / kya date" + "what's"
 _DATE_RX = re.compile(
     r"^\s*(?:today|today'?s?\s+date|date|today\s+date|today\s+is|"
@@ -171,6 +222,16 @@ async def try_short_circuit(message: str) -> Optional[str]:
     if not message:
         return None
     msg = message.strip()
+
+    # iter 322bn — BIN grounding (anti-hallucination). Matches any BIN-like
+    # code anywhere in the message. Bypasses length limit because users
+    # naturally write "Tell me about BIN PINX-K3JN, who owns it?"
+    bin_match = _BIN_RX.search(msg)
+    if bin_match:
+        ans = await _ans_bin_lookup(bin_match.group(1))
+        if ans is not None:
+            return ans
+
     if len(msg) > 80:
         return None  # only short voice phrases short-circuit
 

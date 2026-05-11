@@ -1,6 +1,6 @@
 """
-Public ORA Demo Chat (iter 281.7)
-====================================
+Public ORA Demo Chat (iter 281.7 · 322bn)
+=========================================
 Lightweight, snappy demo chat for the public homepage at /. Uses a single
 Claude Sonnet call with a tight system prompt — bypasses the heavy
 ULTRAPLINIAN multi-model race + memory + NBA pipeline that the admin
@@ -8,9 +8,13 @@ ULTRAPLINIAN multi-model race + memory + NBA pipeline that the admin
 
 Target latency: ~1.5-3s (vs ~10s for the full pipeline).
 
-NO auth. Rate limiting handled at middleware. Stateless — no session
-memory, no language localizer (Claude follows whatever language it's
-addressed in naturally).
+iter 322bn — Founder Priority Override:
+  BUG 1 (hallucination) — see services/ora_fast_cache._ans_bin_lookup. ANY
+    BIN code in the message hits MongoDB directly with no LLM inference.
+  BUG 2 (context loss) — last 10 messages per session_id stored in
+    db.ora_sessions and replayed on every turn.
+  BUG 3 (warmup error) — Claude failure now silently falls back to Groq
+    instead of showing "I'm warming up". Zero user-facing warmup message.
 """
 from __future__ import annotations
 
@@ -18,7 +22,8 @@ import asyncio
 import logging
 import os
 import uuid
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -214,6 +219,103 @@ def _personalised_system(user: Optional[Dict[str, Any]]) -> str:
     )
 
 
+# ── iter 322bn — Conversation memory (BUG 2 fix) ──────────────────
+# Last 10 (user, assistant) turns persisted in db.ora_sessions per
+# session_id + BIN. Loaded on every new message → ORA never asks "who are
+# you" if the user told it 3 turns ago.
+
+async def _load_history(session_id: str, bin_: Optional[str], limit: int = 10) -> List[Dict[str, str]]:
+    if _db is None or not session_id:
+        return []
+    try:
+        key = f"{session_id}:{(bin_ or 'anon').upper()}"
+        doc = await _db.ora_sessions.find_one(
+            {"key": key}, {"_id": 0, "turns": 1},
+        )
+        if not doc:
+            return []
+        return (doc.get("turns") or [])[-limit:]
+    except Exception as e:
+        logger.debug(f"[public-ora-demo] history load failed: {e}")
+        return []
+
+
+async def _save_turn(session_id: str, bin_: Optional[str], user_text: str, ora_text: str) -> None:
+    if _db is None or not session_id or not user_text or not ora_text:
+        return
+    try:
+        key = f"{session_id}:{(bin_ or 'anon').upper()}"
+        now = datetime.now(timezone.utc).isoformat()
+        await _db.ora_sessions.update_one(
+            {"key": key},
+            {
+                "$set": {"key": key, "session_id": session_id, "bin": bin_ or None, "updated_at": now},
+                "$setOnInsert": {"created_at": now},
+                "$push": {
+                    "turns": {
+                        "$each": [
+                            {"role": "user", "text": user_text[:1200], "ts": now},
+                            {"role": "assistant", "text": ora_text[:1800], "ts": now},
+                        ],
+                        # Keep only the last 20 entries (10 turns ≈ user+assistant pairs)
+                        "$slice": -20,
+                    }
+                },
+            },
+            upsert=True,
+        )
+    except Exception as e:
+        logger.debug(f"[public-ora-demo] history save failed: {e}")
+
+
+def _history_block(turns: List[Dict[str, str]]) -> str:
+    if not turns:
+        return ""
+    lines = ["\n\nPREVIOUS CONVERSATION (use this — do NOT ask the user to repeat themselves):"]
+    for t in turns:
+        role = (t.get("role") or "").upper()
+        text = (t.get("text") or "").strip()[:400]
+        if text:
+            lines.append(f"  {role}: {text}")
+    return "\n".join(lines)
+
+
+# ── iter 322bn — Groq fallback (BUG 3 fix) ─────────────────────────
+# If Claude (Emergent LLM key) fails, transparently try Groq instead of
+# surfacing a "warming up" message. User never sees infra wobble.
+
+async def _groq_fallback(messages: List[Dict[str, str]]) -> Optional[str]:
+    """Try Groq with the chat messages. Returns reply text or None."""
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return None
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                    "messages": messages,
+                    "temperature": 0.4,
+                    "max_tokens": 700,
+                },
+            )
+            if resp.status_code != 200:
+                logger.debug(f"[public-ora-demo] groq {resp.status_code}: {resp.text[:200]}")
+                return None
+            data = resp.json()
+            out = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+            return out or None
+    except Exception as e:
+        logger.debug(f"[public-ora-demo] groq error: {e}")
+        return None
+
+
 async def _live_business_context(user: Optional[Dict[str, Any]]) -> str:
     """Pull a snapshot of real DB metrics for the logged-in user and return
     it as a system-prompt block. Without this block, ORA fabricates demo
@@ -377,34 +479,69 @@ async def public_demo_chat(
         sys_prompt = prepend_date(sys_prompt)
     except Exception:
         pass
+
+    # iter 322bn — BUG 2: load last 10 turns from db.ora_sessions so ORA
+    # remembers what the user said earlier in the conversation.
+    sid = req.session_id or f"demo_{uuid.uuid4()}"
+    bin_for_session = (user or {}).get("bin")
+    history = await _load_history(sid, bin_for_session, limit=10)
+    sys_prompt = sys_prompt + _history_block(history)
+
+    out: Optional[str] = None
+    llm_source = "claude"
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         chat = LlmChat(
             api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
-            session_id=req.session_id or f"demo_{uuid.uuid4()}",
+            session_id=sid,
             system_message=sys_prompt,
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        out = (await chat.send_message(UserMessage(text=text))).strip()
-        if not out:
-            out = "I'm here — tell me what your business does and I'll show you what I can do."
-        return {"ok": True, "reply": out, "authenticated": bool(user)}
+        out = (await chat.send_message(UserMessage(text=text))).strip() or None
     except Exception as e:
-        logger.warning(f"[public-ora-demo] LLM call failed: {e}")
-        # Graceful canned reply — keeps the homepage demo from looking dead.
-        # When user is authenticated, answer identity questions deterministically.
-        t = text.lower()
-        if user and any(k in t for k in ("my bin", "what bin", "is admin", "am i admin", "who am i")):
+        logger.warning(f"[public-ora-demo] Claude failed → Groq fallback: {e}")
+        out = None
+
+    # iter 322bn — BUG 3: silent Groq fallback. No "warming up" message.
+    if not out:
+        groq_messages = [{"role": "system", "content": sys_prompt}]
+        for t in history[-6:]:
+            groq_messages.append({
+                "role": "user" if t.get("role") == "user" else "assistant",
+                "content": t.get("text", ""),
+            })
+        groq_messages.append({"role": "user", "content": text})
+        out = await _groq_fallback(groq_messages)
+        if out:
+            llm_source = "groq"
+
+    # If both providers are unreachable AND we know the user, give a
+    # deterministic identity reply (zero LLM, zero hallucination).
+    if not out and user:
+        t_lower = text.lower()
+        if any(k in t_lower for k in ("my bin", "what bin", "is admin", "am i admin", "who am i")):
             admin_status = "full admin access" if user.get("is_admin") else f"on the {user.get('plan')} plan"
-            return {"ok": True, "reply": (
+            out = (
                 f"You're {user.get('name')} ({user.get('business_name') or 'AUREM customer'}). "
                 f"Your BIN is {user.get('bin') or 'not set'}. You have {admin_status}."
-            ), "authenticated": True}
-        return {
-            "ok": False,
-            "reply": (
-                "I'm warming up — try again in a few seconds. "
-                "Meanwhile, scan your website free at /repair-quote — "
-                "it takes 60 seconds and shows you exactly what's costing you leads."
-            ),
-            "authenticated": bool(user),
-        }
+            )
+            llm_source = "deterministic"
+
+    # Last-resort reply — no warmup language. Always offers a path.
+    if not out:
+        out = (
+            "I'm here. Tell me what your business does and I'll show you "
+            "what I can do — or scan your website free at /repair-quote "
+            "for a 60-second teardown."
+        )
+        llm_source = "fallback_template"
+
+    # Persist this turn for future context (BUG 2 fix)
+    await _save_turn(sid, bin_for_session, text, out)
+
+    return {
+        "ok": True,
+        "reply": out,
+        "authenticated": bool(user),
+        "llm_source": llm_source,
+        "session_id": sid,
+    }
