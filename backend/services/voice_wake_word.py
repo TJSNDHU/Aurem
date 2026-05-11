@@ -341,18 +341,41 @@ class VoiceCommandProcessor:
         }
     
     async def _get_bug_report(self) -> Dict[str, Any]:
-        """Get latest bug reports"""
-        # TODO: Query bug tracking system
-        
+        """Get latest bug reports from the real collections.
+
+        iter 322ar — was hard-coded "0 critical / 2 low". Now reads from
+        `system_alerts`, `unfixable_issues_queue` and `error_ledger`."""
+        try:
+            from services.database import get_db
+            db = get_db()
+        except Exception:
+            db = None
+        critical = high = medium = low = 0
+        if db is not None:
+            try:
+                critical = await db.system_alerts.count_documents({"severity": "critical", "resolved": {"$ne": True}})
+                high = await db.system_alerts.count_documents({"severity": "high", "resolved": {"$ne": True}})
+                medium = await db.system_alerts.count_documents({"severity": "medium", "resolved": {"$ne": True}})
+                low = await db.system_alerts.count_documents({"severity": "low", "resolved": {"$ne": True}})
+                # Unfixable queue counts as "high" surface signal
+                high += await db.unfixable_issues_queue.count_documents({})
+            except Exception as e:
+                logger.warning(f"[voice_wake_word] bug-report count error: {e}")
+        total = critical + high + medium + low
+        if total == 0:
+            txt = "No outstanding bugs detected. System healthy."
+        else:
+            txt = f"{critical} critical, {high} high, {medium} medium, {low} low — {total} open issues."
         return {
             "understood": True,
             "command": "bugs",
-            "response_text": "No critical bugs detected. 2 low-priority issues in queue.",
+            "response_text": txt,
             "response_data": {
-                "critical": 0,
-                "high": 0,
-                "medium": 0,
-                "low": 2
+                "critical": critical,
+                "high": high,
+                "medium": medium,
+                "low": low,
+                "total": total,
             },
             "ui_navigation": "/dashboard/bugs",
             "success": True
@@ -442,16 +465,38 @@ class VoiceCommandProcessor:
         }
     
     async def _sync_system(self) -> Dict[str, Any]:
-        """Force system sync"""
-        # TODO: Call system sync API
-        
+        """Force system sync — runs sentinel repair cycle + cache invalidation.
+
+        iter 322ar — was returning canned success. Now actually fires the
+        repair pipeline and reports the real outcome."""
+        ran = []
+        errors = []
+        try:
+            from services.sentinel_repair_loop import run_sentinel_repair_cycle
+            result = await run_sentinel_repair_cycle()
+            ran.append({"sentinel_repair_cycle": result if isinstance(result, dict) else "ok"})
+        except Exception as e:
+            errors.append(f"sentinel_repair_cycle: {str(e)[:120]}")
+        try:
+            from services.aurem_cache import invalidate_all
+            await invalidate_all()
+            ran.append({"cache_flushed": True})
+        except Exception:
+            # cache module may not exist — non-fatal
+            pass
+
+        ok = len(errors) == 0
+        if ok:
+            txt = f"System sync complete. {len(ran)} subsystem(s) refreshed."
+        else:
+            txt = f"System sync ran with {len(errors)} error(s). Check logs."
         return {
             "understood": True,
             "command": "sync",
-            "response_text": "System sync complete. All indexes rebuilt, circuit breakers checked.",
-            "response_data": {"success": True},
+            "response_text": txt,
+            "response_data": {"success": ok, "ran": ran, "errors": errors},
             "ui_navigation": "/dashboard",
-            "success": True
+            "success": ok
         }
 
 

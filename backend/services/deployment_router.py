@@ -27,6 +27,7 @@ import asyncio
 import secrets
 import time
 import httpx
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
@@ -48,11 +49,18 @@ TELEMETRY_WINDOW_SECONDS = 60
 # To swap: set_rate_limiter(RedisLuaLimiter(redis_client))
 # ═══════════════════════════════════════════════════════════════
 
-class RateLimiterBackend:
-    """Abstract interface for rate limiting backends."""
+class RateLimiterBackend(ABC):
+    """Abstract interface for rate limiting backends.
+
+    iter 322ar — converted from a bare `raise NotImplementedError` stub
+    into a proper `abc.ABC` so subclasses are forced (at class-creation
+    time) to implement `check_and_increment`. Mistyped subclasses now
+    fail loudly on `__init__()` instead of silently at runtime."""
+
+    @abstractmethod
     async def check_and_increment(self, key: str, max_count: int, window_seconds: int) -> bool:
         """Return True if allowed, False if rate-limited. Must be atomic."""
-        raise NotImplementedError
+        ...
 
 
 class AsyncioLockLimiter(RateLimiterBackend):

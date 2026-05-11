@@ -275,40 +275,44 @@ class MultiModalProcessor:
         image_data: bytes,
         context: Dict[str, Any]
     ) -> str:
-        """Analyze image using GPT-4o Vision"""
+        """Analyze image using GPT-4o Vision via emergentintegrations.
+
+        iter 322ar — real vision call (was returning a hard-coded placeholder).
+        Passes the base64 image as an `ImageContent` part on a `UserMessage`,
+        which the emergentintegrations LlmChat wraps into OpenAI's
+        multimodal `content` array."""
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            
-            # Convert image to base64
-            image_base64 = base64.b64encode(image_data).decode('utf-8')
-            
-            # Create vision prompt
-            business_context = context.get("business_name", "our business") if context else "our business"
-            
-            prompt = f"""You are analyzing an image sent by a customer to {business_context}.
+            from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
-Describe this image in detail, focusing on:
-1. What is shown in the image
-2. Any text visible in the image
-3. Potential customer intent (e.g., showing damage, asking about a product, sharing results)
-4. Any actionable information
-
-Be concise but thorough. This description will be used to help an AI assistant respond appropriately."""
+            image_base64 = base64.b64encode(image_data).decode("utf-8")
+            business_context = (context or {}).get("business_name", "our business")
+            prompt = (
+                f"You are analyzing an image sent by a customer to {business_context}.\n\n"
+                "Describe this image in detail, focusing on:\n"
+                "1. What is shown in the image\n"
+                "2. Any text visible in the image\n"
+                "3. Potential customer intent (e.g., showing damage, asking about a product, sharing results)\n"
+                "4. Any actionable information\n\n"
+                "Be concise but thorough. This description will be used to help an AI assistant respond appropriately."
+            )
 
             chat = LlmChat(
                 api_key=self.api_key,
-                session_id="vision_analysis"
+                session_id="vision_analysis",
+                system_message="You are a multimodal customer-support analyst.",
             ).with_model("openai", "gpt-4o")
-            
-            # Note: This is simplified - full implementation would use vision-specific API
-            # For now, return a placeholder
-            description = "Image analysis: Customer sent a photo. Full vision analysis requires vision-enabled API implementation."
-            
-            return description
-            
+
+            msg = UserMessage(
+                text=prompt,
+                file_contents=[ImageContent(image_base64=image_base64)],
+            )
+            response = await chat.send_message(msg)
+            # emergentintegrations may return a string OR an object with .content
+            return str(response) if response is not None else "[Vision returned no content]"
+
         except Exception as e:
             logger.error(f"Vision analysis error: {e}")
-            return f"Image received but analysis failed: {str(e)}"
+            return f"Image received but analysis failed: {str(e)[:160]}"
 
 
 # Singleton

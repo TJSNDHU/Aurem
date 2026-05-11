@@ -235,7 +235,46 @@ async def run_startup_validation(db=None) -> bool:
 
 
 async def _send_failure_notification(result: Dict[str, Any]):
-    """Send notification about startup failure"""
-    # TODO: Integrate with WhatsApp/Email when configured
-    logger.error(f"[STARTUP] ❌ CRITICAL: Server startup validation failed")
-    logger.error(f"[STARTUP] Errors: {result['errors']}")
+    """Send notification about startup failure.
+
+    iter 322ar — was a TODO. Now writes a `founder_notifications` row +
+    sends an email to FOUNDER_EMAIL via Resend (best-effort, never raises)."""
+    logger.error("[STARTUP] ❌ CRITICAL: Server startup validation failed")
+    logger.error(f"[STARTUP] Errors: {result.get('errors')}")
+    try:
+        import motor.motor_asyncio
+        from datetime import datetime, timezone
+        url = os.environ.get("MONGO_URL", "")
+        dbn = os.environ.get("DB_NAME", "aurem_db")
+        if url:
+            db = motor.motor_asyncio.AsyncIOMotorClient(url)[dbn]
+            await db.founder_notifications.insert_one({
+                "type": "startup_validation_failed",
+                "severity": "critical",
+                "errors": result.get("errors", []),
+                "warnings": result.get("warnings", []),
+                "ts": datetime.now(timezone.utc),
+                "read": False,
+            })
+    except Exception as e:
+        logger.warning(f"[STARTUP] founder_notifications write failed: {e}")
+    # Best-effort email to founder via Resend
+    try:
+        import resend
+        api_key = os.environ.get("RESEND_API_KEY", "")
+        to_addr = os.environ.get("FOUNDER_EMAIL", "")
+        if api_key and to_addr:
+            resend.api_key = api_key
+            errs = "<br>".join(f"• {e}" for e in result.get("errors", [])[:10]) or "(no errors listed)"
+            resend.Emails.send({
+                "from": os.environ.get("RESEND_FROM_EMAIL", "ORA <ora@aurem.live>"),
+                "to": [to_addr],
+                "subject": "AUREM ❌ Startup validation FAILED",
+                "html": (
+                    "<h2 style=\"color:#EF4444\">Startup validation failed</h2>"
+                    f"<p>Errors:</p><div style=\"font-family:monospace\">{errs}</div>"
+                    "<p style=\"color:#6A6070;font-size:12px\">AUREM Sovereign · Polaris Built Inc.</p>"
+                ),
+            })
+    except Exception as e:
+        logger.warning(f"[STARTUP] founder email send failed: {e}")

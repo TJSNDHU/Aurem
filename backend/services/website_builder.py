@@ -162,7 +162,13 @@ def _generate_why_points(lead: Dict[str, Any], city: str) -> List[Dict[str, str]
 
 
 def _generate_reviews(lead: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Return Google reviews if present; otherwise synthesize industry-appropriate placeholders."""
+    """Return Google reviews if present; then Birdeye reviews if cached on
+    the lead under `birdeye_reviews`; otherwise a clearly-marked placeholder.
+
+    iter 322ar — added Birdeye path. The async wrapper
+    `generate_website_async()` populates `lead['birdeye_reviews']` by
+    calling `services.birdeye_scraper.pull_real_reviews()` before
+    invoking this sync helper, so this function never needs to await."""
     api_reviews = lead.get("google_reviews") or []
     if api_reviews:
         return [
@@ -173,6 +179,17 @@ def _generate_reviews(lead: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "source": "google",
             }
             for r in api_reviews[:6]
+        ]
+    birdeye_reviews = lead.get("birdeye_reviews") or []
+    if birdeye_reviews:
+        return [
+            {
+                "author": r.get("author") or r.get("reviewer") or "Birdeye reviewer",
+                "rating": r.get("rating", 5),
+                "text": (r.get("text") or "")[:260],
+                "source": "birdeye",
+            }
+            for r in birdeye_reviews[:6]
         ]
     # Synthesized fallback clearly marked as placeholder
     return [
@@ -319,3 +336,31 @@ def _extract_city(location: str) -> str:
     if len(parts) >= 2:
         return parts[1].title() if len(parts[1]) <= 30 else parts[0].title()
     return parts[0].title() if parts else "your area"
+
+
+# ─────────────────────────────────────────────────────────────
+# ASYNC WRAPPER — pulls real Birdeye reviews before generation
+# ─────────────────────────────────────────────────────────────
+async def generate_website_async(lead: Dict[str, Any]) -> Dict[str, Any]:
+    """iter 322ar — async generator that enriches the lead with real
+    Birdeye reviews (free, zero-key) before falling through to the sync
+    `generate_website()`. If Birdeye lookup fails for any reason the
+    sync path still produces a complete site spec with the placeholder
+    review — no regressions."""
+    if not lead.get("google_reviews") and not lead.get("birdeye_reviews"):
+        try:
+            from services.birdeye_scraper import pull_real_reviews
+            city = _extract_city(lead.get("location", ""))
+            biz = lead.get("business_name", "")
+            if biz and city:
+                pulled = await pull_real_reviews(biz, city, limit=6)
+                if pulled.get("found") and pulled.get("reviews"):
+                    lead = {**lead, "birdeye_reviews": pulled["reviews"]}
+                    if pulled.get("aggregate_rating"):
+                        lead.setdefault("rating", pulled["aggregate_rating"])
+                    if pulled.get("total_count"):
+                        lead.setdefault("reviews_count", pulled["total_count"])
+        except Exception:
+            # Silent fallback — synced generator still produces a valid site
+            pass
+    return generate_website(lead)

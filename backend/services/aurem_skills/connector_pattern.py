@@ -117,12 +117,20 @@ class ConnectorPatternSkill(BaseSkill):
         if credentials and credentials.get("api_key"):
             self.api_key = credentials["api_key"]
             
-            # Verify credentials (make test API call)
+            # Verify credentials with a lightweight GET on the platform base URL.
             try:
-                # TODO: Implement credential verification
-                self.authenticated = True
-                logger.info("[{platform}] Authenticated successfully")
-                return True
+                import httpx
+                async with httpx.AsyncClient(timeout=10.0) as _c:
+                    _r = await _c.get(
+                        self.base_url,
+                        headers={{"Authorization": f"Bearer {{self.api_key}}"}},
+                    )
+                    self.authenticated = _r.status_code < 400
+                logger.info(
+                    "[{platform}] Auth verify HTTP %s → authenticated=%s",
+                    _r.status_code, self.authenticated,
+                )
+                return self.authenticated
             except Exception as e:
                 logger.error(f"[{platform}] Auth failed: {{e}}")
                 return False
@@ -146,17 +154,27 @@ class ConnectorPatternSkill(BaseSkill):
         limit = query.get("limit", 100)
         
         try:
-            # TODO: Implement API calls
-            # Example:
-            # async with aiohttp.ClientSession() as session:
-            #     async with session.get(
-            #         f"{{self.base_url}}/endpoint",
-            #         headers={{"Authorization": f"Bearer {{self.api_key}}"}}
-            #     ) as response:
-            #         data = await response.json()
-            #         return data.get("results", [])
-            
-            return self._get_demo_data(query)
+            import httpx
+            async with httpx.AsyncClient(timeout=15.0) as _c:
+                _r = await _c.get(
+                    f"{{self.base_url}}/{{fetch_type}}",
+                    headers={{"Authorization": f"Bearer {{self.api_key}}"}},
+                    params={{"limit": limit}},
+                )
+            if _r.status_code >= 400:
+                logger.warning(
+                    "[{platform}] fetch %s returned HTTP %s — falling back to demo",
+                    fetch_type, _r.status_code,
+                )
+                return self._get_demo_data(query)
+            _data = _r.json()
+            # Most REST APIs wrap rows under `results` / `data` / `items`.
+            return (
+                _data.get("results")
+                or _data.get("data")
+                or _data.get("items")
+                or (_data if isinstance(_data, list) else [])
+            )
             
         except Exception as e:
             logger.error(f"[{platform}] Fetch error: {{e}}")
@@ -176,9 +194,21 @@ class ConnectorPatternSkill(BaseSkill):
             return True
         
         try:
-            # TODO: Implement posting
-            logger.info(f"[{platform}] Posted successfully")
-            return True
+            import httpx
+            async with httpx.AsyncClient(timeout=15.0) as _c:
+                _r = await _c.post(
+                    f"{{self.base_url}}/{{content.get('type', 'post')}}",
+                    headers={{
+                        "Authorization": f"Bearer {{self.api_key}}",
+                        "Content-Type": "application/json",
+                    }},
+                    json=content,
+                )
+            logger.info(
+                "[{platform}] Post HTTP %s for type=%s",
+                _r.status_code, content.get("type", "post"),
+            )
+            return _r.status_code < 400
             
         except Exception as e:
             logger.error(f"[{platform}] Post error: {{e}}")
