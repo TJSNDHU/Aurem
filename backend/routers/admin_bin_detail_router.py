@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import bcrypt
@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin BIN Detail"])
 
 _db = None
+
+
+from datetime import timedelta as _td_alias  # noqa: F401  (timedelta imported lazily below if needed)
 
 
 def set_db(db) -> None:
@@ -64,6 +67,40 @@ async def _require_admin(request: Request) -> dict:
     ):
         raise HTTPException(403, "Admin access required")
     return {"email": email, **user}
+
+
+async def _audit(actor_email: str, action: str, bin_id: str, details: dict = None) -> None:
+    """Insert one row in db.admin_audit_log. Never raises."""
+    try:
+        from datetime import datetime, timedelta, timezone
+        await _db.admin_audit_log.insert_one({
+            "actor_email": (actor_email or "").lower(),
+            "action": action,
+            "bin_id": bin_id,
+            "details": details or {},
+            "ts": datetime.now(timezone.utc),
+        })
+    except Exception as e:
+        logger.warning(f"[admin_audit] log failed: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# GET /audit-log — recent admin actions for the Action Log tile.
+# ═══════════════════════════════════════════════════════════════════════
+@router.get("/audit-log")
+async def audit_log(limit: int = 50, _admin: dict = Depends(_require_admin)):
+    if _db is None:
+        raise HTTPException(503, "DB not ready")
+    rows = []
+    cursor = _db.admin_audit_log.find(
+        {}, {"_id": 0}
+    ).sort("ts", -1).limit(max(1, min(limit, 200)))
+    async for r in cursor:
+        ts = r.get("ts")
+        if hasattr(ts, "isoformat"):
+            r["ts"] = ts.isoformat()
+        rows.append(r)
+    return {"ok": True, "count": len(rows), "entries": rows}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -130,8 +167,7 @@ async def bin_detail(bin_id: str, _admin: dict = Depends(_require_admin)):
     else:
         last_evt_iso = None
     since_24h = datetime.now(timezone.utc).replace(microsecond=0)
-    from datetime import timedelta as _td
-    yesterday = since_24h - _td(hours=24)
+    yesterday = since_24h - timedelta(hours=24)
     events_24h = await _db.pixel_events.count_documents(
         {"bin_id": bin_id, "timestamp": {"$gte": yesterday}}
     )
@@ -241,6 +277,7 @@ async def force_unlock(bin_id: str, _admin: dict = Depends(_require_admin)):
         except Exception:
             pass
 
+    await _audit(_admin.get("email"), "force_unlock", bin_id)
     return {"ok": True, "platform_users_modified": r1.modified_count,
             "users_modified": r2.modified_count}
 
@@ -269,6 +306,7 @@ async def reset_password(bin_id: str, _admin: dict = Depends(_require_admin)):
         {"$set": {"password": pw_hash, "password_hash": pw_hash, "updated_at": now}},
     )
     logger.info(f"[admin/reset-password] BIN={bin_id} email={email} by={_admin.get('email')}")
+    await _audit(_admin.get("email"), "reset_password", bin_id, {"target_email": email})
     return {
         "ok": True,
         "email": email,
@@ -325,6 +363,8 @@ async def update_account(
     )
     if res.matched_count == 0:
         raise HTTPException(404, f"no platform_users record for {bin_id}")
+    await _audit(_admin.get("email"), "update_account", bin_id,
+                 {"changed": list(sets.keys())})
     return {"ok": True, "modified": res.modified_count, "updates": list(sets.keys())}
 
 
@@ -338,7 +378,128 @@ async def promote_now(bin_id: str, _admin: dict = Depends(_require_admin)):
         from services.bin_intelligence import promote_verified_to_pipeline
         res = await promote_verified_to_pipeline(_db, bin_id)
         logger.info(f"[admin/promote-now] BIN={bin_id} {res} by={_admin.get('email')}")
+        await _audit(_admin.get("email"), "promote_now", bin_id, res)
         return {"ok": True, "bin_id": bin_id, **res}
     except Exception as e:
         logger.warning(f"[admin/promote-now] failed for {bin_id}: {e}")
         raise HTTPException(500, f"promote failed: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# DELETE /customer/{bin_id} — soft delete (30-day grace) + email + audit.
+# ═══════════════════════════════════════════════════════════════════════
+@router.delete("/customer-health/customer/{bin_id}")
+async def delete_customer(
+    bin_id: str,
+    confirm: str = "",
+    request: Request = None,
+    _admin: dict = Depends(_require_admin),
+):
+    """Soft-delete a customer. Requires `?confirm=DELETE` in query string.
+
+    Sets:
+      • deleted_at  — now (TTL index purges 30 days later)
+      • deleted_by  — admin email
+      • is_active   — False
+      • access locked
+    Sends a notification email to the customer if Resend is configured.
+    Permanent purge happens via the TTL index after 30 days.
+    """
+    if (confirm or "").strip().upper() != "DELETE":
+        raise HTTPException(400, "Must pass ?confirm=DELETE to proceed")
+    pu = await _db.platform_users.find_one(
+        {"business_id": bin_id}, {"_id": 0, "email": 1, "full_name": 1},
+    )
+    if not pu:
+        raise HTTPException(404, f"no platform_users record for {bin_id}")
+    email = (pu.get("email") or "").lower()
+    now = datetime.now(timezone.utc)
+
+    await _db.platform_users.update_one(
+        {"business_id": bin_id},
+        {"$set": {
+            "deleted_at": now, "deleted_by": _admin.get("email"),
+            "is_active": False, "is_locked": True,
+            "subscription_status": "cancelled",
+            "tier_status": "cancelled",
+            "updated_at": now,
+        }},
+    )
+    await _db.users.update_one(
+        {"email": email},
+        {"$set": {"deleted_at": now, "is_active": False, "updated_at": now}},
+    )
+    # Mirror into a deletion-queue collection with 30-day TTL.
+    try:
+        await _db.customer_deletion_queue.insert_one({
+            "bin_id": bin_id, "email": email,
+            "deleted_at": now, "deleted_by": _admin.get("email"),
+            "purge_at": now + timedelta(days=30),
+            "reason": "admin_initiated",
+        })
+    except Exception as e:
+        logger.warning(f"[delete] queue insert failed: {e}")
+
+    # Send notification email — Resend if configured.
+    email_sent = False
+    email_err: Optional[str] = None
+    try:
+        import os as _os
+        rk = _os.environ.get("RESEND_API_KEY")
+        rf = _os.environ.get("FROM_EMAIL") or _os.environ.get("EMAIL_FROM") or "support@aurem.live"
+        if rk and email:
+            import httpx
+            async with httpx.AsyncClient(timeout=8.0) as c:
+                r = await c.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {rk}",
+                             "Content-Type": "application/json"},
+                    json={
+                        "from": rf,
+                        "to": [email],
+                        "subject": "Your AUREM account has been deactivated",
+                        "html": (
+                            f"<p>Hi {pu.get('full_name') or 'there'},</p>"
+                            "<p>Your AUREM account has been deactivated by an "
+                            "administrator. Your data will be permanently "
+                            "deleted in <strong>30 days</strong>.</p>"
+                            "<p>If this was a mistake, reply to this email "
+                            "within 30 days and we can restore it.</p>"
+                            "<p>— Team AUREM</p>"
+                        ),
+                    },
+                )
+            email_sent = r.status_code in (200, 202)
+            if not email_sent:
+                email_err = f"{r.status_code}: {r.text[:120]}"
+    except Exception as e:
+        email_err = str(e)[:200]
+
+    await _audit(_admin.get("email"), "delete_customer", bin_id,
+                 {"target_email": email, "email_sent": email_sent,
+                  "email_error": email_err, "purge_in_days": 30})
+    return {
+        "ok": True,
+        "soft_deleted": True,
+        "purge_at": (now + timedelta(days=30)).isoformat(),
+        "email_sent": email_sent,
+        "email_error": email_err,
+        "bin_id": bin_id,
+    }
+
+
+@router.post("/customer-health/customer/{bin_id}/restore")
+async def restore_customer(bin_id: str, _admin: dict = Depends(_require_admin)):
+    """Undo a soft delete (during the 30-day grace window)."""
+    r1 = await _db.platform_users.update_one(
+        {"business_id": bin_id, "deleted_at": {"$exists": True}},
+        {"$set": {"is_active": True, "is_locked": False,
+                  "subscription_status": "active", "tier_status": "active"},
+         "$unset": {"deleted_at": "", "deleted_by": ""}},
+    )
+    if r1.modified_count == 0:
+        raise HTTPException(404, f"no deleted record for {bin_id}")
+    await _db.customer_deletion_queue.delete_many({"bin_id": bin_id})
+    await _audit(_admin.get("email"), "restore_customer", bin_id)
+    return {"ok": True, "restored": True}
+

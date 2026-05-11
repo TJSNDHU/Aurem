@@ -1115,6 +1115,31 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] admin_bin_detail_router skipped: {e}")
 
 
+    # ORA Skills Router (markdown skill library exposure + health)
+    if not _should_skip("routers.ora_skills_router"):
+        try:
+            from routers.ora_skills_router import router as ora_skills_router
+            app.include_router(ora_skills_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_skills_router skipped: {e}")
+
+
+    # Dev Stack Health (Pillars Map green/red grid)
+    if not _should_skip("routers.dev_stack_health_router"):
+        try:
+            from routers.dev_stack_health_router import (
+                router as dev_stack_health_router,
+                set_db as set_dev_stack_db,
+            )
+            app.include_router(dev_stack_health_router)
+            if db is not None:
+                set_dev_stack_db(db)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] dev_stack_health_router skipped: {e}")
+
+
     # Blast-Chain (Section 7 — staggered 4-touch chains + reply webhook)
     if not _should_skip("routers.blast_chain_router"):
         try:

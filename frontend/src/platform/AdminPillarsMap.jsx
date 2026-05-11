@@ -1199,6 +1199,8 @@ export default function AdminPillarsMap() {
 
             <SystemFlowsPanel flows={snapshot.flows || []} />
 
+            <DevStackSection />
+
             <EndpointAuditPanel />
 
             <WiresFlowMap wires={snapshot.wires || []} onOpenTrace={(w) => setOpenWire(w)} />

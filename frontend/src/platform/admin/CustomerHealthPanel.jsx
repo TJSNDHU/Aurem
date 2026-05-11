@@ -795,6 +795,19 @@ function BinDetailSection({ businessId }) {
             style={{ ...btnSecondary(busy), background: '#F0A030', color: '#0F1115', borderColor: '#F0A030' }}>
             Run Promote Now
           </button>
+          <button
+            data-testid="bin-detail-delete"
+            onClick={() => {
+              if (!window.confirm(`⚠️ Soft-delete customer ${detail.bin_id}?\n\nAccount will be deactivated for 30 days then permanently purged.\nA notification email will be sent to ${detail.account?.email}.\n\nClick OK to proceed to the final confirmation.`)) return;
+              const typed = window.prompt('Type DELETE in CAPITALS to confirm:');
+              if (typed !== 'DELETE') { setMsg({kind:'err',text:'Delete cancelled (must type DELETE).'}); return; }
+              callAction('Delete Customer',
+                () => authedFetch(`/api/admin/customer-health/customer/${detail.bin_id}?confirm=DELETE`, { method: 'DELETE' }));
+            }}
+            disabled={busy}
+            style={{ ...btnSecondary(busy), background: '#7A2E2A', color: '#FFF', borderColor: '#7A2E2A' }}>
+            Delete Customer
+          </button>
         </div>
         {newPw && (
           <div data-testid="bin-detail-new-pw" style={{

@@ -64,6 +64,7 @@ export default function AdminBrainPage() {
   const [deploy, setDeploy] = useState(null);
   const [dogfood, setDogfood] = useState(null);
   const [dogfoodOpen, setDogfoodOpen] = useState(false);
+  const [auditLog, setAuditLog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
@@ -382,6 +383,71 @@ export default function AdminBrainPage() {
                 ))}
             </div>
           )}
+        </section>
+      )}
+
+      {/* Admin Action Log tile (iter 322aq) — recent admin_audit_log entries */}
+      {auditLog && (
+        <section
+          data-testid="admin-action-log-tile"
+          style={{
+            background: COMP_BG,
+            border: `1px solid ${COMP_BORDER}`,
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ color: ACCENT, fontWeight: 600, fontSize: 14 }}>
+              📋 Admin Action Log
+              <span style={{ color: '#8B8475', fontWeight: 500, fontSize: 12, marginLeft: 8 }}>
+                · last {auditLog.count} actions
+              </span>
+            </div>
+          </div>
+          {auditLog.count === 0 ? (
+            <div style={{ color: '#7A7468', fontSize: 12 }}>No admin actions logged yet.</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 130px 110px 1fr 1.2fr', fontSize: 11, color: '#8B8475', padding: '4px 0', borderBottom: `1px solid ${COMP_BORDER}`, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              <div>When</div><div>Action</div><div>BIN</div><div>By</div><div>Details</div>
+            </div>
+          )}
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {(auditLog.entries || []).map((e, i) => {
+              const colors = {
+                force_unlock: '#4AD4A0', reset_password: '#F0A030',
+                update_account: '#88C5FF', promote_now: '#FFE4A8',
+                delete_customer: '#FF8B85', restore_customer: '#9FE3B5',
+              };
+              return (
+                <div key={i} data-testid={`admin-action-log-row-${i}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '160px 130px 110px 1fr 1.2fr',
+                    fontSize: 11, padding: '7px 0',
+                    borderBottom: `1px solid ${COMP_BORDER}`,
+                    color: '#E8E2D4',
+                  }}>
+                  <div style={{ color: '#7A7468', fontFamily: 'monospace' }}>
+                    {e.ts ? new Date(e.ts).toLocaleString() : '—'}
+                  </div>
+                  <div style={{ color: colors[e.action] || '#E8E2D4', fontWeight: 600 }}>
+                    {e.action}
+                  </div>
+                  <div style={{ fontFamily: 'monospace', color: '#D4AF7A' }}>
+                    {e.bin_id || '—'}
+                  </div>
+                  <div style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {e.actor_email || '—'}
+                  </div>
+                  <div style={{ color: '#8B8475', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {e.details ? JSON.stringify(e.details).slice(0, 80) : ''}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 
