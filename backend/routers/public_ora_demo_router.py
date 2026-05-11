@@ -56,7 +56,10 @@ _DEMO_SYSTEM = (
 
 
 class DemoChatReq(BaseModel):
-    text: str = Field(..., min_length=1, max_length=600)
+    # iter 322bp — raised 600 → 8000 so pasted content (snippets, errors,
+    # JSON, emails) doesn't get silently rejected with 422 = empty body =
+    # frontend one-liner fallback. 8000 covers ~1500 words / 2-page paste.
+    text: str = Field(..., min_length=1, max_length=8000)
     session_id: Optional[str] = None
     source: Optional[str] = None   # "dev" → route through ORA dev skills
     # iter 282al-14 — Optional client-side emotion (face-api.js). The

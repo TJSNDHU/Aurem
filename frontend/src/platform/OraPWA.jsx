@@ -1441,13 +1441,35 @@ const OraPWA = () => {
                 style={{ display: "none" }}
                 data-testid="ora-file-input"
               />
-              <input
+              <textarea
                 className="chat-input"
+                rows={1}
                 value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") sendMsg(); }}
-                placeholder="Ask ORA anything…"
+                onChange={(e) => {
+                  setChatInput(e.target.value);
+                  // iter 322bp — auto-grow so pasted content is visible
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                }}
+                onKeyDown={(e) => {
+                  // Enter = send. Shift+Enter = newline. So pasted/typed
+                  // multi-line content doesn't trigger send mid-paste.
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMsg();
+                  }
+                }}
+                onPaste={(e) => {
+                  // iter 322bp — explicit paste logging so we can see the
+                  // event hits the input. Native paste then continues.
+                  try {
+                    const pasted = e.clipboardData?.getData('text') || '';
+                    console.debug('[ORA] paste:', pasted.length, 'chars');
+                  } catch {}
+                }}
+                placeholder="Ask ORA anything… (paste freely · Shift+Enter for new line)"
                 data-testid="ora-chat-input"
+                style={{ resize: 'none', overflow: 'auto', maxHeight: 160 }}
               />
               <button className="send-btn" onClick={() => sendMsg()} disabled={sending || !chatInput.trim()} data-testid="ora-send-btn" aria-label="Send">
                 <svg width="14" height="14" viewBox="0 0 12 12" fill="none">

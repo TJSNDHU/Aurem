@@ -401,6 +401,7 @@ export default function AdminConsole() {
           <Stat label="ORA outcomes" value={Object.values(spine.ora?.outcomes || {}).reduce((a,b)=>a+b,0)} dot="#22C55E" />
           <Stat label="Until finetune" value={spine.ora?.until_finetune ?? 100} dot="#7A7468" />
           <CustomerHealthWidget counts={healthCounts} />
+          <OraLatencyWidget />
         </div>
       )}
 
@@ -757,6 +758,70 @@ const CustomerHealthWidget = ({ counts }) => {
           50%      { box-shadow: 0 0 10px 3px rgba(239,68,68,0.95); }
         }
       `}</style>
+    </a>
+  );
+};
+
+// iter 322bo — live ORA chat latency widget (glass-shine pill)
+const OraLatencyWidget = () => {
+  const [m, setM] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await fetch(
+          `${process.env.REACT_APP_BACKEND_URL}/api/public/ora/metrics/summary?window_min=15`,
+        );
+        const j = await r.json();
+        if (alive && r.ok) setM(j);
+      } catch { /* silent */ }
+    };
+    tick();
+    const id = setInterval(tick, 15000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  if (!m) return null;
+  const p50 = m.latency_ms?.p50 || 0;
+  const p95 = m.latency_ms?.p95 || 0;
+  const calls = m.total_requests || 0;
+  const ok = p95 < 1500;
+  const warn = p95 >= 1500 && p95 < 3500;
+  const dot = ok ? '#22C55E' : (warn ? '#F59E0B' : '#EF4444');
+  const primarySource = Object.entries(m.by_source || {})
+    .sort((a,b) => b[1].calls - a[1].calls)[0]?.[0] || '—';
+  return (
+    <a
+      href="#"
+      onClick={(e) => { e.preventDefault(); }}
+      data-testid="console-ora-latency"
+      title={`p50 ${p50}ms · p95 ${p95}ms · ${calls} calls / 15m · primary: ${primarySource}`}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+        cursor: 'default',
+        padding: '3px 10px',
+        borderRadius: 99,
+        position: 'relative',
+        overflow: 'hidden',
+        background:
+          'radial-gradient(140% 80% at 30% 0%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 30%, transparent 60%),' +
+          'linear-gradient(165deg, rgba(60,62,72,0.42) 0%, rgba(18,20,28,0.48) 60%, rgba(40,42,52,0.38) 100%)',
+        border: `1px solid ${ok ? 'rgba(34,197,94,0.30)' : warn ? 'rgba(245,158,11,0.30)' : 'rgba(239,68,68,0.30)'}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -1px 0 rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.4)',
+      }}>
+      <span style={{
+        width: 7, height: 7, borderRadius: '50%', background: dot,
+        boxShadow: `0 0 8px ${dot}`,
+      }} />
+      <span style={{ color: '#7A7468' }}>ORA</span>
+      <span style={{ color: '#F5E6C8', fontWeight: 700 }}>{p50}ms</span>
+      <span style={{ color: '#5C5548', fontSize: 9 }}>p50</span>
+      <span style={{ color: '#7A7468' }}>·</span>
+      <span style={{ color: '#F5E6C8', fontWeight: 700 }}>{p95}ms</span>
+      <span style={{ color: '#5C5548', fontSize: 9 }}>p95</span>
+      <span style={{ color: '#7A7468' }}>·</span>
+      <span style={{ color: '#C9A227', fontWeight: 600, textTransform: 'uppercase', fontSize: 9 }}>
+        {primarySource}
+      </span>
     </a>
   );
 };
