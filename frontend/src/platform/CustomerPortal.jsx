@@ -13,7 +13,8 @@ import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'reac
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home as HomeIcon, Globe, Star, Share2, MessageSquare,
-  FileText, CreditCard, Settings, LogOut, Menu, X, ChevronRight, Activity, Award, Plug
+  FileText, CreditCard, Settings, LogOut, Menu, X, ChevronRight, Activity,
+  Award, Plug, ShieldCheck, Zap, Users, Sparkles, User as UserIcon,
 } from 'lucide-react';
 import { getPlatformToken, clearPlatformAuth as clearPlatformToken } from '../utils/secureTokenStore';
 import '../styles/portal-global.css';
@@ -40,17 +41,17 @@ const CustomerSiteMonitor = lazy(() => import('./CustomerSiteMonitor'));
 const CustomerBoardReport = lazy(() => import('./CustomerBoardReport'));
 
 const NAV_ITEMS = [
-  { to: '/my',           label: 'Home',           icon: HomeIcon },
-  { to: '/my/website',   label: 'My Website',     icon: Globe },
-  { to: '/my/monitor',   label: 'Site Monitor',   icon: Activity },
-  { to: '/my/board-report', label: 'Board Report', icon: Award },
-  { to: '/my/reviews',   label: 'Google Reviews', icon: Star },
-  { to: '/my/social',    label: 'Social Media',   icon: Share2 },
-  { to: '/my/ora',       label: 'ORA Chat',       icon: MessageSquare },
-  { to: '/my/report',    label: 'Monthly Report', icon: FileText },
-  { to: '/my/billing',   label: 'Billing',        icon: CreditCard },
-  { to: '/my/integrations', label: 'Integrations', icon: Plug },
-  { to: '/my/settings',  label: 'Settings',       icon: Settings },
+  // iter 322bj — sidebar aligned to target Home screenshot:
+  // Home / Live Health / Security / Automation / CRM / ORA / Profile / Settings.
+  // "Integrations" folded into Automation (still reachable via /my/integrations).
+  { to: '/my',              label: 'Home',         icon: HomeIcon },
+  { to: '/my/monitor',      label: 'Live Health',  icon: Activity },
+  { to: '/my/website',      label: 'Security',     icon: ShieldCheck },
+  { to: '/my/integrations', label: 'Automation',   icon: Zap },
+  { to: '/my/reviews',      label: 'CRM',          icon: Users },
+  { to: '/my/ora',          label: 'ORA',          icon: Sparkles },
+  { to: '/my/billing',      label: 'Profile',      icon: UserIcon },
+  { to: '/my/settings',     label: 'Settings',     icon: Settings },
 ];
 
 const COLORS = {

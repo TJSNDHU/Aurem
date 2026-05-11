@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  LineChart, Line,
 } from 'recharts';
 import { Toaster } from 'sonner';
 import { LuxeAuthProvider, useLuxeAuth } from '../luxe/LuxeAuthContext';
@@ -301,18 +302,42 @@ const PillarRow = ({ label, value, hint }) => {
 
 const ScanTile = ({ data }) => {
   const s = data?.websiteScan || {};
+  const dials = [
+    ['GEO', s.geo, '#C9A227', 'Geographic'],
+    ['SEC', s.sec, '#bef264', 'TLS · CSP'],
+    ['ACC', s.acc, '#FFA552', 'WCAG · ARIA'],
+    ['SEO', s.seo, '#60A5FA', 'LCP · meta'],
+  ];
   return (
     <Card testid="website-scan-card">
-      <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 12 }}>
+      <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 14 }}>
         Website Scan
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-        {[['GEO', s.geo], ['SEC', s.sec], ['ACC', s.acc], ['SEO', s.seo]].map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
-            <span style={{ fontFamily: fontMono, color: TEXT_MD, fontSize: 10, letterSpacing: '0.14em' }}>{k}</span>
-            <span style={{ fontFamily: fontMono, color: TEXT_HI, fontSize: 13, fontWeight: 700 }}>{v ?? 0}</span>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+        {dials.map(([k, v, c, hint]) => {
+          const pct = Math.max(0, Math.min(100, Number(v) || 0));
+          const r = 22, C = 2 * Math.PI * r, dash = C * (pct / 100);
+          return (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10 }} data-testid={`scan-dial-${k.toLowerCase()}`}>
+              <div style={{ position: 'relative', width: 60, height: 60, flexShrink: 0 }}>
+                <svg width="60" height="60" viewBox="0 0 60 60">
+                  <circle cx="30" cy="30" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
+                  <circle cx="30" cy="30" r={r} fill="none" stroke={c} strokeWidth="5" strokeLinecap="round"
+                    strokeDasharray={`${dash} ${C}`} transform="rotate(-90 30 30)"
+                    style={{ filter: `drop-shadow(0 0 5px ${c})`, transition: 'stroke-dasharray .8s ease' }} />
+                </svg>
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: fontDisplay, fontSize: 14, fontWeight: 700, color: TEXT_HI,
+                }}>{pct}</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: fontMono, fontSize: 10, color: TEXT_MD, letterSpacing: '0.16em' }}>{k}</div>
+                <div style={{ fontFamily: fontMono, fontSize: 9, color: TEXT_LO, marginTop: 2 }}>{hint}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -320,17 +345,33 @@ const ScanTile = ({ data }) => {
 
 const RepairTile = ({ data }) => {
   const r = data?.oraRepair || {};
+  const spark = (r.sparkline && r.sparkline.length > 0)
+    ? r.sparkline.map((y, i) => ({ x: i, y }))
+    : (r.series || []).map((s, i) => ({ x: i, y: s.v ?? 0 }));
   return (
     <Card testid="ora-repair-card">
       <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 10 }}>
-        ORA Repair
+        ORA Repair Effect
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontFamily: fontDisplay, color: '#22c55e', fontSize: 32, fontWeight: 700 }}>{r.successPct ?? 0}%</span>
         <span style={{ fontFamily: fontMono, color: TEXT_LO, fontSize: 10 }}>success</span>
       </div>
-      <div style={{ fontFamily: fontMono, color: TEXT_MD, fontSize: 10, marginTop: 6 }}>
-        {r.healed ?? 0} healed · {r.attempts ?? 0} attempts
+      <div style={{ fontFamily: fontMono, color: TEXT_MD, fontSize: 10, marginTop: 4, marginBottom: 8 }}>
+        {r.healed ?? 0} healed · {r.attempts ?? 0} attempts (14d)
+      </div>
+      <div style={{ height: 70 }} data-testid="ora-repair-sparkline">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={spark}>
+            <defs>
+              <linearGradient id="repairGreenL" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.55} />
+                <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Area type="monotone" dataKey="y" stroke="#22c55e" strokeWidth={2} fill="url(#repairGreenL)" />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </Card>
   );
@@ -356,59 +397,201 @@ const AlertsTile = ({ data }) => {
   );
 };
 
-// ── Home (12-tile grid) ──────────────────────────────────────────────
+// ── iter 322bj — AUREM PULSE hero + BUSINESS GROWTH chart ────────────
+const fmtCurrency = (n) => {
+  if (!n) return '$0';
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
+  return `$${Math.round(n)}`;
+};
+
+const ProgressMicro = ({ value, max, gradient }) => {
+  const pct = Math.max(0, Math.min(100, (Number(value) / Math.max(1, Number(max))) * 100));
+  return (
+    <div style={{ width: '100%', height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div style={{ width: `${pct}%`, height: '100%', background: gradient, transition: 'width .9s ease', borderRadius: 99 }} />
+    </div>
+  );
+};
+
+const AuremPulseHero = ({ data }) => {
+  const rev = data?.totalRevenue || {};
+  const hp = data?.websiteHealth || { value: 0, max: 100 };
+  const af = data?.autoFix || { value: 0, target: 2000 };
+  const bars = data?.pulseBars || [];
+  const deltaUp = (rev.deltaPct ?? 0) >= 0;
+  return (
+    <Card testid="aurem-pulse-hero">
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,220px)',
+        gap: 22, alignItems: 'start',
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+            fontFamily: fontDisplay, fontSize: 10, letterSpacing: '0.24em',
+            textTransform: 'uppercase', color: GOLD_HI,
+          }}>
+            <PulseRing active={!!data?.pulse?.active} />
+            AUREM PULSE
+            <span style={{ color: data?.pulse?.active ? '#bef264' : '#fbbf24', fontFamily: fontMono, marginLeft: 6 }}>
+              ● {data?.pulse?.active ? 'ACTIVE' : 'STANDBY'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+            <span data-testid="kpi-revenue-hero" style={{
+              fontFamily: fontDisplay, fontSize: 'clamp(28px, 5vw, 40px)',
+              color: TEXT_HI, fontWeight: 700, lineHeight: 1,
+            }}>{fmtCurrency(rev.value)}</span>
+            <span style={{ color: deltaUp ? '#bef264' : '#fca5a5', fontSize: 13, fontWeight: 600 }}>
+              {(deltaUp ? '+' : '') + (rev.deltaPct ?? 0).toFixed(1)}% {deltaUp ? '↑' : '↓'}
+            </span>
+            <span style={{ color: deltaUp ? '#bef264' : '#fca5a5', fontSize: 13 }}>
+              {(deltaUp ? '+' : '') + fmtCurrency(Math.abs(rev.deltaAbs || 0))}
+            </span>
+          </div>
+          <div style={{ fontFamily: fontMono, color: TEXT_LO, fontSize: 10, letterSpacing: '0.14em',
+                         textTransform: 'uppercase', marginTop: 6 }}>
+            Total Revenue · last 30 days
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 22 }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span style={{ fontFamily: fontMono, fontSize: 10, color: TEXT_MD, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                  Website Health Score
+                </span>
+                <span data-testid="kpi-health-hero" style={{ fontFamily: fontDisplay, fontSize: 22, color: TEXT_HI, fontWeight: 700 }}>
+                  {hp.value}<span style={{ color: TEXT_LO, fontSize: 12 }}>/{hp.max}</span>
+                </span>
+              </div>
+              <ProgressMicro value={hp.value} max={hp.max}
+                gradient="linear-gradient(90deg, #C9A227 0%, #F97316 100%)" />
+              <div style={{ fontSize: 9, color: TEXT_LO, marginTop: 4, letterSpacing: '0.06em' }}>
+                composite of GEO · SEC · ACC · SEO
+              </div>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span style={{ fontFamily: fontMono, fontSize: 10, color: TEXT_MD, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                  Auto-Fix Live
+                </span>
+                <span data-testid="kpi-autofix-hero" style={{ fontFamily: fontDisplay, fontSize: 22, color: TEXT_HI, fontWeight: 700 }}>
+                  {(af.value || 0).toLocaleString()}<span style={{ color: TEXT_LO, fontSize: 12 }}>/{(af.target || 2000).toLocaleString()}</span>
+                </span>
+              </div>
+              <ProgressMicro value={af.value} max={af.target || 2000}
+                gradient="linear-gradient(90deg, #2BB36C 0%, #bef264 100%)" />
+              <div style={{ fontSize: 9, color: TEXT_LO, marginTop: 4, letterSpacing: '0.06em' }}>
+                ORA patches applied today
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: fontMono, fontSize: 9, color: TEXT_LO,
+                        letterSpacing: '0.16em', textTransform: 'uppercase',
+                        textAlign: 'right', marginBottom: 6 }}>
+            Active · last 7 mo
+          </div>
+          <div style={{ height: 130 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bars} barCategoryGap="22%">
+                <XAxis dataKey="month" tick={{ fontSize: 8, fill: TEXT_LO }}
+                  axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'rgba(212,163,115,0.06)' }}
+                  contentStyle={{ background: '#0F0F18', border: '1px solid rgba(212,163,115,0.18)', borderRadius: 8, fontSize: 11 }} />
+                <Bar dataKey="value" fill="url(#pulseBarGold)" radius={[3, 3, 0, 0]} />
+                <defs>
+                  <linearGradient id="pulseBarGold" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#FFE4A8" />
+                    <stop offset="100%" stopColor="#8B7355" />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const BusinessGrowthChart = ({ data }) => {
+  const g = data?.growthMulti;
+  const rows = (g?.leads || []).map((row, i) => ({
+    x: row.x,
+    Revenue: g.revenue?.[i]?.y || 0,
+    Leads: g.leads?.[i]?.y || 0,
+    Outreach: g.outreach?.[i]?.y || 0,
+    'Pixel views': g.pixel_views?.[i]?.y || 0,
+    'Auto-fixes': g.auto_fixes?.[i]?.y || 0,
+  }));
+  return (
+    <Card testid="business-growth-card">
+      <div style={{ fontFamily: fontDisplay, color: GOLD_HI, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 14 }}>
+        Business Growth
+      </div>
+      <div style={{ height: 240 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={rows} margin={{ top: 6, right: 14, left: -14, bottom: 0 }}>
+            <XAxis dataKey="x" tick={{ fontSize: 10, fill: TEXT_LO }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 9, fill: TEXT_LO }} axisLine={false} tickLine={false} width={36} />
+            <Tooltip contentStyle={{ background: '#0F0F18', border: '1px solid rgba(212,163,115,0.18)', borderRadius: 8, fontSize: 11 }} />
+            <Line type="monotone" dataKey="Revenue"     stroke="#FFE4A8" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Leads"       stroke="#F97316" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Outreach"    stroke="#C9A227" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Pixel views" stroke="#9CA3AF" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
+            <Line type="monotone" dataKey="Auto-fixes"  stroke="#bef264" strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 10, fontSize: 10 }}>
+        {[
+          ['Revenue', '#FFE4A8'], ['Leads', '#F97316'], ['Outreach', '#C9A227'],
+          ['Pixel views', '#9CA3AF'], ['Auto-fixes', '#bef264'],
+        ].map(([k, c]) => (
+          <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+                                  color: TEXT_MD, letterSpacing: '0.08em', fontFamily: fontMono }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: c }} />{k}
+          </span>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+// ── Home (target screenshot layout) ──────────────────────────────────
 const HomePage = ({ data }) => (
   <div data-testid="page-home" style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 14 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <PulseRing active={!!data.pulse?.active} />
       <h1 style={{
         margin: 0, color: TEXT_HI, fontFamily: fontDisplay,
-        fontSize: 'clamp(18px, 4vw, 22px)', fontWeight: 700, letterSpacing: '0.10em',
-      }}>AUREM PULSE</h1>
-      <span style={{ fontFamily: fontMono, fontSize: 10, color: data.pulse?.active ? '#bef264' : '#fbbf24', letterSpacing: '0.20em' }}>
-        ● {data.pulse?.active ? 'ACTIVE' : 'STANDBY'}
-      </span>
+        fontSize: 'clamp(22px, 4vw, 30px)', fontWeight: 700, letterSpacing: '0.10em',
+      }}>HOME</h1>
     </div>
-    {/* Row 1: 4 KPIs — auto-fit becomes 2x2 on mobile, 4x1 on desktop */}
+
+    {/* Row 1 — AUREM PULSE hero (KPIs + mini bars) */}
+    <AuremPulseHero data={data} />
+
+    {/* Row 2 — Business Growth multi-line chart */}
+    <BusinessGrowthChart data={data} />
+
+    {/* Row 3 — Scan dials · Repair % + sparkline · Alerts */}
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-      gap: 12,
-    }}>
-      <KpiTile testid="total-revenue" label="Total Revenue"
-        value={`$${(data.totalRevenue?.value || 0).toLocaleString()}`}
-        sub={`Δ ${data.totalRevenue?.deltaPct?.toFixed(1) ?? 0}%`} />
-      <KpiTile testid="website-health-score" label="Website Health Score"
-        value={`${data.websiteHealth?.value ?? 0}/${data.websiteHealth?.max ?? 100}`}
-        sub="composite of GEO/SEC/ACC/SEO" />
-      <KpiTile testid="auto-fix-live" label="Auto Fix Live"
-        value={(data.autoFix?.value ?? 0).toLocaleString()}
-        sub="ORA repairs cumulative" />
-      <KpiTile testid="agents-active" label="Services Active"
-        value={`${data.services?.active ?? 0} / ${data.services?.total ?? 0}`}
-        sub={`${data.services?.active ?? 0} of ${data.services?.total ?? 0} services unlocked`} />
-    </div>
-    {/* Row 2: agents + Vanguard — stacks on mobile */}
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-      gap: 12,
-    }}>
-      <div style={{ minWidth: 0 }}><AgentsTileWrap agents={data.agents || []} /></div>
-      <div style={{ minWidth: 0 }}><VanguardTile data={data} /></div>
-    </div>
-    {/* Row 3: scan + repair + alerts — collapses naturally */}
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
       gap: 12,
     }}>
       <ScanTile data={data} />
       <RepairTile data={data} />
       <AlertsTile data={data} />
     </div>
-    {/* Row 4 (iter 322ak) — Customer Results: outcomes only, zero PII */}
+
+    {/* Row 4 (kept) — Customer Results outcomes (zero PII) */}
     <CustomerResultsRow />
+
     <style>{`
       @keyframes luxe-pulse {
         0%, 100% { opacity: 1; transform: scale(1); }

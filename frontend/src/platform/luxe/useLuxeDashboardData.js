@@ -43,7 +43,7 @@ export const useLuxeDashboardData = (token) => {
     }
     const headers = { Authorization: `Bearer ${token}` };
 
-    const [leadStats, agentsStatus, repairLeaderboard, repairHistory, scanEvents, subs, catalog] =
+    const [leadStats, agentsStatus, repairLeaderboard, repairHistory, scanEvents, subs, catalog, homeAgg] =
       await Promise.all([
         safeGet(`${API}/api/leads/stats`, headers),
         safeGet(`${API}/api/aurem/agents/status`, headers),
@@ -52,6 +52,8 @@ export const useLuxeDashboardData = (token) => {
         safeGet(`${API}/api/customer/pipeline/scan-events?limit=30`, headers),
         safeGet(`${API}/api/customer/subscriptions`, headers),
         safeGet(`${API}/api/catalog/services`, headers),
+        // iter 322bj — aggregated home payload (pulse bars + richer growth + sparkline + alerts)
+        safeGet(`${API}/api/me/home/dashboard`, headers),
       ]);
 
     // Vanguard runs a live backlink scan that can take 10–30s on first hit.
@@ -162,9 +164,18 @@ export const useLuxeDashboardData = (token) => {
     setData({
       loading: false,
       pulse: { active: pulseActive },
-      totalRevenue: { value: estRevenue, deltaPct, deltaAbs: 0 },
+      totalRevenue: {
+        // iter 322bj — prefer Stripe-backed home aggregate when available
+        value: homeAgg?.kpis?.revenue_total ?? estRevenue,
+        deltaPct: homeAgg?.kpis?.revenue_delta_pct ?? deltaPct,
+        deltaAbs: homeAgg?.kpis?.revenue_delta_value ?? 0,
+      },
       websiteHealth: { value: compHealth, max: 100 },
-      autoFix: { value: totalFixes, max: Math.max(100, totalFixes) },
+      autoFix: {
+        value: homeAgg?.kpis?.auto_fix_today ?? totalFixes,
+        target: homeAgg?.kpis?.auto_fix_target ?? 2000,
+        max: Math.max(100, totalFixes),
+      },
       agents,
       services: {
         active: subs?.active_count ?? 0,
@@ -176,15 +187,32 @@ export const useLuxeDashboardData = (token) => {
         ),
       },
       growth,
+      // iter 322bj — extra series from home aggregate (multi-line growth chart)
+      growthMulti: homeAgg?.growth || null,
+      pulseBars: homeAgg?.pulse_bars || [],
       websiteScan: {
-        geo: scanGeo, sec: scanSec, acc: scanAcc, seo: scanSeo,
+        geo: homeAgg?.scan?.geo || scanGeo,
+        sec: homeAgg?.scan?.sec || scanSec,
+        acc: homeAgg?.scan?.acc || scanAcc,
+        seo: homeAgg?.scan?.seo || scanSeo,
         lastScan: repairScores?.last_scan || '—',
       },
       oraRepair: {
-        successPct: Math.round(successPct * (successPct <= 1 ? 100 : 1)),
-        healed, attempts: totalFixes, deltaPct: 0, series,
+        successPct: homeAgg?.repair?.success_pct ?? Math.round(successPct * (successPct <= 1 ? 100 : 1)),
+        healed: homeAgg?.repair?.healed ?? healed,
+        attempts: homeAgg?.repair?.attempts ?? totalFixes,
+        deltaPct: 0,
+        series,
+        sparkline: homeAgg?.repair?.sparkline || [],
       },
-      securityAlerts: { count: alerts.length, items: alerts },
+      securityAlerts: {
+        count: (homeAgg?.alerts || alerts).length,
+        items: (homeAgg?.alerts || []).map((a) => ({
+          time: (a.ts_utc || '').slice(11, 16),
+          level: (a.level || 'LOW').toUpperCase(),
+          msg: a.message || 'event',
+        })).concat(alerts).slice(0, 6),
+      },
     });
   }, [token]);
 

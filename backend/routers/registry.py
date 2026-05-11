@@ -666,6 +666,7 @@ def register_all_routers(app, db):
         ("routers.lead_assets_router", "Lead Assets (logo upload, iter 282j)"),
         ("routers.admin_daily_log_router", "Admin Daily Log (founder brief audit, iter 282m)"),
         ("routers.me_pwa_router", "ORA PWA — Me Scoped (BIN-based, iter 282o)"),
+        ("routers.me_home_router", "ORA PWA — Home Dashboard (iter 322bj)"),
         ("routers.shortlink_router", "Shortlink + Founder Brief Health (iter 282al)"),
         ("routers.seo_router", "SEO / Unlinked Mentions (iter 282al-4)"),
         ("routers.site_qa_router", "Site QA (test-lab.ai, iter 282al-15)"),
