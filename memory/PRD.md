@@ -8,6 +8,10 @@
 > 4. **D. Shopify Connect** — `ShopifyCard` in `/my/integrations` (1-click → `/api/shopify/auth`)
 >
 > Customer /my panel (LuxeDashboardPreview) NAV now has **Integrations** + **Settings** tabs with all 4 features visible. `/admin/system-overview` adds **Customer Features** + **Learning System** cards (5,887 brain thoughts · 11 hooks · hourly collective scan · $0 fix cost). Iteration bumped to `322as` in backend stats.
+>
+> **All integration keys already live (verified May 11, 2026)**:
+> - `SHOPIFY_API_KEY` + `SHOPIFY_API_SECRET` + `SHOPIFY_APP_URL` + 9 scopes → OAuth init returns valid 307 to `*.myshopify.com/admin/oauth/authorize`
+> - `RETELL_API_KEY` + `RETELL_FROM_NUMBER=+14314500004` + `RETELL_WORKSPACE_ID=org_QP4r6K9O9eKgssD9` → 295 voices, 11 agents, 1 phone number live
 
 # AUREM Platform — PRD
 
