@@ -148,6 +148,12 @@ async def _scan_agent(agent: str, spec: Dict) -> Dict[str, Any]:
 
 async def _scan_all() -> List[Dict[str, Any]]:
     """Phase 1 — all 25 agents probed in parallel."""
+    # iter 322ar — also ensure the cost-tier fixer + learner have db.
+    try:
+        from services import emergent_code_fixer as _ecf
+        _ecf.set_db(_db)
+    except Exception:
+        pass
     tasks = [_scan_agent(name, spec) for name, spec in DEPENDENCY_MAP.items()]
     return await asyncio.gather(*tasks)
 
@@ -274,10 +280,13 @@ async def _publish_dev_console_proposal(
             "cascade_size": step.get("cascade_size", 0),
             "fixes_these_too": step.get("fixes_these_too", []),
         }
-        await request_code_fix(issue)
+        result = await request_code_fix(issue)
+        if not result.get("ok"):
+            logger.warning(f"[collective-scan] fixer not-ok for {agent}: {result.get('reason')}")
         return
     except Exception as e:
-        logger.warning(f"[collective-scan] cost-tier fixer failed, falling back: {e}")
+        import traceback
+        logger.warning(f"[collective-scan] cost-tier fixer EXCEPTION for {agent}: {e}\n{traceback.format_exc()[:600]}")
 
     # Plain fallback (legacy behaviour)
     cascade = step.get("fixes_these_too", [])

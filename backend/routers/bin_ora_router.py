@@ -198,6 +198,26 @@ async def bin_ora_ask(body: AskReq, request: Request):
     except Exception:
         pass
 
+    # iter 322ar — ORA universal learner hook (HOOK 10b: customer chat)
+    try:
+        import asyncio as _asyncio
+        from services.ora_universal_learner import ora_learn as _ora_learn
+        _asyncio.create_task(_ora_learn({
+            "source": "ora_chat",
+            "event": "CUSTOMER_CHAT",
+            "category": "ora_conversation",
+            "summary": (
+                f"Customer asked ORA on layer={layer.get('name','?')}. "
+                f"BIN grounding rows: {len(bin_grounding or [])}. "
+                f"Best practice: {best_practice or 'n/a'}."
+            ),
+            "outcome": "answered",
+            "agent": "bin_ora",
+            "bin_id": ctx.business_id,
+        }))
+    except Exception:
+        pass
+
     return {
         "ok": True,
         "answer": parsed,

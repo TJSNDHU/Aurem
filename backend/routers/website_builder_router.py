@@ -212,6 +212,25 @@ async def _send_starter_welcome_email(
     except Exception as e:
         logger.warning(f"[starter-welcome] send failed for {email}: {e}")
 
+    # iter 322ar — ORA universal learner hook (HOOK 7: site generation)
+    try:
+        import asyncio as _asyncio
+        from services.ora_universal_learner import ora_learn as _ora_learn
+        _asyncio.create_task(_ora_learn({
+            "source": "website_builder",
+            "event": "SITE_GENERATED",
+            "category": "site_generated",
+            "summary": (
+                f"Site built for '{business_name or 'unknown'}' "
+                f"BIN={bin_code}. Sample URL: {sample_url}"
+            ),
+            "outcome": "success",
+            "agent": "website_builder",
+            "bin_id": bin_code,
+        }))
+    except Exception:
+        pass
+
 
 @router.post("/no-website")
 async def no_website_instant(

@@ -124,6 +124,15 @@ async def ora_self_sufficiency_stats(request: Request, days: int = 30):
     return {"ok": True, "stats": _sanitize(stats), "patterns": _sanitize(patterns)}
 
 
+@router.get("/brain-growth")
+async def brain_growth(request: Request):
+    """iter 322ar — Brain Growth tile data for /admin/brain."""
+    await _require_admin(request)
+    from services.ora_universal_learner import brain_growth_summary
+    g = await brain_growth_summary()
+    return {"ok": True, "growth": _sanitize(g)}
+
+
 def _sanitize(doc):
     """Strip datetime objects → ISO strings so FastAPI JSON-serialises cleanly."""
     if isinstance(doc, dict):

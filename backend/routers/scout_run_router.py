@@ -52,6 +52,25 @@ async def scout_run(request: Request, body: Dict[str, Any] = Body(default={})):
         raise HTTPException(502, f"scout hunt failed: {e}")
 
     ctx = getattr(request.state, "bin_ctx", None)
+    # iter 322ar — ORA universal learning hook (fire-and-forget)
+    try:
+        import asyncio as _asyncio
+        from services.ora_universal_learner import ora_learn as _ora_learn
+        _asyncio.create_task(_ora_learn({
+            "source": "scout",
+            "event": "SCOUT_RUN",
+            "category": "lead_intelligence",
+            "summary": (
+                f"Scout ran for '{name}' in {location or 'any'}. "
+                f"Depth: {'full' if full else 'surface'}. "
+                f"Sources: {(result or {}).get('sources_tried', '?')}."
+            ),
+            "outcome": "found" if (result or {}).get("found") else "not_found",
+            "agent": "scout_ora",
+            "bin_id": getattr(ctx, "business_id", None) or "system",
+        }))
+    except Exception:
+        pass
     return {
         "ok": True,
         "query": name,

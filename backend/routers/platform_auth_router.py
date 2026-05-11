@@ -470,6 +470,24 @@ async def register(request: RegisterRequest, req: Request = None):
             logging.getLogger(__name__).warning(f"[REGISTER] onboarding wire-up error: {_e}")
 
         token = create_token(email, "user")
+        # iter 322ar — ORA universal learner hook (HOOK 8: signup)
+        try:
+            import asyncio as _asyncio
+            from services.ora_universal_learner import ora_learn as _ora_learn
+            _asyncio.create_task(_ora_learn({
+                "source": "platform",
+                "event": "CUSTOMER_SIGNUP",
+                "category": "customer_action",
+                "summary": (
+                    f"New customer signed up. Plan: trial. "
+                    f"Has company: {bool(request.normalized_company())}"
+                ),
+                "outcome": "signup",
+                "agent": "platform_auth",
+                "bin_id": locals().get("ws_business_id") or "system",
+            }))
+        except Exception:
+            pass
         return TokenResponse(
             token=token,
             email=email,

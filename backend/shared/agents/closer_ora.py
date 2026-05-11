@@ -95,6 +95,23 @@ class CloserORA(AuremAgent):
         stats = {"closer_attempts": attempted, "converted": converted, "cold_skipped": cold_skipped}
         self._today_stats = stats
         await self.broadcast("daily_complete", {"agent": self.AGENT_ID, "stats": stats})
+        # iter 322ar — ORA universal learner hook (HOOK 4)
+        try:
+            import asyncio as _asyncio
+            from services.ora_universal_learner import ora_learn as _ora_learn
+            _asyncio.create_task(_ora_learn({
+                "source": "closer",
+                "event": "CLOSER_CYCLE",
+                "category": "agent_performance",
+                "summary": (
+                    f"Closer attempts={attempted} converted={converted} "
+                    f"cold_skipped={cold_skipped} leads_scanned={len(leads)}"
+                ),
+                "outcome": "completed",
+                "agent": "closer_ora",
+            }))
+        except Exception:
+            pass
         return stats
 
     async def _send_closer_step(self, lead: Dict[str, Any], step: Dict[str, Any]):

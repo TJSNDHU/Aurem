@@ -995,6 +995,65 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
     `council_rotation`, `pillar_fulfiller`, `council_sessions_24h`,
     `boundary_lint`, `ts`).
 
+### iter 322ar — 25-Agent Collective Scan + ORA Universal Learning + Cost Cascade (2026-05-11)
+  - **Disk emergency** (P0 blocker): `/app` mount was 100% full from torch +
+    nvidia-* residue in `.venv`. `/root/.venv/bin/pip uninstall` cleaned
+    them; disk dropped from 100% → 73% (2.7 GB free). Re-added
+    `tokenizers`, `huggingface_hub`, `safetensors` (small deps
+    emergentintegrations needs at runtime, ~6 MB combined).
+  - **25-Agent Collective Scanner** (`services/collective_scanner.py` +
+    `services/agent_dependency_map.py` + `routers/collective_scan_router.py`):
+    Phase 1–6 pipeline. 25 agents probed in parallel, results bucketed
+    by `subject_agent`, root causes ranked by cascade impact via
+    `downstream_of()` graph traversal, fixes routed through existing
+    Council `deliberate()`. Hourly cron + manual trigger
+    (`POST /api/admin/collective-scan/run`).
+  - **Cost cascade router** (`services/emergent_code_fixer.py` +
+    `services/ora_pattern_matcher.py` + `services/fix_learning_pipeline.py`):
+    L0 ORA pattern match → L1 Sovereign LLM → L2 OpenRouter free →
+    L3 Emergent. Every fix proposal lands in `ora_dev_actions` (Dev
+    Console picks up Tier-1 auto / Tier-2 founder-approval). Every
+    proposal also writes a learning row in `fix_patterns` + a thought
+    in `ora_brain_thoughts`. **Live test result**: 100% L1 Sovereign
+    (free) — 0 paid Emergent calls.
+  - **NOTE — autonomous code mutation explicitly deferred**: actual
+    file rewrite + git worktree sandbox + auto-revert is a separate
+    week of infra work. Current behaviour: fixer produces a complete
+    structured proposal (diff/action/risk/verification) and writes it
+    to `ora_dev_actions`. A human (or future sandbox runner) applies
+    it. No file system writes from LLMs.
+  - **ORA Universal Learner** (`services/ora_universal_learner.py`):
+    single `ora_learn(event_data)` fire-and-forget. Writes a
+    categorised thought (`category` field: `lead_intelligence |
+    agent_performance | council_decision | customer_action |
+    site_generated | pixel_intelligence | ora_conversation |
+    system_health | fix_applied`) + emits A2A `ORA_LEARNED` event.
+    PII (emails/phones) auto-redacted in summaries.
+  - **11 Hooks wired**:
+    1. `scout_run_router.py:scout_run` — SCOUT_RUN
+    2. `shared/agents/hunter_ora.py:run_cycle` — HUNT_CYCLE
+    3. `shared/agents/followup_ora.py:run_cycle` — FOLLOWUP_TICK
+    4. `shared/agents/closer_ora.py:run_cycle` — CLOSER_CYCLE
+    5. `services/council_deliberate.py:deliberate` — COUNCIL_DECISION
+    6. `services/sentinel_repair_loop.py:run_sentinel_repair_cycle` — already learns
+    7. `routers/website_builder_router.py:_generate_site_background` — SITE_GENERATED
+    8. `routers/platform_auth_router.py:starter_signup` — CUSTOMER_SIGNUP
+    9. `routers/customer_intelligence_router.py:pixel_event` — PIXEL_EVENT
+    10. `routers/customer_intelligence_router.py:import_csv` — INVOICE_IMPORT
+    11. `routers/customer_intelligence_router.py:bucket_confirm` — CONTACT_VERIFIED
+       PLUS `routers/bin_ora_router.py:bin_ora_ask` — CUSTOMER_CHAT
+  - **`/admin/brain` tiles** (both new):
+    - **🛰️ Collective Scan**: critical/warning/healthy/fixes-approved/
+      duration + expandable fix priority queue. Run Now button works.
+    - **🧠 ORA Brain Growth**: total thoughts, new 24h/7d, 7/11 active
+      sources, category-bar chart, expandable sources list.
+  - **New admin endpoints**: `GET /api/admin/collective-scan/last`,
+    `/recent`, `/dependency-map`, `/ora-stats`, `/brain-growth`,
+    `POST /api/admin/collective-scan/run`.
+  - **Verification**: Delta +7 thoughts after one scan + one pixel
+    event. Brain Growth API returns total=5,647, 7 active sources,
+    real category breakdown. Backend `/api/health` 200 OK.
+
 ### iter 322ar — 6 additional stub fixes (multimodal/voice/skills/deploy/startup/website) (2026-05-11)
   - **Multimodal vision** (`services/multimodal_processor.py:282+`):
     `_analyze_image()` now performs a real GPT-4o vision call via

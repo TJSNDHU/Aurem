@@ -88,7 +88,7 @@ async def pixel_event(request: Request, body: Dict[str, Any] = Body(...)):
     if not bin_id:
         raise HTTPException(400, "bin_id required")
 
-    return await bi.record_pixel_event(
+    result = await bi.record_pixel_event(
         _db,
         business_id=bin_id,
         visitor_hash=(body.get("visitor_hash") or "")[:64],
@@ -100,6 +100,36 @@ async def pixel_event(request: Request, body: Dict[str, Any] = Body(...)):
         form_email=body.get("form_email") or "",
         form_phone=body.get("form_phone") or "",
     )
+    # iter 322ar — ORA universal learner hook (HOOK 9: pixel)
+    try:
+        import asyncio as _asyncio
+        _asyncio.create_task(_learn_pixel_event(bin_id, body))
+    except Exception:
+        pass
+    return result
+    # NOTE: hook 9 (pixel) is wired in the wrapper below via _learn_pixel_event
+    # because Python returns above; see line ~104.
+
+
+async def _learn_pixel_event(bin_id: str, body: Dict[str, Any]) -> None:
+    try:
+        from services.ora_universal_learner import ora_learn as _ora_learn
+        await _ora_learn({
+            "source": "pixel",
+            "event": "PIXEL_EVENT",
+            "category": "pixel_intelligence",
+            "summary": (
+                f"Visitor page={body.get('page') or '?'} "
+                f"time={int(body.get('time_spent') or 0)}s "
+                f"form_filled={bool(body.get('form_filled'))} "
+                f"device={body.get('device') or 'desktop'}"
+            ),
+            "outcome": "tracked",
+            "agent": "pixel",
+            "bin_id": bin_id,
+        })
+    except Exception:
+        pass
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -248,6 +278,24 @@ async def bucket_confirm(request: Request, body: Dict[str, Any] = Body(...)):
         {"bin_id": ctx["business_id"], "contact_hash": contact_hash},
         {"$set": {"customer_confirmed": True, "business_score": 100}},
     )
+    # iter 322ar — ORA universal learner hook (HOOK 11: contact verify)
+    try:
+        import asyncio as _asyncio
+        from services.ora_universal_learner import ora_learn as _ora_learn
+        _asyncio.create_task(_ora_learn({
+            "source": "intelligence",
+            "event": "CONTACT_VERIFIED",
+            "category": "lead_intelligence",
+            "summary": (
+                f"Customer verified contact (hash={contact_hash[:12]}). "
+                f"Promoted to verified bucket. updated={res.modified_count}."
+            ),
+            "outcome": "verified",
+            "agent": "intelligence_merge",
+            "bin_id": ctx["business_id"],
+        }))
+    except Exception:
+        pass
     return {"ok": True, "updated": res.modified_count}
 
 

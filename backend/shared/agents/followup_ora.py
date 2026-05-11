@@ -124,6 +124,24 @@ class FollowupORA(AuremAgent):
         stats = {"drip_sent": sent, "handed_to_closer": handed_to_closer}
         self._today_stats = stats
         await self.broadcast("daily_complete", {"agent": self.AGENT_ID, "stats": stats})
+        # iter 322ar — ORA universal learner hook (HOOK 3)
+        try:
+            import asyncio as _asyncio
+            from services.ora_universal_learner import ora_learn as _ora_learn
+            _asyncio.create_task(_ora_learn({
+                "source": "followup",
+                "event": "FOLLOWUP_TICK",
+                "category": "agent_performance",
+                "summary": (
+                    f"Followup drip_sent={sent} "
+                    f"handed_to_closer={handed_to_closer} "
+                    f"leads_scanned={len(leads)}"
+                ),
+                "outcome": "completed",
+                "agent": "followup_ora",
+            }))
+        except Exception:
+            pass
         return stats
 
     async def _send_drip_step(self, lead: Dict[str, Any], step: Dict[str, Any]):

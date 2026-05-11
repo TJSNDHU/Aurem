@@ -174,4 +174,23 @@ async def deliberate(
     if persist_tasks:
         await asyncio.gather(*persist_tasks, return_exceptions=True)
 
+    # iter 322ar — ORA universal learner hook (HOOK 5)
+    try:
+        from services.ora_universal_learner import ora_learn as _ora_learn
+        asyncio.create_task(_ora_learn({
+            "source": "council",
+            "event": "COUNCIL_DECISION",
+            "category": "council_decision",
+            "summary": (
+                f"Council voted on {action} for {agent}. "
+                f"Verdict: {verdict}. "
+                f"Votes: {len(votes)}, confidence={confidence:.2f}"
+            ),
+            "outcome": verdict,
+            "agent": "council",
+            "confidence": float(confidence),
+        }))
+    except Exception:
+        pass
+
     return {"verdict": verdict, "votes": votes, "confidence": confidence}

@@ -2739,6 +2739,15 @@ def register_all_routers(app, db):
     except Exception as e:
         logger.warning(f"Collective Scan router not loaded: {e}")
 
+    # iter 322ar — ORA Universal Learner wiring (used by hooks across
+    # scout/hunter/council/sentinel/website-builder/auth/intel/bin-ora).
+    try:
+        from services import ora_universal_learner as _oul
+        _oul.set_db(db)
+        logger.info("[REGISTRY] ORA universal learner wired")
+    except Exception as e:
+        logger.warning(f"ORA universal learner not wired: {e}")
+
     # ═══════════════════════════════════════════
     # LEAN MODE: Post-registration route cleanup
     # See routers/_registry_lean_prune.py for the full prune-list.

@@ -194,4 +194,22 @@ class HunterORA(AuremAgent):
 
         self._today_stats = stats
         await self.broadcast("daily_complete", {"agent": self.AGENT_ID, "stats": stats})
+        # iter 322ar — ORA universal learner hook (HOOK 2)
+        try:
+            import asyncio as _asyncio
+            from services.ora_universal_learner import ora_learn as _ora_learn
+            _asyncio.create_task(_ora_learn({
+                "source": "hunter",
+                "event": "HUNT_CYCLE",
+                "category": "agent_performance",
+                "summary": (
+                    f"Hunter hunts_started={stats.get('hunts_started', 0)} "
+                    f"scouted={stats.get('scouted', 0)} "
+                    f"council_rejected={stats.get('council_rejected', 0)}"
+                ),
+                "outcome": "completed",
+                "agent": "hunter_ora",
+            }))
+        except Exception:
+            pass
         return stats

@@ -71,6 +71,7 @@ export default function AdminBrainPage() {
   const [dogfoodOpen, setDogfoodOpen] = useState(false);
   const [auditLog, setAuditLog] = useState(null);
   const [collective, setCollective] = useState(null);
+  const [brainGrowth, setBrainGrowth] = useState(null);
   const [collectiveRunning, setCollectiveRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -79,7 +80,7 @@ export default function AdminBrainPage() {
     try {
       setErr('');
       // allSettled so one failing endpoint doesn't blank the whole page.
-      const [ro, rf, rn, rd, rdp, ral, rcs] = await Promise.allSettled([
+      const [ro, rf, rn, rd, rdp, ral, rcs, rbg] = await Promise.allSettled([
         fetchJSON('/api/admin/autonomous/overview'),
         fetchJSON('/api/admin/autonomous/pipeline-flow?limit=10'),
         fetchJSON('/api/admin/autonomous/notifications?limit=10&unread_only=true'),
@@ -87,6 +88,7 @@ export default function AdminBrainPage() {
         fetchJSON('/api/admin/dogfood/pulse'),
         fetchJSON('/api/admin/audit-log?limit=20'),
         fetchJSON('/api/admin/collective-scan/last'),
+        fetchJSON('/api/admin/collective-scan/brain-growth'),
       ]);
       if (ro.status === 'fulfilled') setOverview(ro.value);
       if (rf.status === 'fulfilled') setFlow(rf.value);
@@ -95,6 +97,7 @@ export default function AdminBrainPage() {
       if (rdp.status === 'fulfilled') setDogfood(rdp.value);
       if (ral.status === 'fulfilled') setAuditLog(ral.value);
       if (rcs.status === 'fulfilled') setCollective(rcs.value);
+      if (rbg.status === 'fulfilled') setBrainGrowth(rbg.value);
 
       // Surface only if EVERYTHING failed
       const allFailed = [ro, rf, rn, rd].every(r => r.status === 'rejected');
@@ -408,6 +411,99 @@ export default function AdminBrainPage() {
                 ))}
             </div>
           )}
+        </section>
+      )}
+
+      {/* Brain Growth tile (iter 322ar) — ORA Universal Learning */}
+      {brainGrowth && brainGrowth.growth && (
+        <section
+          data-testid="brain-growth-tile"
+          style={{
+            background: COMP_BG,
+            border: `1px solid ${COMP_BORDER}`,
+            borderRadius: 10,
+            padding: 14,
+            marginBottom: 16,
+          }}
+        >
+          {(() => {
+            const g = brainGrowth.growth || {};
+            const cats = g.categories || {};
+            const srcs = g.sources || [];
+            const catEntries = Object.entries(cats).slice(0, 9);
+            const maxCount = Math.max(1, ...catEntries.map(([, v]) => v));
+            return (
+              <>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ color: ACCENT, fontWeight: 600, fontSize: 14 }}>
+                    🧠 ORA Brain Growth
+                    <span style={{ color: '#8B8475', fontWeight: 500, fontSize: 12, marginLeft: 8 }}>
+                      · universal learning · 11 hooks wired
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#7A7468' }}>
+                    Latest: {g.latest?.category || '—'} · {g.latest?.ts ? new Date(g.latest.ts).toLocaleTimeString() : '—'}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 12 }}>
+                  <div data-testid="brain-growth-total" style={{ padding: '10px 12px', background: 'rgba(212,175,122,0.06)', border: `1px solid ${COMP_BORDER}`, borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>TOTAL THOUGHTS</div>
+                    <div style={{ fontSize: 22, color: ACCENT, fontWeight: 700, marginTop: 2 }}>{(g.total || 0).toLocaleString()}</div>
+                  </div>
+                  <div data-testid="brain-growth-24h" style={{ padding: '10px 12px', background: 'rgba(74,212,160,0.06)', border: '1px solid rgba(74,212,160,0.2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>NEW 24H</div>
+                    <div style={{ fontSize: 22, color: '#4AD4A0', fontWeight: 700, marginTop: 2 }}>{(g.new_24h || 0).toLocaleString()}</div>
+                  </div>
+                  <div data-testid="brain-growth-7d" style={{ padding: '10px 12px', background: 'rgba(136,197,255,0.06)', border: '1px solid rgba(136,197,255,0.2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>NEW 7D</div>
+                    <div style={{ fontSize: 22, color: '#88C5FF', fontWeight: 700, marginTop: 2 }}>{(g.new_7d || 0).toLocaleString()}</div>
+                  </div>
+                  <div data-testid="brain-growth-sources" style={{ padding: '10px 12px', background: 'rgba(240,160,48,0.06)', border: '1px solid rgba(240,160,48,0.2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: '#8B8475', letterSpacing: '0.08em' }}>ACTIVE SOURCES</div>
+                    <div style={{ fontSize: 22, color: '#F0A030', fontWeight: 700, marginTop: 2 }}>{g.active_sources_count || 0}<span style={{ fontSize: 12, color: '#7A7468', marginLeft: 4 }}>/11</span></div>
+                  </div>
+                </div>
+
+                {catEntries.length > 0 && (
+                  <div data-testid="brain-growth-categories">
+                    <div style={{ fontSize: 11, color: '#8B8475', letterSpacing: '0.08em', marginBottom: 8 }}>
+                      CATEGORY BREAKDOWN (LAST 30D)
+                    </div>
+                    {catEntries.map(([cat, count]) => {
+                      const pct = Math.round((count / maxCount) * 100);
+                      return (
+                        <div key={cat} style={{ marginBottom: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#E8E2D4', marginBottom: 2 }}>
+                            <span style={{ fontFamily: 'monospace' }}>{cat}</span>
+                            <span style={{ color: ACCENT, fontFamily: 'monospace' }}>{count.toLocaleString()}</span>
+                          </div>
+                          <div style={{ height: 4, background: 'rgba(0,0,0,0.25)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${ACCENT}, rgba(74,212,160,0.6))`, transition: 'width 0.4s ease' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {srcs.length > 0 && (
+                  <details style={{ marginTop: 12 }}>
+                    <summary style={{ cursor: 'pointer', fontSize: 11, color: '#D4AF7A', userSelect: 'none' }}>
+                      Active sources last 24h ({srcs.length})
+                    </summary>
+                    <div style={{ marginTop: 6, fontSize: 11, color: '#E8E2D4', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 4 }}>
+                      {srcs.map((s, i) => (
+                        <div key={i} style={{ padding: '4px 8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, fontFamily: 'monospace' }}>
+                          {s.source} <span style={{ color: '#8B8475', float: 'right' }}>{s.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </>
+            );
+          })()}
         </section>
       )}
 
