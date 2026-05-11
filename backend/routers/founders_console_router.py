@@ -365,6 +365,31 @@ async def propose(body: ProposeRequest, authorization: Optional[str] = Header(No
     from services.council import council
 
     task = await preprocess_input(body.message)
+
+    # iter 322ap — Business action short-circuit. SCOUT / STATUS / LEADS /
+    # PAUSE / BLAST intents bypass Council/code-edit and hit the real gated
+    # endpoints. Returns a chat-friendly result without touching code.
+    from services.founders_actions import maybe_dispatch_action
+    action_res = await maybe_dispatch_action(task, db)
+    if action_res is not None:
+        proposal_id = uuid.uuid4().hex[:14]
+        session_id = body.session_id or uuid.uuid4().hex[:10]
+        action_doc = {
+            "proposal_id": proposal_id, "session_id": session_id,
+            "task": task,
+            "kind": "business_action",
+            "action": action_res,
+            "status": "executed",
+            "created_at": started.isoformat(),
+            "elapsed_s": round((datetime.now(timezone.utc) - started).total_seconds(), 2),
+        }
+        try:
+            await db.console_proposals.insert_one(dict(action_doc))
+            action_doc.pop("_id", None)
+        except Exception as e:
+            logger.warning(f"[fc-action] persist failed: {e}")
+        return {"ok": True, **action_doc}
+
     race = await multi_model_race(task, db)
 
     council_decision = await council.deliberate(

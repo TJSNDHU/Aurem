@@ -103,10 +103,24 @@ export default function AdminConsole() {
           setSessionId(proposal.session_id);
           localStorage.setItem('console_session', proposal.session_id);
         }
-        setMessages(m => [...m, {
-          role: 'assistant', kind: 'proposal',
-          proposal, ts: new Date().toISOString(),
-        }]);
+        // iter 322ap — Business action short-circuit. Render the action
+        // outcome as a normal assistant message instead of a ProposalCard.
+        if (proposal.kind === 'business_action' && proposal.action) {
+          const a = proposal.action;
+          setMessages(m => [...m, {
+            role: 'assistant',
+            message: a.summary || `Action ${a.intent} executed.`,
+            intent: a.intent,
+            action_result: a,
+            elapsed_s: proposal.elapsed_s,
+            ts: new Date().toISOString(),
+          }]);
+        } else {
+          setMessages(m => [...m, {
+            role: 'assistant', kind: 'proposal',
+            proposal, ts: new Date().toISOString(),
+          }]);
+        }
         setSending(false);
         return;
       }
@@ -382,10 +396,12 @@ export default function AdminConsole() {
             </p>
             <div style={{ marginTop: 24, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
               {['Run scout for auto-repair shops in Mississauga',
-                'Send blast to 3 leads',
+                'Status — kitne leads aaj?',
                 'Pause outreach',
-                'How many sends today?'].map((s, i) => (
-                <button key={i} onClick={() => setInput(s)} data-testid={`console-suggest-${i}`}
+                'Leads pipeline kya hai?'].map((s, i) => (
+                <button key={i}
+                  onClick={() => { setInput(s); setTimeout(() => send(), 0); }}
+                  data-testid={`console-suggest-${i}`}
                   style={chipBtn}>{s}</button>
               ))}
             </div>
