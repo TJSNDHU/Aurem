@@ -227,21 +227,89 @@ async def _run_blast_one(
 async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
     """Discover a LIST of businesses matching a free-text query.
 
-    Tries in order:
-      1. Google Places (if GOOGLE_PLACES_API_KEY) — best data quality
-      2. Tavily discovery — uses search to find business listings
-      3. DuckDuckGo — last-resort web fallback
+    iter 322av — OSM Overpass is now the PRIMARY source (100% free, no key,
+    no quota, no billing risk). Yelp + Google Places are silent fallbacks
+    that activate only when the key is valid AND OSM returned 0.
 
-    Returns list of {business_name, phone, address, website, rating} dicts.
-    This is the DISCOVERY step (many businesses from one query), distinct from
-    scout_business_full() which looks up ONE business by name.
+    Order:
+      1. OSM Overpass (PRIMARY, free)   — community-maintained, real SMB data
+      2. Yelp Fusion                    — only if YELP_API_KEY is still valid
+      3. Google Places                  — high quality if billed
+      4. Tavily discovery               — search-based fallback
+      5. DuckDuckGo                     — last-resort web fallback
     """
     import os
     import re
     import httpx
     results: List[Dict[str, Any]] = []
 
-    # ── 1. Google Places (preferred) ──────────────────────────
+    # ── Parse "industry in city" / "industry near city" out of the query ──
+    industry_for_lookup = query
+    city_for_lookup = None
+    if " in " in query:
+        industry_for_lookup, _, city_for_lookup = query.partition(" in ")
+    elif " near " in query:
+        industry_for_lookup, _, city_for_lookup = query.partition(" near ")
+    industry_for_lookup = industry_for_lookup.strip()
+    city_for_lookup = (city_for_lookup or "").strip() or "Mississauga, ON"
+
+    # ── 1. OSM Overpass (PRIMARY — iter 322av) ─────────────────
+    try:
+        from services.osm_scout import osm_leads
+        ores = await osm_leads(
+            query=industry_for_lookup,
+            location=city_for_lookup,
+            limit=min(int(limit) * 2, 50),
+            radius_m=15000,
+        )
+        if ores.get("success") and ores.get("leads"):
+            for lead in ores["leads"][:limit]:
+                results.append({
+                    "business_name": lead["business_name"],
+                    "phone":   lead.get("phone") or "",
+                    "address": lead.get("address") or lead.get("city") or "",
+                    "website": lead.get("website") or "",
+                    "rating":  lead.get("rating") or 4.0,
+                    "email":   lead.get("email") or "",
+                    "osm_id":  lead.get("osm_id"),
+                    "source":  "osm_overpass",
+                })
+            if results:
+                logger.info(f"[hunt_live] OSM Overpass → {len(results)} businesses (primary)")
+                return results
+    except Exception as e:
+        logger.warning(f"[hunt_live] OSM Overpass discovery failed: {e}")
+
+    # ── 2. Yelp Fusion (fallback — iter 322av) ─────────────────
+    yelp_key = os.environ.get("YELP_API_KEY", "").strip()
+    if yelp_key:
+        try:
+            from services.yelp_scout import yelp_leads
+            yres = await yelp_leads(
+                query=industry_for_lookup,
+                location=city_for_lookup,
+                limit=min(int(limit) * 2, 50),
+                radius_m=15000,
+            )
+            if yres.get("success") and yres.get("leads"):
+                for lead in yres["leads"][:limit]:
+                    results.append({
+                        "business_name": lead["business_name"],
+                        "phone":   lead.get("phone") or "",
+                        "address": lead.get("address") or lead.get("city") or "",
+                        "website": lead.get("website") or "",
+                        "rating":  lead.get("rating") or 4.0,
+                        "review_count": lead.get("review_count") or 0,
+                        "yelp_url": lead.get("yelp_url") or "",
+                        "source":  "yelp_fusion",
+                    })
+                if results:
+                    logger.info(f"[hunt_live] Yelp Fusion → {len(results)} businesses (fallback)")
+                    return results
+        except Exception as e:
+            logger.warning(f"[hunt_live] Yelp Fusion discovery failed: {e}")
+
+    # ── 3. Google Places (fallback) ──────────────────────────
     gp_key = os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")
     if gp_key:
         try:
@@ -269,7 +337,7 @@ async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
                             "source":  "google_places",
                         })
                     if results:
-                        logger.info(f"[hunt_live] Google Places → {len(results)} businesses")
+                        logger.info(f"[hunt_live] Google Places → {len(results)} businesses (tertiary)")
                         return results
         except Exception as e:
             logger.warning(f"[hunt_live] Google Places discovery failed: {e}")
