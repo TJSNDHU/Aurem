@@ -551,7 +551,13 @@ const AuremHomepage = () => {
           <span className="ca-trust-sep">·</span>
           <span className="ca-trust-item" data-testid="ca-trust-built">📍&nbsp;Built in Mississauga, Ontario</span>
           <span className="ca-trust-sep">·</span>
-          <span className="ca-trust-item" data-testid="ca-trust-casl">🛡&nbsp;5-Layer Security Suite</span>
+          <span className="ca-trust-item" data-testid="ca-trust-casl"
+            onClick={() => scrollTo("security-suite")}
+            style={{ cursor: "pointer", textDecoration: "underline", textDecorationColor: "rgba(212,175,55,0.35)", textUnderlineOffset: 3 }}
+            role="button" tabIndex={0}
+            onKeyDown={e => { if (e.key === "Enter") scrollTo("security-suite"); }}>
+            🛡&nbsp;5-Layer Security Suite
+          </span>
           <span className="ca-trust-sep">·</span>
           <span className="ca-trust-item" data-testid="ca-trust-data">🔒&nbsp;Your Data Stays in Canada</span>
         </div>

@@ -619,6 +619,116 @@ async def customer_subscribe(body: SubscribeRequest, user: dict = Depends(_verif
         raise HTTPException(500, f"checkout failed: {e}")
 
 
+# ─────────────────────────────────────────────────────────────────
+# iter 322aw — Public Stripe checkout (no auth, email captured by Stripe)
+# Used by homepage CTA: /welcome?plan=security_suite
+# ─────────────────────────────────────────────────────────────────
+class PublicCheckoutRequest(BaseModel):
+    service_id: str
+    email: Optional[str] = None
+    origin_url: Optional[str] = None
+
+
+@router.post("/api/public/subscribe")
+async def public_subscribe(body: PublicCheckoutRequest):
+    """Public Stripe checkout for SKUs that don't require an account yet
+    (homepage upsells, bundle CTAs). Stripe captures the email + payment;
+    the webhook provisions the customer on success.
+    """
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+
+    svc = await _db.service_catalog.find_one(
+        {"service_id": body.service_id, "status": "live"}, {"_id": 0}
+    )
+    if not svc:
+        raise HTTPException(404, "service not available")
+
+    api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not api_key:
+        raise HTTPException(500, "Stripe not configured")
+
+    _mode = "live" if api_key.startswith("sk_live_") else (
+        "test" if api_key.startswith("sk_test_") else "unknown"
+    )
+    price_field = f"stripe_price_id_{_mode}"
+    product_field = f"stripe_product_id_{_mode}"
+    price_id = svc.get(price_field) or svc.get("stripe_price_id")
+
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = api_key
+
+        async def _mint_fresh_price():
+            new_product = stripe_lib.Product.create(
+                name=svc["name"],
+                description=svc.get("description", ""),
+                metadata={"service_id": svc["service_id"], "mode": _mode},
+            )
+            new_price = stripe_lib.Price.create(
+                product=new_product.id,
+                unit_amount=int(svc["price_monthly"] * 100),
+                currency=svc.get("currency", "cad"),
+                recurring={"interval": "month"} if svc.get("billing_type") == "recurring" else None,
+                tax_behavior="inclusive",
+            )
+            await _db.service_catalog.update_one(
+                {"service_id": body.service_id},
+                {"$set": {
+                    product_field: new_product.id,
+                    price_field: new_price.id,
+                    "stripe_product_id": new_product.id,
+                    "stripe_price_id": new_price.id,
+                    "stripe_active_mode": _mode,
+                }}
+            )
+            return new_price.id
+
+        if not price_id:
+            price_id = await _mint_fresh_price()
+        else:
+            try:
+                stripe_lib.Price.retrieve(price_id)
+            except stripe_lib.error.InvalidRequestError as e:
+                if "No such price" in str(e):
+                    price_id = await _mint_fresh_price()
+                else:
+                    raise
+
+        origin = (body.origin_url or "https://aurem.live").rstrip("/")
+        session_params = {
+            "mode": "subscription" if svc.get("billing_type") == "recurring" else "payment",
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "success_url": f"{origin}/welcome?session_id={{CHECKOUT_SESSION_ID}}&plan={body.service_id}",
+            "cancel_url": f"{origin}/?cancel={body.service_id}",
+            "allow_promotion_codes": True,
+            "metadata": {
+                "service_id": body.service_id,
+                "type": "public_subscription",
+            },
+        }
+        if body.email:
+            session_params["customer_email"] = body.email
+        if _automatic_tax_enabled():
+            session_params["automatic_tax"] = {"enabled": True}
+        session = stripe_lib.checkout.Session.create(**session_params)
+
+        await _db.public_checkout_intents.insert_one({
+            "service_id": body.service_id,
+            "service_name": svc["name"],
+            "price_monthly": svc["price_monthly"],
+            "stripe_session_id": session.id,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {"ok": True, "url": session.url, "session_id": session.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"[public-subscribe] failed: {e}")
+        raise HTTPException(500, f"checkout failed: {e}")
+
+
 class CancelRequest(BaseModel):
     service_id: str
 

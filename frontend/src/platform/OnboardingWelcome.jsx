@@ -57,14 +57,66 @@ const getSessionId = () => {
   return params.get('session_id') || '';
 };
 
+// iter 322aw — Plan-redirect helper. If user landed at /welcome?plan=XXX
+// without a session_id, kick them straight to Stripe checkout for that SKU.
+const getPlanParam = () => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('plan') || '';
+};
+
+const PLAN_TO_SERVICE_ID = {
+  security_suite: 'security_suite_bundle',
+  vanguard:       'security_vanguard',
+  shannon:        'security_shannon_patcher',
+  casl:           'security_casl_compliance',
+  soc2:           'security_soc2_audit',
+  auto_heal:      'security_auto_heal',
+};
+
 const OnboardingWelcome = () => {
   const [sessionId] = useState(getSessionId());
+  const [planParam] = useState(getPlanParam());
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [retries, setRetries] = useState(0);
+  const [redirecting, setRedirecting] = useState(false);
+
+  // iter 322aw — Public-checkout redirect for ?plan= entries (homepage CTA)
+  useEffect(() => {
+    if (sessionId) return;          // post-payment flow — handled below
+    if (!planParam) return;
+    const serviceId = PLAN_TO_SERVICE_ID[planParam];
+    if (!serviceId) return;
+    setRedirecting(true);
+    (async () => {
+      try {
+        const r = await fetch(`${API}/api/public/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service_id: serviceId,
+            origin_url: window.location.origin,
+          }),
+        });
+        const j = await r.json();
+        if (j?.url) {
+          window.location.href = j.url;
+        } else {
+          setError(j?.detail || 'Checkout could not start. Please try again.');
+          setRedirecting(false);
+        }
+      } catch (e) {
+        setError(e.message || 'Checkout failed');
+        setRedirecting(false);
+      }
+    })();
+  }, [sessionId, planParam]);
 
   useEffect(() => {
-    if (!sessionId) { setError('Missing session_id in URL'); return; }
+    if (!sessionId) {
+      if (!planParam) setError('Missing session_id in URL');
+      return;
+    }
     let cancelled = false;
     const fetchData = async () => {
       try {
@@ -112,6 +164,25 @@ const OnboardingWelcome = () => {
     const id = setTimeout(tick, 8000);
     return () => { cancelled = true; clearTimeout(id); };
   }, [data?.tenant_id, data?.tasks]);
+
+  if (redirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: BG, color: '#fff' }} data-testid="welcome-redirecting-stripe">
+        <div className="text-center max-w-md">
+          <div className="w-12 h-12 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin mx-auto mb-4" />
+          <div className="text-[11px] tracking-[0.4em] font-semibold mb-2" style={{ color: GOLD }}>
+            REDIRECTING TO SECURE CHECKOUT
+          </div>
+          <h1 className="text-xl font-bold mb-2" style={{ fontFamily: 'Cinzel, serif' }}>
+            🛡 AUREM Security Suite
+          </h1>
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            Hold tight — Stripe is opening with your $197/mo bundle…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
