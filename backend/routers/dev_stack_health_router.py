@@ -112,10 +112,15 @@ async def _check_a2a() -> Dict[str, Any]:
 
 
 async def _check_sentinel() -> Dict[str, Any]:
+    """iter 322ar — point at the real collections written by
+    services.sentinel_repair_loop. Previously queried `sentinel_repair_runs`
+    + `repair_history` which never existed, so the grid always showed RED."""
     try:
-        n = await _db.sentinel_repair_runs.count_documents({})
-        return _g(n > 0 or await _db.repair_history.count_documents({}) > 0,
-                  f"{n} repair runs")
+        sentinel_n = await _db.sentinel_runs.count_documents({})
+        heal_n = await _db.auto_heal_log.count_documents({})
+        repair_n = await _db.repair_runs.count_documents({})
+        ok = (sentinel_n > 0) or (heal_n > 0) or (repair_n > 0)
+        return _g(ok, f"{sentinel_n} sentinel · {heal_n} heals · {repair_n} repairs")
     except Exception as e:
         return _g(False, str(e)[:80])
 

@@ -43,7 +43,6 @@ def init_all_service_dbs(db):
         "routers.biometric_auth",
         "routers.github_integration",
         "routers.toon_router",
-        "routers.crypto_treasury_router",
         "routers.generative_ui_router",
         "routers.push_notification_router",
         "routers.system_pulse_router",

@@ -319,8 +319,24 @@ class CoexistenceManager:
                 "timestamp": datetime.now(timezone.utc)
             })
         
-        # TODO: Notify humans (WhatsApp, email, dashboard notification)
-        
+        # iter 322ar — notify founder via founder_notifications collection
+        # (read by Admin Brain notifications tile). Best-effort, never raises.
+        if self.db is not None:
+            try:
+                await self.db.founder_notifications.insert_one({
+                    "type": "whatsapp_coexistence",
+                    "severity": "high",
+                    "business_id": business_id,
+                    "customer_id": customer_id,
+                    "reason": reason.value,
+                    "message": f"WhatsApp coexistence escalation — {reason.value} for BIN {business_id}",
+                    "context": ai_context,
+                    "ts": datetime.now(timezone.utc),
+                    "read": False,
+                })
+            except Exception as _ne:
+                logger.warning(f"[coexistence] founder_notifications insert failed: {_ne}")
+
         return {
             "status": "escalated",
             "reason": reason.value,

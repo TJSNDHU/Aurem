@@ -79,8 +79,13 @@ async def audit_website(url: str) -> Dict[str, Any]:
     parsed = urlparse(url if "://" in url else f"https://{url}")
     full_url = parsed.geturl()
 
-    # 1. SSL — only meaningful if HTTPS is reachable
-    ssl_task = _check_ssl(parsed.netloc) if parsed.scheme == "https" else _placeholder()
+    # iter 322ar — try HTTPS upgrade even for http:// URLs so we never
+    # silently mark a site green when SSL is broken. Falls back to a true
+    # negative if the host does not respond on 443.
+    if parsed.scheme == "https":
+        ssl_task = _check_ssl(parsed.netloc)
+    else:
+        ssl_task = _check_ssl(parsed.netloc)  # probe the same host on :443
     # 2. HTTP fetch + load time (one round-trip drives 4 checks)
     fetch_task = _fetch_with_timing(full_url)
 

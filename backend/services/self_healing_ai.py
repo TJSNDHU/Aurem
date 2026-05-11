@@ -139,15 +139,61 @@ class SelfHealingAI:
         """Check API endpoints health"""
         issues = []
         
-        # Test critical endpoints
+        # iter 322ar — Real HTTP probes on critical endpoints. Hits the
+        # local backend on 127.0.0.1:8001 (same-pod, low-latency, bypasses
+        # ingress). Any non-200 or exception becomes a self-heal issue.
+        import httpx as _httpx
+        base = "http://127.0.0.1:8001"
         critical_endpoints = [
-            "/health",
+            "/api/health",
             "/api/admin/mission-control/dashboard",
-            "/api/subscriptions/custom/available-services"
+            "/api/subscriptions/custom/available-services",
         ]
-        
-        # TODO: Make HTTP requests to test endpoints
-        
+        try:
+            async with _httpx.AsyncClient(timeout=5.0) as client:
+                for ep in critical_endpoints:
+                    try:
+                        r = await client.get(f"{base}{ep}")
+                        if r.status_code >= 500:
+                            issues.append({
+                                "type": "endpoint_5xx",
+                                "endpoint": ep,
+                                "status": r.status_code,
+                                "severity": "critical",
+                            })
+                        elif r.status_code >= 400 and ep == "/api/health":
+                            # /api/health must be 200; any 4xx is a misconfig
+                            issues.append({
+                                "type": "health_4xx",
+                                "endpoint": ep,
+                                "status": r.status_code,
+                                "severity": "high",
+                            })
+                    except Exception as _ee:
+                        issues.append({
+                            "type": "endpoint_unreachable",
+                            "endpoint": ep,
+                            "error": str(_ee)[:160],
+                            "severity": "critical",
+                        })
+        except Exception as _e:
+            issues.append({
+                "type": "probe_client_error",
+                "error": str(_e)[:160],
+                "severity": "high",
+            })
+
+        # If health endpoint failed, trigger the sentinel repair cycle so
+        # the self-healing loop kicks in immediately instead of waiting for
+        # the next 60s tick.
+        if any(i.get("type") in ("endpoint_5xx", "endpoint_unreachable", "health_4xx") for i in issues):
+            try:
+                from services.sentinel_repair_loop import run_sentinel_repair_cycle
+                import asyncio as _asyncio
+                _asyncio.create_task(run_sentinel_repair_cycle())
+            except Exception:
+                pass
+
         return issues
     
     async def _check_security(self) -> List[Dict]:

@@ -145,7 +145,6 @@ ROUTER_COLLECTION_MAP = {
     "integration_api":     ["api_keys", "api_keys_registry"],
     "biometric_secure":    ["webauthn_challenges", "users"],
     "push_notification_router": ["push_subscriptions"],
-    "crypto_treasury_router":   ["crypto_wallets", "crypto_treasury_config", "crypto_treasury_transactions"],
     "self_healing_router": ["auto_heal_log", "auto_heal_runs"],
     "crash_dashboard_routes": ["crash_log"],
     "vault_router":        ["secret_vault", "vault_audit_log"],

@@ -1257,26 +1257,10 @@ def register_all_routers(app, db):
         except Exception:
             pass
 
-    # La Vela Bianca
-    if not _should_skip("lavela"):
-        try:
-            from lavela import products_router as lavela_products_router
-            from lavela import content_router as lavela_content_router
-            from lavela import quiz_router as lavela_quiz_router
-            app.include_router(lavela_products_router)
-            app.include_router(lavela_content_router)
-            app.include_router(lavela_quiz_router)
-        except Exception:
-            pass
+    # La Vela Bianca — REMOVED (iter 322ar cleanup: not part of AUREM product)
 
-    # Crypto Signal Engine
-    if not _should_skip("routers.crypto_signal_engine"):
-        try:
-            from routers.crypto_signal_engine import router as crypto_router
-            if crypto_router:
-                app.include_router(crypto_router)
-        except Exception:
-            pass
+    # Crypto Signal Engine — REMOVED (iter 322ar cleanup: AUREM is a business
+    # automation platform; crypto treasury was the wrong product surface)
 
     # Live Sync
     if not _should_skip("routers.live_sync_router"):

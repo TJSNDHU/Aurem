@@ -280,10 +280,10 @@ async def test_secret(secret_id: str, request: Request):
                 else:
                     result.update(supported=False, detail="Need instance_url + access_token")
             elif provider in ("coinbase", "coinbase_commerce"):
-                key = creds.get("api_key")
-                r = await client.get("https://api.commerce.coinbase.com/charges?limit=1",
-                                     headers={"X-CC-Api-Key": key, "X-CC-Version": "2018-03-22"})
-                result.update(status_code=r.status_code, ok=r.status_code == 200, detail="Charges endpoint reachable")
+                # iter 322ar — Coinbase removed from AUREM (business automation, not crypto).
+                # Leave the branch as a graceful no-op so any stale vault entries
+                # report unsupported without crashing the verifier loop.
+                result.update(supported=False, ok=False, detail="Coinbase verification removed in iter 322ar (not part of AUREM)")
             else:
                 # Custom API or unrecognised provider — just check we can decrypt.
                 any_cred = any(v for v in creds.values())

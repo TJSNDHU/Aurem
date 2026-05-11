@@ -50,17 +50,6 @@ const SECRET_TYPES = [
     logo: 'WA'
   },
   {
-    id: 'coinbase',
-    name: 'Coinbase Commerce',
-    description: 'Crypto payment processing',
-    fields: [
-      { key: 'api_key', label: 'API Key', sensitive: true },
-      { key: 'webhook_secret', label: 'Webhook Secret', sensitive: true }
-    ],
-    color: '#0052FF',
-    logo: 'CB'
-  },
-  {
     id: 'apollo',
     name: 'Apollo.io',
     description: 'Lead enrichment & contact intelligence',

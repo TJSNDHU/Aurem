@@ -34,7 +34,6 @@ BACKFILL_COLLECTIONS = [
     "gmail_tokens",
     "whatsapp_messages",
     "referral_profiles",
-    "crypto_wallets", "crypto_treasury_config", "crypto_treasury_transactions",
     "custom_subscriptions",
 ]
 

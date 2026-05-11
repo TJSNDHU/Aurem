@@ -342,12 +342,26 @@ Be specific and actionable. Focus on what matters."""
         return metrics
     
     async def _send_realtime_alert(self, event: DigestEvent):
-        """Send immediate alert for critical events"""
+        """Send immediate alert for critical events to founder via WhatsApp."""
         logger.warning(f"[DIGEST] CRITICAL ALERT: {event.title}")
-        
-        # TODO: Integrate with WhatsApp/SMS for real-time alerts
-        # For now, just log
-        pass
+        # iter 322ar — wire real Twilio WABA send to founder phone.
+        try:
+            from services.twilio_whatsapp import send_whatsapp_session
+            import os as _os
+            phone = _os.environ.get("FOUNDER_PHONE", "").strip()
+            if not phone:
+                logger.warning("[DIGEST] FOUNDER_PHONE env not set — skipping WA alert")
+                return
+            body = (
+                f"AUREM ALERT — {event.title}\n"
+                f"{(event.description or '')[:240]}\n"
+                f"Severity: {getattr(event, 'severity', 'critical')}"
+            )
+            result = await send_whatsapp_session(to_phone=phone, body=body)
+            if not result.get("success"):
+                logger.warning(f"[DIGEST] WA alert failed: {result.get('error')}")
+        except Exception as _e:
+            logger.warning(f"[DIGEST] WA alert send error: {_e}")
     
     async def send_digest(
         self,
@@ -391,10 +405,10 @@ Be specific and actionable. Focus on what matters."""
     def _format_whatsapp_digest(self, digest: Dict) -> str:
         """Format digest for WhatsApp (concise, actionable)"""
         lines = [
-            f"🤖 *AUREM Daily Digest*",
+            "🤖 *AUREM Daily Digest*",
             f"📅 {digest['period']}",
             "",
-            f"📊 *Summary*",
+            "📊 *Summary*",
             digest['summary'],
             ""
         ]
@@ -421,9 +435,20 @@ Be specific and actionable. Focus on what matters."""
         return "\n".join(lines)
     
     def _format_email_digest(self, digest: Dict) -> str:
-        """Format digest for email (detailed HTML)"""
-        # TODO: Build HTML email template
-        return self._format_whatsapp_digest(digest)  # Fallback to text for now
+        """Format digest for email — minimal HTML wrapper around text body."""
+        # iter 322ar — minimal HTML email template (no marketing fluff,
+        # since this is an internal founder digest, not a customer email).
+        text = self._format_whatsapp_digest(digest)
+        safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return (
+            "<div style=\"font-family:-apple-system,Helvetica,Arial,sans-serif;"
+            "max-width:640px;margin:0 auto;padding:24px;color:#0E0E0F\">"
+            "<h2 style=\"color:#C9A84C;margin:0 0 16px\">AUREM Daily Digest</h2>"
+            f"<pre style=\"white-space:pre-wrap;font-family:inherit;font-size:14px;"
+            f"line-height:1.6;color:#0E0E0F\">{safe}</pre>"
+            "<p style=\"font-size:12px;color:#6A6070;margin-top:24px\">"
+            "AUREM Sovereign · Polaris Built Inc.</p></div>"
+        )
 
 
 # Singleton

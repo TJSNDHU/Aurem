@@ -995,6 +995,66 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
     `council_rotation`, `pillar_fulfiller`, `council_sessions_24h`,
     `boundary_lint`, `ts`).
 
+### iter 322ar — Coinbase/Lavela CLEANUP + Sentinel + 5-stub fix batch (2026-05-11)
+  - **Removed Coinbase / Crypto Treasury (wrong product surface)**:
+    - Deleted `/app/backend/services/crypto_treasury/` (4 files:
+      treasury_service.py, coinbase_service.py, polygon_wallet_service.py,
+      wallet_crypto.py).
+    - Removed `crypto_router` include + `# Crypto Signal Engine` block
+      from `registry.py`.
+    - Cleaned Coinbase references from: `tenant_migration_router.py`
+      (3 collections), `generative_ui_router.py` (endpoint +
+      dashboard_service method), `nexus_router.py` (provider entry),
+      `system_pulse_router.py` (sensor + map row), `vault_router.py`
+      (verifier branch now reports unsupported), `startup_init.py`
+      (skipped router name), `SecretVault.jsx` (Coinbase Commerce
+      provider), `FrameworkMap.jsx` (L7 billing tile).
+  - **Removed La Vela Bianca (separate business — reroots.ca, not AUREM)**:
+    - Removed lavela import + 3 router includes from `registry.py`.
+    - Stripped `.theme-lavela` CSS variables + overrides from
+      `frontend/src/styles/brand-themes.css` (≈70 LOC removed).
+  - **PROOF**: `grep -E "lavela|coinbase|crypto_router|crypto_treasury"
+    /app/backend/routers/registry.py` → 0 hits. `GET /api/health` → 200.
+  - **Sentinel Repair Loop red→green fix**: the dev_stack health probe
+    `_check_sentinel` was querying `sentinel_repair_runs` +
+    `repair_history` — neither collection exists. Repointed to the real
+    collections written by `sentinel_repair_loop.py`: `sentinel_runs`
+    (142), `auto_heal_log` (676), `repair_runs` (5,044). Grid now reports
+    **11/11 green, 0 red**.
+  - **5 Stub fixes**:
+    1. **Resend SDK** — `resend` v2.27.0 already installed. Stub
+       fallback in `email_engine.py` is dormant. Live test email sent:
+       message_id `db4cd692-554f-4f0e-ae21-6803b7cc7220`, quota remaining
+       289/month.
+    2. **WhatsApp coexistence** — `services/whatsapp_coexistence.py`
+       `escalate_to_human()` now inserts a row into
+       `db.founder_notifications` with `type=whatsapp_coexistence,
+       severity=high, customer_id, business_id, reason, context, ts`.
+       Verified with test escalation; row cleaned up.
+    3. **Daily digest WA alert** — `services/daily_digest.py`
+       `_send_realtime_alert()` now calls
+       `twilio_whatsapp.send_whatsapp_session(to_phone=FOUNDER_PHONE,
+       body=…)`. **Env-blocked**: `TWILIO_WA_FROM_NUMBER` is empty so
+       Twilio returns `creds_missing`. Code path verified — user must
+       set the env to unlock delivery. Also replaced
+       `_format_email_digest()` stub with a real HTML wrapper.
+    4. **Self-healing HTTP probes** — `services/self_healing_ai.py`
+       `_check_api_health()` now hits `/api/health`,
+       `/api/admin/mission-control/dashboard`,
+       `/api/subscriptions/custom/available-services` via httpx, returns
+       issue dicts on 5xx / 4xx / unreachable, and fires
+       `run_sentinel_repair_cycle()` on failure. Verified: 0 issues
+       (all 200 OK).
+    5. **Website QA SSL** — `services/website_qa.py` `_placeholder()`
+       branch removed. SSL handshake on :443 now runs even for http://
+       URLs (probe the same host). Verified for aurem.live:
+       `ssl_valid=True, status=200, load=282ms`.
+  - **One env action remaining for full WA delivery**: add
+    `TWILIO_WA_FROM_NUMBER=whatsapp:+14155238886` (sandbox) or your
+    registered Meta-approved sender to `/app/backend/.env`. Code is
+    ready; only the env var blocks the actual outbound WA message.
+
+
 ### iter 322ar — Lean 3-Step Admin Batch + System Overview real-numbers update (2026-05-11)
   - **Bug fix**: `services/founder_provision.py:187` — `is_dogfood` variable
     was referenced but never defined → silent `name 'is_dogfood' is not

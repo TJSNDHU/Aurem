@@ -86,7 +86,6 @@ CONNECTORS = [
     {"id": "brave_search",  "name": "Brave Search",          "icon": "search",         "method": "api_key", "category": "Search",        "description": "Privacy-focused web search API.","fields": ["api_key"]},
     {"id": "exa_search",    "name": "EXA Search",            "icon": "search",         "method": "api_key", "category": "Search",        "description": "Neural search engine for content.","fields": ["api_key"]},
     {"id": "openweather",   "name": "OpenWeatherMap",        "icon": "cloud",          "method": "api_key", "category": "Data",          "description": "Weather data API.","fields": ["api_key"]},
-    {"id": "coinbase",      "name": "Coinbase Crypto",       "icon": "dollar-sign",    "method": "api_key", "category": "Payments",      "description": "Cryptocurrency payments and wallets.","fields": ["api_key", "api_secret"]},
     {"id": "omnidimension", "name": "OmniDimension 3D",      "icon": "box",            "method": "api_key", "category": "AI / ML",       "description": "3D model generation and rendering.","fields": ["api_key"]},
     {"id": "elevenlabs",    "name": "ElevenLabs",            "icon": "volume-2",       "method": "api_key", "category": "Voice",         "description": "AI voice synthesis and cloning.","fields": ["api_key"]},
 ]

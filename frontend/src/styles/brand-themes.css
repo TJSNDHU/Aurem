@@ -38,37 +38,10 @@
 }
 
 /* ============================================
-   LA VELA BIANCA THEME
+   LA VELA BIANCA THEME — REMOVED (iter 322ar cleanup)
+   La Vela was a separate business (reroots.ca), not AUREM. Theme
+   removed completely. AUREM uses the Obsidian/Gold theme only.
    ============================================ */
-.theme-lavela {
-  --brand-primary: #0D4D4D;
-  --brand-secondary: #D4A574;
-  --brand-accent: #E8C4B8;
-  --brand-bg: #0D4D4D;
-  --brand-text: #FDF8F5;
-  --brand-text-muted: #E8C4B8;
-  
-  /* La Vela specific colors */
-  --lavela-teal-deep: #0D4D4D;
-  --lavela-teal: #1A6B6B;
-  --lavela-rose-gold: #D4A574;
-  --lavela-rose: #E8C4B8;
-  --lavela-cream: #FDF8F5;
-  
-  /* Gradients - Midnight to Dawn */
-  --brand-gradient: linear-gradient(135deg, #0D4D4D 0%, #1A6B6B 40%, #D4A090 80%, #E8C4B8 100%);
-  --brand-gradient-soft: linear-gradient(135deg, #0D4D4D 0%, #1A6B6B 100%);
-  
-  /* Button styles - Rose Gold */
-  --btn-primary-bg: #D4A574;
-  --btn-primary-hover: #E6BE8A;
-  --btn-primary-text: #0D4D4D;
-  
-  /* Card styles */
-  --card-bg: rgba(26, 107, 107, 0.3);
-  --card-border: rgba(212, 165, 116, 0.3);
-  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-}
 
 /* ============================================
    BRAND-AWARE UTILITY CLASSES
@@ -132,64 +105,8 @@
 }
 
 /* ============================================
-   LA VELA SPECIFIC OVERRIDES
-   ============================================ */
-.theme-lavela body,
-.theme-lavela .app-container {
-  background-color: var(--lavela-teal-deep);
-  color: var(--lavela-cream);
-}
-
-.theme-lavela .navbar {
-  background: linear-gradient(180deg, rgba(13, 77, 77, 0.95) 0%, rgba(13, 77, 77, 0.8) 100%);
-  backdrop-filter: blur(10px);
-}
-
-.theme-lavela .footer {
-  background-color: var(--lavela-teal-deep);
-  border-top: 1px solid rgba(212, 165, 116, 0.2);
-}
-
-/* La Vela button overrides */
-.theme-lavela .btn-primary,
-.theme-lavela button[data-brand="primary"] {
-  background-color: var(--lavela-rose-gold);
-  color: var(--lavela-teal-deep);
-  font-weight: 500;
-}
-
-.theme-lavela .btn-primary:hover {
-  background-color: var(--lavela-rose);
-}
-
-/* La Vela input overrides */
-.theme-lavela input,
-.theme-lavela textarea,
-.theme-lavela select {
-  background-color: rgba(26, 107, 107, 0.5);
-  border-color: rgba(212, 165, 116, 0.3);
-  color: var(--lavela-cream);
-}
-
-.theme-lavela input::placeholder,
-.theme-lavela textarea::placeholder {
-  color: rgba(253, 248, 245, 0.5);
-}
-
-.theme-lavela input:focus,
-.theme-lavela textarea:focus {
-  border-color: var(--lavela-rose-gold);
-  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.2);
-}
-
-/* ============================================
    RESPONSIVE BRAND ADJUSTMENTS
    ============================================ */
-@media (max-width: 768px) {
-  .theme-lavela .mobile-nav {
-    background: var(--lavela-teal-deep);
-  }
-}
 
 /* ============================================
    TRANSITION ANIMATIONS BETWEEN BRANDS

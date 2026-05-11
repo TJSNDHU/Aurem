@@ -225,113 +225,6 @@ class DashboardService:
             logger.error(f"[GenUI] Subscription dashboard error: {e}")
             return {"success": False, "error": str(e)}
     
-    async def generate_crypto_treasury_dashboard(self) -> Dict[str, Any]:
-        """
-        Generate crypto treasury dashboard
-        
-        Components:
-        - Current profit (metric card)
-        - Conversion history (line chart)
-        - Wallet balance (metric card)
-        - Recent transactions (table)
-        """
-        try:
-            # Get treasury stats
-            from services.crypto_treasury.treasury_service import get_treasury_service
-            
-            treasury_service = get_treasury_service(self.db)
-            stats = await treasury_service.get_treasury_stats()
-            
-            # Component 1: Current Profit Card
-            profit_card = {
-                "type": "metric_card",
-                "data": {
-                    "value": f"${stats['current_profit_usd']:,.2f}",
-                    "label": "Current Profit",
-                    "change": "+25%",
-                    "trend": "up"
-                },
-                "config": {
-                    "color": "blue"
-                }
-            }
-            
-            # Component 2: Wallet Balance Card
-            wallet_card = {
-                "type": "metric_card",
-                "data": {
-                    "value": f"{stats['treasury_wallet_balance_usdt']:,.2f} USDT",
-                    "label": "Treasury Wallet",
-                    "change": None,
-                    "trend": "neutral"
-                },
-                "config": {
-                    "color": "purple"
-                }
-            }
-            
-            # Component 3: Conversion History (Line Chart)
-            # Mock data - replace with real conversion history
-            conversion_history = [
-                {"date": "Week 1", "amount": 0},
-                {"date": "Week 2", "amount": 0},
-                {"date": "Week 3", "amount": 0},
-                {"date": "Week 4", "amount": stats['total_converted_usdt']}
-            ]
-            
-            conversion_chart = {
-                "type": "line_chart",
-                "data": conversion_history,
-                "config": {
-                    "title": "USD → USDT Conversions",
-                    "xKey": "date",
-                    "yKey": "amount",
-                    "color": "#8b5cf6"
-                }
-            }
-            
-            # Component 4: Recent Transactions (Table)
-            transactions = await self.db.crypto_treasury_transactions.find(
-                {},
-                {"_id": 0}
-            ).sort("created_at", -1).limit(5).to_list(5)
-            
-            # Format for table
-            table_data = []
-            for tx in transactions:
-                table_data.append({
-                    "type": tx["transaction_type"],
-                    "amount": f"${tx['amount_usd']:.2f}",
-                    "status": tx["status"],
-                    "date": tx["created_at"].strftime("%Y-%m-%d %H:%M")
-                })
-            
-            tx_table = {
-                "type": "data_table",
-                "data": table_data,
-                "config": {
-                    "title": "Recent Transactions"
-                }
-            }
-            
-            # Generate dashboard
-            dashboard = self.generator.generate_dashboard([
-                profit_card,
-                wallet_card,
-                conversion_chart,
-                tx_table
-            ])
-            
-            dashboard.setdefault("dashboard", {})["data_source"] = "partial"
-            return dashboard
-        
-        except Exception as e:
-            logger.error(f"[GenUI] Crypto treasury dashboard error: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
     async def generate_hooks_performance_dashboard(self) -> Dict[str, Any]:
         """
         Generate hooks system performance dashboard
@@ -1257,7 +1150,7 @@ class DashboardService:
             
             # Component 3: Top Collections by Size (Pie Chart)
             collection_sizes = [
-                {"name": "crypto_treasury_transactions", "value": 2500},
+                {"name": "council_decisions", "value": 32900},
                 {"name": "subscription_plans", "value": 450},
                 {"name": "users", "value": 1200},
                 {"name": "connector_data", "value": 5000},
@@ -1376,7 +1269,7 @@ class DashboardService:
             # Component 4: Slow Queries (Table)
             slow_queries = [
                 {
-                    "query": "find crypto_treasury_transactions",
+                    "query": "find council_decisions",
                     "duration": "1.2s",
                     "count": "45",
                     "optimization": "Add index"

@@ -84,7 +84,6 @@ const LAYERS = [
       { id: 'sub_mgr', name: 'Subscription Mgr', files: 'subscription_manager.py\nsubscription_router.py', status: 'LIVE' },
       { id: 'usage_meter', name: 'Usage Metering', files: 'usage_metering_service.py\nUsageBilling.jsx', status: 'LIVE' },
       { id: 'revenue_eng', name: 'Revenue Engine', files: 'revenue_engine.py\nRevenueAutomation.jsx', status: 'LIVE' },
-      { id: 'crypto_treasury', name: 'Crypto Treasury', files: 'crypto_treasury_router.py\naurem_billing_router.py', status: 'LIVE' },
     ]
   },
   {
