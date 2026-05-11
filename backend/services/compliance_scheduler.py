@@ -88,9 +88,12 @@ async def collect_evidence() -> Dict:
             "evidence_snapshots": await _db["compliance_evidence"].count_documents({}),
         }
 
-    # Dependency count
+    # Dependency count — offloaded to thread pool to avoid blocking event loop
     try:
-        pip_result = subprocess.run(["pip", "freeze"], capture_output=True, text=True, timeout=30)
+        pip_result = await asyncio.to_thread(
+            subprocess.run, ["pip", "freeze"],
+            capture_output=True, text=True, timeout=30,
+        )
         evidence["dependency_count"] = len(pip_result.stdout.strip().split("\n")) if pip_result.returncode == 0 else 0
     except Exception:
         evidence["dependency_count"] = 0

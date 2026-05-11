@@ -22,6 +22,17 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 
+
+async def _run_supervisor(*args: str, timeout: int = 30):
+    """Run supervisorctl in a worker thread so the event loop is never
+    blocked. Critical for K8s liveness — a blocking subprocess.run inside
+    an async cron task can freeze the loop for up to `timeout` seconds and
+    cause repeated readiness-probe failures → pod restart loop."""
+    return await asyncio.to_thread(
+        subprocess.run, list(args),
+        capture_output=True, text=True, timeout=timeout,
+    )
+
 # MongoDB client — self-connects from environment if set_db() wasn't called
 _db = None
 _db_init_attempted = False
@@ -142,13 +153,8 @@ async def check_backend_health() -> Dict[str, Any]:
             action = "Attempted supervisorctl restart of backend"
             
             try:
-                # Use subprocess to restart via supervisor (no sudo in Emergent)
-                result = subprocess.run(
-                    ["supervisorctl", "restart", "backend"],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
+                # Use subprocess via thread pool so the event loop stays free
+                result = await _run_supervisor("supervisorctl", "restart", "backend")
                 resolved = result.returncode == 0
                 
                 # Log and alert
@@ -174,12 +180,7 @@ async def check_backend_health() -> Dict[str, Any]:
         action = "Attempted supervisorctl restart of backend"
         
         try:
-            result = subprocess.run(
-                ["supervisorctl", "restart", "backend"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            result = await _run_supervisor("supervisorctl", "restart", "backend")
             resolved = result.returncode == 0
             
             await log_auto_heal_action(check_name, issue, action, resolved)
@@ -214,13 +215,8 @@ async def check_frontend_serving() -> Dict[str, Any]:
             action = "Attempted supervisorctl restart of frontend"
             
             try:
-                # Use supervisorctl directly (no sudo in Emergent container)
-                result = subprocess.run(
-                    ["supervisorctl", "restart", "frontend"],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
+                # Use supervisorctl via thread pool to avoid blocking loop
+                result = await _run_supervisor("supervisorctl", "restart", "frontend")
                 resolved = result.returncode == 0
                 
                 await log_auto_heal_action(check_name, issue, action, resolved)
@@ -254,12 +250,7 @@ async def check_frontend_serving() -> Dict[str, Any]:
         action = "Attempted supervisorctl restart of frontend"
         
         try:
-            result = subprocess.run(
-                ["supervisorctl", "restart", "frontend"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            result = await _run_supervisor("supervisorctl", "restart", "frontend")
             resolved = result.returncode == 0
             
             await log_auto_heal_action(check_name, issue, action, resolved)
@@ -404,12 +395,7 @@ async def check_scheduler_jobs() -> Dict[str, Any]:
         
         # Try to restart backend to re-register schedulers (no sudo in Emergent)
         try:
-            result = subprocess.run(
-                ["supervisorctl", "restart", "backend"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            result = await _run_supervisor("supervisorctl", "restart", "backend")
             resolved = result.returncode == 0
             
             await log_auto_heal_action(check_name, issue, action, resolved)

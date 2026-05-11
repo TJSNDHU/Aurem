@@ -152,13 +152,12 @@ class Orchestrator:
         service = data.get('service', 'backend')
         error = data.get('error', 'Unknown error')
         
-        # Try to restart service
+        # Try to restart service — offloaded to thread to avoid blocking loop
         try:
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 ['sudo', 'supervisorctl', 'restart', service],
-                capture_output=True,
-                text=True,
-                timeout=30
+                capture_output=True, text=True, timeout=30,
             )
             if result.returncode != 0:
                 logger.warning(f"[Orchestrator] Restart returned non-zero: {result.stderr}")
