@@ -2748,6 +2748,18 @@ def register_all_routers(app, db):
     except Exception as e:
         logger.warning(f"ORA universal learner not wired: {e}")
 
+    # iter 322ar — White-Label admin router (branding/cname endpoints)
+    try:
+        from routers.white_label_router import (
+            router as wl_router,
+            set_db as set_wl_db,
+        )
+        set_wl_db(db)
+        app.include_router(wl_router)
+        logger.info("[REGISTRY] White-Label router registered")
+    except Exception as e:
+        logger.warning(f"White-Label router not loaded: {e}")
+
     # ═══════════════════════════════════════════
     # LEAN MODE: Post-registration route cleanup
     # See routers/_registry_lean_prune.py for the full prune-list.

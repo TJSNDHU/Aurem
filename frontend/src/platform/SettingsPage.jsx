@@ -230,6 +230,8 @@ export default function SettingsPage({ token, user }) {
     { id: 'api-keys', label: 'API Keys', icon: Key },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'integrations', label: 'Integrations', icon: Plug },
+    { id: 'branding', label: 'Branding', icon: Palette },
+    { id: 'voice', label: 'Inbound Voice', icon: Smartphone },
     { id: 'linkedin', label: 'LinkedIn', icon: Linkedin },
     { id: 'infrastructure', label: 'Infrastructure', icon: Server },
     { id: 'team', label: 'Team', icon: Users },
@@ -604,8 +606,17 @@ export default function SettingsPage({ token, user }) {
                     </div>
                   </div>
                 </div>
+
+                {/* iter 322ar — Shopify 1-click connect card */}
+                <ShopifyConnectCard token={token} />
               </div>
             )}
+
+            {/* iter 322ar — Branding tab (white-label) */}
+            {activeTab === 'branding' && <BrandingTab token={token} user={user} inputCls={inputCls} />}
+
+            {/* iter 322ar — Inbound Voice (Retell) tab */}
+            {activeTab === 'voice' && <InboundVoiceTab token={token} user={user} />}
 
             {/* Infrastructure Tab — Redis, CORS, Indexes */}
             {activeTab === 'infrastructure' && <InfrastructureTab token={token} inputCls={inputCls} />}
@@ -1171,3 +1182,281 @@ function BusinessIdTab({ token }) {
     </div>
   );
 }
+
+
+// ─────────────────────────────────────────────────────────────────
+// iter 322ar — Branding (White-Label) tab
+// ─────────────────────────────────────────────────────────────────
+function BrandingTab({ token, user, inputCls }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [branding, setBranding] = useState(null);
+  const [cname, setCname] = useState(null);
+  const [err, setErr] = useState('');
+  const [saved, setSaved] = useState(false);
+  const tenantId = user?.business_id || user?.bin_id || user?.id || '';
+
+  const fetchAll = useCallback(async () => {
+    if (!tenantId) { setErr('Business ID unavailable'); setLoading(false); return; }
+    setLoading(true); setErr('');
+    try {
+      const [b, c] = await Promise.allSettled([
+        fetch(`${API_URL}/api/admin/branding/${tenantId}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+        fetch(`${API_URL}/api/admin/branding/${tenantId}/cname`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      ]);
+      if (b.status === 'fulfilled' && b.value?.branding) setBranding(b.value.branding);
+      if (c.status === 'fulfilled' && c.value?.cname) setCname(c.value.cname);
+    } catch (e) { setErr(String(e?.message || e)); }
+    setLoading(false);
+  }, [token, tenantId]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const save = async () => {
+    if (!branding) return;
+    setSaving(true); setSaved(false); setErr('');
+    try {
+      const r = await fetch(`${API_URL}/api/admin/branding/${tenantId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand_name: branding.brand_name || '',
+          logo_url: branding.logo_url || '',
+          primary_color: branding.primary_color || '#D4A373',
+          domain: branding.domain || '',
+          favicon_url: branding.favicon_url || '',
+          tagline: branding.tagline || '',
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || j?.error || `HTTP ${r.status}`);
+      setBranding(j.branding);
+      setSaved(true);
+      fetchAll();
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) { setErr(String(e?.message || e)); }
+    setSaving(false);
+  };
+
+  if (loading) return <div className="aurem-glass-card rounded-xl p-6" data-testid="branding-loading">Loading branding…</div>;
+
+  return (
+    <div className="aurem-glass-card rounded-xl p-6 space-y-4" data-testid="settings-branding">
+      <div>
+        <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>White-Label Branding</h2>
+        <p className="text-[11px] mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
+          Customise how AUREM looks for your team and customers. Enterprise plan required for custom domains.
+        </p>
+      </div>
+
+      {err && <div className="p-3 rounded-md text-xs" style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444' }} data-testid="branding-error">{err}</div>}
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-xs space-y-1">
+          <span style={{ color: 'var(--aurem-body-secondary)' }}>Brand name</span>
+          <input data-testid="branding-brand-name" className={inputCls} style={{ background: 'var(--aurem-surface)', color: 'var(--aurem-heading)' }}
+            value={branding?.brand_name || ''}
+            onChange={e => setBranding({ ...branding, brand_name: e.target.value })} />
+        </label>
+        <label className="text-xs space-y-1">
+          <span style={{ color: 'var(--aurem-body-secondary)' }}>Tagline</span>
+          <input data-testid="branding-tagline" className={inputCls} style={{ background: 'var(--aurem-surface)', color: 'var(--aurem-heading)' }}
+            value={branding?.tagline || ''}
+            onChange={e => setBranding({ ...branding, tagline: e.target.value })} />
+        </label>
+        <label className="text-xs space-y-1">
+          <span style={{ color: 'var(--aurem-body-secondary)' }}>Logo URL</span>
+          <input data-testid="branding-logo-url" className={inputCls} style={{ background: 'var(--aurem-surface)', color: 'var(--aurem-heading)' }}
+            placeholder="https://cdn.example.com/logo.png"
+            value={branding?.logo_url || ''}
+            onChange={e => setBranding({ ...branding, logo_url: e.target.value })} />
+        </label>
+        <label className="text-xs space-y-1">
+          <span style={{ color: 'var(--aurem-body-secondary)' }}>Favicon URL</span>
+          <input data-testid="branding-favicon-url" className={inputCls} style={{ background: 'var(--aurem-surface)', color: 'var(--aurem-heading)' }}
+            value={branding?.favicon_url || ''}
+            onChange={e => setBranding({ ...branding, favicon_url: e.target.value })} />
+        </label>
+        <label className="text-xs space-y-1">
+          <span style={{ color: 'var(--aurem-body-secondary)' }}>Primary colour</span>
+          <div className="flex gap-2 items-center">
+            <input type="color" data-testid="branding-color-picker" value={branding?.primary_color || '#D4A373'}
+              onChange={e => setBranding({ ...branding, primary_color: e.target.value })}
+              style={{ width: 40, height: 32, padding: 0, border: 'none', background: 'transparent' }} />
+            <input className={inputCls} style={{ background: 'var(--aurem-surface)', color: 'var(--aurem-heading)' }}
+              data-testid="branding-color-hex"
+              value={branding?.primary_color || ''}
+              onChange={e => setBranding({ ...branding, primary_color: e.target.value })} />
+          </div>
+        </label>
+        <label className="text-xs space-y-1">
+          <span style={{ color: 'var(--aurem-body-secondary)' }}>Custom domain (CNAME)</span>
+          <input data-testid="branding-custom-domain" className={inputCls} style={{ background: 'var(--aurem-surface)', color: 'var(--aurem-heading)' }}
+            placeholder="ai.yourcompany.com"
+            value={branding?.domain || ''}
+            onChange={e => setBranding({ ...branding, domain: e.target.value })} />
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <button data-testid="branding-save" disabled={saving} onClick={save}
+          className="px-4 py-2 rounded-md text-xs font-medium transition-opacity"
+          style={{ background: '#D4AF37', color: '#0E0E0F', opacity: saving ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}>
+          {saving ? 'Saving…' : 'Save Branding'}
+        </button>
+        {saved && <span className="text-xs" data-testid="branding-saved" style={{ color: '#4ADE80' }}>✓ Saved</span>}
+      </div>
+
+      {cname && (
+        <div className="mt-4 p-4 rounded-lg" data-testid="branding-cname" style={{ background: 'var(--aurem-surface)', border: '1px solid rgba(212,175,55,0.18)' }}>
+          <div className="text-xs font-medium mb-2" style={{ color: 'var(--aurem-heading)' }}>
+            DNS instructions — {cname.custom_domain}
+          </div>
+          <ol className="text-[11px] space-y-1" style={{ color: 'var(--aurem-body-secondary)' }}>
+            {(cname.instructions || []).map((line, i) => <li key={i}>{line}</li>)}
+          </ol>
+          <div className="mt-2 text-[10px]" style={{ color: cname.status === 'configured' ? '#4ADE80' : '#F59E0B' }}>
+            Status: {cname.status}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// iter 322ar — Inbound Voice (Retell) tab
+// ─────────────────────────────────────────────────────────────────
+function InboundVoiceTab({ token, user }) {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  const fetchStatus = useCallback(async () => {
+    setLoading(true); setErr('');
+    try {
+      const r = await fetch(`${API_URL}/api/customer/voice-agent/status`, { headers: { Authorization: `Bearer ${token}` } });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.detail || `HTTP ${r.status}`);
+      setStatus(j);
+    } catch (e) { setErr(String(e?.message || e)); }
+    setLoading(false);
+  }, [token]);
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  const live = !!(status?.retell_key_set || status?.live);
+
+  return (
+    <div className="aurem-glass-card rounded-xl p-6 space-y-4" data-testid="settings-voice">
+      <div>
+        <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>Inbound Call Handler</h2>
+        <p className="text-[11px] mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
+          ORA answers your business line 24×7 using Retell AI. Set <code>RETELL_API_KEY</code> in Emergent env vars to activate.
+        </p>
+      </div>
+
+      {err && <div className="p-3 rounded-md text-xs" style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444' }}>{err}</div>}
+
+      <div className="p-4 rounded-lg flex items-center gap-3" data-testid="voice-status-row"
+        style={{ background: 'var(--aurem-surface)', border: `1px solid ${live ? 'rgba(74,222,128,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
+        <span style={{
+          width: 10, height: 10, borderRadius: '50%',
+          background: live ? '#4ADE80' : '#F59E0B',
+          boxShadow: `0 0 10px ${live ? '#4ADE80' : '#F59E0B'}80`,
+        }} />
+        <div className="flex-1">
+          <div className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }} data-testid="voice-status-label">
+            {loading ? 'Checking…' : (live ? '🟢 Active' : '🔴 Not configured')}
+          </div>
+          <div className="text-[11px] mt-0.5" style={{ color: 'var(--aurem-body-secondary)' }}>
+            {live
+              ? `Number: ${status?.phone_number || '—'}. ORA answers calls 24×7.`
+              : 'Add your Retell API key to enable AI inbound calls.'}
+          </div>
+        </div>
+        <button onClick={fetchStatus} className="text-[10px] px-3 py-1 rounded-md"
+          style={{ background: 'rgba(212,175,55,0.1)', color: '#D4AF37' }}
+          data-testid="voice-refresh">Refresh</button>
+      </div>
+
+      {!live && (
+        <div className="text-[11px] space-y-2 p-4 rounded-lg" style={{ background: 'var(--aurem-surface)' }}>
+          <div style={{ color: 'var(--aurem-heading)', fontWeight: 500 }}>Setup guide</div>
+          <ol className="space-y-1" style={{ color: 'var(--aurem-body-secondary)' }}>
+            <li>1. Visit <a href="https://www.retellai.com" target="_blank" rel="noreferrer" style={{ color: '#D4AF37' }}>retellai.com</a> and sign in to your dashboard.</li>
+            <li>2. Generate an API key from <em>Settings → API Keys</em>.</li>
+            <li>3. In Emergent: Settings → Env Variables → add <code>RETELL_API_KEY</code>.</li>
+            <li>4. Redeploy. ORA will start answering on your configured number.</li>
+          </ol>
+        </div>
+      )}
+
+      {live && (
+        <div className="text-[11px] p-4 rounded-lg" style={{ background: 'var(--aurem-surface)' }}>
+          <div style={{ color: 'var(--aurem-heading)', fontWeight: 500, marginBottom: 6 }}>Quick actions</div>
+          <button data-testid="voice-test-call"
+            onClick={async () => {
+              try {
+                const r = await fetch(`${API_URL}/api/admin/voice-agent/test-call`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                alert(r.ok ? 'Test call queued. ORA will dial your number shortly.' : 'Test call failed — check Retell key.');
+              } catch (e) { alert('Error: ' + e.message); }
+            }}
+            className="px-4 py-2 rounded-md text-xs font-medium"
+            style={{ background: '#D4AF37', color: '#0E0E0F' }}>
+            Run test call
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// iter 322ar — Shopify 1-click connect card (inside Integrations tab)
+// ─────────────────────────────────────────────────────────────────
+function ShopifyConnectCard({ token }) {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API_URL}/api/shopify/auth/status`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(setStatus)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const connected = !!(status?.connected || status?.shop);
+
+  return (
+    <div className="mt-3 p-4 rounded-lg" data-testid="shopify-connect-card"
+      style={{ background: 'var(--aurem-surface)', border: '1px solid rgba(149,194,75,0.25)' }}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <span style={{
+            width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: '#95BF4720', borderRadius: 6, color: '#95BF47', fontWeight: 700,
+          }}>S</span>
+          <div>
+            <div className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>Shopify</div>
+            <div className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
+              {loading ? 'Checking…' : connected ? `Connected: ${status?.shop || status?.shop_domain || '—'}` : 'Not connected'}
+            </div>
+          </div>
+        </div>
+        <a data-testid="shopify-connect-btn"
+          href={`${API_URL}/api/shopify/auth?token=${encodeURIComponent(token)}`}
+          className="px-4 py-2 rounded-md text-xs font-medium"
+          style={{ background: connected ? 'rgba(149,194,75,0.15)' : '#95BF47',
+                   color: connected ? '#95BF47' : '#0E0E0F' }}>
+          {connected ? 'Manage Store' : 'Connect Shopify Store'}
+        </a>
+      </div>
+    </div>
+  );
+}
+

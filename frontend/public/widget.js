@@ -321,7 +321,10 @@
       <div style="font-size: 16px;">AUREM AI</div>
       <div style="font-size: 11px; opacity: 0.8;">Intelligent Assistant</div>
     </div>
-    <button id="aurem-close-btn" style="background: none; border: none; color: ${buttonTextColor}; cursor: pointer; font-size: 28px; line-height: 1;">&times;</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="aurem-book-btn" title="Book an appointment" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: ${buttonTextColor}; cursor: pointer; font-size: 11px; line-height: 1; padding: 6px 10px; border-radius: 6px; font-weight:600;">📅 Book</button>
+      <button id="aurem-close-btn" style="background: none; border: none; color: ${buttonTextColor}; cursor: pointer; font-size: 28px; line-height: 1;">&times;</button>
+    </div>
   `;
 
   // Messages container
@@ -375,6 +378,7 @@
   // Event listeners
   chatButton.onclick = toggleChat;
   document.getElementById('aurem-close-btn').onclick = toggleChat;
+  document.getElementById('aurem-book-btn').onclick = openBookingModal;
   
   const input = document.getElementById('aurem-input');
   const sendBtn = document.getElementById('aurem-send-btn');
@@ -476,4 +480,183 @@
   }
 
   console.log('[AUREM Widget] Loaded successfully with auto-theme detection');
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // iter 322ar — BOOKING MODAL
+  // GET  /api/public/booking/types
+  // GET  /api/public/booking/availability?service_type=...&date=YYYY-MM-DD
+  // POST /api/public/booking/book   {name, phone, service_type, slot}
+  // ═════════════════════════════════════════════════════════════════════════════
+
+  let bookingModal = null;
+
+  function openBookingModal() {
+    if (bookingModal) {
+      bookingModal.style.display = 'flex';
+      return;
+    }
+    const modal = document.createElement('div');
+    modal.id = 'aurem-booking-modal';
+    modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 2147483647;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    `;
+    const card = document.createElement('div');
+    card.style.cssText = `
+      width: 420px; max-width: 92vw; max-height: 90vh; overflow:auto;
+      background: ${windowBg}; color: ${windowTextColor};
+      border-radius: 14px; padding: 22px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+      border: 1px solid ${inputBorder};
+    `;
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:16px;font-weight:600;color:${config.color}">📅 Book appointment</div>
+        <button id="aurem-book-close" style="background:none;border:none;color:${windowTextColor};font-size:24px;cursor:pointer;line-height:1">&times;</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <label>Name
+          <input id="aurem-book-name" placeholder="Your full name"
+            style="width:100%;margin-top:4px;padding:10px;border:1px solid ${inputBorder};border-radius:6px;background:${inputBg};color:${windowTextColor};font-size:13px"/>
+        </label>
+        <label>Phone or email
+          <input id="aurem-book-phone" placeholder="+1 416-555-0123 or you@example.com"
+            style="width:100%;margin-top:4px;padding:10px;border:1px solid ${inputBorder};border-radius:6px;background:${inputBg};color:${windowTextColor};font-size:13px"/>
+        </label>
+        <label>Service
+          <select id="aurem-book-service"
+            style="width:100%;margin-top:4px;padding:10px;border:1px solid ${inputBorder};border-radius:6px;background:${inputBg};color:${windowTextColor};font-size:13px">
+            <option value="">Loading…</option>
+          </select>
+        </label>
+        <label>Date
+          <input id="aurem-book-date" type="date" min="${new Date().toISOString().slice(0,10)}"
+            style="width:100%;margin-top:4px;padding:10px;border:1px solid ${inputBorder};border-radius:6px;background:${inputBg};color:${windowTextColor};font-size:13px"/>
+        </label>
+        <div id="aurem-book-slots" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:24px"></div>
+        <div id="aurem-book-msg" style="font-size:12px;min-height:18px;color:${config.color}"></div>
+        <button id="aurem-book-submit"
+          style="margin-top:6px;padding:12px;background:${config.color};color:${buttonTextColor};border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;opacity:0.55"
+          disabled>Book now</button>
+      </div>
+    `;
+    modal.appendChild(card);
+    document.body.appendChild(modal);
+    bookingModal = modal;
+
+    const closeBtn = card.querySelector('#aurem-book-close');
+    const submitBtn = card.querySelector('#aurem-book-submit');
+    const serviceSel = card.querySelector('#aurem-book-service');
+    const dateInput = card.querySelector('#aurem-book-date');
+    const slotsWrap = card.querySelector('#aurem-book-slots');
+    const msgEl = card.querySelector('#aurem-book-msg');
+    let chosenSlot = null;
+
+    const setSubmitEnabled = () => {
+      const ready = !!chosenSlot
+        && card.querySelector('#aurem-book-name').value.trim()
+        && card.querySelector('#aurem-book-phone').value.trim();
+      submitBtn.disabled = !ready;
+      submitBtn.style.opacity = ready ? 1 : 0.55;
+    };
+    card.querySelector('#aurem-book-name').oninput = setSubmitEnabled;
+    card.querySelector('#aurem-book-phone').oninput = setSubmitEnabled;
+
+    closeBtn.onclick = () => { modal.style.display = 'none'; };
+    modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+
+    // Load service types
+    fetch(`${config.apiUrl}/booking/types`, { headers: { Authorization: `Bearer ${config.apiKey}` } })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(d => {
+        const types = (d && (d.types || d.service_types || (Array.isArray(d) ? d : []))) || [];
+        if (!types.length) { serviceSel.innerHTML = '<option value="general">General consultation</option>'; return; }
+        serviceSel.innerHTML = types.map(t => {
+          const id = t.id || t.value || t.slug || t.name;
+          const label = t.name || t.label || id;
+          return `<option value="${id}">${label}</option>`;
+        }).join('');
+      })
+      .catch(() => { serviceSel.innerHTML = '<option value="general">General consultation</option>'; });
+
+    // Slot loader (re-fires on service/date change)
+    const loadSlots = () => {
+      const svc = serviceSel.value;
+      const date = dateInput.value;
+      slotsWrap.innerHTML = '<span style="opacity:0.6;font-size:12px">Loading slots…</span>';
+      chosenSlot = null; setSubmitEnabled();
+      if (!svc || !date) { slotsWrap.innerHTML = ''; return; }
+      fetch(`${config.apiUrl}/booking/availability?service_type=${encodeURIComponent(svc)}&date=${date}`, {
+        headers: { Authorization: `Bearer ${config.apiKey}` },
+      })
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(d => {
+          const slots = (d && (d.slots || d.available || (Array.isArray(d) ? d : []))) || [];
+          if (!slots.length) { slotsWrap.innerHTML = '<span style="opacity:0.6;font-size:12px">No slots that day. Try another date.</span>'; return; }
+          slotsWrap.innerHTML = '';
+          slots.slice(0, 12).forEach(s => {
+            const v = s.time || s.slot || s.start || s;
+            const label = (typeof v === 'string') ? v.slice(11,16) || v : String(v);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = label;
+            btn.style.cssText = `padding:6px 10px;border:1px solid ${inputBorder};border-radius:6px;background:${inputBg};color:${windowTextColor};cursor:pointer;font-size:12px`;
+            btn.onclick = () => {
+              chosenSlot = v;
+              slotsWrap.querySelectorAll('button').forEach(b => {
+                b.style.background = inputBg;
+                b.style.borderColor = inputBorder;
+                b.style.color = windowTextColor;
+              });
+              btn.style.background = config.color;
+              btn.style.color = buttonTextColor;
+              btn.style.borderColor = config.color;
+              setSubmitEnabled();
+            };
+            slotsWrap.appendChild(btn);
+          });
+        })
+        .catch(() => { slotsWrap.innerHTML = '<span style="opacity:0.6;font-size:12px">Unable to load slots right now.</span>'; });
+    };
+    serviceSel.onchange = loadSlots;
+    dateInput.onchange = loadSlots;
+
+    // Submit
+    submitBtn.onclick = async () => {
+      submitBtn.disabled = true; submitBtn.style.opacity = 0.55;
+      msgEl.textContent = 'Booking…';
+      try {
+        const r = await fetch(`${config.apiUrl}/booking/book`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: card.querySelector('#aurem-book-name').value.trim(),
+            phone: card.querySelector('#aurem-book-phone').value.trim(),
+            service_type: serviceSel.value,
+            date: dateInput.value,
+            slot: chosenSlot,
+          }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) {
+          card.innerHTML = `
+            <div style="text-align:center;padding:20px">
+              <div style="font-size:42px;color:${config.color}">✓</div>
+              <div style="font-size:16px;font-weight:600;margin-top:10px">Booking confirmed!</div>
+              <div style="font-size:13px;opacity:0.7;margin-top:6px">${data.confirmation || 'You will receive a confirmation shortly.'}</div>
+              <button id="aurem-book-done" style="margin-top:18px;padding:10px 18px;background:${config.color};color:${buttonTextColor};border:none;border-radius:8px;font-weight:600;cursor:pointer">Close</button>
+            </div>`;
+          card.querySelector('#aurem-book-done').onclick = () => { modal.style.display = 'none'; };
+        } else {
+          msgEl.textContent = (data.detail || data.error || 'Booking failed. Try a different slot.');
+          submitBtn.disabled = false; submitBtn.style.opacity = 1;
+        }
+      } catch (e) {
+        msgEl.textContent = 'Network error. Please try again.';
+        submitBtn.disabled = false; submitBtn.style.opacity = 1;
+      }
+    };
+  }
 })();
