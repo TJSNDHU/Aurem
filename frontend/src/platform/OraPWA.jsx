@@ -711,31 +711,88 @@ const OraPWA = () => {
         // ORA can adapt tone. We send only the label, never the video.
         const emo = emotionRef.current;
         const fresh = emo && Date.now() - emo.ts < 8000;
-        const r = await fetch(`${API}/api/public/ora/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders },
-          body: JSON.stringify({
-            text: txt,
-            session_id: sessionId,
-            ...(devMode ? { source: "dev" } : {}),
-            ...(fresh ? {
-              emotion: emo.emotion,
-              emotion_confidence: emo.confidence,
-            } : {}),
-          }),
-        });
-        const body = await r.json().catch(() => ({}));
-        const reply =
-          (body?.reply || "").trim() ||
-          // iter 322bo — softer fallback. If we land here it means backend
-          // returned an empty body — usually a 502/timeout. Tell user it's
-          // a connectivity blip, not a feature limitation.
-          "One sec — connection blinked. Re-send your message and I'll pick up where we left off.";
-        setMessages((p) =>
-          p.map((m) => (m.id === placeholderId ? { ...m, text: reply, typing: false } : m))
-        );
-        // Speak ORA's reply if speaker is on (iter 282t)
-        try { playTTS(reply); } catch (_) {}
+        const payload = {
+          text: txt,
+          session_id: sessionId,
+          ...(devMode ? { source: "dev" } : {}),
+          ...(fresh ? {
+            emotion: emo.emotion,
+            emotion_confidence: emo.confidence,
+          } : {}),
+        };
+
+        // iter 322br — SSE streaming. Tokens arrive 80-120ms after send;
+        // user sees ORA typing in real time. If streaming fails for any
+        // reason we silently fall back to the legacy non-stream POST.
+        let streamed = "";
+        let streamOk = false;
+        try {
+          const sr = await fetch(`${API}/api/public/ora/chat/stream`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            body: JSON.stringify(payload),
+          });
+          if (sr.ok && sr.body && sr.headers.get("content-type")?.includes("text/event-stream")) {
+            streamOk = true;
+            const reader = sr.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = "";
+            // Replace placeholder typing dot with empty text immediately so
+            // streaming chars land into the same bubble.
+            setMessages((p) =>
+              p.map((m) => (m.id === placeholderId ? { ...m, text: "", typing: false } : m))
+            );
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              // SSE frames are \n\n separated. Each frame starts with "data: " (and optional "event: done").
+              let idx;
+              while ((idx = buf.indexOf("\n\n")) >= 0) {
+                const frame = buf.slice(0, idx);
+                buf = buf.slice(idx + 2);
+                if (frame.startsWith("event: done")) {
+                  // metadata frame — ignore content for now
+                  continue;
+                }
+                const line = frame.split("\n").find((l) => l.startsWith("data:"));
+                if (!line) continue;
+                try {
+                  const token = JSON.parse(line.slice(5).trim());
+                  if (typeof token === "string" && token) {
+                    streamed += token;
+                    const snapshot = streamed;
+                    setMessages((p) =>
+                      p.map((m) => (m.id === placeholderId ? { ...m, text: snapshot } : m))
+                    );
+                  }
+                } catch { /* skip malformed frame */ }
+              }
+            }
+            // Speak full reply after stream completes
+            try { playTTS(streamed); } catch (_) {}
+          }
+        } catch (streamErr) {
+          // network/abort error — fall through to legacy POST
+          streamOk = false;
+        }
+
+        if (!streamOk || !streamed) {
+          // Legacy path — single POST, full reply returned at once
+          const r = await fetch(`${API}/api/public/ora/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders },
+            body: JSON.stringify(payload),
+          });
+          const body = await r.json().catch(() => ({}));
+          const reply =
+            (body?.reply || "").trim() ||
+            "One sec — connection blinked. Re-send your message and I'll pick up where we left off.";
+          setMessages((p) =>
+            p.map((m) => (m.id === placeholderId ? { ...m, text: reply, typing: false } : m))
+          );
+          try { playTTS(reply); } catch (_) {}
+        }
       } catch (e) {
         setMessages((p) =>
           p.map((m) =>

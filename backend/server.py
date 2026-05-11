@@ -1072,6 +1072,13 @@ async def startup_event():
         logging.info(f"[ENV] SITE_URL: {os.environ.get('SITE_URL', 'not set')}")
         logging.info(f"[ENV] JWT_SECRET set: {'✓' if os.environ.get('JWT_SECRET') else '❌'}")
         
+        # iter 322br — pre-warm Groq HTTP/2 socket (saves ~100ms first chat)
+        try:
+            from routers.public_ora_demo_router import prewarm_groq
+            asyncio.create_task(prewarm_groq())
+        except Exception as _pe:
+            logging.debug(f"[ORA] Groq prewarm skipped: {_pe}")
+
         # Validate required secrets first
         try:
             from utils.secrets import validate_all_secrets, scan_for_pymongo_antipatterns

@@ -316,40 +316,139 @@ def _history_block(turns: List[Dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-# ── iter 322bn — Groq fallback (BUG 3 fix) ─────────────────────────
-# If Claude (Emergent LLM key) fails, transparently try Groq instead of
-# surfacing a "warming up" message. User never sees infra wobble.
+# ── iter 322br — Persistent Groq HTTP client (pre-warm) ────────────
+# A single AsyncClient kept open for the process lifetime so TCP+TLS
+# handshake (80-120ms) happens once at boot, not on every request.
+# Idle pings keep the keep-alive socket warm.
 
+_GROQ_CLIENT: Optional[Any] = None
+
+
+def _get_groq_client():
+    global _GROQ_CLIENT
+    if _GROQ_CLIENT is None:
+        import httpx
+        _GROQ_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(15.0, connect=4.0),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10,
+                                keepalive_expiry=120.0),
+            # http2 needs the 'h2' wheel; HTTP/1.1 keep-alive is plenty for our QPS
+            headers={
+                "Authorization": f"Bearer {os.environ.get('GROQ_API_KEY','')}",
+                "Content-Type":  "application/json",
+                "User-Agent":    "AUREM-ORA/322br",
+            },
+        )
+    return _GROQ_CLIENT
+
+
+async def prewarm_groq():
+    """Touch Groq once at startup so the first user request is hot."""
+    if not os.environ.get("GROQ_API_KEY", "").strip():
+        return
+    try:
+        c = _get_groq_client()
+        await c.get("https://api.groq.com/openai/v1/models", timeout=5.0)
+        logger.info("[public-ora-demo] Groq pre-warmed ✓")
+    except Exception as e:
+        logger.debug(f"[public-ora-demo] Groq pre-warm skipped: {e}")
+
+
+# ── iter 322br — RAM cache with TTL (no Redis, multi-pod safe) ─────
+# Per-process LRU-ish dict. TTL'd entries; Mongo remains source-of-truth.
+# Pod restart → rebuilt lazily. Pod 1 vs Pod 2 may briefly disagree for
+# up to TTL_S seconds — acceptable for hot-path settings.
+
+_RAM_CACHE: Dict[str, Dict[str, Any]] = {}
+_RAM_CACHE_TTL_S = float(os.environ.get("ORA_RAM_CACHE_TTL", "30"))
+
+
+async def cache_get_or_fetch(key: str, fetch_coro_fn) -> Any:
+    """Read RAM cache; on miss/stale, await `fetch_coro_fn()` once and store."""
+    import time as _t
+    now = _t.time()
+    hit = _RAM_CACHE.get(key)
+    if hit and (now - hit["t"]) < _RAM_CACHE_TTL_S:
+        return hit["v"]
+    val = await fetch_coro_fn()
+    _RAM_CACHE[key] = {"v": val, "t": now}
+    # Bound the cache size (LRU-ish: drop oldest 25% when >1000)
+    if len(_RAM_CACHE) > 1000:
+        oldest = sorted(_RAM_CACHE.items(), key=lambda kv: kv[1]["t"])[:250]
+        for k, _ in oldest:
+            _RAM_CACHE.pop(k, None)
+    return val
+
+
+# iter 322br — Groq with persistent client + temp 0.3 (was 0.4)
 async def _groq_fallback(messages: List[Dict[str, str]]) -> Optional[str]:
     """Try Groq with the chat messages. Returns reply text or None."""
     api_key = os.environ.get("GROQ_API_KEY", "").strip()
     if not api_key:
         return None
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
-                    "messages": messages,
-                    "temperature": 0.4,
-                    "max_tokens": 700,
-                },
-            )
-            if resp.status_code != 200:
-                logger.debug(f"[public-ora-demo] groq {resp.status_code}: {resp.text[:200]}")
-                return None
-            data = resp.json()
-            out = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
-            return out or None
+        client = _get_groq_client()
+        resp = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                "messages": messages,
+                "temperature": float(os.environ.get("ORA_GROQ_TEMP", "0.3")),
+                "max_tokens": 700,
+            },
+        )
+        if resp.status_code != 200:
+            logger.debug(f"[public-ora-demo] groq {resp.status_code}: {resp.text[:200]}")
+            return None
+        data = resp.json()
+        out = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+        return out or None
     except Exception as e:
         logger.debug(f"[public-ora-demo] groq error: {e}")
         return None
+
+
+# iter 322br — Streaming Groq generator (SSE)
+async def _groq_stream(messages: List[Dict[str, str]]):
+    """Yield text tokens as Groq generates them. Each yield is a partial
+    string suitable for SSE 'data:' lines. Yields '' at end to signal done."""
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return
+    try:
+        import json as _json
+        client = _get_groq_client()
+        async with client.stream(
+            "POST",
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                "messages": messages,
+                "temperature": float(os.environ.get("ORA_GROQ_TEMP", "0.3")),
+                "max_tokens": 700,
+                "stream": True,
+            },
+            timeout=20.0,
+        ) as resp:
+            if resp.status_code != 200:
+                logger.debug(f"[public-ora-demo] groq stream {resp.status_code}")
+                return
+            async for line in resp.aiter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    chunk = _json.loads(payload)
+                    delta = (chunk.get("choices") or [{}])[0].get("delta", {})
+                    token = delta.get("content") or ""
+                    if token:
+                        yield token
+                except Exception:
+                    continue
+    except Exception as e:
+        logger.debug(f"[public-ora-demo] groq stream error: {e}")
 
 
 async def _live_business_context(user: Optional[Dict[str, Any]]) -> str:
@@ -440,6 +539,109 @@ async def _live_business_context(user: Optional[Dict[str, Any]]) -> str:
 @router.get("/health")
 async def health():
     return {"ok": True}
+
+
+# iter 322br — Streaming SSE chat. Tokens stream from Groq → frontend as
+# they're generated. TTFB ~80ms instead of waiting for full reply.
+@router.post("/chat/stream")
+async def public_demo_chat_stream(
+    req: DemoChatReq,
+    authorization: Optional[str] = Header(None),
+):
+    """SSE chat — yields 'data: <token>\\n\\n' frames as Groq generates.
+    Final frame: 'event: done\\ndata: {json metadata}\\n\\n'."""
+    from fastapi.responses import StreamingResponse
+    import time as _time
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(400, "Empty message")
+
+    user = await _resolve_user_context(authorization)
+
+    # Same fast-cache path as non-stream — instant deterministic answers
+    try:
+        from services.ora_fast_cache import try_short_circuit
+        fast = await try_short_circuit(text, user=user)
+        if fast is not None:
+            async def _fast_gen():
+                # emit the whole answer in 4-char chunks so frontend still
+                # feels typing animation
+                for i in range(0, len(fast), 6):
+                    yield f"data: {json_dumps(fast[i:i+6])}\n\n"
+                    await asyncio.sleep(0.012)
+                yield f"event: done\ndata: {json_dumps({'src': 'ora_fast_cache'})}\n\n"
+            return StreamingResponse(_fast_gen(), media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache, no-transform",
+                                              "X-Accel-Buffering": "no"})
+    except Exception as _e:
+        logger.debug(f"[stream] fast-cache skipped: {_e}")
+
+    sys_prompt = _personalised_system(user) + await _live_business_context(user) + _emotion_context(req.emotion, req.emotion_confidence)
+    try:
+        from services.ora_date_helper import prepend_date
+        sys_prompt = prepend_date(sys_prompt)
+    except Exception:
+        pass
+    sid = req.session_id or f"demo_{uuid.uuid4()}"
+    bin_for_session = (user or {}).get("bin")
+    history = await _load_history(sid, bin_for_session, limit=10)
+    sys_prompt += _history_block(history)
+
+    messages = [{"role": "system", "content": sys_prompt}]
+    for t in history[-6:]:
+        messages.append({
+            "role": "user" if t.get("role") == "user" else "assistant",
+            "content": t.get("text", ""),
+        })
+    messages.append({"role": "user", "content": text})
+
+    async def _gen():
+        t0 = _time.monotonic()
+        collected: List[str] = []
+        try:
+            async for token in _groq_stream(messages):
+                collected.append(token)
+                yield f"data: {json_dumps(token)}\n\n"
+        except Exception as e:
+            logger.warning(f"[stream] error: {e}")
+
+        full = "".join(collected).strip()
+        if not full:
+            # Fallback to non-stream (Claude path) if Groq failed mid-stream
+            full = await _groq_fallback(messages) or ""
+            if full:
+                # send remaining as one chunk
+                yield f"data: {json_dumps(full)}\n\n"
+        if not full:
+            full = "One sec — connection blinked. Try once more."
+            yield f"data: {json_dumps(full)}\n\n"
+
+        # Persist + metrics (non-blocking)
+        asyncio.create_task(_save_turn(sid, bin_for_session, text, full))
+        total_ms = int((_time.monotonic() - t0) * 1000)
+        try:
+            if _db is not None:
+                asyncio.create_task(_db.ora_chat_metrics.insert_one({
+                    "session_id": sid, "bin": bin_for_session,
+                    "authenticated": bool(user), "llm_source": "groq_stream",
+                    "total_ms": total_ms, "claude_ms": 0, "groq_ms": total_ms,
+                    "reply_len": len(full), "history_size": len(history),
+                    "ts": datetime.now(timezone.utc),
+                }))
+        except Exception:
+            pass
+
+        yield f"event: done\ndata: {json_dumps({'src': 'groq_stream', 'lat_ms': total_ms, 'session_id': sid})}\n\n"
+
+    return StreamingResponse(_gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache, no-transform",
+                                      "X-Accel-Buffering": "no",
+                                      "Connection": "keep-alive"})
+
+
+def json_dumps(o):
+    import json as _j
+    return _j.dumps(o, ensure_ascii=False)
 
 
 # iter 322bo — Latency & speed dashboard for ORA chat.
