@@ -1,3 +1,26 @@
+## 2026-05-11 — iter 322bg — Unified Sign-In, BIN+PIN, ORA PWA 1-Click SSO
+
+**Backend**
+- `routers/platform_auth_router.py` — removed the strict admin/super_admin 403 collision wall. `/api/platform/auth/login` is now the **single endpoint** that authenticates customers, admins, super_admins, and the dogfood account. Issues a JWT with the correct `role` claim either way. Resolves "request failed with 520 / dogfood admin privileges locked".
+- `routers/platform_auth_router.py` — `/register` now accepts an optional `pin` (4–6 digit). On signup it persists `pin_hash` (bcrypt) and `pin_set_at`.
+- `routers/pin_auth_router.py` — added `POST /forgot-pin/request` and `POST /forgot-pin/confirm`. OTP delivered via Resend (HTML branded). 15-min expiry, single-use, bcrypt-hashed code stored in `pin_reset_codes`.
+
+**Frontend**
+- `platform/PlatformAuth.jsx` — signup form has a new "Quick-Login PIN (optional · 4–6 digits)" field with show/hide toggle. Client-side validation rejects non-4-6-digit values.
+- `platform/ForgotPin.jsx` — new 2-step page (`/forgot-pin`): identifier → email OTP → new PIN. Wired in `App.js`.
+- `platform/CustomerPortal.jsx` — gold "Open ORA AI" button at the bottom of the sidebar. Token already lives in `localStorage`, so the ORA PWA picks it up and skips the login screen → genuine 1-click SSO.
+- `platform/AdminConsole.jsx` — "Open ORA" button next to "NEW SESSION" in the Founders Console header so founders jump to ORA PWA without breaking flow.
+
+**Verified**
+- `curl POST /api/platform/auth/login` with admin creds → 200, role=super_admin
+- `curl POST /api/platform/auth/login` with dogfood creds → 200, role=super_admin (was 403)
+- `curl POST /api/platform/auth/register` with `pin: 482190` → 200, pin persisted
+- `curl POST /api/platform/auth/login-pin` with BIN PINX-K3JN + 482190 → 200, full token
+- `curl POST /api/platform/auth/forgot-pin/request` with unknown email → 200 generic ("no enum leak")
+- `curl POST /api/platform/auth/forgot-pin/confirm` with bad code → 400 "Invalid code"
+- Frontend smoke screenshot: `/platform/signup` renders the new PIN field correctly.
+
+
 ## 2026-02 · iter 305i — Admin AWB maintenance API (run-from-anywhere fixes)
 
 Production Atlas can't be reached from preview sandbox by design (IP

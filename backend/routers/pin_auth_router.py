@@ -338,3 +338,138 @@ async def ensure_pin_indexes(db) -> None:
         )
     except Exception as e:
         logger.debug(f"[pin_auth] index ensure skipped: {e}")
+
+
+# ─── Forgot-PIN flow (email OTP → reset) ──────────────────────────────────
+import secrets
+import asyncio
+
+
+class ForgotPinRequest(BaseModel):
+    identifier: str = Field(..., min_length=3, max_length=120)  # BIN or email
+
+
+class ResetPinRequest(BaseModel):
+    identifier: str = Field(..., min_length=3, max_length=120)
+    code: str = Field(..., min_length=4, max_length=10)
+    new_pin: str = Field(..., min_length=4, max_length=6)
+
+
+async def _resolve_user_for_pin_reset(identifier: str):
+    """Find a user row by BIN or email. Returns (user, collection)."""
+    if _db is None or not identifier:
+        return None, None
+    ident = identifier.strip()
+    # Try BIN
+    try:
+        from services.bin_generator import is_bin, normalize_bin
+        if is_bin(ident):
+            bid = normalize_bin(ident)
+            u = await _db.platform_users.find_one({"business_id": bid})
+            if u:
+                return u, _db.platform_users
+            u = await _db.users.find_one({"business_id": bid})
+            if u:
+                return u, _db.users
+    except Exception:
+        pass
+    # Email path
+    email = ident.lower()
+    u = await _db.platform_users.find_one({"email": email})
+    if u:
+        return u, _db.platform_users
+    u = await _db.users.find_one({"email": email})
+    if u:
+        return u, _db.users
+    return None, None
+
+
+async def _send_pin_reset_email(email: str, name: str, code: str) -> bool:
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    if not api_key:
+        logger.warning("[pin_auth] RESEND_API_KEY missing — PIN reset code logged only")
+        logger.info(f"[pin_auth] PIN reset code for {email}: {code}")
+        return False
+    try:
+        import resend  # type: ignore
+        resend.api_key = api_key
+        from_addr = os.environ.get("RESEND_FROM_EMAIL", "AUREM <ora@aurem.live>")
+        html = f"""
+        <div style="background:#060608;color:#F0EBE0;padding:36px;font-family:Georgia,serif;">
+          <h2 style="color:#F97316;margin:0 0 16px;">AUREM — PIN Reset</h2>
+          <p style="margin:0 0 12px;">Hi {name or 'there'},</p>
+          <p style="margin:0 0 20px;">Use the code below to reset your AUREM PIN. Expires in 15 minutes.</p>
+          <div style="font-family:'Courier New',monospace;font-size:32px;letter-spacing:0.4em;
+                      color:#F97316;padding:18px 24px;border:1px solid rgba(249,115,22,0.4);
+                      border-radius:6px;display:inline-block;background:rgba(249,115,22,0.08);">
+            {code}
+          </div>
+          <p style="color:#5C5548;font-size:12px;margin-top:24px;">
+            Didn't request this? Ignore this email — your PIN is unchanged.
+          </p>
+        </div>
+        """
+        await asyncio.to_thread(resend.Emails.send, {
+            "from": from_addr,
+            "to": [email],
+            "subject": "Reset your AUREM PIN",
+            "html": html,
+        })
+        return True
+    except Exception as e:
+        logger.error(f"[pin_auth] PIN reset email failed: {e}")
+        return False
+
+
+@router.post("/forgot-pin/request")
+async def forgot_pin_request(body: ForgotPinRequest):
+    """Email a 6-digit OTP that authorises one PIN reset. Always returns 200
+    to avoid leaking which BINs/emails exist."""
+    if _db is None:
+        raise HTTPException(status_code=503, detail="DB unavailable")
+    user, _coll = await _resolve_user_for_pin_reset(body.identifier)
+    if user and user.get("email"):
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        await _db.pin_reset_codes.update_one(
+            {"email": user["email"].lower()},
+            {"$set": {
+                "email": user["email"].lower(),
+                "code_hash": bcrypt.hashpw(code.encode("utf-8"), bcrypt.gensalt(rounds=10)).decode("utf-8"),
+                "expires_at": _now() + timedelta(minutes=15),
+                "used": False,
+                "created_at": _now(),
+            }},
+            upsert=True,
+        )
+        name = user.get("first_name") or user.get("full_name") or user.get("name") or ""
+        asyncio.create_task(_send_pin_reset_email(user["email"], name, code))
+    return {"ok": True, "message": "If the account exists, a reset code has been sent."}
+
+
+@router.post("/forgot-pin/confirm")
+async def forgot_pin_confirm(body: ResetPinRequest):
+    """Verify the OTP + persist a new PIN."""
+    if _db is None:
+        raise HTTPException(status_code=503, detail="DB unavailable")
+    if not PIN_RE.match(body.new_pin):
+        raise HTTPException(status_code=400, detail="PIN must be 4–6 digits")
+    user, coll = await _resolve_user_for_pin_reset(body.identifier)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid code")
+    email = (user.get("email") or "").lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid code")
+    rec = await _db.pin_reset_codes.find_one({"email": email})
+    if not rec or rec.get("used"):
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    exp = rec.get("expires_at")
+    if isinstance(exp, datetime) and exp < _now():
+        raise HTTPException(status_code=400, detail="Code expired")
+    if not bcrypt.checkpw(body.code.strip().encode("utf-8"),
+                          (rec.get("code_hash") or "").encode("utf-8")):
+        raise HTTPException(status_code=400, detail="Invalid code")
+    await _persist_pin(user, coll, body.new_pin)
+    await _db.pin_reset_codes.update_one({"email": email}, {"$set": {"used": True}})
+    # Clear any active lockout so the user can log in right away
+    await _db.pin_login_attempts.delete_many({"key": {"$regex": f":{(user.get('business_id') or '').upper()}$"}})
+    return {"ok": True, "pin_reset": True}

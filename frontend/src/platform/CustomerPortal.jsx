@@ -350,6 +350,43 @@ export default function CustomerPortal() {
 
           {/* Footer */}
           <div style={{marginTop:'auto',paddingTop:18,borderTop:`1px solid ${COLORS.border}`}}>
+            {/* iter 322bg — 1-click ORA PWA SSO. Token already in localStorage,
+                so /ora reads it and auto-skips the platform/login page. */}
+            <a
+              href="/ora"
+              data-testid="customer-open-ora-pwa"
+              style={{
+                width:'100%',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                gap:8,
+                padding:'11px 12px',
+                borderRadius:11,
+                marginBottom:10,
+                textDecoration:'none',
+                color:'#0A0A00',
+                fontWeight:700,
+                fontSize:12.5,
+                letterSpacing:'0.06em',
+                textTransform:'uppercase',
+                fontFamily:"'Jost',sans-serif",
+                background:'linear-gradient(135deg,#F97316,#C9A227)',
+                boxShadow:'0 8px 22px rgba(249,115,22,0.35)',
+                transition:'transform 0.2s ease, box-shadow 0.2s ease',
+              }}
+              onMouseEnter={(e)=>{
+                e.currentTarget.style.transform='translateY(-1px)';
+                e.currentTarget.style.boxShadow='0 12px 28px rgba(249,115,22,0.5)';
+              }}
+              onMouseLeave={(e)=>{
+                e.currentTarget.style.transform='translateY(0)';
+                e.currentTarget.style.boxShadow='0 8px 22px rgba(249,115,22,0.35)';
+              }}
+            >
+              <span style={{width:7,height:7,borderRadius:'50%',background:'#0A0A00',boxShadow:'0 0 8px rgba(0,0,0,0.4)'}}/>
+              Open ORA AI
+            </a>
             <div style={{fontSize:11,color:COLORS.textD,marginBottom:8,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
               {ctx.full_name || ctx.email}
             </div>

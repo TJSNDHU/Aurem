@@ -61,6 +61,8 @@ class RegisterRequest(BaseModel):
     company: Optional[str] = None
     phone: Optional[str] = None
     terms_accepted: bool = False
+    # iter 322bg — optional 4–6 digit PIN set at signup
+    pin: Optional[str] = None
 
     def normalized_full_name(self) -> str:
         if self.full_name:
@@ -161,29 +163,58 @@ async def login(request: LoginRequest):
 
     logger.info(f"[PLATFORM AUTH] Login attempt for: {email}")
 
-    # Collision guard: block admin accounts from authenticating via client endpoint.
-    # Admins live in db.users (super_admin/admin role) — if a row with that email
-    # exists there, route them to /api/auth/login instead.
+    # iter 322bg — UNIFIED LOGIN. Admins, super-admins AND customers all log in
+    # through this single endpoint so the ORA PWA & customer portal work for
+    # every role. We try admin (db.users) first if the email exists there, then
+    # fall through to client (db.platform_users). No more 403 collision walls.
     if db is not None:
         try:
             admin_row = await db.users.find_one(
                 {"email": email},
-                {"_id": 0, "is_admin": 1, "is_super_admin": 1, "role": 1},
+                {"_id": 0, "email": 1, "password": 1, "password_hash": 1,
+                 "is_admin": 1, "is_super_admin": 1, "role": 1,
+                 "name": 1, "user_id": 1, "business_id": 1, "plan": 1,
+                 "services_unlocked": 1},
             )
-            if admin_row and (
-                admin_row.get("is_admin")
-                or admin_row.get("is_super_admin")
-                or admin_row.get("role") in ("admin", "super_admin")
-            ):
-                logger.warning(f"[PLATFORM AUTH] Blocked admin account {email} from client endpoint — route via /api/auth/login")
-                raise HTTPException(
-                    status_code=403,
-                    detail="This account has admin privileges. Sign in via the admin portal (/login) instead.",
-                )
-        except HTTPException:
-            raise
+            if admin_row:
+                stored = admin_row.get("password_hash") or admin_row.get("password") or ""
+                # Also accept ADMIN_PASSWORD_HASH_1/2 from env for legacy
+                # founder accounts that live in `users` without a stored hash.
+                if not stored:
+                    for slot in ("ADMIN_PASSWORD_HASH_1", "ADMIN_PASSWORD_HASH_2"):
+                        cand = os.getenv(slot, "").replace("$$", "$")
+                        if cand and verify_password_hash(request.password, cand):
+                            stored = cand
+                            break
+                if stored and verify_password_hash(request.password, stored):
+                    is_admin_flag = bool(
+                        admin_row.get("is_admin")
+                        or admin_row.get("is_super_admin")
+                        or admin_row.get("role") in ("admin", "super_admin")
+                    )
+                    role_value = (
+                        "super_admin" if admin_row.get("is_super_admin")
+                        else ("admin" if is_admin_flag else (admin_row.get("role") or "user"))
+                    )
+                    token = create_token(
+                        email, role_value,
+                        extra={
+                            "business_id": admin_row.get("business_id") or "",
+                            "plan": admin_row.get("plan") or "founder",
+                            "services_unlocked": admin_row.get("services_unlocked") or [],
+                            "user_id": admin_row.get("user_id") or "admin",
+                            "is_admin": is_admin_flag,
+                        },
+                    )
+                    return TokenResponse(
+                        token=token,
+                        email=email,
+                        full_name=admin_row.get("name") or "AUREM Admin",
+                        company_name="AUREM Platform",
+                        role=role_value,
+                    )
         except Exception as e:
-            logger.debug(f"[PLATFORM AUTH] admin-row collision check skipped: {e}")
+            logger.debug(f"[PLATFORM AUTH] unified admin check skipped: {e}")
 
     # Check in-memory admin users first (bcrypt from ENV)
     if email in ADMIN_USERS:
@@ -203,15 +234,7 @@ async def login(request: LoginRequest):
         try:
             user = await db.platform_users.find_one({"email": email})
             if user and verify_password_hash(request.password, user.get("password_hash", "")):
-                # Secondary guard: reject if this platform_users row somehow has an admin role
-                # (legacy data hygiene — should never happen post-separation).
                 user_role = (user.get("role") or "user").lower()
-                if user_role in ("admin", "super_admin"):
-                    logger.warning(f"[PLATFORM AUTH] platform_users row for {email} has admin role — denying client login")
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Admin-role client record detected. Contact support to migrate this account.",
-                    )
                 # Auto-migrate SHA-256 to bcrypt on successful login
                 if not user.get("password_hash", "").startswith("$2b$"):
                     new_hash = hash_password(request.password)
@@ -227,7 +250,7 @@ async def login(request: LoginRequest):
                         "plan": user.get("plan") or "trial",
                         "services_unlocked": user.get("services_unlocked") or [],
                         "user_id": user.get("user_id") or user.get("id") or "",
-                        "is_admin": False,
+                        "is_admin": user_role in ("admin", "super_admin"),
                     },
                 )
                 return TokenResponse(
@@ -255,28 +278,6 @@ async def register(request: RegisterRequest, req: Request = None):
     if email in ADMIN_USERS:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Collision guard: never let a client register with an email that already
-    # belongs to an admin account in db.users (privilege-collision prevention).
-    if db is not None:
-        try:
-            admin_row = await db.users.find_one(
-                {"email": email},
-                {"_id": 0, "is_admin": 1, "is_super_admin": 1, "role": 1},
-            )
-            if admin_row and (
-                admin_row.get("is_admin")
-                or admin_row.get("is_super_admin")
-                or admin_row.get("role") in ("admin", "super_admin")
-            ):
-                raise HTTPException(
-                    status_code=409,
-                    detail="This email is reserved for platform administrators.",
-                )
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-
     if db is not None:
         existing = await db.platform_users.find_one({"email": email})
         if existing:
@@ -301,6 +302,17 @@ async def register(request: RegisterRequest, req: Request = None):
             "terms_accepted_at": datetime.utcnow().isoformat(),
             "terms_accepted_ip": client_ip,
         }
+        # iter 322bg — optional PIN at signup (4–6 digits, bcrypt-hashed)
+        if request.pin:
+            import re as _re_pin
+            if not _re_pin.match(r"^\d{4,6}$", request.pin.strip()):
+                raise HTTPException(status_code=400, detail="PIN must be 4–6 digits")
+            user_data["pin_hash"] = bcrypt.hashpw(
+                request.pin.strip().encode("utf-8"), bcrypt.gensalt(rounds=12)
+            ).decode("utf-8")
+            user_data["pin_set_at"] = datetime.utcnow().isoformat()
+            user_data["pin_failed_count"] = 0
+            user_data["pin_locked_until"] = None
         await db.platform_users.insert_one(user_data)
 
         # iter 322 — start 7-day trial via SSOT trial engine. This sets

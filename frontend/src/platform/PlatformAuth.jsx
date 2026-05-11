@@ -400,9 +400,11 @@ export const PlatformSignup = () => {
     password: '',
     company_name: '',
     full_name: '',
+    pin: '',
     terms_accepted: false,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -439,6 +441,12 @@ export const PlatformSignup = () => {
 
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.pin && !/^\d{4,6}$/.test(formData.pin.trim())) {
+      setError('PIN must be 4 to 6 digits');
       setLoading(false);
       return;
     }
@@ -691,6 +699,42 @@ export const PlatformSignup = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </div>
+
+            {/* iter 322bg — Quick-login PIN (optional, 4–6 digits) */}
+            <div>
+              <label htmlFor="signup-pin" className="block text-xs text-[#5C5C5C] dark:text-[#9CA3AF] tracking-[0.15em] uppercase mb-2">
+                Quick-Login PIN <span className="text-[#8B8170] normal-case tracking-normal">(optional · 4–6 digits)</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170] dark:text-[#666]" />
+                <input
+                  id="signup-pin"
+                  type={showPin ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="\d{4,6}"
+                  maxLength={6}
+                  name="pin"
+                  value={formData.pin}
+                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                  placeholder="e.g. 482190"
+                  aria-label="Quick-login PIN"
+                  data-testid="signup-pin-input"
+                  className="w-full pl-12 pr-12 py-3.5 bg-white dark:bg-[#0F0F10] border border-[#E5E0D5] dark:border-[#2a2a2a] rounded text-[#1A1A2E] dark:text-[#F5E6C8] placeholder-[#A89F8C] dark:placeholder-[#555] focus:border-[#F97316] dark:focus:border-[#F97316]/60 focus:outline-none transition-colors tracking-[0.4em]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  aria-label="Toggle PIN visibility"
+                  data-testid="signup-pin-toggle"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8B8170] dark:text-[#666] hover:text-[#F97316] transition-colors"
+                >
+                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-[#8B8170] dark:text-[#777] leading-relaxed">
+                Sign in faster on mobile using your BIN + PIN. You can set or change this later in Settings.
+              </p>
             </div>
 
             <div className="flex items-start gap-3 py-2">

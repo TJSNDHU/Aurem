@@ -56,6 +56,7 @@ import RefundPolicy from './platform/RefundPolicy';
 import AcceptableUsePolicy from './platform/AcceptableUsePolicy';
 import ContactPage from './platform/ContactPage';
 import ForgotPassword from './platform/ForgotPassword';
+import ForgotPin from './platform/ForgotPin';
 import ResetPassword from './platform/ResetPassword';
 import VerifyEmail from './platform/VerifyEmail';
 import GoogleAuthCallback from './platform/GoogleAuthCallback';
@@ -281,6 +282,7 @@ function AppRouter() {
       
       {/* Auth Recovery */}
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/forgot-pin" element={<ForgotPin />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       

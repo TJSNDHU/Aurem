@@ -360,6 +360,30 @@ export default function AdminConsole() {
         </div>
         <button data-testid="console-new-session" onClick={newSession}
           style={btnSec}>NEW SESSION</button>
+        {/* iter 322bg — 1-click ORA PWA jump for founder/admins */}
+        <a
+          href="/ora"
+          data-testid="console-open-ora"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 14px',
+            borderRadius: 10,
+            background: 'linear-gradient(135deg,#F97316,#C9A227)',
+            color: '#0A0A00',
+            fontFamily: "'DM Mono',monospace",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textDecoration: 'none',
+            textTransform: 'uppercase',
+            boxShadow: '0 6px 18px rgba(249,115,22,0.35)',
+          }}
+        >
+          <span style={{width:6,height:6,borderRadius:'50%',background:'#0A0A00'}}/>
+          Open ORA
+        </a>
       </header>
 
       {/* Spine HUD */}
