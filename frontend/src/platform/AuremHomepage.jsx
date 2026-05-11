@@ -1,5 +1,5 @@
 /**
- * AUREM Homepage — World's First Autonomous Intelligence Platform
+ * AUREM Homepage — Canada's Autonomous Business Platform
  * iter 281.7 — full design refresh (orange/gold theme, plain English)
  * with real React Router wiring + real ORA backend chat.
  */
@@ -541,7 +541,7 @@ const AuremHomepage = () => {
       </nav>
 
       <div className="world-first-bar" data-testid="world-first-banner">
-        <span>🌍 &nbsp;The World's First &nbsp;<em>Autonomous Intelligence Platform</em>&nbsp; — Built in Canada &nbsp;🇨🇦</span>
+        <span>🌍 &nbsp;Canada's &nbsp;<em>Autonomous Business Platform</em>&nbsp; — Built in Canada &nbsp;🇨🇦</span>
       </div>
 
       {/* CANADIAN TRUST BAR — iter 282al-7 (Canadian Moat) */}
@@ -554,8 +554,6 @@ const AuremHomepage = () => {
           <span className="ca-trust-item" data-testid="ca-trust-casl">⚖️&nbsp;CASL Compliant — Always</span>
           <span className="ca-trust-sep">·</span>
           <span className="ca-trust-item" data-testid="ca-trust-data">🔒&nbsp;Your Data Stays in Canada</span>
-          <span className="ca-trust-sep">·</span>
-          <span className="ca-trust-item" data-testid="ca-trust-since">⭐&nbsp;Serving Canadian Trades Since 2024</span>
         </div>
       </div>
 
@@ -564,14 +562,14 @@ const AuremHomepage = () => {
         <div className="hero-inner">
           <div className="hero-eyebrow">
             <div className="dot" />
-            Live right now — <span data-testid="hero-live-count">{liveCount}</span> businesses helped today
+            Live right now — <span data-testid="hero-live-count">Join Canadian businesses already on AUREM</span>
           </div>
           <h1 className="hero-title" data-testid="hero-title">
             <span className="t1">Your Business Finds Customers,</span>
             <span className="t2">Books Jobs &amp; Fixes Itself.</span>
           </h1>
           <p className="hero-punch">
-            AUREM is the world's first platform that runs your entire business on autopilot.<br />
+            AUREM runs your entire business on autopilot.<br />
             <strong>No staff. No missed calls. No manual follow-ups. Ever.</strong>
           </p>
           <div className="hero-btns">
@@ -587,7 +585,7 @@ const AuremHomepage = () => {
           </p>
 
           <div className="stats-row fade-up">
-            <div className="stat"><span className="stat-n" data-testid="stat-live">{liveCount}</span><span className="stat-l">Businesses helped today</span></div>
+            <div className="stat"><span className="stat-n" data-testid="stat-live">24/7</span><span className="stat-l">Always working for you</span></div>
             <div className="stat"><span className="stat-n">90 sec</span><span className="stat-l">Average reply time</span></div>
             <div className="stat"><span className="stat-n">2,224</span><span className="stat-l">Issues auto-fixed</span></div>
             <div className="stat"><span className="stat-n">24/7</span><span className="stat-l">Never offline</span></div>
@@ -814,7 +812,7 @@ const AuremHomepage = () => {
         <div className="trust-row">
           <div className="trust-item"><span className="ti">🔒</span> CASL &amp; PIPEDA Compliant</div>
           <div className="trust-item"><span className="ti">🇨🇦</span> Canadian Built — Mississauga, ON</div>
-          <div className="trust-item"><span className="ti">🧠</span> Powered by Claude + GPT-4o + Gemini</div>
+          <div className="trust-item"><span className="ti">🧠</span> Powered by Enterprise-Grade AI</div>
           <div className="trust-item"><span className="ti">⚡</span> No credit card to start</div>
           <div className="trust-item"><span className="ti">🛡️</span> Your data stays in Canada. Always.</div>
         </div>
@@ -840,7 +838,10 @@ const AuremHomepage = () => {
             </div>
           ))}
         </div>
-        <p style={{ fontSize: 11, color: "var(--muted2)", marginTop: 16 }}>Become a beta client and get your result featured here.</p>
+        <p data-testid="testimonials-disclaimer" style={{ fontSize: 11, color: "var(--muted2)", marginTop: 16, fontStyle: "italic", maxWidth: 700, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
+          Results shown are from early beta clients. Individual results may vary based on industry, location, and usage.
+        </p>
+        <p style={{ fontSize: 11, color: "var(--muted2)", marginTop: 8 }}>Become a beta client and get your result featured here.</p>
       </section>
 
       {/* FAQ */}
@@ -875,7 +876,7 @@ const AuremHomepage = () => {
           <button className="btn-primary" onClick={() => navigate("/repair-quote")} data-testid="final-cta-check">
             Check My Website Free — It Takes 60 Seconds →
           </button>
-          <p style={{ fontSize: 12, color: "var(--muted2)", marginTop: 14 }}>The World's First Autonomous Intelligence Platform &nbsp;·&nbsp; Mississauga, Canada 🇨🇦</p>
+          <p style={{ fontSize: 12, color: "var(--muted2)", marginTop: 14 }}>Canada's Autonomous Business Platform &nbsp;·&nbsp; Mississauga, Canada 🇨🇦</p>
         </div>
       </section>
 
@@ -908,7 +909,7 @@ const AuremHomepage = () => {
               </Link>
             )}
             <div className="footer-logo">AUREM</div>
-            <div className="footer-sub">World's First Autonomous Intelligence Platform</div>
+            <div className="footer-sub">Canada's Autonomous Business Platform</div>
           </div>
           <div className="footer-links">
             <button onClick={() => scrollTo("scan")} data-testid="footer-link-scan">Free Website Check</button>
@@ -919,6 +920,17 @@ const AuremHomepage = () => {
             <Link to="/my" data-testid="footer-link-login">Log In</Link>
           </div>
           <div className="footer-copy">© 2026 Polaris Built Inc. &nbsp;·&nbsp; Mississauga, Ontario, Canada &nbsp;·&nbsp; CASL &amp; PIPEDA Compliant</div>
+          <div data-testid="footer-legal-disclaimer" className="footer-disclaimer" style={{
+            maxWidth: 760, margin: "16px auto 0", padding: "0 20px",
+            fontSize: 11, lineHeight: 1.65, color: "var(--muted2)",
+            textAlign: "center", fontStyle: "italic"
+          }}>
+            AUREM provides business automation tools. Results may vary based on industry, location, and usage.
+            CASL compliance features are designed to assist with regulatory requirements — consult a qualified
+            legal professional for advice specific to your situation.
+            <br /><br />
+            Polaris Built Inc. · Mississauga, Ontario, Canada
+          </div>
         </div>
       </footer>
     </div>
