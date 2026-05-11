@@ -66,10 +66,10 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
       <aside
         data-testid="luxe-sidebar"
         style={{
-          width: 200, padding: '20px 14px',
+          width: 232, padding: '22px 16px',
           display: visible ? 'flex' : 'none',
           flexDirection: 'column', gap: 4,
-          background: 'rgba(8,10,14,0.92)',
+          background: 'rgba(6,7,11,0.96)',
           borderRight: '1px solid rgba(212,163,115,0.10)',
           backdropFilter: 'blur(18px)',
           WebkitBackdropFilter: 'blur(18px)',
@@ -140,33 +140,52 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
         {NAV.map(({ k, label, icon: Icon }) => (
           <button key={k} data-testid={`nav-${k}`} onClick={() => navClick(k)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 10,
-              background: active === k ? 'rgba(212,163,115,0.10)' : 'transparent',
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '11px 14px', borderRadius: 12,
+              background: active === k ? 'rgba(255,228,168,0.08)' : 'transparent',
               border: `1px solid ${active === k ? STROKE : 'transparent'}`,
-              color: active === k ? GOLD_HI : TEXT_MD,
-              fontFamily: fontMono, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
+              color: active === k ? TEXT_HI : TEXT_MD,
+              // iter 322bk — sentence-case, no tracking — matches target screenshot
+              fontFamily: fontBody, fontSize: 13.5, fontWeight: active === k ? 600 : 500,
+              letterSpacing: '0',
               cursor: 'pointer', textAlign: 'left',
+              transition: 'background 0.18s ease, color 0.18s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (active !== k) {
+                e.currentTarget.style.background = 'rgba(255,228,168,0.035)';
+                e.currentTarget.style.color = TEXT_HI;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (active !== k) {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = TEXT_MD;
+              }
             }}>
-            <Icon size={14} />
+            <Icon size={16} color={active === k ? GOLD_HI : TEXT_MD} />
             {label}
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        <div style={{
-          padding: '10px 12px', fontFamily: fontMono, color: TEXT_LO, fontSize: 9,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {user?.email || 'Loading…'}
-        </div>
         <button data-testid="nav-logout" onClick={onLogout} style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 12px', borderRadius: 10, background: 'transparent',
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '11px 14px', borderRadius: 12, background: 'transparent',
           border: '1px solid transparent', color: TEXT_MD,
-          fontFamily: fontMono, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase',
+          fontFamily: fontBody, fontSize: 13.5, fontWeight: 500,
+          letterSpacing: '0',
           cursor: 'pointer', textAlign: 'left',
-        }}>
-          <LogOut size={14} />
+          transition: 'background 0.18s ease, color 0.18s ease',
+        }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,228,168,0.035)';
+            e.currentTarget.style.color = TEXT_HI;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = TEXT_MD;
+          }}>
+          <LogOut size={16} />
           Log out
         </button>
       </aside>
