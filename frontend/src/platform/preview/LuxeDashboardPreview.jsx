@@ -804,6 +804,20 @@ const HomePage = ({ data }) => (
       <AlertsTile data={data} />
     </div>
 
+    {/* ── iter 322bl — extra rows brought back below target layout ─── */}
+    {/* Row 4 — Active Agents · Vanguard Security */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+      gap: 12,
+    }}>
+      <div style={{ minWidth: 0 }}><AgentsTileWrap agents={data.agents || []} /></div>
+      <div style={{ minWidth: 0 }}><VanguardTile data={data} /></div>
+    </div>
+
+    {/* Row 5 — AUREM Working For You · Recent Activity · Pipeline This Month */}
+    <CustomerResultsRow />
+
     <style>{`
       @keyframes luxe-pulse {
         0%, 100% { opacity: 1; transform: scale(1); }

@@ -29,23 +29,36 @@ export const Card = ({ children, style, contentStyle, testid }) => (
     position: 'relative',
     padding: 'clamp(14px, 3vw, 22px)', borderRadius: 'clamp(16px, 3vw, 26px)',
     overflow: 'hidden',
+    // iter 322bl — stronger 3D glass-bubble shine (matches sidebar style):
+    //   Layer 1: bright top-left caustic (water-bubble highlight)
+    //   Layer 2: subtle gold-tinged top arc
+    //   Layer 3: depth gradient (lighter at top, deeper at bottom)
     background:
-      'radial-gradient(140% 80% at 30% 0%, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.04) 22%, transparent 55%),' +
-      'linear-gradient(165deg, rgba(60,62,72,0.40) 0%, rgba(18,20,28,0.46) 60%, rgba(40,42,52,0.36) 100%)',
-    border: '1px solid rgba(255,255,255,0.14)',
+      'radial-gradient(180% 90% at 25% -10%, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.06) 22%, transparent 55%),' +
+      'radial-gradient(280px 140px at 75% -20%, rgba(255,228,168,0.10), transparent 70%),' +
+      'linear-gradient(165deg, rgba(60,62,72,0.42) 0%, rgba(18,20,28,0.48) 60%, rgba(40,42,52,0.38) 100%)',
+    border: '1px solid rgba(255,255,255,0.16)',
     backdropFilter: 'blur(34px) saturate(180%)',
     WebkitBackdropFilter: 'blur(34px) saturate(180%)',
     boxShadow:
-      '0 1px 0 rgba(255,255,255,0.18) inset,' +
-      ' 0 -1px 0 rgba(0,0,0,0.40) inset,' +
-      ' 0 22px 44px -14px rgba(0,0,0,0.65)',
+      '0 1px 0 rgba(255,255,255,0.22) inset,' +
+      ' 0 -1px 0 rgba(0,0,0,0.45) inset,' +
+      ' 0 26px 50px -16px rgba(0,0,0,0.7),' +
+      ' 0 0 0 1px rgba(255,228,168,0.04)',
     minWidth: 0,
     ...style,
   }}>
+    {/* Top shine line — the "water bubble" rim light */}
     <span aria-hidden="true" style={{
       position: 'absolute', top: 0, left: 18, right: 18, height: 1,
-      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%)',
+      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.32) 50%, transparent 100%)',
       pointerEvents: 'none',
+    }} />
+    {/* Diagonal gloss streak — subtle, only visible on darker cards */}
+    <span aria-hidden="true" style={{
+      position: 'absolute', top: 0, left: -40, width: 140, height: 100,
+      background: 'linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%)',
+      pointerEvents: 'none', filter: 'blur(6px)',
     }} />
     <div style={{ position: 'relative', ...contentStyle }}>{children}</div>
   </div>
