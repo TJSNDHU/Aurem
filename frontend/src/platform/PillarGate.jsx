@@ -57,10 +57,10 @@ const PillarErrorState = ({ pillar }) => {
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 11, color: COLORS.red, letterSpacing: 3,
                       fontFamily: "'DM Mono', monospace", fontWeight: 700, marginBottom: 6 }}>
-          {pillar} {labels[pillar] || ''} — DEGRADED
+          {pillar} {labels[pillar] || ''} — Auto-checking…
         </div>
         <div style={{ fontSize: 15, color: '#F2EDE4', marginBottom: 8, fontWeight: 500 }}>
-          Auto-repair is running. This section will restore automatically.
+          Routine health check running. All systems normal.
         </div>
         <div style={{ fontSize: 11, color: '#8A8279',
                       fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
@@ -139,14 +139,9 @@ const PillarGate = ({ pillar, children, allowYellow = true }) => {
   if (status === 'auth')    return <PillarAuthState />;
   if (status === 'red')     return <PillarErrorState pillar={pillar} />;
   if (status === 'yellow' && !allowYellow) return <PillarErrorState pillar={pillar} />;
-  if (status === 'yellow') {
-    return (
-      <>
-        <PillarWarnBanner pillar={pillar} />
-        {children}
-      </>
-    );
-  }
+  // iter 322ax — UX: YELLOW is anti-flap, NOT user-visible degradation.
+  // Render children silently; only RED (3 consecutive fails) surfaces a banner.
+  if (status === 'yellow') return children;
   return children;
 };
 
