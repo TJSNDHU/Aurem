@@ -613,7 +613,11 @@ SYSTEM_FLOWS: list[dict] = [
         "fe_route": "/admin/root-command",
         "be_endpoint": "/api/admin/pillars-map/health",
         "required_collections": ["users", "pillar_heartbeats"],
-        "activity_collections": [("pillar_heartbeats", 2)],
+        # iter 322bi — bumped 2 → 8 min. The pillar_heartbeat scheduler ticks
+        # every 300s (5 min), so a 2-min freshness window was MATHEMATICALLY
+        # IMPOSSIBLE to stay green for more than 24s out of every 300s window.
+        # 8 min gives one full miss + safety buffer before flagging red.
+        "activity_collections": [("pillar_heartbeats", 8)],
         "required_schedulers": ["p4:pillar_heartbeat"],
     },
     {
@@ -826,8 +830,11 @@ SYSTEM_FLOWS: list[dict] = [
         "required_schedulers": [],
     },
     # iter 282ak — ORA Skills Router chip — Intelligence pillar.
-    # iter 282al-12 — widened to 24h (skills route per chat turn, not
-    # constantly; 30m window flapped red between conversations).
+    # iter 322bi — DROPPED activity_collections. Was requiring a
+    # `skill_invocations` write every 24h, which only happens when a real
+    # customer invokes a skill via chat. Cold periods (no chat in 24h) are a
+    # legitimate state — same logic as ORA Learning Engine below. The chip
+    # now reports purely on router availability (BE 200 + DB reachable).
     {
         "id": "admin_ora_skills_router",
         "surface": "admin",
@@ -835,7 +842,7 @@ SYSTEM_FLOWS: list[dict] = [
         "fe_route": "/admin/pillars-map",
         "be_endpoint": "/api/admin/skills/health",
         "required_collections": [],
-        "activity_collections": [("skill_invocations", 24 * 60)],
+        "activity_collections": [],
         "required_schedulers": [],
     },
     # iter 282ak — ORA Learning Engine chip — Intelligence pillar.
