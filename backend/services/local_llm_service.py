@@ -31,7 +31,7 @@ _config = {
     #       3-15s on Legion's CPU/GPU when the model is cold. The old 5s
     #       hard cap guaranteed every chat call timed out at ~5072ms.
     "timeout": int(os.environ.get("LOCAL_LLM_TIMEOUT_S", "30")),
-    "connect_timeout": int(os.environ.get("LOCAL_LLM_CONNECT_TIMEOUT_S", "5")),
+    "connect_timeout": int(os.environ.get("LOCAL_LLM_CONNECT_TIMEOUT_S", "3")),
     "last_status": None,
     "last_check": None,
     "consecutive_failures": 0,
@@ -49,10 +49,15 @@ _config = {
 # and retries restored to 3 (with 5s gap) per user spec. Net worst-case
 # blocking time when tunnel is reachable but model is loading: ~45s.
 # When tunnel is dead: ~5s connect-fail × 3 = 15s before circuit opens.
-MAX_RETRIES = 3                  # user spec — 3 retries
-RETRY_DELAY_S = 5.0              # user spec — 5s apart
-BACKOFF_AFTER_FAILURES = 3       # open the breaker after 3 consecutive total failures
-BACKOFF_DURATION_S = 300         # 5-minute cool-down
+# iter 322bs — Production-safe defaults. With BACKOFF_AFTER_FAILURES=2
+# (was 3) and connect-timeout 3s, a dead tunnel trips the breaker in <8s
+# total worst case (2 connect attempts × 3s + 5s retry sleep), well below
+# K8s probe interval (10s). Once the breaker opens, ALL subsequent calls
+# return None instantly (no event loop blocking) for 300s.
+MAX_RETRIES = int(os.environ.get("LOCAL_LLM_RETRIES", "2"))
+RETRY_DELAY_S = float(os.environ.get("LOCAL_LLM_RETRY_DELAY_S", "3.0"))
+BACKOFF_AFTER_FAILURES = int(os.environ.get("LOCAL_LLM_BACKOFF_AFTER", "2"))
+BACKOFF_DURATION_S = int(os.environ.get("LOCAL_LLM_BACKOFF_DURATION", "300"))
 
 
 def is_backed_off() -> bool:
@@ -134,7 +139,20 @@ async def _request_with_retry(method: str, url: str, retries: int = MAX_RETRIES,
     read timeout is generous (default 30s) so a live tunnel + cold Ollama
     model loading from disk (3-15s) doesn't get killed mid-generation.
     """
+    # iter 322bs — Hard gate. If we've already accumulated failures past
+    # threshold, refuse new calls immediately (no HTTP, no retries) so the
+    # event loop never stalls. Backoff state is rechecked only after
+    # BACKOFF_DURATION_S has passed.
     if _is_backed_off():
+        return None
+    if _config["consecutive_failures"] >= BACKOFF_AFTER_FAILURES:
+        # We were past threshold but backoff_until expired — open a fresh
+        # window and bail. The single test-probe below will set things
+        # right once Sovereign comes back.
+        from datetime import timedelta as _td
+        _config["backoff_until"] = (
+            datetime.now(timezone.utc) + _td(seconds=BACKOFF_DURATION_S)
+        ).isoformat()
         return None
 
     read_timeout = kwargs.pop("timeout", _config["timeout"])
@@ -184,7 +202,8 @@ async def _request_with_retry(method: str, url: str, retries: int = MAX_RETRIES,
 
     # Track consecutive failures for backoff
     _config["consecutive_failures"] += 1
-    if _config["consecutive_failures"] >= BACKOFF_AFTER_FAILURES:
+    if _config["consecutive_failures"] == BACKOFF_AFTER_FAILURES:
+        # Open the circuit breaker — log ONCE.
         from datetime import timedelta
         _config["backoff_until"] = (datetime.now(timezone.utc) + timedelta(seconds=BACKOFF_DURATION_S)).isoformat()
         logger.warning(f"[Sovereign] {_config['consecutive_failures']} consecutive failures — backing off for {BACKOFF_DURATION_S}s")
