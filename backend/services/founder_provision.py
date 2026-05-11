@@ -182,6 +182,9 @@ async def ensure_founders(db) -> dict:
         )
 
         # Also keep `aurem_users` (legacy customer-login fallback) in sync.
+        # iter 322ar — `is_dogfood` was referenced but never defined → silent
+        # ProvisioningFailed on every startup. Derive from the founder dict.
+        is_dogfood = bool(fdr.get("dogfood"))
         aurem_set = {
             "email": email,
             "role": "user" if is_dogfood else "super_admin",

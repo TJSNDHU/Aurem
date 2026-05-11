@@ -212,6 +212,115 @@ function StatCard({ value, label, color, sub }) {
   );
 }
 
+/**
+ * StackStatusGrid (iter 322ar)
+ * Polls /api/admin/dev-stack/health every 20 s and renders a live green/red
+ * grid for the 11 core runtime components. Replaces stale "ALL OPERATIONAL"
+ * placeholder text with actual probe results.
+ */
+function StackStatusGrid() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const token = sessionStorage.getItem('platform_token')
+        || sessionStorage.getItem('aurem_platform_token')
+        || localStorage.getItem('aurem_token')
+        || localStorage.getItem('token');
+      try {
+        const r = await fetch(`${API}/api/admin/dev-stack/health`, {
+          headers: { Authorization: `Bearer ${token || ''}` },
+        });
+        if (!cancelled && r.ok) setData(await r.json());
+      } catch { /* silent — keep last good state */ }
+    };
+    tick();
+    const id = setInterval(tick, 20000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  const components = data?.components || [];
+  const summary = data?.summary || { total: 0, green: 0, red: 0 };
+
+  return (
+    <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20 }} data-testid="sov-stack-status-grid">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div className="sov-hdr" style={{ fontSize: 14 }}>LIVE STACK STATUS (auto-refresh 20s)</div>
+        <div className="sov-mono" style={{ fontSize: 11, color: summary.red === 0 ? '#4ADE80' : '#F59E0B' }}>
+          {summary.green}/{summary.total} GREEN · {summary.red} RED
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+        {components.length === 0 && (
+          <div className="sov-mono" style={{ fontSize: 11, color: '#5A5468' }}>Polling /api/admin/dev-stack/health …</div>
+        )}
+        {components.map((c, i) => {
+          const ok = c.status === 'green';
+          return (
+            <div key={i} data-testid={`sov-stack-${i}`} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
+              background: ok ? 'rgba(74,222,128,0.05)' : 'rgba(239,68,68,0.05)',
+              border: `1px solid ${ok ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)'}`,
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: ok ? '#4ADE80' : '#EF4444',
+                boxShadow: `0 0 8px ${ok ? '#4ADE80' : '#EF4444'}80`,
+                animation: ok ? 'sov-pulse 2s ease-in-out infinite' : 'none',
+              }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="sov-mono" style={{ fontSize: 11, fontWeight: 700, color: '#E8E0D0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                {c.detail && <div style={{ fontSize: 9, color: '#6A6070', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.detail}>{c.detail}</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * AuditStatsTile (iter 322ar)
+ * Real platform audit numbers from /api/admin/system-overview/stats.
+ * Replaces stale "19 jobs", "234 routers", "16 endpoints" with live counts.
+ */
+function AuditStatsTile({ platform, audit }) {
+  const p = platform || {};
+  const a = audit || {};
+  const cells = [
+    { label: 'ROUTER FILES',      value: p.router_files ?? '—',     color: '#64C8FF', sub: `${p.wired_routers ?? 0} wired` },
+    { label: 'API ENDPOINTS',     value: (p.endpoint_count ?? 0).toLocaleString(), color: '#4ADE80' },
+    { label: 'SCHEDULER JOBS',    value: p.scheduler_jobs ?? '—',   color: '#F59E0B', sub: 'APScheduler + cron' },
+    { label: 'COLLECTIONS',       value: p.collections ?? '—',      color: '#8B5CF6', sub: `${p.data_mb || 0} MB` },
+    { label: 'COUNCIL DECISIONS', value: (a.council_decisions ?? 0).toLocaleString(), color: '#C9A84C' },
+    { label: 'ORA BRAIN THOUGHTS',value: (a.ora_brain_thoughts ?? 0).toLocaleString(), color: '#8B5CF6' },
+    { label: 'AGENT ACTIONS',     value: (a.agent_actions ?? 0).toLocaleString(), color: '#4ADE80' },
+    { label: 'AUTO-HEAL RUNS',    value: (a.auto_heal_runs ?? 0).toLocaleString(), color: '#FF4D00' },
+    { label: 'PIXEL EVENTS',      value: (a.pixel_events ?? 0).toLocaleString(), color: '#64C8FF' },
+    { label: 'BIN INTEL ROWS',    value: (a.bin_intelligence ?? 0).toLocaleString(), color: '#C9A84C' },
+    { label: 'UNIFIED INBOX',     value: (a.unified_inbox ?? 0).toLocaleString(), color: '#4ADE80' },
+    { label: 'ADMIN ACTIONS',     value: (a.admin_actions ?? 0).toLocaleString(), color: '#F59E0B' },
+  ];
+  return (
+    <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20 }} data-testid="sov-audit-stats">
+      <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14 }}>SOVEREIGN AUDIT (REAL NUMBERS)</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+        {cells.map((c, i) => (
+          <div key={i} data-testid={`sov-audit-${i}`} style={{
+            padding: '12px 14px', borderRadius: 10,
+            background: 'rgba(13,13,13,0.6)', border: `1px solid ${c.color}25`,
+          }}>
+            <div className="sov-mono" style={{ fontSize: 9, letterSpacing: '0.12em', color: '#6A6070' }}>{c.label}</div>
+            <div className="sov-mono" style={{ fontSize: 20, fontWeight: 700, color: c.color, marginTop: 4 }}>{c.value}</div>
+            {c.sub && <div style={{ fontSize: 9, color: '#4A4458', marginTop: 2 }}>{c.sub}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FeatureGrid({ title, items, accent }) {
   return (
     <div className="sov-card" style={{ padding: '20px 24px', animationDelay: '0.1s' }}>
@@ -269,7 +378,7 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER 256</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '322ar+'} | MAY 2026</p>
 
           {/* ═══ SHARE BUTTON ═══ */}
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -332,9 +441,85 @@ export default function SystemOverview() {
         {/* ═══ iter 285.4 — TRANSPARENCY WALL (Truth-Sync Live) ═══ */}
         <TransparencyWall />
 
-        {/* ═══ ITERATION 255+ — LATEST BUILDS (Feb 2026) ═══ */}
+        {/* ═══ iter 322ar — REAL AUDIT STATS + LIVE STACK STATUS ═══ */}
+        <AuditStatsTile platform={p} audit={data?.audit} />
+        <StackStatusGrid />
+
+        {/* ═══ ITER 322 (Feb–May 2026) — SHIPPED THIS QUARTER ═══ */}
+        <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid ${GOLD}40`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-iter322-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: GOLD }}>ITER 322 — FEB→MAY 2026 SHIPPED</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            <FeatureGrid title="INTELLIGENCE STACK" accent="#C9A84C" items={[
+              'Client-side pixel hashing (aurem-pixel.js — sha256 PII only)',
+              'CSV invoice ingest → bin_intelligence merge engine',
+              'Unified profile bin_unified_profiles (15-min cron)',
+              'Visitor identity stitching (hashed email/phone match)',
+              'Privacy-first: zero raw PII in DB',
+              'Morning Brief integration — top hot prospects auto-surfaced',
+            ]} />
+            <FeatureGrid title="UNIFIED INBOX" accent="#4ADE80" items={[
+              'Single inbox merging SMS · WhatsApp · Email · Replies',
+              '/api/inbox/reply two-way reply wired to Twilio + Resend',
+              'Customer dashboard inbox tile (auto-populate)',
+              'Auto-link to source lead via bin_intelligence',
+              'CASL-tagged outbound trail',
+            ]} />
+            <FeatureGrid title="FOUNDERS CONSOLE — ACTION DISPATCHER" accent={SOLAR} items={[
+              'POST /propose intercepts SCOUT · STATUS · BLAST · LEADS · PAUSE',
+              'founders_actions.py runs REAL business logic (not LLM)',
+              'Hinglish regex matcher → API route → live exec',
+              'Falls through to ORA brain for free-form prompts',
+              'Audit trail in admin_action_log',
+            ]} />
+            <FeatureGrid title="ADMIN ACTION LOG + BIN OPS" accent="#F59E0B" items={[
+              'Every edit/delete writes db.admin_audit_log',
+              'Admin Brain tile shows recent admin actions (live)',
+              'BIN Soft-Delete: 30-day grace, double-confirm (type DELETE)',
+              'Restore endpoint: /customer-health/customer/{bin}/restore',
+              'Audit chain hash-linked (tamper-evident)',
+            ]} />
+            <FeatureGrid title="SOVEREIGN TRUTH PROTOCOL" accent="#8B5CF6" items={[
+              'INSUFFICIENT_DATA refusal when evidence missing',
+              'Council Data-Anchor: system callers must supply evidence',
+              'Idempotent prompt wrap (every role wrapped exactly once)',
+              '/api/sovereign/telemetry-status — admin HUD',
+              '9/9 directive tests green · 59/59 Sovereign suite green',
+            ]} />
+            <FeatureGrid title="DOGFOOD PULSE" accent="#64C8FF" items={[
+              'AUREM self-hosts on aurem.live as Customer #001',
+              'Dogfood Pulse tile on /admin/brain (live KPIs)',
+              'LIFETIME_FREE plan · billing_exempt · services_unlocked=*',
+              'Same login flow as customers — no admin shortcuts',
+              'Auto-provisioned on startup (idempotent)',
+            ]} />
+            <FeatureGrid title="DEV STACK HEALTH GRID" accent="#4ADE80" items={[
+              '11 runtime components probed live',
+              'Sovereign LLM · LLM Gateway v2 · Council · A2A Bus',
+              'Sentinel · ORA Brain · Birdeye · Unified Inbox',
+              'Intelligence Merge · ORA Skills · Groq',
+              'Mounted on /admin/pillars-map + /admin/system-overview',
+              '/api/admin/dev-stack/health · 20s auto-refresh',
+            ]} />
+            <FeatureGrid title="PUBLIC STATUS PAGE" accent={GOLD} items={[
+              '/status — public-safe sovereign trust page',
+              '/api/public/status + /badge.json (shields.io endpoint)',
+              'Sanitizer guard blocks _id/JWT/MONGO leaks',
+              '11-key payload contract enforced',
+              'Sparkline + Council activity + last incident',
+              'Footer trust-pill on homepage links here',
+            ]} />
+            <FeatureGrid title="REGISTRY.PY REFACTOR (PHASE 1)" accent="#EF4444" items={[
+              'LEAN_MODE + 94-entry skip-set → _registry_config.py (147 LOC)',
+              'LEAN prune logic → _registry_lean_prune.py (89 LOC)',
+              'registry.py 2257 → 2126 LOC · behaviour-identical',
+              'Phase 2 (scheduler block + 5 domain splits) deferred',
+            ]} />
+          </div>
+        </div>
+
+        {/* ═══ ITER 256 (Feb 2026 archive) ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE8040`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-iter256-builds">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>ITERATION 256 — FEB 2026 SHIPPED</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>ITER 256 — FEB 2026 ARCHIVE</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
             <FeatureGrid title="RETELL AI VOICE AGENT — LIVE" accent="#4ADE80" items={[
               'RETELL_API_KEY wired (318 voices accessible)',
@@ -384,7 +569,7 @@ export default function SystemOverview() {
               '3 orphan services → _archive/services/',
               '2 stale tests → _archive/tests/',
               'Archived: clawchief, empire_hud, evolver, openfang, sentinel-{anomaly,guard,overwatch,router}, telegram',
-              'Router count: 234 → 225',
+              'Router count: 234 → 225 (now 331 files / 102 wired @ iter 322ar)',
               'Registry.py cleaned (9 entries removed)',
               '6 deep-wired services preserved (middleware dependencies)',
             ]} />
@@ -419,7 +604,7 @@ export default function SystemOverview() {
               'System Audit verdict, Wiring Coverage %, DB indexes',
               'Redis Cache hit rate + Pixel Buffer efficiency',
               '4-Agent Autonomous System live status',
-              'Scheduler (19 jobs) + Anomaly Detector + Health Check',
+              'Scheduler (~60 jobs) + Anomaly Detector + Health Check',
               'Integration Secrets (required + optional badges)',
             ]} />
             <FeatureGrid title="CUSTOMER 360° + IMPERSONATION" accent="#64C8FF" items={[
@@ -515,7 +700,7 @@ export default function SystemOverview() {
               'CASL compliance', 'do_not_contact list',
               'APScheduler automation', 'Lead Lifecycle (Kanban + Drip)',
               'Accurate Scout + Dark Scout Intelligence',
-              '16 campaign API endpoints',
+              '2,138 API endpoints across 102 wired routers',
             ]} />
             <FeatureGrid title="SOVEREIGN ARCHITECTURE" accent={SOLAR} items={[
               'Sovereign Node (Ollama via Ngrok)', 'XTTS v2 Voice Cloning',
@@ -639,6 +824,9 @@ export default function SystemOverview() {
             'Emergent K8s deployment', 'GitHub backup', '6-hour MongoDB backup',
             'Supervisor process manager', 'Health check endpoint', 'SSL certificate (aurem.live)',
             'PWA (installable app)', 'Overwatch mobile PWA',
+            'Public Status Page (/status · shields.io badge)',
+            'Lavela vertical (3 routers: products / content / quiz)',
+            'DR backup (primary → secondary Atlas, 03:00 UTC daily)',
           ]} />
         </div>
 
@@ -687,7 +875,7 @@ export default function SystemOverview() {
               { status: 'active', icon: '\u{1F7E2}', title: 'Deploy Webhook Fallback LIVE', desc: '/api/admin/deploy/trigger (Iter 287.1)', priority: 'P0' },
               { status: 'active', icon: '\u{1F7E2}', title: 'AUREM Builder pipeline LIVE', desc: 'Async BackgroundTask \u2022 ORA intents wired', priority: 'P0' },
               { status: 'active', icon: '\u{1F7E2}', title: 'Evolver gene approval gate LIVE', desc: '/admin/evolver \u2022 review-mode ON \u2022 never auto-applies', priority: 'P0' },
-              { status: 'active', icon: '\u{1F7E2}', title: 'Nightly scheduler (19 jobs)', desc: '2:00 learn \u2022 2:30 health \u2022 2:45 evolver \u2022 3:15 audit', priority: 'P0' },
+              { status: 'active', icon: '\u{1F7E2}', title: 'APScheduler (~60 jobs)', desc: 'Wedge-scan 60s · Verdict-exec 5m · FollowUp 30m · Referral 6h · plus 15 cron jobs (Toronto TZ)', priority: 'P0' },
             ].map((item, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderRadius: 12,

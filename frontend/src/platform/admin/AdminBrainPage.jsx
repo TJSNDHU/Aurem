@@ -72,18 +72,20 @@ export default function AdminBrainPage() {
     try {
       setErr('');
       // allSettled so one failing endpoint doesn't blank the whole page.
-      const [ro, rf, rn, rd, rdp] = await Promise.allSettled([
+      const [ro, rf, rn, rd, rdp, ral] = await Promise.allSettled([
         fetchJSON('/api/admin/autonomous/overview'),
         fetchJSON('/api/admin/autonomous/pipeline-flow?limit=10'),
         fetchJSON('/api/admin/autonomous/notifications?limit=10&unread_only=true'),
         fetchJSON('/api/admin/deploy-readiness'),
         fetchJSON('/api/admin/dogfood/pulse'),
+        fetchJSON('/api/admin/audit-log?limit=20'),
       ]);
       if (ro.status === 'fulfilled') setOverview(ro.value);
       if (rf.status === 'fulfilled') setFlow(rf.value);
       if (rn.status === 'fulfilled') setNotif(rn.value);
       if (rd.status === 'fulfilled') setDeploy(rd.value);
       if (rdp.status === 'fulfilled') setDogfood(rdp.value);
+      if (ral.status === 'fulfilled') setAuditLog(ral.value);
 
       // Surface only if EVERYTHING failed
       const allFailed = [ro, rf, rn, rd].every(r => r.status === 'rejected');

@@ -889,6 +889,87 @@ function EndpointAuditPanel() {
 }
 
 
+/* ─── Dev Stack Section (iter 322ar) ─────────────────────────────── */
+function DevStackSection() {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`${API}/api/admin/dev-stack/health`, { headers: authHeaders() });
+        if (!cancelled && r.ok) setData(await r.json());
+      } catch { /* silent */ }
+      finally { if (!cancelled) setLoading(false); }
+    };
+    tick();
+    const id = setInterval(tick, 20000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  const components = data?.components || [];
+  const summary = data?.summary || { total: 0, green: 0, red: 0 };
+
+  return (
+    <div
+      data-testid="dev-stack-section"
+      className="mb-5 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Server className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">
+            Dev Stack Health · Live (auto-refresh 20s)
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/50">
+            {summary.green}/{summary.total} green
+          </span>
+          {summary.red > 0 && (
+            <span className="px-2 py-0.5 rounded bg-red-900/40 text-red-300 border border-red-800/50">
+              {summary.red} red
+            </span>
+          )}
+        </div>
+      </div>
+
+      {loading && <div className="text-xs text-gray-500 py-3">Loading stack health…</div>}
+
+      {!loading && components.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          {components.map((c, i) => {
+            const ok = c.status === "green";
+            return (
+              <div
+                key={i}
+                data-testid={`dev-stack-${i}`}
+                className="rounded border px-3 py-2"
+                style={{
+                  background: ok ? "rgba(34,197,94,0.05)" : "rgba(239,68,68,0.05)",
+                  borderColor: ok ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <StatusDot status={c.status} size={8} pulse={!ok} />
+                  <span className="text-xs font-semibold text-gray-200 truncate">{c.name}</span>
+                </div>
+                {c.detail && (
+                  <div className="text-[10px] text-gray-500 truncate" title={c.detail}>
+                    {c.detail}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* ─── Page ──────────────────────────────────────────────────────── */
 export default function AdminPillarsMap() {
   const [snapshot, setSnapshot] = useState(null);
