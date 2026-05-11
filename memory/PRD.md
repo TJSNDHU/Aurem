@@ -1,5 +1,23 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322au (2026-05-11) — AUREM BUILD JOURNAL + Deployment Hardening SHIPPED**
+>
+> **5-phase Build Journal** (Day-1 build data → ORA Learning Stack, fully automatic):
+> 1. **Phase 1 — Git Log Backfill** — 158 commits auto-imported on first boot to `db.build_journal`
+> 2. **Phase 2 — Live Sync** — `IntervalTrigger(minutes=10)` cron ingests new commits
+> 3. **Phase 3 — Public `/build-log` page** — paginated, filter chips, stats strip (158 commits · 2 iters · +3.6M / -4.4K), ORA-learned badges
+> 4. **Phase 4 — Founder Digest** — Resend HTML email daily 04:00 UTC (≈23:00 Toronto) summarising last-24h commits by iter
+> 5. **Phase 5 — ORA Pattern Miner** — nightly 03:30 UTC mines file-coupling patterns to `db.fix_patterns` + emits `BUILD_PATTERN_MINED` brain thought
+>
+> Iter-tag auto-extracted from commit messages OR `backend/tests/test_iteration_XXX_*.py` file paths. `ora_learn()` fires only on iter-tagged rows → brain signal-rich.
+>
+> **Deployment hardening (iter 322au companion fixes):**
+> - `/api/platform/health` endpoint added (sub-1ms response) → fixes nginx upstream timeout / connection-refused on K8s liveness probe
+> - DR-backup switched to whitelist mode (30 critical collections) + 480-collection-cap pre-flight guard → fixes Atlas free-tier 500-collection flood
+> - `register_agents` / `get_agent` / `all_agents` re-exported from `services.agents` with safe fallbacks → fixes 3 recurring startup warnings
+>
+> Endpoints: `GET /api/build-journal/feed`, `GET /api/build-journal/stats`, admin `POST /api/admin/build-journal/{backfill,sync,digest,mine}` (super_admin only).
+
 > **🟢 ITER 322as (2026-05-11) — A→B→C→D Frontend Batch + Customer /my upgrade SHIPPED**
 >
 > 1. **A. White-Label Branding** — `BrandingCard` in `/my/settings` (logo · color · domain · CNAME)

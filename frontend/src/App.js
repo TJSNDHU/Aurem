@@ -15,6 +15,7 @@ import "./App.css";
 // Eager imports for landing routes — lazy() hangs in some envs (webpack chunk
 // not resolving), keeping the splash forever. These pages are tiny enough.
 import AuremHomepage from "./platform/AuremHomepage";
+import BuildLog from "./platform/BuildLog";
 import CustomerEditPortal from "./pages/CustomerEditPortal";
 // AUTO-EAGER (iter 301): converted from lazy() because chunk-split hangs in this env
 import FaceIDAuthWrapper from './components/FaceIDAuthWrapper';
@@ -244,6 +245,7 @@ function AppRouter() {
       <Routes>
       {/* Public Routes */}
       <Route path="/" element={<AuremHomepage />} />
+      <Route path="/build-log" element={<BuildLog />} />
       <Route path="/report/:slug" element={<AuremReport />} />
       <Route path="/report/audit/:tenantId" element={<ClientReport />} />
       <Route path="/welcome" element={<OnboardingWelcome />} />

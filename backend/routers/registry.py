@@ -2772,6 +2772,98 @@ def register_all_routers(app, db):
     except Exception as e:
         logger.warning(f"Public booking router not loaded: {e}")
 
+    # iter 322au — Build Journal router (Day-1 build data → ORA Learning Stack)
+    try:
+        from routers.build_journal_router import (
+            public_router as bj_public,
+            admin_router as bj_admin,
+            set_db as set_bj_db,
+        )
+        set_bj_db(db)
+        app.include_router(bj_public)
+        app.include_router(bj_admin)
+        logger.info("[REGISTRY] Build Journal router registered")
+
+        # ── Auto-backfill on first boot (idempotent, runs once per startup) ──
+        try:
+            import asyncio as _aio
+            from services import build_journal_service as _bj_svc
+
+            async def _build_journal_first_boot():
+                try:
+                    res = await _bj_svc.backfill(db, limit=5000)
+                    logger.info(f"[REGISTRY] Build Journal backfill: {res}")
+                except Exception as bex:
+                    logger.warning(f"[REGISTRY] Build Journal backfill failed: {bex}")
+
+            _aio.get_event_loop().create_task(_build_journal_first_boot())
+        except Exception as e:
+            logger.warning(f"[REGISTRY] Build Journal first-boot task: {e}")
+
+        # ── Phase 2 — Live sync every 10 min ─────────────────────────────
+        try:
+            from apscheduler.triggers.interval import IntervalTrigger
+            from apscheduler.triggers.cron import CronTrigger
+
+            async def _bj_live_sync_job():
+                try:
+                    from services import build_journal_service as _bj
+                    await _bj.live_sync(db)
+                except Exception as e:
+                    logger.warning(f"[bj-sync] {e}")
+
+            aurem_scheduler.add_job(
+                _bj_live_sync_job,
+                IntervalTrigger(minutes=10),
+                id="build_journal_live_sync",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+
+            # ── Phase 4 — Daily founder digest 04:00 UTC (≈23:00 Toronto) ──
+            async def _bj_digest_job():
+                try:
+                    from services import build_journal_service as _bj
+                    res = await _bj.send_daily_digest(db)
+                    logger.info(f"[bj-digest] {res}")
+                except Exception as e:
+                    logger.warning(f"[bj-digest] {e}")
+
+            aurem_scheduler.add_job(
+                _bj_digest_job,
+                CronTrigger(hour=4, minute=0),
+                id="build_journal_daily_digest",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+
+            # ── Phase 5 — ORA Pattern Miner 03:30 UTC ────────────────────
+            async def _bj_miner_job():
+                try:
+                    from services import build_journal_service as _bj
+                    res = await _bj.mine_patterns(db)
+                    logger.info(f"[bj-miner] {res}")
+                except Exception as e:
+                    logger.warning(f"[bj-miner] {e}")
+
+            aurem_scheduler.add_job(
+                _bj_miner_job,
+                CronTrigger(hour=3, minute=30),
+                id="build_journal_pattern_miner",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+
+            logger.info("[REGISTRY] Build Journal schedulers wired — live-sync 10m, digest 04:00, miner 03:30")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] Build Journal scheduler wiring failed: {e}")
+
+    except Exception as e:
+        logger.warning(f"Build Journal router not loaded: {e}")
+
     # ═══════════════════════════════════════════
     # LEAN MODE: Post-registration route cleanup
     # See routers/_registry_lean_prune.py for the full prune-list.
