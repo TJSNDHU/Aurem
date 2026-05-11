@@ -316,6 +316,17 @@ async def get_current_platform_user(authorization: str = Header(None)):
 # PUBLIC ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@router.get("/health")
+async def platform_health():
+    """
+    Kubernetes / nginx liveness probe target.
+    MUST stay dependency-free (no DB, no auth, no third-party) so it returns
+    instantly during cold-start. Hit by Emergent's ingress at /api/platform/health.
+    iter 322au — added to fix deployment health-check timeouts.
+    """
+    return {"status": "ok", "service": "aurem-platform"}
+
+
 @router.get("/tiers")
 async def get_platform_tiers():
     """Get available subscription tiers"""

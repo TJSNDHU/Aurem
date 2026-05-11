@@ -26,6 +26,52 @@ from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
 
+# ─────────────────────────────────────────────────────────────────────
+# WHITELIST mode (iter 322au, May 2026)
+# ─────────────────────────────────────────────────────────────────────
+# Backup-Atlas is on a 500-collection-per-cluster tier (Atlas free/M0/M2/M5
+# all share this cap). Mirroring every collection from primary blew past
+# the cap and flooded the logs with `cannot create a new collection` errors
+# during every deployment. From iter 322au onward we mirror ONLY the
+# business-critical collections that we'd actually need to recover from
+# disaster. Operational logs / heartbeats / audit chunks are intentionally
+# NOT mirrored — they regenerate naturally post-failover.
+DR_WHITELIST = {
+    # auth + identity
+    "users", "platform_users", "user_api_keys", "tenant_api_keys",
+    "customer_api_keys", "api_keys",
+    # commercial / billing
+    "subscriptions", "subscription_plans", "payments",
+    "payment_transactions", "invoices",
+    # tenant business data
+    "bins", "businesses", "business_intelligence", "bin_intelligence",
+    "tenant_health", "tenant_branding", "tenant_booking_services",
+    "tenant_settings",
+    # customer-facing artifacts
+    "bookings", "leads", "lead_intelligence", "appointments",
+    "unified_inbox", "messages", "conversations", "campaigns",
+    "websites", "sites", "site_pages",
+    # founder / admin
+    "admin_audit_log", "admin_actions",
+    "founder_provision_attempts", "founder_state",
+    # learning + intelligence (small, valuable)
+    "ora_brain_thoughts", "fix_patterns", "agent_dependency_map",
+}
+
+# Anything matching these prefixes/suffixes is treated as transient log noise
+# and skipped from DR backup unconditionally — these are the ones the deploy
+# logs flagged as repeatedly hitting the 500-collection cap.
+TRANSIENT_PATTERNS = (
+    "_log", "_logs", "_audit", "_heartbeats", "heartbeats",
+    "_archive", "client_errors", "auto_heal", "pillar_heartbeats",
+    "temp_buffer", "_quarantine", "hunter_live_tests",
+    "voice_interactions", "search_quota", "webauthn_challenges",
+    "live_patches", "autotune_usage_log", "morning_briefs",
+    "monday_briefs", "case_study_reports", "sent_emails", "email_logs",
+    "ora_learning_digests", "founder_notifications", "do_not_contact",
+    "site_content", "orders", "_backup_metadata",
+)
+
 # Collections we never want to mirror (transient / huge / sensitive).
 # High-volume operational/audit logs are intentionally skipped — they're
 # write-only noise that bloats the secondary without aiding recovery.
@@ -33,17 +79,26 @@ EXCLUDE_COLLECTIONS = {
     "fs.files", "fs.chunks",          # GridFS files (size)
     "system.indexes", "system.users", # mongo internal
     "session_logs",                    # transient
-    # High-volume transient logs — recreate themselves quickly post-failover
-    "api_audit_log",
-    "site_monitor_logs",
-    "qa_bot_endpoint_log",
-    "agent_feed",
-    "a2a_events",
-    "sentinel_diagnoses_archive",
-    "cost_savings_log_archive",
-    "auto_heal_log_archive",
-    "council_decisions_archive",
+    "api_audit_log", "site_monitor_logs", "qa_bot_endpoint_log",
+    "agent_feed", "a2a_events",
+    "sentinel_diagnoses_archive", "cost_savings_log_archive",
+    "auto_heal_log_archive", "council_decisions_archive",
+    "db_backup_runs",                  # self-referential
 }
+
+
+def _is_transient(name: str) -> bool:
+    """True if collection name looks like a high-volume log we should skip."""
+    low = name.lower()
+    for pat in TRANSIENT_PATTERNS:
+        if pat in low:
+            return True
+    return False
+
+
+# Hard ceiling — never let the secondary exceed this. 480 leaves headroom
+# under Atlas's 500-collection cluster cap.
+SECONDARY_COLLECTION_CEILING = 480
 
 # Page size when streaming docs (memory bound)
 PAGE_SIZE = 500
@@ -100,8 +155,13 @@ def _mirror_collection(
     skipped = 0
     batch = []
     cursor = src.find({}, no_cursor_timeout=False).batch_size(PAGE_SIZE)
+    cap_hit = False
     try:
         for doc in cursor:
+            if cap_hit:
+                # secondary at 500-collection cap → stop trying further
+                skipped += 1
+                continue
             batch.append(doc)
             if len(batch) >= PAGE_SIZE:
                 try:
@@ -109,19 +169,35 @@ def _mirror_collection(
                     inserted += len(batch)
                 except PyMongoError as e:
                     skipped += len(batch)
-                    logger.warning(
-                        f"[DR-BACKUP] insert_many {coll_name} chunk failed: {e}"
-                    )
+                    msg = str(e)
+                    if "already using 500 collections" in msg:
+                        cap_hit = True
+                        logger.warning(
+                            f"[DR-BACKUP] secondary at collection cap — "
+                            f"abandoning further inserts for {coll_name}"
+                        )
+                    else:
+                        logger.warning(
+                            f"[DR-BACKUP] insert_many {coll_name} chunk failed: {e}"
+                        )
                 batch = []
-        if batch:
+        if batch and not cap_hit:
             try:
                 dst.insert_many(batch, ordered=False)
                 inserted += len(batch)
             except PyMongoError as e:
                 skipped += len(batch)
-                logger.warning(
-                    f"[DR-BACKUP] insert_many {coll_name} tail failed: {e}"
-                )
+                msg = str(e)
+                if "already using 500 collections" in msg:
+                    cap_hit = True
+                    logger.warning(
+                        f"[DR-BACKUP] secondary at collection cap — "
+                        f"tail skipped for {coll_name}"
+                    )
+                else:
+                    logger.warning(
+                        f"[DR-BACKUP] insert_many {coll_name} tail failed: {e}"
+                    )
     finally:
         cursor.close()
 
@@ -129,6 +205,7 @@ def _mirror_collection(
         "collection": coll_name,
         "inserted": inserted,
         "skipped": skipped,
+        "cap_hit": cap_hit,
         "elapsed_ms": int((time.time() - started) * 1000),
     }
 
@@ -181,12 +258,45 @@ def run_backup(triggered_by: str = "scheduler") -> Dict[str, Any]:
         # Use the SAME db_name on the secondary so app failover is a 1-line URL swap.
         secondary_db = secondary_client[db_name]
 
+        # ── iter 322au: pre-flight collection-cap guard ─────────────
+        # Atlas free/M0/M2/M5 tiers have a hard 500-collection-per-cluster
+        # cap. If the secondary is already near the ceiling, abort the run
+        # gracefully instead of flooding logs with `cannot create new
+        # collection` errors during deployment.
+        try:
+            secondary_coll_count = len(secondary_db.list_collection_names())
+        except Exception as e:
+            secondary_coll_count = 0
+            logger.warning(f"[DR-BACKUP] could not count secondary collections: {e}")
+
+        if secondary_coll_count >= SECONDARY_COLLECTION_CEILING:
+            report["status"] = "skipped"
+            report["error"] = (
+                f"Secondary cluster has {secondary_coll_count} collections "
+                f"(>= {SECONDARY_COLLECTION_CEILING} ceiling). DR mirror "
+                f"skipped to avoid Atlas 500-collection cap. Upgrade tier "
+                f"or prune unused collections to resume mirroring."
+            )
+            report["finished_at"] = datetime.now(timezone.utc).isoformat()
+            logger.warning(f"[DR-BACKUP] {run_id} skipped — {report['error']}")
+            return report
+
+        # ── iter 322au: whitelist-only mirror ─────────────────────────
+        # Mirror only business-critical collections (see DR_WHITELIST).
+        # Skip anything in EXCLUDE_COLLECTIONS, anything matching the
+        # transient log patterns, and anything starting with `system.`.
+        all_names = primary_db.list_collection_names()
         coll_names = [
-            c for c in primary_db.list_collection_names()
-            if c not in EXCLUDE_COLLECTIONS and not c.startswith("system.")
+            c for c in all_names
+            if c in DR_WHITELIST
+            and c not in EXCLUDE_COLLECTIONS
+            and not c.startswith("system.")
+            and not _is_transient(c)
         ]
         logger.info(
-            f"[DR-BACKUP] {run_id} started — {len(coll_names)} collections to mirror"
+            f"[DR-BACKUP] {run_id} started — "
+            f"{len(coll_names)}/{len(all_names)} collections to mirror "
+            f"(whitelist mode; secondary has {secondary_coll_count} cols)"
         )
 
         for name in coll_names:
@@ -195,6 +305,13 @@ def run_backup(triggered_by: str = "scheduler") -> Dict[str, Any]:
             report["totals"]["inserted"] += stats["inserted"]
             report["totals"]["skipped"] += stats["skipped"]
             report["totals"]["collections"] += 1
+            if stats.get("cap_hit"):
+                logger.warning(
+                    f"[DR-BACKUP] {run_id} aborting remaining collections — "
+                    f"secondary Atlas cluster at 500-collection cap"
+                )
+                report["aborted_due_to_cap"] = True
+                break
 
         report["status"] = "ok"
         report["finished_at"] = datetime.now(timezone.utc).isoformat()

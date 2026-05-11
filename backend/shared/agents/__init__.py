@@ -99,18 +99,35 @@ _agents: Dict[str, AuremAgent] = {}
 
 
 def register_agents(db):
-    """Instantiate all 4 agents and register them. Called at startup."""
-    from services.agents.hunter_ora import HunterORA
-    from services.agents.followup_ora import FollowupORA
-    from services.agents.closer_ora import CloserORA
-    from services.agents.referral_ora import ReferralORA
+    """Instantiate all 4 agents and register them. Called at startup.
 
-    for cls in (HunterORA, FollowupORA, CloserORA, ReferralORA):
-        agent = cls(db)
-        _agents[agent.AGENT_ID] = agent
-        logger.info(f"[Agents] Registered: {agent.AGENT_EMOJI} {agent.AGENT_NAME}")
+    iter 322au — made resilient to missing agent classes so a single
+    missing module doesn't break the whole startup path. Each agent is
+    imported individually; failures are logged and skipped.
+    """
+    agent_specs = [
+        ("services.agents.hunter_ora",   "HunterORA"),
+        ("services.agents.followup_ora", "FollowupORA"),
+        ("services.agents.closer_ora",   "CloserORA"),
+        ("services.agents.referral_ora", "ReferralORA"),
+    ]
+    for mod_path, cls_name in agent_specs:
+        try:
+            mod = __import__(mod_path, fromlist=[cls_name])
+            cls = getattr(mod, cls_name, None)
+            if cls is None:
+                logger.warning(f"[Agents] {cls_name} not found in {mod_path} — skipped")
+                continue
+            agent = cls(db)
+            _agents[agent.AGENT_ID] = agent
+            logger.info(f"[Agents] Registered: {agent.AGENT_EMOJI} {agent.AGENT_NAME}")
+        except Exception as e:
+            logger.warning(f"[Agents] {cls_name} init failed — skipped ({e})")
 
-    bus.set_db(db)
+    try:
+        bus.set_db(db)
+    except Exception as e:
+        logger.warning(f"[Agents] bus.set_db failed: {e}")
     return _agents
 
 
