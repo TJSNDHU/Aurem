@@ -795,12 +795,13 @@ async def ora_bridge_watchdog(db=None) -> Dict[str, Any]:
         from apscheduler.triggers.interval import IntervalTrigger
         sched.add_job(
             ora_bridge_tick,
-            IntervalTrigger(seconds=60),
+            IntervalTrigger(seconds=60, jitter=20),
             id="ora_proposal_bridge",
             name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
             replace_existing=True,
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=30,
         )
         restart_ok = True
     except Exception as e:

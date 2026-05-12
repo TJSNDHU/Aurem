@@ -1761,7 +1761,18 @@ def register_all_routers(app, db):
         from utils.aurem_bug_engine import scheduled_bug_scan
         from utils.self_scan import run_self_scan
 
-        aurem_scheduler = AsyncIOScheduler()
+        aurem_scheduler = AsyncIOScheduler(
+            # [DEPLOY FIX iter 322ea] Global job defaults — prevent any
+            # job from running concurrently with itself, coalesce missed
+            # runs into a single fire, and tolerate a 30s misfire window
+            # so a slow tick doesn't cascade into a backlog warning that
+            # spams the logs and blocks future jobs.
+            job_defaults={
+                "max_instances": 1,
+                "coalesce": True,
+                "misfire_grace_time": 30,
+            }
+        )
         # Expose at module level so /api/admin/system-audit can introspect job list + next-run times
         globals()["aurem_scheduler"] = aurem_scheduler
         aurem_scheduler.add_job(
@@ -1797,6 +1808,7 @@ def register_all_routers(app, db):
                 IntervalTrigger(
                     seconds=int(_WEDGE_INTERVAL),
                     start_date=_wedge_first_run,
+                    jitter=20,
                 ),
                 id='agent_wedge_scan',
                 name='Agent A2A Self-Heal Loop',
@@ -2602,12 +2614,13 @@ def register_all_routers(app, db):
             from apscheduler.triggers.interval import IntervalTrigger as _IT
             aurem_scheduler.add_job(
                 run_sentinel_repair_cycle,
-                _IT(seconds=60),
+                _IT(seconds=60, jitter=20),
                 id="sentinel_repair_loop",
                 name="Sentinel Repair Loop (A2A → Council → ORA + AI Diagnose)",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
+                misfire_grace_time=30,
             )
             logger.info("[REGISTRY] Sentinel repair loop scheduled (every 60s)")
         except Exception as sr_e:
@@ -2656,12 +2669,13 @@ def register_all_routers(app, db):
             from apscheduler.triggers.interval import IntervalTrigger as _IT3
             aurem_scheduler.add_job(
                 ora_bridge_tick,
-                _IT3(seconds=60),
+                _IT3(seconds=60, jitter=20),
                 id="ora_proposal_bridge",
                 name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
+                misfire_grace_time=30,
             )
             logger.info("[REGISTRY] ORA proposal bridge scheduled (every 60s)")
         except Exception as ob_e:

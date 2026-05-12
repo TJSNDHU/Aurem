@@ -1101,12 +1101,25 @@ async def startup_event():
                 logging.error("❌ MONGO_URL not configured - database operations will fail")
                 logging.warning("Server will continue but database operations will fail")
             else:
+                # [DEPLOY FIX iter 322ea] Atlas pool exhaustion was killing
+                # K8s health probes: with maxPoolSize=50 + 4 per-minute
+                # scheduler jobs all hitting Atlas at xx:00, the pool
+                # paused, every awaiting coroutine blocked for 10s, and
+                # the event loop saturated so /api/platform/health
+                # couldn't be scheduled within nginx's 10s upstream
+                # timeout → pod restart loop.
+                #   • maxPoolSize 50 → 200  : room for scheduler burst + user reqs
+                #   • minPoolSize 0 → 10    : warm pool eliminates cold-connect on first probe
+                #   • waitQueueTimeoutMS 10s → 2s : fail fast when pool exhausted
+                #     instead of holding the event loop hostage
                 client = AsyncIOMotorClient(
                     mongo_url,
                     serverSelectionTimeoutMS=5000,
                     connectTimeoutMS=10000,
                     socketTimeoutMS=20000,
-                    maxPoolSize=50,
+                    maxPoolSize=200,
+                    minPoolSize=10,
+                    waitQueueTimeoutMS=2000,
                     retryWrites=True,
                 )
                 db = client[db_name]
