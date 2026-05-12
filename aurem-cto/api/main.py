@@ -12,6 +12,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# iter 322ex — sovereign LLM + tool-bridge orchestrator
+from services.orchestrator import chat_with_tools
+from services.tools_bridge import list_tools as upstream_list_tools
+
 # Load environment variables
 load_dotenv()
 
@@ -152,31 +156,57 @@ async def health_check():
 
 
 @app.get("/api/tools/list")
-async def list_tools():
-    """Return list of available tool names (stub for Batch 2)."""
-    tools = [
+async def list_tools(authorization: Optional[str] = Header(None)):
+    """Proxy upstream tool catalog via tools_bridge (iter 322ex).
+
+    Falls back to a static 28-tool stub if upstream is unreachable so the
+    Cockpit UI still renders something."""
+    token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    try:
+        tools = await upstream_list_tools(token)
+        if tools:
+            return {"ok": True, "tools": tools, "count": len(tools), "source": "upstream"}
+    except Exception as e:
+        logger.warning(f"upstream tool catalog unreachable: {e!r}")
+    # Static fallback
+    stub = [
         "grep_codebase", "view_file", "view_dir", "curl_internal", "db_count",
         "db_distinct", "git_log", "health_check", "lint_python", "shell_exec",
-        "safe_edit", "restart_service", "peer_review", "code_review", "security_scan",
-        "council_consult", "safe_edit_with_council", "shell_exec_with_council",
-        "propose_commit", "create_file", "create_dir", "append_to_file", "pytest_run",
-        "cloudflare_dns_list", "cloudflare_dns_write", "docker_compose", "pip_propose",
-        "ora_run_natural"
+        "safe_edit", "restart_service", "peer_review", "code_review",
+        "council_safe_edit", "council_shell_exec", "propose_commit",
+        "create_file", "create_dir", "append_to_file", "pytest_run",
+        "cloudflare_dns_list", "cloudflare_dns_write", "docker_compose",
+        "pip_propose", "ora_run_natural", "git_status", "git_diff_path",
     ]
-    return {"ok": True, "tools": tools, "count": len(tools)}
+    return {"ok": True, "tools": stub, "count": len(stub), "source": "stub-fallback"}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, user: dict = Depends(verify_admin_token)):
-    """Chat endpoint with JWT admin requirement (stub LLM for Batch 2)."""
-    logger.info(f"Chat request from user {user.get('sub', 'unknown')}: {request.prompt[:80]}")
-    
-    # Stub response
+async def chat(
+    request: ChatRequest,
+    user: dict = Depends(verify_admin_token),
+    authorization: Optional[str] = Header(None),
+):
+    """Real LLM + tool-call loop (iter 322ex). Routes through:
+       Groq llama-3.3-70b → OpenRouter Haiku → Emergent Claude Sonnet 4.5.
+       Tool execution proxied to upstream AUREM via tools_bridge."""
+    logger.info(f"Chat from {user.get('email') or user.get('sub','?')}: {request.prompt[:80]}")
+    jwt_token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        jwt_token = authorization.split(" ", 1)[1].strip()
+
+    res = await chat_with_tools(
+        prompt=request.prompt,
+        jwt_token=jwt_token,
+        max_iters=max(1, min(request.max_tool_iters, 6)),
+    )
     return ChatResponse(
-        ok=True,
-        content=f"stub: {request.prompt[:80]}",
-        provider="stub",
-        iterations=0
+        ok=res.get("ok", True),
+        content=res.get("content") or "(no response)",
+        provider=res.get("provider") or "?",
+        iterations=res.get("iterations") or 0,
     )
 
 

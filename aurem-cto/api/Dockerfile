@@ -5,9 +5,10 @@ WORKDIR /app
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Copy and install dependencies
+# Install Python deps (emergentintegrations needs Emergent's extra index)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
 
 # Copy application code
 COPY . .

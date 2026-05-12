@@ -1,9 +1,12 @@
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 motor==3.6.0
-pymongo==4.10.1
+# pymongo intentionally unpinned — motor 3.6.0 picks compatible version
 pydantic==2.10.0
 aiosqlite==0.20.0
 httpx==0.27.0
 python-dotenv==1.0.1
 pyjwt==2.10.0
+# iter 322ex — Emergent universal key fallback (lazy-imported; install via
+# extra-index https://d33sy5i8bnduwe.cloudfront.net/simple/  )
+emergentintegrations==0.1.1
