@@ -27,7 +27,7 @@ import {
   // Settings
   Lock, DollarSign, Hash, Eye,
   // HUD
-  Flame, Dot, LogOut,
+  Flame, Dot, LogOut, MessageSquare,
 } from 'lucide-react';
 import { getPlatformToken, clearPlatformAuth } from '../utils/secureTokenStore';
 import { BACKEND_URL } from '../lib/api';
@@ -88,6 +88,8 @@ const SECTIONS = [
       { to: '/admin/ora-optimize',       label: 'ORA Optimizer · $',   icon: Zap,        hint: '' },
       { to: '/admin/ora-cto',            label: 'ORA CTO Cockpit',     icon: Crown,      hint: '' },
       { to: '/admin/git-gate',           label: 'Git Commit Gate',     icon: GitBranch,  hint: '' },
+      { to: '/admin/ora-chat',           label: 'ORA Chat',            icon: MessageSquare, hint: '' },
+      { to: '/admin/ora-settings',       label: 'ORA Settings',        icon: Settings,   hint: '' },
     ],
   },
   {

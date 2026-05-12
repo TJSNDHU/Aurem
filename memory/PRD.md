@@ -1,5 +1,61 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322es (2026-05-12) — ORA CTO 100% COMPLETE · NO BROKEN ENDS**
+>
+> Founder ordered: finish the ORA CTO stack fully before Camoufox. Cost-tracking and quotas explicitly skipped (AUREM is self-hosted, single-founder — meter customers, not yourself). Council gate + git commit gate are the safety net.
+>
+> **What landed**:
+>
+> **A. `/admin/ora-chat`** — 3-tab founder console
+>   - **Tab 1 General Chat** — converses with ORA via `/api/public/ora/chat` with admin JWT, multi-turn session_id, provider + latency badges.
+>   - **Tab 2 CTO Mode** — 12 quick-action buttons (Read File / Grep / Shell / Restart / Council / Health Check / Git Log / Lint / Code Review / Security Scan / DB Count / Propose Commit). Live JSON output pane. Args box (JSON, editable). **Preview → Deploy → Save to GitHub workflow inline**: after any successful edit, the founder gets `Deploy: lint → restart → health` and `Save to GitHub` buttons that chain `lint_python` + `restart_service` + `health_check` and then call `propose_commit`. Recent invocations sidebar (10) + **Rollback panel** listing last 10 `.bak` snapshots from `/tmp/ora_backups/` with one-click restore.
+>   - **Tab 3 Files & Uploads** — drag-drop multi-file uploader (PDF, DOCX, TXT, MD, CSV, JSON, JPG, PNG, MP3, MP4, etc — 30 MB cap). Stored at `/mnt/uploads/{tenant_id}/`. "Analyze with ORA" button per file calls `call_llm_with_meta` with best-effort text extraction (pypdf for PDF, python-docx for DOCX, raw text for others). Delete button per file.
+>
+> **B. `/admin/ora-settings`** — 5-section founder console
+>   - **GitHub** — PAT (masked when stored), repo, default branch, branch protection toggle, Test connection button (hits `api.github.com/user`).
+>   - **Permissions** — toggle each of the 19 tools individually + shell-whitelist editor.
+>   - **Council** — peer-role multi-select (security/backend/qa/devops/design/finance/marketing/pricing), hard gate ON/OFF (default ON), vote threshold (1 / 2 / unanimous).
+>   - **Notifications** — WhatsApp critical alerts toggle + email digest time + digest email.
+>   - **Audit & Logs** — retention days + Export CSV (5000 rows) + jump-to-cockpit / jump-to-rollbacks shortcuts.
+>   - All saved to `platform_settings/ora_cto` doc.
+>
+> **C. New backend routers**
+>   - `routers/ora_files_router.py` — `/api/admin/ora-files/{upload,list,{id},{id}/analyze,{id} DELETE}` with MIME + size validation, tenant-scoped storage at `/mnt/uploads/{tenant_id}/`.
+>   - `routers/ora_settings_router.py` — `/api/admin/ora-settings/{,/{section},/github-test,/export-audit-csv}` over `platform_settings/ora_cto`.
+>   - `routers/ora_rollback_router.py` — `/api/admin/ora-rollback/{list,restore}` over `/tmp/ora_backups/*.bak` with path-decoder that reverses safe_edit's `/` → `__` encoding. Optional service restart on restore.
+>
+> **D. Quotas + cost tracking removed**
+>   - `_QUOTA_PER_HOUR`, `_check_quota`, `_maybe_alert_quota`, `_record_llm_cost` all deleted from `ora_tools.py`.
+>   - Cockpit's "Rolling-hour quotas" + "LLM cost · last 24h" sections stripped.
+>   - Cockpit KPI tiles reduced 5 → 5 (kept all behavioural ones; only renamed "Overrides 24h" → "Council overrides" for clarity).
+>
+> **E. iter 322es skill saved across all 4 channels**
+>   - `dev_ora-cto-final-complete.md` (5,480 chars) → `ora_training_files` + `ora_skills_library` + `ora_skills_broadcast` (now 13 skills, 64,774 chars addendum) + SECONDARY Atlas mirror.
+>
+> **F. E2E results**
+>   - **10/10 fast tools** all green through `POST /api/ora-tools/execute`: grep_codebase, view_file, view_dir, curl_internal, db_count, db_distinct, git_log, health_check, lint_python, shell_exec.
+>   - **council_consult** + **peer_review** verified working (40s LLM round-trip).
+>   - **propose_commit + approve** verified earlier in iter 322er with real SHA `c3ff792`.
+>   - **safe_edit_with_council REJECT** verified earlier in iter 322eq (2/2 peers blocked bcrypt bypass).
+>
+> **G. Regression suite**
+>   - **28/28 pytests passing** across iter 322ep + 322eq + 322er + 322es.
+>   - Tests lock in: broadcast full-body, council gate signal detector, risk classifier, rollback path decoder, ora_files MIME caps, settings section defaults, iter 322es skill persistence, quota machinery removal.
+>
+> **3 Proofs**:
+>   1. `/api/admin/{ora-cto,git-gate,ora-files,ora-settings,ora-rollback,design-extract,ora-optimize}/_/health` ALL return HTTP 200 (8/8 green).
+>   2. `ora_tool_invocations`=107 rows growing real-time · `ora_commit_proposals.approved`=1 (real founder approval) · `ora_skills_library`=1,466 rows (iter 322es skill present).
+>   3. `git log --oneline -3` shows ORA's real founder-approved commit: `c3ff792 docs: iter 322er git-gate proof marker`.
+>
+> **Routes wired**: `/admin/ora-chat`, `/admin/ora-settings`, `/admin/ora-cto`, `/admin/git-gate`, `/admin/ora-optimize`, `/admin/design-extract` — all in sidebar (BUILD/HEALTH sections).
+>
+> **Files**:
+>   - Backend: 3 new routers (ora_files, ora_settings, ora_rollback) + `ora_tools.py` cleanup + `teach_ora_iter_322es.py` + `dev_ora-cto-final-complete.md`
+>   - Frontend: `OraChat.jsx` (770 lines, 3 tabs), `OraSettings.jsx` (380 lines, 5 sections), cockpit cleanup
+>   - Tests: `test_iter_322es_ora_cto_final_complete.py`
+
+---
+
 > **🟢 ITER 322er (2026-05-12) — P5 GIT COMMIT GATE LIVE**
 >
 > **What landed**: ORA can no longer push commits without founder approval.

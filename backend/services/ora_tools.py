@@ -1080,21 +1080,10 @@ async def council_consult(question: str, *,
 #      the caller explicitly sets override_dissent=True with a recorded
 #      override_reason. The override is loud-logged.
 
-# Hourly cap per (tool, actor). actor "ora" = ORA itself; founder JWT
-# = "founder"; testing scripts = "test". These caps are intentionally
-# generous — they exist to catch runaway loops, not to gate normal work.
-_QUOTA_PER_HOUR: dict[str, int] = {
-    "shell_exec":              60,
-    "safe_edit":               30,
-    "restart_service":         10,
-    "safe_edit_with_council":  20,
-    "shell_exec_with_council": 20,
-    "council_consult":         40,
-    "peer_review":             80,
-    "code_review":             100,
-    "security_scan":           60,
-    "propose_commit":          15,
-}
+# iter 322es — quotas removed. AUREM is a single-user self-hosted stack;
+# ORA operates without rate limits. Safety is enforced by the council
+# gate (safe_edit_with_council / shell_exec_with_council) and the git
+# commit gate (propose_commit + founder approval), not by quotas.
 
 # Substrings (case-insensitive) which, when present in a peer's opinion,
 # mark them as DISSENTING. Tuned conservatively — false positives are
@@ -1130,31 +1119,6 @@ _RISKY_SHELL_SIGNALS = (
     "rm ", "rm-", "truncate", "drop ", "drop_", "drop-",
     "format", "mkfs", "dd if=", ":wq!",
 )
-
-
-async def _check_quota(tool: str, actor: str) -> tuple[bool, dict]:
-    """Returns (allowed, {used, cap, window_h}).
-
-    Quotas are rolling-hourly and per (tool, actor). Failures default to
-    "allow" so a transient Mongo blip doesn't lock ORA out.
-    """
-    cap = _QUOTA_PER_HOUR.get(tool)
-    if cap is None or _db is None:
-        return True, {"used": 0, "cap": cap, "window_h": 1, "note": "no quota tracked"}
-    try:
-        since = datetime.now(timezone.utc).replace(microsecond=0)
-        # Subtract 1 hour exactly via timedelta
-        from datetime import timedelta as _td
-        since = since - _td(hours=1)
-        used = await _db[_INVOCATION_LOG].count_documents({
-            "tool":  tool,
-            "actor": actor,
-            "ts":    {"$gte": since.isoformat()},
-        })
-        return used < cap, {"used": used, "cap": cap, "window_h": 1}
-    except Exception as e:
-        logger.warning(f"[ora_tools] quota check failed for {tool}/{actor}: {e}")
-        return True, {"used": 0, "cap": cap, "window_h": 1, "note": "quota check errored — fail-open"}
 
 
 def _peer_dissents(opinion_text: str) -> tuple[bool, list[str]]:
@@ -1798,35 +1762,29 @@ TOOL_REGISTRY: dict[str, dict] = {
 
 
 async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
-    """Dispatch a tool by name. Always returns a dict; never raises."""
+    """Dispatch a tool by name. Always returns a dict; never raises.
+
+    iter 322es — quota enforcement removed. AUREM is a self-hosted stack
+    used only by the founder; ORA operates without rate limits. Safety
+    is enforced by the council gate (safe_edit_with_council / shell_exec
+    _with_council) and the git commit gate (propose_commit + founder
+    approval).
+    """
     start = time.time()
     if name not in TOOL_REGISTRY:
         result = {"ok": False, "error": f"unknown tool: {name}",
                    "available_tools": sorted(TOOL_REGISTRY.keys())}
     else:
-        # iter 322eq — hourly quota gate
-        allowed, q_meta = await _check_quota(name, actor)
-        if not allowed:
-            result = {
-                "ok": False,
-                "error": f"hourly quota exhausted for {name} (used {q_meta['used']}/{q_meta['cap']} in last 1h)",
-                "quota": q_meta,
-                "hint": "Wait for the rolling window to roll forward, or escalate to founder.",
-            }
-        else:
-            fn = TOOL_REGISTRY[name]["fn"]
-            # Light arg sanitisation — coerce dict
-            if not isinstance(args, dict):
-                args = {}
-            try:
-                result = await fn(**args)
-            except TypeError as e:
-                result = {"ok": False, "error": f"bad args for {name}: {str(e)[:120]}"}
-            except Exception as e:
-                result = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
-            # Attach quota state on the result for caller visibility
-            if isinstance(result, dict):
-                result.setdefault("quota", q_meta)
+        fn = TOOL_REGISTRY[name]["fn"]
+        # Light arg sanitisation — coerce dict
+        if not isinstance(args, dict):
+            args = {}
+        try:
+            result = await fn(**args)
+        except TypeError as e:
+            result = {"ok": False, "error": f"bad args for {name}: {str(e)[:120]}"}
+        except Exception as e:
+            result = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
 
     elapsed_ms = int((time.time() - start) * 1000)
     result["tool"] = name

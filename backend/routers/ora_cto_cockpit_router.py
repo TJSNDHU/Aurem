@@ -274,31 +274,11 @@ async def overrides(
 
 @router.get("/quotas")
 async def quotas(authorization: Optional[str] = Header(None)):
-    """Live per-tool quota state — used/cap over the last rolling hour."""
+    """Iter 322es — quotas were removed. Endpoint kept as a deprecation
+    shim that returns an empty list so older UIs don't crash."""
     _verify_token(authorization)
-    db = _get_db()
-    from services.ora_tools import _QUOTA_PER_HOUR
-    since = _hrs_ago(1).isoformat()
-    out = []
-    pipeline = [
-        {"$match": {"ts": {"$gte": since}, "tool": {"$in": list(_QUOTA_PER_HOUR.keys())}}},
-        {"$group": {"_id": "$tool", "calls": {"$sum": 1}}},
-    ]
-    seen: dict[str, int] = {}
-    async for r in db.ora_tool_invocations.aggregate(pipeline):
-        seen[r["_id"]] = r["calls"]
-    for tool, cap in _QUOTA_PER_HOUR.items():
-        used = seen.get(tool, 0)
-        out.append({
-            "tool":        tool,
-            "used":        used,
-            "cap":         cap,
-            "remaining":   max(cap - used, 0),
-            "pct":         round(used / cap * 100, 1),
-            "exhausted":   used >= cap,
-        })
-    out.sort(key=lambda r: -r["pct"])
-    return {"ok": True, "window_hours": 1, "rows": out}
+    return {"ok": True, "window_hours": 1, "rows": [],
+             "deprecated": "iter 322es — ORA operates without rate limits"}
 
 
 @router.get("/_/health")

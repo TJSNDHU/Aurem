@@ -87,12 +87,19 @@ def test_shell_exec_with_council_validates_rationale():
     assert "rationale required" in res["error"].lower()
 
 
-def test_quota_caps_present_for_write_tools():
-    from services.ora_tools import _QUOTA_PER_HOUR
-    for tool in ("safe_edit", "shell_exec", "restart_service",
-                  "safe_edit_with_council", "shell_exec_with_council"):
-        assert tool in _QUOTA_PER_HOUR, f"missing quota cap for {tool}"
-        assert _QUOTA_PER_HOUR[tool] > 0
+def test_council_tools_in_registry():
+    from services.ora_tools import TOOL_REGISTRY
+    assert "safe_edit_with_council" in TOOL_REGISTRY
+    assert "shell_exec_with_council" in TOOL_REGISTRY
+
+
+def test_council_gate_signal_detector_works():
+    """Iter 322es — quota tests removed. Gate still active."""
+    from services.ora_tools import _peer_dissents
+    diss, _ = _peer_dissents("VERDICT: REJECT. CRITICAL SECURITY issue.")
+    assert diss is True
+    diss, _ = _peer_dissents("Looks good, ship it.")
+    assert diss is False
 
 
 def test_ora_cto_cockpit_router_imports_clean():
@@ -126,3 +133,11 @@ def test_new_council_tools_in_registry():
     from services.ora_tools import TOOL_REGISTRY
     assert "safe_edit_with_council" in TOOL_REGISTRY
     assert "shell_exec_with_council" in TOOL_REGISTRY
+
+
+def test_iter_322es_quota_helpers_removed():
+    """Iter 322es — confirm quota machinery is gone from ora_tools."""
+    import services.ora_tools as ot
+    for sym in ("_QUOTA_PER_HOUR", "_check_quota", "_maybe_alert_quota",
+                 "_record_llm_cost", "_SESSION_QUOTA_PER_HOUR", "_QUOTA_ALERT_FIRED"):
+        assert not hasattr(ot, sym), f"quota symbol still present: {sym}"

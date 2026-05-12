@@ -28,10 +28,8 @@ def test_git_gate_router_imports_clean():
 
 
 def test_propose_commit_registered():
-    from services.ora_tools import TOOL_REGISTRY, _QUOTA_PER_HOUR
+    from services.ora_tools import TOOL_REGISTRY
     assert "propose_commit" in TOOL_REGISTRY
-    assert "propose_commit" in _QUOTA_PER_HOUR
-    assert _QUOTA_PER_HOUR["propose_commit"] > 0
 
 
 @pytest.mark.asyncio

@@ -1150,6 +1150,36 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] design_extract_router skipped: {e}")
 
+    # iter 322es — ORA Rollback (one-click restore from safe_edit backups)
+    if not _should_skip("routers.ora_rollback_router"):
+        try:
+            from routers.ora_rollback_router import router as ora_rollback_router
+            app.include_router(ora_rollback_router)
+            logger.info("[REGISTRY] ora_rollback_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_rollback_router skipped: {e}")
+
+    # iter 322es — ORA Settings (founder-facing platform settings)
+    if not _should_skip("routers.ora_settings_router"):
+        try:
+            from routers.ora_settings_router import router as ora_settings_router
+            app.include_router(ora_settings_router)
+            logger.info("[REGISTRY] ora_settings_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_settings_router skipped: {e}")
+
+    # iter 322es — ORA Files (multi-format upload + analyze)
+    if not _should_skip("routers.ora_files_router"):
+        try:
+            from routers.ora_files_router import router as ora_files_router
+            app.include_router(ora_files_router)
+            logger.info("[REGISTRY] ora_files_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_files_router skipped: {e}")
+
     # iter 322er — Git Commit Gate (founder approves every ORA commit)
     if not _should_skip("routers.git_gate_router"):
         try:

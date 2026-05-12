@@ -93,6 +93,8 @@ import DesignExtractStudio from './platform/admin/DesignExtractStudio';
 import OraOptimizer from './platform/admin/OraOptimizer';
 import OraCtoCockpit from './platform/admin/OraCtoCockpit';
 import GitCommitGate from './platform/admin/GitCommitGate';
+import OraChat from './platform/admin/OraChat';
+import OraSettings from './platform/admin/OraSettings';
 import MonitorFreeLanding from './platform/MonitorFreeLanding';
 import AdminSiteMonitor from './platform/AdminSiteMonitor';
 import PublicStatusPage from './platform/PublicStatusPage';
@@ -333,6 +335,8 @@ function AppRouter() {
         <Route path="/admin/ora-optimize" element={<OraOptimizer />} />
         <Route path="/admin/ora-cto" element={<OraCtoCockpit />} />
         <Route path="/admin/git-gate" element={<GitCommitGate />} />
+        <Route path="/admin/ora-chat" element={<OraChat />} />
+        <Route path="/admin/ora-settings" element={<OraSettings />} />
         <Route path="/admin/links" element={<AdminLinksHub />} />
         <Route path="/admin/site-monitor" element={<AdminSiteMonitor />} />
         <Route path="/admin/system-audit" element={<AdminSystemAudit />} />

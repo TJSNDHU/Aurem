@@ -13,7 +13,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Crown, Activity, Shield, AlertTriangle, RefreshCw,
-  Zap, DollarSign, Gauge, FileWarning, Hammer, CheckCircle,
+  Zap, FileWarning, Hammer, CheckCircle,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -52,10 +52,8 @@ export default function OraCtoCockpit() {
   const [window, setWindow] = useState(24);
   const [summary, setSummary] = useState(null);
   const [byTool, setByTool] = useState([]);
-  const [costs, setCosts] = useState(null);
   const [overrides, setOverrides] = useState([]);
   const [invocations, setInvocations] = useState([]);
-  const [quotas, setQuotas] = useState([]);
   const [filterTool, setFilterTool] = useState("");
   const [onlyFails, setOnlyFails] = useState(false);
   const [error, setError] = useState(null);
@@ -68,20 +66,16 @@ export default function OraCtoCockpit() {
       if (filterTool) params.set("tool", filterTool);
       if (onlyFails) params.set("only_failures", "true");
       params.set("limit", "30");
-      const [s, b, c, o, i, q] = await Promise.all([
+      const [s, b, o, i] = await Promise.all([
         fetch(`${API}/api/admin/ora-cto/summary`, { headers }).then(r => r.json()),
         fetch(`${API}/api/admin/ora-cto/by-tool?window_hours=${window}`, { headers }).then(r => r.json()),
-        fetch(`${API}/api/admin/ora-cto/cost-breakdown?window_hours=${window}`, { headers }).then(r => r.json()),
         fetch(`${API}/api/admin/ora-cto/overrides?limit=20`, { headers }).then(r => r.json()),
         fetch(`${API}/api/admin/ora-cto/invocations?${params.toString()}`, { headers }).then(r => r.json()),
-        fetch(`${API}/api/admin/ora-cto/quotas`, { headers }).then(r => r.json()),
       ]);
       if (s?.ok) setSummary(s);
       if (b?.ok) setByTool(b.rows || []);
-      if (c?.ok) setCosts(c);
       if (o?.ok) setOverrides(o.rows || []);
       if (i?.ok) setInvocations(i.rows || []);
-      if (q?.ok) setQuotas(q.rows || []);
     } catch (e) {
       setError(String(e));
     }
@@ -137,89 +131,43 @@ export default function OraCtoCockpit() {
           <Tile testid="kpi-24h"    icon={Zap}       label="Last 24h"        value={summary.invocations_24h} sub={`${summary.invocations_1h} in last 1h`} />
           <Tile testid="kpi-okrate" icon={CheckCircle} label="Success rate"   value={`${summary.success_rate_24h ?? 0}%`} sub={`${summary.failures_24h} failures`}
                 accent={summary.success_rate_24h < 90 ? "warn" : null} />
-          <Tile testid="kpi-overrides" icon={Shield} label="Overrides 24h"   value={summary.overrides_24h}
+          <Tile testid="kpi-overrides" icon={Shield} label="Council overrides" value={summary.overrides_24h}
                 sub={`${summary.overrides_total} lifetime`}
                 accent={summary.overrides_24h > 0 ? "warn" : null} />
           <Tile testid="kpi-active" icon={Hammer}    label="Active tools 24h" value={summary.tools_active_24h} sub="distinct tools" />
         </div>
       )}
 
-      {/* Quotas strip */}
-      {quotas.length > 0 && (
-        <div style={{ ...GLASS, padding: 18, marginBottom: 18 }}>
-          <SectionTitle icon={Gauge} text="Rolling-hour quotas" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-            {quotas.map((q) => (
-              <QuotaBar key={q.tool} q={q} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Quotas section intentionally removed (iter 322es). */}
 
-      {/* By-tool + cost grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 18 }}>
-        <div style={{ ...GLASS, padding: 18 }}>
-          <SectionTitle icon={Activity} text={`Per-tool rollup · last ${window}h`} />
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 70px 70px 90px 130px",
-                        gap: 6, padding: "4px 0", color: TEXT_DIM, fontSize: 11,
-                        textTransform: "uppercase", borderBottom: `1px solid ${BORDER}` }}>
-            <div>Tool</div><div>Calls</div><div>OK %</div><div>Avg ms</div><div>Last</div>
-          </div>
-          {byTool.length === 0 ? (
-            <div style={{ padding: 10, color: TEXT_DIM, fontSize: 13 }}>No activity in this window.</div>
-          ) : byTool.map((r, i) => (
-            <div data-testid={`tool-row-${r.tool}`} key={r.tool}
-                 onClick={() => setFilterTool(r.tool === filterTool ? "" : r.tool)}
-                 style={{
-                   display: "grid", gridTemplateColumns: "1.4fr 70px 70px 90px 130px",
-                   gap: 6, padding: "8px 0", fontSize: 12.5, cursor: "pointer",
-                   borderBottom: `1px solid rgba(212,175,55,0.06)`,
-                   background: filterTool === r.tool ? "rgba(212,175,55,0.08)" : "transparent",
-                 }}>
-              <div style={{ fontWeight: filterTool === r.tool ? 700 : 500 }}>{r.tool}</div>
-              <div>{r.calls}</div>
-              <div style={{ color: r.ok_pct < 90 ? RED : r.ok_pct < 99 ? AMBER : GREEN }}>
-                {r.ok_pct}%
-              </div>
-              <div style={{ color: TEXT_DIM }}>{r.avg_latency_ms}</div>
-              <div style={{ color: TEXT_DIM, fontSize: 11 }}>{(r.last_ts || "").slice(0, 19)}</div>
+      {/* By-tool grid */}
+      <div style={{ ...GLASS, padding: 18, marginBottom: 18 }}>
+        <SectionTitle icon={Activity} text={`Per-tool rollup · last ${window}h`} />
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 70px 70px 90px 130px",
+                      gap: 6, padding: "4px 0", color: TEXT_DIM, fontSize: 11,
+                      textTransform: "uppercase", borderBottom: `1px solid ${BORDER}` }}>
+          <div>Tool</div><div>Calls</div><div>OK %</div><div>Avg ms</div><div>Last</div>
+        </div>
+        {byTool.length === 0 ? (
+          <div style={{ padding: 10, color: TEXT_DIM, fontSize: 13 }}>No activity in this window.</div>
+        ) : byTool.map((r, i) => (
+          <div data-testid={`tool-row-${r.tool}`} key={r.tool}
+               onClick={() => setFilterTool(r.tool === filterTool ? "" : r.tool)}
+               style={{
+                 display: "grid", gridTemplateColumns: "1.4fr 70px 70px 90px 130px",
+                 gap: 6, padding: "8px 0", fontSize: 12.5, cursor: "pointer",
+                 borderBottom: `1px solid rgba(212,175,55,0.06)`,
+                 background: filterTool === r.tool ? "rgba(212,175,55,0.08)" : "transparent",
+               }}>
+            <div style={{ fontWeight: filterTool === r.tool ? 700 : 500 }}>{r.tool}</div>
+            <div>{r.calls}</div>
+            <div style={{ color: r.ok_pct < 90 ? RED : r.ok_pct < 99 ? AMBER : GREEN }}>
+              {r.ok_pct}%
             </div>
-          ))}
-        </div>
-
-        <div style={{ ...GLASS, padding: 18 }}>
-          <SectionTitle icon={DollarSign} text={`LLM cost · last ${window}h`} />
-          {costs && (
-            <>
-              <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
-                <div>
-                  <div style={{ color: TEXT_DIM, fontSize: 11 }}>Total cost</div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: GOLD }}>${costs.total_cost_usd.toFixed(4)}</div>
-                </div>
-                <div>
-                  <div style={{ color: TEXT_DIM, fontSize: 11 }}>Total LLM calls</div>
-                  <div style={{ fontSize: 24, fontWeight: 700 }}>{costs.total_calls}</div>
-                </div>
-              </div>
-              <div style={{ color: TEXT_DIM, fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>
-                Top task types
-              </div>
-              {(costs.by_task || []).slice(0, 6).map((t, i) => (
-                <div data-testid={`cost-row-${t.task_type}`} key={t.task_type + i}
-                     style={{ display: "grid", gridTemplateColumns: "1.4fr 60px 80px",
-                              gap: 6, padding: "6px 0", fontSize: 12,
-                              borderBottom: `1px solid rgba(212,175,55,0.06)` }}>
-                  <div>{t.task_type}</div>
-                  <div style={{ color: TEXT_DIM }}>{t.calls}</div>
-                  <div style={{ color: GOLD }}>${t.est_cost_usd.toFixed(4)}</div>
-                </div>
-              ))}
-              {(costs.by_task || []).length === 0 && (
-                <div style={{ padding: 6, color: TEXT_DIM, fontSize: 13 }}>No LLM activity in window.</div>
-              )}
-            </>
-          )}
-        </div>
+            <div style={{ color: TEXT_DIM }}>{r.avg_latency_ms}</div>
+            <div style={{ color: TEXT_DIM, fontSize: 11 }}>{(r.last_ts || "").slice(0, 19)}</div>
+          </div>
+        ))}
       </div>
 
       {/* Override trail */}
@@ -341,21 +289,6 @@ function SectionTitle({ icon: Icon, text }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
       <Icon size={14} color={GOLD} />
       <span style={{ fontWeight: 600, fontSize: 13 }}>{text}</span>
-    </div>
-  );
-}
-
-function QuotaBar({ q }) {
-  const color = q.pct >= 100 ? RED : q.pct >= 80 ? AMBER : GREEN;
-  return (
-    <div data-testid={`quota-${q.tool}`} style={{ border: `1px solid ${BORDER}`, padding: 10, borderRadius: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 600 }}>{q.tool}</span>
-        <span style={{ color: TEXT_DIM, fontSize: 11 }}>{q.used}/{q.cap}</span>
-      </div>
-      <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.min(q.pct, 100)}%`, background: color, transition: "width .25s" }} />
-      </div>
     </div>
   );
 }
