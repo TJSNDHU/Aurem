@@ -46,6 +46,44 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/**
+ * safeJson — never throws "Unexpected token '<'".
+ * Reads body as text, attempts JSON parse, and on failure surfaces
+ * the actual HTTP status + a short preview so the founder can see WHAT
+ * went wrong (502 from nginx, HTML login page, timeout, etc).
+ *
+ * Always resolves with a plain object. Caller can rely on `.ok` boolean.
+ */
+async function safeJson(r) {
+  const status = r?.status ?? 0;
+  let text = "";
+  try { text = await r.text(); } catch { /* network mid-read */ }
+  // Try JSON parse
+  try {
+    const j = text ? JSON.parse(text) : {};
+    if (typeof j === "object" && j !== null) {
+      if (!("ok" in j)) j.ok = r.ok;
+      j._http_status = status;
+      return j;
+    }
+    return { ok: r.ok, _http_status: status, value: j };
+  } catch (_e) {
+    const preview = (text || "").replace(/\s+/g, " ").trim().slice(0, 220);
+    const looksLikeHtml = /^\s*<(?:!doctype|html|head|body)/i.test(text);
+    const reason = !r.ok
+      ? `HTTP ${status} ${r.statusText || ""}`.trim()
+      : looksLikeHtml
+        ? "Server returned an HTML page (likely 502/504/gateway timeout)"
+        : "Response was not valid JSON";
+    return {
+      ok: false,
+      _http_status: status,
+      error: reason,
+      detail: preview ? `${reason} — body preview: ${preview}` : reason,
+    };
+  }
+}
+
 export default function OraChat() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("chat");
@@ -116,11 +154,12 @@ function ChatPane() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ text: q, session_id: sessionId }),
       });
-      const j = await r.json();
+      const j = await safeJson(r);
+      const isErr = j.ok === false;
       setHistory((h) => [...h, {
-        role: "assistant",
-        content: j.reply || j.detail || JSON.stringify(j),
-        provider: j.provider,
+        role: isErr ? "error" : "assistant",
+        content: j.reply || j.detail || j.error || JSON.stringify(j),
+        provider: j.provider || (isErr ? `HTTP ${j._http_status}` : undefined),
         ms: Date.now() - t0,
       }]);
     } catch (e) {
@@ -234,7 +273,7 @@ function CTOPane() {
     try {
       const r = await fetch(`${API}/api/ora-tools/invocations?limit=10`,
                              { headers: authHeaders() });
-      const j = await r.json();
+      const j = await safeJson(r);
       if (j?.ok) setRecent(j.invocations || []);
     } catch { /* soft fail */ }
   };
@@ -242,7 +281,7 @@ function CTOPane() {
     try {
       const r = await fetch(`${API}/api/admin/ora-rollback/list?limit=10`,
                              { headers: authHeaders() });
-      const j = await r.json();
+      const j = await safeJson(r);
       if (j?.ok) setBackups(j.rows || []);
     } catch { /* soft fail */ }
   };
@@ -251,7 +290,7 @@ function CTOPane() {
     try {
       const r = await fetch(`${API}/api/admin/ora-cto/morning-brief`,
                              { headers: authHeaders() });
-      const j = await r.json();
+      const j = await safeJson(r);
       if (j?.ok) setBrief(j);
       else setError(j?.detail || "morning-brief failed");
     } catch (e) {
@@ -285,8 +324,9 @@ function CTOPane() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ tool: chosen.tool, args }),
       });
-      const j = await r.json();
+      const j = await safeJson(r);
       setResult(j);
+      if (j.ok === false && j.error) setError(j.detail || j.error);
       loadRecent();
       loadBackups();
     } catch (e) {
@@ -307,13 +347,13 @@ function CTOPane() {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ tool: "lint_python", args: { path: result.path } }),
-      }).then(r => r.json());
+      }).then(safeJson);
       steps.push({ step: "lint_python", ok: linted.ok, summary: linted.error_count ?? linted.error });
       const restarted = await fetch(`${API}/api/ora-tools/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ tool: "restart_service", args: { service: "backend" } }),
-      }).then(r => r.json());
+      }).then(safeJson);
       steps.push({ step: "restart_service", ok: restarted.ok });
       // Wait a tick for the supervisor to bring things back
       await new Promise((res) => setTimeout(res, 4000));
@@ -321,7 +361,7 @@ function CTOPane() {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ tool: "health_check", args: {} }),
-      }).then(r => r.json());
+      }).then(safeJson);
       steps.push({ step: "health_check", ok: hc.ok });
       setResult({ ...result, deploy_steps: steps });
     } catch (e) {
@@ -351,7 +391,7 @@ function CTOPane() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
       });
-      const j = await r.json();
+      const j = await safeJson(r);
       if (j?.ok && j?.proposal_id) {
         setResult({ ...result, proposal_id: j.proposal_id });
         navigate("/admin/git-gate");
@@ -374,7 +414,7 @@ function CTOPane() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ backup_name: backupName, restart_service: "backend" }),
       });
-      const j = await r.json();
+      const j = await safeJson(r);
       setResult({ rollback: j });
       loadBackups(); loadRecent();
     } catch (e) {
@@ -566,7 +606,7 @@ function FilesPane() {
     try {
       const r = await fetch(`${API}/api/admin/ora-files/list?limit=30`,
                              { headers: authHeaders() });
-      const j = await r.json();
+      const j = await safeJson(r);
       if (j?.ok) setFiles(j.rows || []);
     } catch (e) { /* soft fail */ }
   };
@@ -584,8 +624,8 @@ function FilesPane() {
         const r = await fetch(`${API}/api/admin/ora-files/upload`, {
           method: "POST", body: form, headers: authHeaders(),
         });
-        const j = await r.json();
-        if (!r.ok) setError(j.detail || `upload failed for ${f.name}`);
+        const j = await safeJson(r);
+        if (!r.ok) setError(j.detail || j.error || `upload failed for ${f.name}`);
       } catch (e) {
         setError(String(e));
       }
@@ -602,7 +642,7 @@ function FilesPane() {
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ question }),
       });
-      const j = await r.json();
+      const j = await safeJson(r);
       setAnalysis((m) => ({ ...m, [id]: j }));
       load();
     } catch (e) {
