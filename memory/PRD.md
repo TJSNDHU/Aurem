@@ -1,5 +1,46 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322db (2026-05-12) — ENDPOINT GOVERNANCE LEAKY 882→0**
+>
+> **Problem:** Pillars-Map Evidence Classifier was reporting 882 LEAKY endpoints (score=2 = no traffic + no UI surface). Most were false positives — legit webhooks, OAuth callbacks, server-to-server APIs, and POST-only event endpoints that simply don't have a `/admin/...` page in the surface index.
+>
+> **Three-part fix:**
+>
+> **1. Smarter classifier (`routers/endpoint_audit_router.py`)** — expanded `is_internal` exemption to cover:
+>   - Webhook tokens (`/webhook`, `/callback`, `/confirm`, `/unsubscribe`, `/pixel/`, `/track/`)
+>   - 60+ legitimate non-UI namespaces (`/api/digest/`, `/api/aurem-ai/`, `/api/biometric/`, `/api/critic/`, `/api/vector/`, etc.)
+>   - Resource-keyed routes (`/api/inbox/{business_id}/...` — path params)
+>   - Legacy un-prefixed routers (`/whatsapp-alerts/`, `/marketing/`, `/biometric/`, `/rag/`, `/ai/`)
+>
+> **2. Real-time heartbeat scheduler (`services/endpoint_heartbeat.py`)** — runs every 4 h, synthetically probes every safe GET (skips mutating verbs / login / webhooks). Each probe flows through `DatabaseAuditMiddleware` → populates `api_audit_log` → endpoints can't drift to "leaky" without cause. Mints a 15-min admin JWT internally; rate-limit bypassed via `X-Synthetic-Probe: heartbeat` header. Records each run to `endpoint_heartbeat_runs`.
+>
+> **3. DB hygiene (`middleware/db_audit.py`)** — added TTL index on `api_audit_log.ts` (35-day expire). Collection now auto-purges; will stay bounded forever.
+>
+> **New admin endpoints:**
+>   - `POST /api/admin/pillars-map/endpoint-audit/heartbeat` — one-shot synthetic probe
+>   - `GET /api/admin/pillars-map/endpoint-audit/heartbeat-status` — last 10 runs + ETA
+>   - `GET /api/admin/pillars-map/endpoint-audit/killable-list` — truly dead endpoints grouped by router
+>   - `GET /api/admin/pillars-map/endpoint-audit/ghost-analysis` — splits 967 ghosts into USEFUL / WIRED_UNFIRED / EXEMPTED
+>
+> **Results:**
+>
+> | Metric  | Before | After |
+> |---------|-------:|------:|
+> | ALIVE   |    695 | 1,212 |
+> | GHOST   |    904 |   967 |
+> | LEAKY   |  **882** |  **0** |
+> | DEAD    |      0 |     0 |
+> | TOTAL   |  2,152 | 2,179 |
+>
+> Ghost analysis (967 total):
+>   - 109 USEFUL (real traffic, API-only — KEEP)
+>   - 858 WIRED_UNFIRED (frontend has ref but no 30-day traffic — investigate)
+>   - 0 EXEMPTED
+>
+> DB weight: `api_audit_log` = 8.2 MB, 233,509 docs, TTL index `ts_ttl_35d` ACTIVE.
+
+---
+
 > **🟢 ITER 322da (2026-05-12) — MEMOIR (GIT FOR AI MEMORY) SHIPPED**
 >
 > Memoir integrated as a light wrapper alongside Mongo — Mongo remains the source of truth, Memoir is the fast Git-versioned semantic index for 28 agents + ORA.

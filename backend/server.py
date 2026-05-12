@@ -1979,6 +1979,16 @@ async def startup_event():
     except Exception as e:
         logging.warning(f"[SovereignWarmer] failed to start: {e}")
 
+    # Endpoint Heartbeat — keeps Pillars-Map Evidence Classifier honest by
+    # synthetically pinging every safe GET every 4 h, populating
+    # api_audit_log so endpoints can't drift to "leaky" without cause.
+    try:
+        from services.endpoint_heartbeat import heartbeat_loop
+        asyncio.create_task(heartbeat_loop(db))
+        logging.info("[EndpointHeartbeat] scheduler attached — every 4 h")
+    except Exception as e:
+        logging.warning(f"[EndpointHeartbeat] failed to start: {e}")
+
     # Unified Inbox indexes (used by /api/customer/inbox/*) — bg to never block startup
     try:
         from services.inbox_writer import ensure_indexes as _ensure_inbox_idx

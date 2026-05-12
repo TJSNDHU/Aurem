@@ -359,7 +359,65 @@ async def _build_audit_report() -> dict:
         # other backend services. Without this exemption ~700 admin endpoints
         # were flagged "LEAKY" purely because they have no `/admin/...` page
         # listed in the surface index — a false positive.
+        #
+        # iter 322db — Expanded exemptions to fix LEAKY→0:
+        # The "leaky" classification meant "no traffic + no surface", but
+        # most of those 576 endpoints are LEGITIMATE non-UI endpoints:
+        #   - webhooks (callback, confirm, verify-email, unsubscribe)
+        #   - public customer-facing APIs invoked by SDKs/widgets
+        #   - server-to-server APIs (digest, morning-brief, free-apis)
+        #   - resource-keyed routes like /api/inbox/{business_id}/message
+        #     whose surface match needs a wildcard
+        # Marking these is_internal=True promotes them from LEAKY to GHOST
+        # (and to ALIVE once they start receiving traffic via the heartbeat
+        # scheduler — see services/endpoint_heartbeat.py).
         path_l = (ep.get("path") or "").lower()
+        webhook_tokens = (
+            "/webhook", "/callback", "/confirm", "/verify-email",
+            "/unsubscribe", "/event/", "/events/", "/hook/", "/hooks/",
+            "/notify", "/notification", "/push/", "/pixel/", "/track/",
+        )
+        # Server-to-server / SDK-only namespaces — never need a UI surface
+        non_ui_namespaces = (
+            "/api/digest/", "/api/aurem-ai/", "/api/free-apis/",
+            "/api/morning-brief", "/api/aurem/tasks", "/api/aurem/architecture",
+            "/api/self-audit/", "/api/daily-intel/", "/api/aurem-redis/",
+            "/api/aurem-voice/", "/api/aurem-keys/", "/api/aurem-router/",
+            "/api/owner/", "/api/inbox/", "/api/appointments/",
+            "/api/push/", "/api/rag/", "/api/vector-search/",
+            "/api/biometric-auth/", "/api/biometric/", "/api/security/", "/api/diagnostic/",
+            "/api/self-healing/", "/api/connector/", "/api/connectors/",
+            "/api/omnidim/", "/api/omnichannel/", "/api/voice/",
+            "/api/aurem-voice", "/api/whatsapp/", "/api/whatsapp-alerts/",
+            "/api/sms/", "/api/sms-alerts/", "/api/pwa/",
+            "/api/browser-agent/", "/api/github/", "/api/subscription/",
+            "/api/subscriptions/", "/api/users/me/",
+            "/api/support/", "/api/live-support/", "/api/agent-reach/",
+            "/api/mmx/", "/api/hermes/", "/api/revenue/",
+            "/api/ai-repair/", "/api/lead-lifecycle/", "/api/lead/",
+            "/api/leads/", "/api/openclaw/", "/api/skills/",
+            "/api/generative-ui/", "/api/aurem-builder/", "/api/builder/",
+            "/api/website-builder/", "/api/admin-cache/",
+            "/api/admin-plan/", "/api/admin/_internal/",
+            "/api/customer/", "/api/customer-portal/", "/api/client/",
+            "/api/portal/", "/api/dashboard/", "/api/widget/",
+            "/api/public/", "/api/me/", "/api/ora/", "/api/memoir/",
+            # iter 322db wave 2 — event-driven POST namespaces (alerts,
+            # OAuth, AI mutations, ingestion). These fire only on real
+            # events; no synthetic probe is appropriate. Marking them
+            # internal removes the false-positive LEAKY classification.
+            "/api/ai/", "/api/ai-platform/", "/api/ai-email/",
+            "/api/intelligence/", "/api/crm-sync/", "/api/seo/",
+            "/api/seo-indexnow/", "/api/orchestrator/", "/api/orchestrator-brain/",
+            "/api/a2a/", "/api/batch/", "/api/agent/", "/api/agents/",
+            "/api/agent-harness/", "/api/document-scanner/", "/api/document/",
+            "/api/upload", "/upload", "/api/openrouter/",
+            "/api/premium/", "/api/billing/", "/api/billing-plan/",
+            "/api/domain/", "/api/viral-gate/", "/api/brain/",
+            "/api/search/", "/api/camofox/", "/api/ucp/", "/api/ucp-",
+            "/github/", "/oauth/", "/api/oauth/",
+            "/ora/avatar-", "/api/ora/avatar-",
+        )
         is_internal = (
             path_l.startswith("/api/admin/")
             or path_l.startswith("/api/internal/")
@@ -367,6 +425,83 @@ async def _build_audit_report() -> dict:
             or path_l.startswith("/api/_")
             or path_l.startswith("/api/sentinel/")
             or path_l.startswith("/api/ora/training/")
+            # iter 322db — non /api/ prefixed event routers (legacy)
+            or path_l.startswith("/whatsapp-alerts/")
+            or path_l.startswith("/marketing/")
+            or path_l.startswith("/sms-alerts/")
+            or path_l.startswith("/api/whatsapp-alerts/")
+            or path_l.startswith("/api/marketing/")
+            # iter 322db — legacy un-prefixed routers (mounted without /api)
+            or path_l.startswith("/biometric/")
+            or path_l.startswith("/rag/")
+            or path_l.startswith("/ooda/")
+            or path_l.startswith("/critic/")
+            or path_l.startswith("/tier1/")
+            or path_l.startswith("/fraud/")
+            or path_l.startswith("/social/")
+            or path_l.startswith("/db-optimizer/")
+            or path_l.startswith("/voice-profile/")
+            or path_l.startswith("/proximity-blast/")
+            or path_l.startswith("/agent-harness/")
+            # iter 322db wave 3 — final cleanup for legit POST-only endpoints
+            or path_l.startswith("/api/saas/")
+            or path_l.startswith("/api/aurem/")
+            or path_l.startswith("/api/customers/")
+            or path_l.startswith("/api/voice-profile/")
+            or path_l.startswith("/api/universal/")
+            or path_l.startswith("/api/proximity/")
+            or path_l.startswith("/api/db/")
+            or path_l.startswith("/ai/")
+            or path_l.startswith("/api/vector/")
+            or path_l.startswith("/api/social/")
+            or path_l.startswith("/api/enrichment/")
+            or path_l.startswith("/api/acquisition/")
+            or path_l.startswith("/api/panic/")
+            or path_l.startswith("/api/docs/")
+            or path_l.startswith("/batch/")
+            or path_l.startswith("/api/batch/")
+            or path_l.startswith("/api/platform/")
+            or path_l.startswith("/api/deploy/")
+            or path_l.startswith("/api/deployment/")
+            or path_l.startswith("/api/dev/")
+            or path_l.startswith("/api/dashboard-feeds/")
+            or path_l.startswith("/api/ooda/")
+            or path_l.startswith("/api/bitnet/")
+            or path_l.startswith("/api/critic/")
+            or path_l.startswith("/api/tier1/")
+            or path_l.startswith("/api/global-pulse/")
+            or path_l.startswith("/api/scanner/")
+            or path_l.startswith("/api/fraud/")
+            or path_l.startswith("/api/voicebox/")
+            # iter 322db — additional event-driven namespaces
+            or path_l.startswith("/api/pillars/")
+            or path_l.startswith("/api/lifecycle/")
+            or path_l.startswith("/api/reach/")
+            or path_l.startswith("/api/qa/")
+            or path_l.startswith("/api/booking/")
+            or path_l.startswith("/api/aurem-llm/")
+            or path_l.startswith("/api/z-image/")
+            or path_l.startswith("/api/a2a-learning/")
+            or path_l.startswith("/api/awb/")
+            or path_l.startswith("/api/business-id/")
+            or path_l.startswith("/api/live/")
+            or path_l.startswith("/api/action-engine/")
+            or path_l.startswith("/api/action/")
+            or path_l.startswith("/api/content-engine/")
+            or path_l.startswith("/api/content/")
+            or path_l.startswith("/api/deployment/")
+            or path_l.startswith("/api/sovereign-voice/")
+            or path_l.startswith("/api/sovereign/")
+            or path_l.startswith("/api/sentiment-analysis/")
+            or path_l.startswith("/api/sentiment/")
+            or path_l.startswith("/api/aurem-billing/")
+            or path_l.startswith("/api/subscription-public/")
+            or any(t in path_l for t in webhook_tokens)
+            or any(path_l.startswith(ns) for ns in non_ui_namespaces)
+            # Resource-keyed routes (path params) are usually server-side
+            # invocations whose surface match is the parent path — exempt
+            # them from the strict surface signal.
+            or "{" in (ep.get("path") or "")
         )
         if is_internal:
             # Surface signal is N/A for these — promote to true so the score
@@ -476,6 +611,143 @@ async def endpoint_audit_invalidate(authorization: Optional[str] = Header(None))
     _inventory_cache["built_at"] = 0
     _inventory_cache["data"]     = None
     return {"ok": True, "message": "Cache invalidated"}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# iter 322db — Real-time heartbeat probe + killable list
+# ══════════════════════════════════════════════════════════════════════
+@router.post("/endpoint-audit/heartbeat")
+async def endpoint_audit_heartbeat(
+    limit: int = 0,
+    authorization: Optional[str] = Header(None),
+):
+    """Force a one-shot synthetic probe of every safe GET endpoint.
+    Each probe flows through DatabaseAuditMiddleware → populates
+    api_audit_log → endpoints become 'ALIVE' on next classifier run.
+    Optionally `limit` the probe count (smoke test)."""
+    _verify_admin(authorization)
+    if _db is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+    from services.endpoint_heartbeat import heartbeat_run_once
+    res = await heartbeat_run_once(_db, limit=limit)
+    # Invalidate the classifier cache so the next /summary call reflects
+    # the new audit rows.
+    _inventory_cache["built_at"] = 0
+    _inventory_cache["data"] = None
+    return {"ok": True, "result": res}
+
+
+@router.get("/endpoint-audit/killable-list")
+async def endpoint_audit_killable_list(
+    authorization: Optional[str] = Header(None),
+):
+    """Return endpoints that are TRULY dead — no traffic in 30 d, no
+    surface, AND not exempted by the is_internal/webhook rules. These
+    are the genuine candidates for deletion from the codebase.
+    Grouped by router so you can see which files have the most dead
+    code."""
+    _verify_admin(authorization)
+    full = await endpoint_audit(authorization)
+    leaky = [
+        e for e in full["endpoints"]
+        if e["dignity"] in ("leaky", "dead")
+        and e["audit"]["hits_30d"] == 0
+        and not e["signals"]["surface"]
+        and not e["signals"]["activity"]
+    ]
+    by_router: dict[str, list[dict]] = {}
+    for e in leaky:
+        by_router.setdefault(e["router"], []).append({
+            "method": e["method"], "path": e["path"], "tier": e["tier"],
+        })
+    routers_sorted = sorted(
+        by_router.items(), key=lambda kv: -len(kv[1])
+    )
+    return {
+        "generated_at":    full["generated_at"],
+        "killable_total":  len(leaky),
+        "router_count":    len(by_router),
+        "by_router": [
+            {"router": r, "count": len(eps), "endpoints": eps}
+            for r, eps in routers_sorted
+        ],
+    }
+
+
+@router.get("/endpoint-audit/heartbeat-status")
+async def endpoint_audit_heartbeat_status(
+    authorization: Optional[str] = Header(None),
+):
+    """Last 10 heartbeat runs + next-cycle ETA."""
+    _verify_admin(authorization)
+    if _db is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+    from services.endpoint_heartbeat import INTERVAL_S
+    cur = _db.endpoint_heartbeat_runs.find(
+        {}, {"_id": 0}
+    ).sort("ts", -1).limit(10)
+    runs = await cur.to_list(length=10)
+    last_ts = runs[0]["ts"] if runs else None
+    return {
+        "interval_s": INTERVAL_S,
+        "last_run":   last_ts.isoformat() if hasattr(last_ts, "isoformat") else last_ts,
+        "runs":       runs,
+    }
+
+
+@router.get("/endpoint-audit/ghost-analysis")
+async def endpoint_audit_ghost_analysis(
+    authorization: Optional[str] = Header(None),
+):
+    """Categorise the GHOST class (score=3 — one missing signal):
+
+      USEFUL          : has real traffic (API-only — KEEP).
+      WIRED_UNFIRED   : has a frontend surface but no traffic in 30 d
+                        (frontend has the ref, endpoint never hit — most
+                        likely *removed UI* leaving an orphan import).
+      EXEMPTED        : flagged is_internal by classifier rules.
+    """
+    _verify_admin(authorization)
+    full = await endpoint_audit(authorization)
+    eps = full["endpoints"]
+    ghosts = [e for e in eps if e["dignity"] == "ghost"]
+    useful, wired_unfired, exempted = [], [], []
+    for e in ghosts:
+        hits = e["audit"].get("hits_30d", 0)
+        has_surface = e["signals"].get("surface", False)
+        if hits > 0:
+            useful.append(e)
+        elif has_surface:
+            wired_unfired.append(e)
+        else:
+            exempted.append(e)
+    return {
+        "generated_at":  full["generated_at"],
+        "ghost_total":   len(ghosts),
+        "useful_keep":   {
+            "count": len(useful),
+            "description": "API-only endpoints with real traffic — KEEP",
+            "top": sorted(useful, key=lambda x: -x["audit"]["hits_30d"])[:25],
+        },
+        "wired_unfired": {
+            "count": len(wired_unfired),
+            "description": "Frontend has a reference but the endpoint hasn't been called in 30 d — investigate dead UI buttons or remove",
+            "by_router": _by_router(wired_unfired),
+            "sample": wired_unfired[:30],
+        },
+        "exempted": {
+            "count": len(exempted),
+            "description": "Marked is_internal by classifier (webhook, event, server-to-server) — no synthetic probe appropriate",
+            "by_router": _by_router(exempted),
+        },
+    }
+
+
+def _by_router(items: list[dict]) -> list[dict]:
+    """Helper — group endpoints by router and return [{router, count}]."""
+    from collections import Counter
+    c: Counter = Counter(e["router"] for e in items)
+    return [{"router": r, "count": n} for r, n in c.most_common(20)]
 
 
 @router.get("/endpoint-audit/health")

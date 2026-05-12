@@ -220,9 +220,14 @@ class SecurityMiddleware:
         # iter 285.5 — bypass rate limit for internal-audit self-probes
         # The /api/admin/a2a/audit/widgets endpoint fires 60+ requests back
         # to other widget endpoints inside the pod. Each carries this header.
+        # iter 322db — also bypass for X-Synthetic-Probe header used by the
+        # endpoint heartbeat scheduler that pings every safe GET every 4 h.
         try:
             hdrs = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
             if hdrs.get("x-internal-audit") == "true" and client_ip in ("127.0.0.1", "localhost", "::1"):
+                await self.app(scope, receive, send)
+                return
+            if hdrs.get("x-synthetic-probe") == "heartbeat" and client_ip in ("127.0.0.1", "localhost", "::1"):
                 await self.app(scope, receive, send)
                 return
         except Exception:

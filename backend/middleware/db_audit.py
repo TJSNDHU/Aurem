@@ -65,6 +65,22 @@ def set_db(database):
     """Set DB reference to avoid circular import with server.py."""
     global _db_ref
     _db_ref = database
+    # iter 322db — TTL index on api_audit_log so the collection auto-purges
+    # rows older than 35 days. Prevents unbounded growth. 35 d is just over
+    # the classifier's 30-d window so the signal stays valid.
+    if database is not None:
+        try:
+            import asyncio
+            async def _ensure_ttl():
+                try:
+                    await database.api_audit_log.create_index(
+                        "ts", expireAfterSeconds=35 * 24 * 3600, name="ts_ttl_35d",
+                    )
+                except Exception:
+                    pass
+            asyncio.create_task(_ensure_ttl())
+        except Exception:
+            pass
 
     
 def _log_audit(method: str, path: str, status_code: int, duration_ms: float):
