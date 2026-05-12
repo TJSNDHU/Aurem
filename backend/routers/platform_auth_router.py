@@ -500,6 +500,32 @@ async def register(request: RegisterRequest, req: Request = None):
             }))
         except Exception:
             pass
+
+        # ═══ ITER 322ca — AUTO-AUDIT on signup ═══════════════════════════
+        # If the signup form captured a website URL, fire the SEO + Ads-Waste
+        # audit in the background so the customer sees a populated dashboard
+        # widget within ~60s of landing on /my. Sticky upsell hook for $49/mo.
+        try:
+            site_url = (
+                (getattr(request, "website", None) or "").strip()
+                or (getattr(request, "domain", None) or "").strip()
+                or (getattr(request, "company_website", None) or "").strip()
+            )
+            if site_url and not site_url.startswith("http"):
+                site_url = "https://" + site_url
+            if site_url:
+                import asyncio as _asyncio_audit
+                from services.customer_audit_service import run_audit as _run_audit
+                _asyncio_audit.create_task(_run_audit(
+                    url=site_url,
+                    customer_id=email,
+                    bin=(locals().get("ws_business_id") or None),
+                    db=db,
+                ))
+        except Exception:
+            pass
+        # ═══════════════════════════════════════════════════════════════
+
         return TokenResponse(
             token=token,
             email=email,

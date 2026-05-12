@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { getPlatformToken } from '../../utils/secureTokenStore';
 import TrialBanner from '../TrialBanner';
+import AuditWidget from './AuditWidget';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -200,6 +201,11 @@ export default function CustomerHome({ ctx }) {
       </motion.div>
 
       <TrialBanner />
+
+      {/* SEO + Ads Waste Audit widget (auto-runs on signup if URL captured) */}
+      <div style={{ marginBottom: 18 }}>
+        <AuditWidget />
+      </div>
 
       {loading && (
         <div data-testid="home-loading" style={{ ...GLASS, padding: 36, textAlign: 'center', color: '#9CA3AF' }}>

@@ -1140,6 +1140,23 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] antigravity_skills_router skipped: {e}")
 
 
+    # Customer Site Audit Router ($49/mo SEO + Ads Waste detector)
+    if not _should_skip("routers.customer_audit_router"):
+        try:
+            from routers.customer_audit_router import (
+                router as customer_audit_router,
+                set_db as set_customer_audit_db,
+                set_jwt as set_customer_audit_jwt,
+            )
+            set_customer_audit_db(db)
+            from config import JWT_SECRET, JWT_ALGORITHM
+            set_customer_audit_jwt(JWT_SECRET, JWT_ALGORITHM)
+            app.include_router(customer_audit_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] customer_audit_router skipped: {e}")
+
+
     # Dev Stack Health (Pillars Map green/red grid)
     if not _should_skip("routers.dev_stack_health_router"):
         try:
