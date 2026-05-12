@@ -52,6 +52,13 @@ SKIP_IN_LEAN: frozenset[str] = frozenset({
     "routers.universal_connector_router",
     # "routers.google_oauth_router" — RE-ENABLED (iter 285): wired to Gmail Integration sidebar widget + audit
     "routers.shopify_storefront_router",
+    # iter 322ee — e-commerce skeleton dead-load (orders/products/carts
+    # all empty + AUREM is SaaS, not Shopify). Lean-mode skip — files
+    # kept for tests + future opt-in. Saves N route registrations on
+    # cold start and removes ~2200 lines of dead router code from the
+    # production OpenAPI schema.
+    "routers.shopify_pulse_router",
+    "routers.attribution_engine",
     # ── Internal / background-only (0 frontend refs) ──
     "routers.orchestrator_brain_router", "routers.ooda_loop_router",
     "routers.agent_harness_router",

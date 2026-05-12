@@ -21,7 +21,10 @@ BIN_SCOPED_COLLECTIONS: List[str] = [
     "pixel_events", "client_errors", "service_usage_log",
     "trial_reminders_sent", "user_integrations", "aurem_workspaces",
     "aurem_billing", "customer_subscriptions", "platform_users",
-    "aurem_pixels", "scout_runs", "campaign_runs",
+    "aurem_pixels",
+    # iter 322ee — scout_runs + campaign_runs auto-recreated empty on every
+    # restart. Camoufox Scout not built yet (P1 backlog); when it ships
+    # the writer can re-add these here.
 ]
 
 TIME_FIELDS_BY_COLLECTION = {
@@ -39,8 +42,6 @@ TIME_FIELDS_BY_COLLECTION = {
     "client_errors":       "ts",
     "service_usage_log":   "ts",
     "trial_reminders_sent": "ts",
-    "scout_runs":          "ts",
-    "campaign_runs":       "ts",
 }
 
 

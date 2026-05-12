@@ -1518,3 +1518,28 @@ See `/app/memory/test_credentials.md`.
 - ✓ Frontend lint clean (0 issues both files)
 - ✓ `/admin/audit-live` route gated correctly (redirects to admin login when unauth)
 - ✓ Backend health 200, no regressions
+
+## iter 322ee — DB Hygiene Sweep + Security/Compliance Regression Locks
+
+### Investigated 3 "broken" writes — found 2 work, 1 truly dead:
+- ✅ **`token_blocklist`**: Code works. `block_token() → is_blocked()` proven end-to-end. Empty in prod because no user has called `/api/auth/logout` yet.
+- ✅ **`dnc_list`**: Code works. `process_stop_reply() → is_in_dnc()` proven for both email + phone paths. Empty because no STOP replies received yet.
+- 💀 **E-commerce skeleton**: TRULY dead. AUREM is SaaS, not Shopify. Dropped.
+
+### Actions taken
+- **DB: 524 → 498 collections (-26 net)**:
+  - Dropped 27 dead collections in one pass
+  - Gutted re-creation paths in 5 files: `server.py` (2 functions), `services/startup_init.py`, `services/db_indexes.py`, `services/db_index_builder.py`, `bootstrap/background_init.py`, `routes/orchestrator_routes.py`
+  - Only 3 minor index-shells still auto-create (unlinked_mentions + 2 supporting cols — active P2 feature, leaving alone)
+- **Lean-mode skip-list**: Added `shopify_pulse_router` (1220 lines) + `attribution_engine` (512 lines) to `_registry_config.SKIP_IN_LEAN`. Production cold start now skips ~1700 lines of dead e-commerce router code (files kept for tests).
+- **Feature flag**: New `AUREM_COMMERCIAL_FEATURES=1` env var gates the empty commercial-scaffolding service indexes (TokenVault, ConsentTracker, Gmail, UnifiedInbox, WhatsApp, KeyService). AuditLogger + BillingService + WorkspaceService stay always-on (live data).
+- **NEW regression tests**: `/app/backend/tests/test_security_compliance_writes.py` — 3 tests proving token_blocklist + dnc_list email/phone paths all work. Passing in 0.60s. Locks them down so refactors can't silently break security/compliance.
+
+### Verified
+- ✓ Backend health 200 after restart
+- ✓ Critical endpoints intact: `/api/platform/health`, `/aurem-billing/plans`, `/catalog/services`, `/ora/health`, `/me/home/dashboard` (401 auth-gated as expected), `/customer/audit/admin/live` (401 admin-gated as expected)
+- ✓ pytest 3/3 passed
+- ✓ Zero exceptions in backend logs
+
+### Deferred (Stage B — future sprint)
+- E-commerce surgical removal from 18 mixed-purpose files (~200 code refs): `routers/server_misc_routes.py`, `routers/pwa_router.py`, `routers/ucp_router.py`, `services/email_templates.py`, `services/admin_action_ai.py`, `services/cron_schedulers.py`, etc. Requires 2-3 day dedicated sprint with per-file testing.

@@ -89,15 +89,15 @@ async def run_background_init(
             logger.info("ℹ Crypto Signal Engine disabled - skipping startup")
 
         # Blog indexes + image cleanup
+        # iter 322ee — blog_posts is unused in AUREM SaaS surface
+        # (Pillars: SEO, Audit, Intelligence, Ads). The cleanup_broken_images
+        # call is kept because it scans existing image refs, but the empty
+        # blog_posts collection no longer auto-resurrects on startup.
         try:
             await cleanup_broken_images(db)
-            await db.blog_posts.create_index("slug", unique=True)
-            await db.blog_posts.create_index("status")
-            await db.blog_posts.create_index("category")
-            await db.blog_posts.create_index("published_at")
-            logger.info("✓ Blog indexes created")
+            logger.info("✓ Image cleanup completed")
         except Exception as e:
-            logger.warning(f"Blog index creation: {e}")
+            logger.warning(f"Image cleanup: {e}")
 
     except Exception as e:
         logger.error(f"Background index creation failed: {e}")

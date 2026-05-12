@@ -454,16 +454,15 @@ print(f"[DB] Configuration loaded: {db_name} (client will be created at startup)
 
 # MongoDB Index Setup for Performance
 async def setup_database_indexes():
-    """Create indexes for commonly queried fields - critical for dashboard speed"""
-    try:
-        # Bio-scans collection indexes
-        await db.bio_scans.create_index("email")
-        await db.bio_scans.create_index("phone")
-        await db.bio_scans.create_index("whatsapp")
-        await db.bio_scans.create_index("referral_code")
-        await db.bio_scans.create_index("referred_by")
-        await db.bio_scans.create_index("created_at")
+    """Create indexes for commonly queried fields - critical for dashboard speed.
 
+    iter 322ee — Stripped the dead-feature indexes (bio_scans,
+    marketing_broadcasts, marketing_social_posts). These collections sat
+    empty in production and the indexes themselves were re-creating
+    empty shells on every restart, polluting the DB scan output. Kept
+    founding_members, verified_referrals, and waitlist because they're
+    actively wired to the live referral system."""
+    try:
         # Founding members indexes
         await db.founding_members.create_index("email", unique=True, sparse=True)
         await db.founding_members.create_index(
@@ -483,11 +482,6 @@ async def setup_database_indexes():
         # Waitlist indexes
         await db.waitlist.create_index("email", unique=True, sparse=True)
         await db.waitlist.create_index("referral_code")
-
-        # Marketing collections indexes
-        await db.marketing_broadcasts.create_index("created_at")
-        await db.marketing_social_posts.create_index("created_at")
-        await db.marketing_social_posts.create_index("posted")
 
         print("[DB] Indexes created successfully for optimized queries")
     except Exception as e:
@@ -917,33 +911,17 @@ except Exception as _e:
 
 # ============= DATABASE INDEXES FOR PERFORMANCE =============
 async def create_indexes():
-    """Create database indexes for optimal query performance"""
+    """Create database indexes for optimal query performance.
+
+    iter 322ee — Stripped the e-commerce-skeleton indexes (products,
+    orders, carts, discount_codes, subscribers, abandoned_carts,
+    analytics_visits, reviews). AUREM is a SaaS platform, not a
+    Shopify-style storefront — none of these collections has ever
+    received a write and they keep auto-resurrecting empty on every
+    startup, polluting `list_collection_names()` and confusing the DB
+    audit. The full e-commerce code surface is also lean-mode-skipped
+    via routers/_registry_config.SKIP_IN_LEAN."""
     try:
-        # Products - frequently queried by category and brand
-        await db.products.create_index("category")
-        await db.products.create_index("brand")
-        await db.products.create_index("slug")
-        await db.products.create_index([("name", "text"), ("description", "text")])
-
-        # Orders - queried by user and status
-        await db.orders.create_index("user_id")
-        await db.orders.create_index("email")
-        await db.orders.create_index("status")
-        await db.orders.create_index("created_at")
-        await db.orders.create_index("order_status")
-        await db.orders.create_index("order_number")
-        await db.orders.create_index("user_email")
-        await db.orders.create_index("tracking_number")
-        # Compound index for common admin queries
-        await db.orders.create_index([("order_status", 1), ("created_at", -1)])
-        # Text index for search
-        await db.orders.create_index([
-            ("order_number", "text"),
-            ("shipping_address.first_name", "text"),
-            ("shipping_address.last_name", "text"),
-            ("shipping_address.email", "text")
-        ])
-
         # Users - auth lookups (handle duplicate key gracefully)
         try:
             await db.users.create_index("email", unique=True)
@@ -955,47 +933,10 @@ async def create_indexes():
             else:
                 raise
 
-        # Subscribers - email campaigns
-        await db.subscribers.create_index("email")
-        await db.subscribers.create_index("subscribed_at")
-
-        # Discount codes - lookup by code
-        try:
-            await db.discount_codes.create_index("code", unique=True)
-        except Exception as e:
-            if "duplicate key" in str(e).lower():
-                logging.info("Discount codes index exists")
-            else:
-                raise
-
-        # Cart sessions
-        await db.carts.create_index("session_id")
-        await db.carts.create_index("user_id")
-
-        # Analytics - time-based queries
+        # Analytics - time-based queries (the *_events live collection
+        # actually receives data; the *_visits one was dead).
         await db.analytics_events.create_index("timestamp")
         await db.analytics_events.create_index("event_type")
-
-        # Reviews - for moderation and product lookup
-        await db.reviews.create_index("product_id")
-        await db.reviews.create_index("is_approved")
-        await db.reviews.create_index("created_at")
-        await db.reviews.create_index(
-            [("product_id", 1), ("is_approved", 1)]
-        )  # Compound for approved product reviews
-
-        # Orders - payment status for analytics (CRITICAL for accurate revenue)
-        await db.orders.create_index("payment_status")
-        await db.orders.create_index(
-            [("payment_status", 1), ("created_at", -1)]
-        )  # Compound for paid orders by date
-
-        # Abandoned carts - for recovery features
-        await db.abandoned_carts.create_index("created_at")
-        await db.abandoned_carts.create_index("recovered")
-
-        # Visitor tracking (if enabled)
-        await db.analytics_visits.create_index("timestamp")
 
         logging.info("✓ Database indexes created/verified")
     except Exception as e:

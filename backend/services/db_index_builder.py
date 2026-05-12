@@ -26,7 +26,10 @@ PLAIN_INDEXES: List[Tuple[str, str, dict]] = [
     ("pixel_events",         "api_key",     {}),
     ("touchpoints",          "lead_id",     {}),
     ("touchpoints",          "tenant_id",   {}),
-    ("lifecycle_history",    "lead_id",     {}),
+    # iter 322ee — lifecycle_history was auto-resurrecting empty;
+    # services/lead_lifecycle.transition() writes to lead_lifecycle_events
+    # (the live collection) not lifecycle_history. Re-add if/when a writer
+    # for lifecycle_history exists.
     ("system_auto_repairs",  "tenant_id",   {}),
     ("scan_history",         "tenant_id",   {}),
     ("aurem_live_viewers",   "slug",        {}),

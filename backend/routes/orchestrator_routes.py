@@ -157,13 +157,13 @@ async def force_sync(request: Request):
         results['orchestrator_cache'] = f'error: {str(e)}'
     
     # 2. Sync MongoDB indexes for Reroots collections
+    # iter 322ee — `orders` is part of the e-commerce skeleton AUREM never
+    # shipped. Skip those three indexes so the empty `orders` collection
+    # stops auto-resurrecting. Reroots-specific indexes (chat_sessions,
+    # customer_profiles, orchestrator_events) are kept because that
+    # subsystem is alive.
     if _db is not None:
         try:
-            # Orders indexes
-            await _db.orders.create_index('customer_email')
-            await _db.orders.create_index('status')
-            await _db.orders.create_index('created_at')
-            
             # Chat session indexes
             await _db.reroots_chat_sessions.create_index('session_id')
             await _db.reroots_chat_sessions.create_index('user_email')

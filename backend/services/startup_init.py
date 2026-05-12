@@ -202,11 +202,21 @@ def init_all_service_dbs(db):
 
 
 async def init_aurem_indexes(db):
-    """Initialize AUREM commercial platform indexes in background."""
+    """Initialize AUREM commercial platform indexes in background.
+
+    iter 322ee — Gated the truly-empty commercial scaffolding behind
+    `AUREM_COMMERCIAL_FEATURES=1`. The TokenVault/ConsentTracker/Gmail/
+    UnifiedInbox/WhatsApp/KeyService collections sit empty in production
+    (AUREM is currently SaaS-focused, not the multi-tenant commercial
+    platform these were built for). Indexes still got created on every
+    restart, auto-resurrecting the empty collections and polluting DB
+    audits. AuditLogger + BillingService stay always-on because they
+    have live data (983 audit_log rows).
+    """
     try:
         from services.aurem_commercial import (
-            get_token_vault, get_workspace_service,
-            get_audit_logger, get_consent_tracker, get_billing_service,
+            get_workspace_service,
+            get_audit_logger, get_billing_service,
         )
 
         async def safe_ensure_indexes(service, name):
@@ -215,39 +225,54 @@ async def init_aurem_indexes(db):
             except Exception as e:
                 logger.warning(f"[AUREM] {name} index creation skipped: {e}")
 
-        await safe_ensure_indexes(get_token_vault(db), "TokenVault")
+        # Always-on (live data flowing through these).
         await safe_ensure_indexes(get_workspace_service(db), "WorkspaceService")
         await safe_ensure_indexes(get_audit_logger(db), "AuditLogger")
-        await safe_ensure_indexes(get_consent_tracker(db), "ConsentTracker")
         await safe_ensure_indexes(get_billing_service(db), "BillingService")
 
-        # Gmail service indexes
-        try:
-            from services.aurem_commercial import get_gmail_service
-            await safe_ensure_indexes(get_gmail_service(db), "GmailService")
-        except ImportError:
-            pass
+        commercial_enabled = os.environ.get(
+            "AUREM_COMMERCIAL_FEATURES", "0"
+        ).lower() in ("1", "true", "yes")
 
-        # Unified Inbox indexes
-        try:
-            from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
-            await safe_ensure_indexes(get_unified_inbox_service(db), "UnifiedInbox")
-        except ImportError:
-            pass
+        if commercial_enabled:
+            from services.aurem_commercial import (
+                get_token_vault, get_consent_tracker,
+            )
+            await safe_ensure_indexes(get_token_vault(db), "TokenVault")
+            await safe_ensure_indexes(get_consent_tracker(db), "ConsentTracker")
 
-        # WhatsApp indexes
-        try:
-            from services.aurem_commercial.whatsapp_service import get_whatsapp_service
-            await safe_ensure_indexes(get_whatsapp_service(db), "WhatsApp")
-        except ImportError:
-            pass
+            # Gmail service indexes
+            try:
+                from services.aurem_commercial import get_gmail_service
+                await safe_ensure_indexes(get_gmail_service(db), "GmailService")
+            except ImportError:
+                pass
 
-        # Key Service indexes
-        try:
-            from services.aurem_commercial.key_service import get_aurem_key_service
-            await safe_ensure_indexes(get_aurem_key_service(db), "KeyService")
-        except ImportError:
-            pass
+            # Unified Inbox indexes
+            try:
+                from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+                await safe_ensure_indexes(get_unified_inbox_service(db), "UnifiedInbox")
+            except ImportError:
+                pass
+
+            # WhatsApp indexes
+            try:
+                from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+                await safe_ensure_indexes(get_whatsapp_service(db), "WhatsApp")
+            except ImportError:
+                pass
+
+            # Key Service indexes
+            try:
+                from services.aurem_commercial.key_service import get_aurem_key_service
+                await safe_ensure_indexes(get_aurem_key_service(db), "KeyService")
+            except ImportError:
+                pass
+        else:
+            logger.info(
+                "[AUREM] commercial-scaffolding indexes skipped "
+                "(AUREM_COMMERCIAL_FEATURES != 1)"
+            )
 
         # Memory Tiers indexes (3-tier memory + execution plans)
         try:
