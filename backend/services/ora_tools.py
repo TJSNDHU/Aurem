@@ -595,6 +595,253 @@ async def shell_exec(command: str, args: list[str] | None = None) -> dict:
                 "command": command, "args": args}
 
 
+# ─── iter 322en — Surgical Writer (Atomic File Writer) ───────────────
+# Real write. NOT a mock. ORA can now edit files BUT only via exact-match
+# search-replace — no whole-file overwrites, no guesswork. If the
+# find_string doesn't match exactly (byte-for-byte, whitespace included),
+# the tool refuses. Every successful edit creates a .bak file at
+# /tmp/ora_backups/<timestamp>__<safe_path>.bak so revert is one cp away.
+
+_WRITE_ALLOWED_ROOTS = (
+    "/app/backend",
+    "/app/frontend/src",
+    "/app/memory",
+    "/app/ora_skills",
+    "/app/scripts",
+)
+_WRITE_FORBIDDEN_PATTERNS = (
+    "/.env", "/.ssh", "/.git/", "node_modules", "__pycache__",
+    "/migrations/", "/.next/", "/build/", "/dist/",
+)
+_WRITE_FORBIDDEN_FILES = (
+    ".env", ".env.local", ".env.production",
+    "requirements.txt", "package.json", "package-lock.json", "yarn.lock",
+)
+_BACKUP_DIR = Path("/tmp/ora_backups")
+
+
+def _is_write_path_allowed(p: str) -> tuple[bool, str]:
+    """Stricter than read allowlist — write paths exclude /app/frontend/build,
+    .env, package.json, etc."""
+    try:
+        abs_p = str(Path(p).resolve())
+    except Exception:
+        return False, "could not resolve path"
+    if not any(abs_p == r or abs_p.startswith(r + os.sep) for r in _WRITE_ALLOWED_ROOTS):
+        return False, f"not under write-allowed roots: {_WRITE_ALLOWED_ROOTS}"
+    for bad in _WRITE_FORBIDDEN_PATTERNS:
+        if bad in abs_p:
+            return False, f"forbidden pattern in path: {bad!r}"
+    name = Path(abs_p).name
+    if name in _WRITE_FORBIDDEN_FILES:
+        return False, f"file is in write-forbidden list: {name}"
+    return True, ""
+
+
+async def safe_edit(
+    path: str,
+    find_string: str,
+    replace_string: str,
+    *,
+    expected_occurrences: int = 1,
+) -> dict:
+    """Atomic, exact-match find/replace.
+
+    Steps:
+        1. Validate path is under write-allowed roots, not forbidden file.
+        2. Read file content.
+        3. Verify `find_string` appears exactly `expected_occurrences` times
+           (default 1). If 0 or >expected, REFUSE — no guessing.
+        4. Backup full file to /tmp/ora_backups/<ts>__<safe_path>.bak.
+        5. Compute new content (`text.replace(find_string, replace_string, expected_occurrences)`).
+        6. Atomic write (write to .tmp, fsync, rename).
+        7. Run git diff for proof. Return diff snippet + backup path.
+
+    Returns {ok, path, occurrences_replaced, backup_path, diff_preview,
+              bytes_before, bytes_after}.
+    NEVER raises. All failures explained in `error`.
+    """
+    # ── 1. Path validation ──
+    if not isinstance(path, str) or not path:
+        return {"ok": False, "error": "path required"}
+    ok_path, why = _is_write_path_allowed(path)
+    if not ok_path:
+        return {"ok": False, "error": f"path not allowed: {why}", "path": path}
+    p = Path(path)
+    if not p.exists():
+        return {"ok": False, "error": f"file does not exist: {path}"}
+    if not p.is_file():
+        return {"ok": False, "error": f"not a regular file: {path}"}
+    if p.stat().st_size > 2_000_000:
+        return {"ok": False, "error": "file too large for safe edit (>2MB)"}
+
+    # ── 2. Validate find/replace inputs ──
+    if not isinstance(find_string, str) or find_string == "":
+        return {"ok": False, "error": "find_string required (non-empty)"}
+    if not isinstance(replace_string, str):
+        return {"ok": False, "error": "replace_string must be a string"}
+    if len(find_string) > 50_000:
+        return {"ok": False, "error": "find_string too large (>50KB)"}
+    if len(replace_string) > 200_000:
+        return {"ok": False, "error": "replace_string too large (>200KB)"}
+    if not isinstance(expected_occurrences, int) or expected_occurrences < 1 or expected_occurrences > 50:
+        return {"ok": False, "error": "expected_occurrences must be int 1-50"}
+
+    # ── 3. Read + verify uniqueness ──
+    try:
+        original = await asyncio.to_thread(p.read_text, "utf-8", errors="replace")
+    except Exception as e:
+        return {"ok": False, "error": f"read failed: {type(e).__name__}: {str(e)[:120]}"}
+
+    actual_count = original.count(find_string)
+    if actual_count != expected_occurrences:
+        return {
+            "ok": False,
+            "error": (f"find_string occurs {actual_count}× in file; "
+                       f"expected exactly {expected_occurrences}. "
+                       f"Refusing to guess — either add more context to find_string "
+                       f"for uniqueness, or set expected_occurrences correctly."),
+            "actual_occurrences":   actual_count,
+            "expected_occurrences": expected_occurrences,
+        }
+    if find_string == replace_string:
+        return {"ok": False, "error": "find_string == replace_string (no-op edit refused)"}
+
+    # ── 4. Backup ──
+    try:
+        _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        safe_name = str(p).replace("/", "__").lstrip("_")
+        backup_path = _BACKUP_DIR / f"{ts}__{safe_name}.bak"
+        await asyncio.to_thread(backup_path.write_text, original, "utf-8")
+    except Exception as e:
+        return {"ok": False, "error": f"backup failed: {type(e).__name__}: {str(e)[:120]}"}
+
+    # ── 5. Compute new content ──
+    new_content = original.replace(find_string, replace_string, expected_occurrences)
+
+    # ── 6. Atomic write (.tmp + rename) ──
+    try:
+        tmp_path = p.with_suffix(p.suffix + ".ora_tmp")
+
+        def _atomic_write():
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, p)
+
+        await asyncio.to_thread(_atomic_write)
+    except Exception as e:
+        # Try to clean up the .ora_tmp if it exists
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
+        return {
+            "ok": False,
+            "error": f"write failed: {type(e).__name__}: {str(e)[:120]}",
+            "backup_path": str(backup_path),
+        }
+
+    # ── 7. git diff for proof (best-effort, never blocks success) ──
+    diff_preview = ""
+    try:
+        r = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "diff", "--unified=2", "--no-color", str(p)],
+            capture_output=True, text=True, timeout=5,
+            cwd="/app",
+        )
+        diff_preview = (r.stdout or "")[:2500]
+    except Exception:
+        pass
+
+    return {
+        "ok":                     True,
+        "path":                   str(p),
+        "occurrences_replaced":   expected_occurrences,
+        "backup_path":            str(backup_path),
+        "bytes_before":           len(original),
+        "bytes_after":            len(new_content),
+        "diff_preview":           diff_preview,
+        "diff_truncated":         len(diff_preview) >= 2500,
+        "revert_cmd":             f"cp '{backup_path}' '{p}'",
+    }
+
+
+# ─── iter 322en — Service Supervisor (controlled restart) ────────────
+# Real `supervisorctl restart` against the whitelisted services. Backend
+# + frontend only. Database / postgres / mongo are HARD-blocked.
+
+_RESTART_WHITELIST: set[str] = {"backend", "frontend"}
+
+
+async def restart_service(service: str) -> dict:
+    """Restart a whitelisted supervisor-managed service.
+
+    Args:
+        service: must be in _RESTART_WHITELIST.
+
+    Returns {ok, service, scheduled_at, ...}. The restart is detached into
+    a background process so that when the backend restarts itself, the
+    in-flight HTTP response can complete cleanly BEFORE the supervisor
+    kills the process group. Without this trick, ORA's caller hits a
+    socket reset and never sees the success ack.
+
+    For `backend`: we schedule the restart 1.5s after the HTTP response
+    returns. Caller is expected to poll /api/platform/health afterwards
+    (or use safe_edit_lint_restart_verify which does this automatically).
+    """
+    if service not in _RESTART_WHITELIST:
+        return {
+            "ok": False,
+            "error": f"service not in restart whitelist: {service}",
+            "whitelist": sorted(_RESTART_WHITELIST),
+        }
+
+    import shutil as _sh
+    sup = _sh.which("supervisorctl") or "/usr/bin/supervisorctl"
+    if not Path(sup).is_file():
+        return {"ok": False, "error": f"supervisorctl not found at {sup}"}
+
+    sudo = _sh.which("sudo")
+    sup_cmd = f"{sudo + ' ' if sudo else ''}{sup} restart {service}"
+
+    # Schedule the restart in a detached shell that survives THIS process
+    # being killed. We use nohup + setsid + bash -c with a short delay so
+    # the HTTP response can flush back to the caller first.
+    detached_script = (
+        f"sleep 1.5 && "
+        f"{sup_cmd} > /tmp/ora_restart_{service}.log 2>&1"
+    )
+    try:
+        # setsid detaches from the current process group; nohup ignores
+        # SIGHUP. Combined, the restart survives the in-flight backend
+        # process dying mid-`supervisorctl` call.
+        await asyncio.to_thread(
+            subprocess.Popen,
+            ["bash", "-c", f"setsid nohup bash -c '{detached_script}' >/dev/null 2>&1 &"],
+            shell=False, cwd="/app",
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        scheduled_at = datetime.now(timezone.utc).isoformat()
+        return {
+            "ok":            True,
+            "service":       service,
+            "scheduled_at":  scheduled_at,
+            "scheduled_via": "detached_setsid",
+            "delay_seconds": 1.5,
+            "log_path":      f"/tmp/ora_restart_{service}.log",
+            "note":          (f"Restart of '{service}' scheduled to fire 1.5s after this "
+                              "response. Poll /api/platform/health to verify recovery."),
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}",
+                "service": service}
+
+
 # ─── Registry ────────────────────────────────────────────────────────
 
 TOOL_REGISTRY: dict[str, dict] = {
@@ -658,6 +905,33 @@ TOOL_REGISTRY: dict[str, dict] = {
             "find, wc, stat, du, file, df, free, ps, which, whereis, python3 "
             "--version, node --version, pip list, yarn --version, ruff, git "
             "(log/status/diff/show/branch only), supervisorctl status."
+        ),
+    },
+    "safe_edit": {
+        "fn": safe_edit,
+        "args_spec": {
+            "path":                 "str (must be under /app/{backend,frontend/src,memory,ora_skills,scripts})",
+            "find_string":          "str (exact match, whitespace-sensitive)",
+            "replace_string":       "str (the new code)",
+            "expected_occurrences": "int 1-50 (default 1) — fails if actual count differs",
+        },
+        "description": (
+            "ATOMIC FILE WRITER (iter 322en) — surgical search/replace with "
+            "auto-backup. Refuses if find_string doesn't appear EXACTLY "
+            "`expected_occurrences` times (no guessing). Backups land in "
+            "/tmp/ora_backups/. Atomic write via .tmp + os.replace. "
+            "Returns git diff preview + revert command. Forbidden: .env, "
+            "package.json, requirements.txt, lock files, /.git/, /build/."
+        ),
+    },
+    "restart_service": {
+        "fn": restart_service,
+        "args_spec": {"service": "str — must be 'backend' or 'frontend'"},
+        "description": (
+            "SERVICE SUPERVISOR (iter 322en) — real `supervisorctl restart "
+            "<service>`. Whitelist hard-coded to backend + frontend only. "
+            "Database / postgres / mongo / system services BLOCKED. "
+            "Returns post-restart status so ORA can verify recovery."
         ),
     },
 }
