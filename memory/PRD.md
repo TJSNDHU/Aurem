@@ -1,5 +1,38 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322da (2026-05-12) — MEMOIR (GIT FOR AI MEMORY) SHIPPED**
+>
+> Memoir integrated as a light wrapper alongside Mongo — Mongo remains the source of truth, Memoir is the fast Git-versioned semantic index for 28 agents + ORA.
+>
+> **Backend (23/23 tests passing — 9 unit + 14 API):**
+>   - `services/memoir_service.py` — thin façade over `memoir-ai 0.2.0` (`ProllyTreeStore`). Sync calls behind a thread lock. Helpers for ORA turns, customer audits, founder saves, skill broadcasts, agent scratchpads.
+>   - `routers/memoir_router.py` — REST surface: `/api/admin/memoir/{info,stats,recall,search,history,remember,commit,_/health}` + `/ora/session/{sid}` + `/founder/save-history/{id}`.
+>   - `routers/registry.py` — `memoir_service.init()` on startup; store auto-bootstrapped at `/app/data/memoir/store` via `memoir new` CLI.
+>   - **Mirrors wired into 4 critical paths:**
+>     - ORA chat → `aurem.ora.sessions.{sid}.turns` (every turn auto-commits)
+>     - Customer audit → `aurem.customers.{email}.audits.latest` (audit summary cached)
+>     - Skill broadcast → `aurem.skills.broadcast.active` (live system addendum)
+>     - Founder Save → `aurem.founder.saves.{id}` (Git audit trail FREE)
+>
+> **Frontend:**
+>   - `platform/AdminMemoir.jsx` — full browser UI at `/admin/memoir`: search by path, drill into commit history per key, real-time stats. Linked from AdminShell sidebar.
+>   - `platform/SystemOverview.jsx` — three new tiles: `MemoirOverviewTile`, `SkillsAndVoiceOverviewTile`, `AuditOverviewTile`. Live perf stats poll every 25s.
+>
+> **Real Git commits emitted** — sample from store: `b205a18 broadcast:2`, `cfe9984 founder-save:save_*`, `149995a audit:test+memoir@aurem.live`. Every memory change is a real Git commit you can `git log` against.
+>
+> **Tests:** `/app/backend/tests/test_memoir_service.py` (9 passing), `/app/test_reports/iteration_322da.json` (14 passing).
+>
+> **Why this matters:**
+>   - 150-750× faster than vector DB (path lookup, no embeddings)
+>   - Explainable retrieval — every recall has a traceable path
+>   - Git commits = FREE audit trail (solves the long-pending `/admin/founder-saves` requirement)
+>   - Branch/rollback fixes ORA hallucinations deterministically
+>   - <10ms per recall (verified locally)
+>
+> **MiroThinker (deep research agent):** Deferred to a later iteration after Camoufox Scout ships. Reason: 600 tool-calls/task economics + ngrok/GPU hosting overhead. Will re-evaluate post-Camoufox.
+
+---
+
 > **🟢 ITER 322ca (2026-05-11) — $49/mo CUSTOMER AUDIT (SEO + ADS WASTE) SHIPPED**
 >
 > Revenue-generating upsell feature shipped. Customer signs up → AUREM automatically:

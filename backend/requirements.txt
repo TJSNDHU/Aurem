@@ -106,10 +106,19 @@ jmespath==1.1.0
 joblib==1.5.3
 jq==1.11.0
 json_repair==0.59.4
+jsonpatch==1.33
+jsonpointer==3.1.1
 jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 kubernetes==35.0.0
+langchain-core==1.4.0
+langchain-protocol==0.0.15
 langdetect==1.0.9
+langgraph==1.1.10
+langgraph-checkpoint==4.0.3
+langgraph-prebuilt==1.0.13
+langgraph-sdk==0.3.14
+langsmith==0.8.3
 language-tags==1.3.1
 librt==0.8.1
 license-expression==30.4.4
@@ -121,6 +130,7 @@ MarkupSafe==3.0.3
 maxminddb==3.1.1
 mccabe==0.7.0
 mdurl==0.1.2
+memoir-ai==0.2.0
 mmh3==5.2.1
 motor==3.3.1
 mpmath==1.3.0
@@ -133,12 +143,17 @@ nest-asyncio==1.6.0
 networkx==3.6.1
 notebooklm-py==0.3.4
 numpy==2.4.3
-# nvidia-* / torch / transformers / sentence-transformers / safetensors /
-# tokenizers / huggingface_hub removed in iter 322ar — the embedding
-# service is opt-in (AUREM_EMBEDDINGS_ENABLED env var) and falls back to
-# no-op zero vectors when these libs aren't importable. They were bloating
-# the deploy image by ~5 GB and OOMing the 1 GB production pod build.
-# Backend behaviour is functionally identical without them.
+nvidia-cublas==13.1.0.3
+nvidia-cuda-cupti==13.0.85
+nvidia-cuda-nvrtc==13.0.88
+nvidia-cuda-runtime==13.0.96
+nvidia-cufft==12.0.0.61
+nvidia-cufile==1.15.1.6
+nvidia-curand==10.4.0.35
+nvidia-cusolver==12.0.4.66
+nvidia-cusparse==12.6.3.3
+nvidia-nvjitlink==13.0.88
+nvidia-nvtx==13.0.85
 oauthlib==3.3.1
 onnxruntime==1.24.4
 openai==1.99.9
@@ -151,6 +166,7 @@ opentelemetry-sdk==1.37.0
 opentelemetry-semantic-conventions==0.58b0
 opentelemetry-util-http==0.58b0
 orjson==3.11.8
+ormsgpack==1.12.2
 overrides==7.7.0
 packageurl-python==0.17.6
 packaging==26.0
@@ -169,6 +185,7 @@ platformdirs==4.9.4
 playwright==1.59.0
 pluggy==1.6.0
 primp==1.2.2
+prollytree==0.3.3
 prometheus-client==0.19.0
 propcache==0.4.1
 proto-plus==1.27.1
@@ -226,6 +243,7 @@ reportlab==4.4.10
 requests==2.32.5
 requests-file==3.0.1
 requests-oauthlib==2.0.0
+requests-toolbelt==1.0.0
 resend==2.27.0
 rich==14.3.3
 rlp==4.1.0
@@ -241,11 +259,13 @@ scipy==1.17.1
 scrapling==0.2.99
 screeninfo==0.8.1
 semantic-version==2.10.0
+sentry-sdk==2.42.0
 sgmllib3k==1.0.0
 shellingham==1.5.4
 six==1.17.0
 slowapi==0.1.9
 sniffio==1.3.1
+socksio==1.0.0
 sortedcontainers==2.4.0
 soupsieve==2.8.3
 sse-starlette==3.3.4
@@ -264,6 +284,27 @@ tomli==2.2.1
 tomli_w==1.2.0
 toolz==1.1.0
 tqdm==4.67.3
+tree-sitter==0.25.2
+tree-sitter-c==0.24.2
+tree-sitter-c-sharp==0.23.5
+tree-sitter-cpp==0.23.4
+tree-sitter-elixir==0.3.5
+tree-sitter-go==0.25.0
+tree-sitter-java==0.23.5
+tree-sitter-javascript==0.25.0
+tree-sitter-julia==0.23.1
+tree-sitter-kotlin==1.1.0
+tree-sitter-lua==0.5.0
+tree-sitter-objc==3.0.2
+tree-sitter-php==0.24.1
+tree-sitter-powershell==0.26.4
+tree-sitter-python==0.25.0
+tree-sitter-ruby==0.23.1
+tree-sitter-rust==0.24.2
+tree-sitter-scala==0.26.0
+tree-sitter-swift==0.7.2
+tree-sitter-typescript==0.23.2
+tree-sitter-zig==1.1.2
 twilio==9.10.4
 typer==0.23.1
 types-requests==2.33.0.20260402
@@ -275,6 +316,7 @@ ua-parser==1.0.2
 ua-parser-builtins==202605
 uritemplate==4.2.0
 urllib3==2.6.3
+uuid_utils==0.15.0
 uvicorn==0.44.0
 uvloop==0.22.1
 vulture==2.16
@@ -288,7 +330,10 @@ webencodings==0.5.1
 websocket-client==1.9.0
 websockets==15.0.1
 wrapt==1.17.3
+xlsxwriter==3.2.9
+xxhash==3.7.0
 yarl==1.23.0
 yt-dlp==2026.3.17
 zipp==3.23.0
 zopfli==0.4.1
+zstandard==0.25.0
