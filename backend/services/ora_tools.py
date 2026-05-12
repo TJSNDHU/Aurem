@@ -809,17 +809,11 @@ async def restart_service(service: str) -> dict:
     sudo = _sh.which("sudo")
     sup_cmd = f"{sudo + ' ' if sudo else ''}{sup} restart {service}"
 
-    # Schedule the restart in a detached shell that survives THIS process
-    # being killed. We use nohup + setsid + bash -c with a short delay so
-    # the HTTP response can flush back to the caller first.
     detached_script = (
         f"sleep 1.5 && "
         f"{sup_cmd} > /tmp/ora_restart_{service}.log 2>&1"
     )
     try:
-        # setsid detaches from the current process group; nohup ignores
-        # SIGHUP. Combined, the restart survives the in-flight backend
-        # process dying mid-`supervisorctl` call.
         await asyncio.to_thread(
             subprocess.Popen,
             ["bash", "-c", f"setsid nohup bash -c '{detached_script}' >/dev/null 2>&1 &"],
@@ -840,6 +834,240 @@ async def restart_service(service: str) -> dict:
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}",
                 "service": service}
+
+
+# ─── iter 322eo — ORA CTO Peer-Council (P4) ──────────────────────────
+# Sovereign Chief Technology Officer stack — ORA can now escalate hard
+# decisions to specialist peer agents BEFORE committing a safe_edit or
+# restart_service. Uses the existing AUREMAgentHarness (build-fixer,
+# code-reviewer, security-scanner, planner) AND the LLM gateway for
+# role-prompted peer review (security-engineer, devops, backend-eng,
+# qa-engineer, refactor-expert).
+#
+# The 10 agent profiles in /app/backend/ora_skills/agent_*.md become
+# the system prompts for LLM-peer review — no new prompt engineering,
+# we reuse what's already battle-tested.
+
+_LLM_PEER_PROFILES = {
+    # role         → (ora_skills filename, max_tokens)
+    "security":     ("agent_security_engineer.md",   600),
+    "backend":      ("agent_engineering_backend.md", 600),
+    "devops":       ("agent_engineering_devops.md",  500),
+    "qa":           ("agent_qa_engineer.md",         500),
+    "design":       ("agent_design_ux.md",           400),
+    "finance":      ("agent_finance_analyst.md",     400),
+    "marketing":    ("agent_marketing_growth.md",    400),
+    "pricing":      ("agent_pricing_analyst.md",     400),
+}
+
+# Native code agents from services/aurem_agents/* (already in production)
+_HARNESS_AGENTS = {
+    "code-reviewer":    "Static code review (Python/JS/MongoDB anti-patterns + security)",
+    "security-scanner": "OWASP + SaaS-specific security audit",
+    "build-fixer":      "Import errors / 404s / build failures",
+    "planner":          "Feature planning + architecture sketches",
+}
+
+
+def _load_peer_prompt(role: str) -> str:
+    """Read the skill profile for a peer role. Falls back to a generic
+    review prompt if the file is missing."""
+    spec = _LLM_PEER_PROFILES.get(role)
+    if not spec:
+        return ""
+    skill_path = Path("/app/backend/ora_skills") / spec[0]
+    if not skill_path.is_file():
+        return ""
+    try:
+        return skill_path.read_text("utf-8", errors="replace")[:6000]
+    except Exception:
+        return ""
+
+
+async def peer_review(role: str, question: str,
+                       context: str = "",
+                       max_tokens: int | None = None) -> dict:
+    """LLM peer-review by a specialist role.
+
+    Args:
+        role:       one of `_LLM_PEER_PROFILES` keys (security, backend,
+                    devops, qa, design, finance, marketing, pricing).
+        question:   the specific question or proposed change.
+        context:    optional diff / code / log to give the peer.
+        max_tokens: response cap (defaults to role's recommended size).
+
+    Returns:
+        {ok, role, opinion, provider, elapsed_ms, prompt_chars}.
+    """
+    if role not in _LLM_PEER_PROFILES:
+        return {
+            "ok": False,
+            "error": f"unknown peer role: {role}",
+            "available_roles": sorted(_LLM_PEER_PROFILES),
+        }
+    if not isinstance(question, str) or not question.strip():
+        return {"ok": False, "error": "question required"}
+    if len(question) > 20_000:
+        return {"ok": False, "error": "question too long (>20KB)"}
+    if len(context) > 50_000:
+        return {"ok": False, "error": "context too long (>50KB)"}
+
+    profile = _load_peer_prompt(role)
+    if not profile:
+        return {"ok": False, "error": f"peer profile not loaded for: {role}"}
+
+    spec = _LLM_PEER_PROFILES[role]
+    tokens = max_tokens or spec[1]
+
+    sys_prompt = (
+        profile
+        + "\n\n# PEER REVIEW REQUEST\n"
+        "ORA (the autonomous CTO) is consulting you before committing a "
+        "change. Be specific. Quote line numbers / endpoints. If the "
+        "change is risky, say so plainly. If it's fine, say so plainly. "
+        "Apply the Zero Hallucination Charter — if you don't know, say "
+        "so. Cap your answer to ~3 short paragraphs."
+    )
+    user_prompt = f"Question:\n{question}\n\n"
+    if context:
+        user_prompt += f"Context (diff / code / log):\n```\n{context[:8000]}\n```\n"
+
+    import time as _t
+    t0 = _t.time()
+    try:
+        from services.llm_gateway import call_llm_with_meta
+        # Skip cache so peer review is always fresh per question.
+        r = await call_llm_with_meta(
+            sys_prompt, user_prompt, max_tokens=tokens,
+            bypass_cache=True,
+        )
+    except Exception as e:
+        return {"ok": False, "error": f"llm_gateway failed: {type(e).__name__}: {str(e)[:120]}"}
+
+    return {
+        "ok":           bool(r.get("ok")),
+        "role":         role,
+        "provider":     r.get("provider"),
+        "opinion":      r.get("content"),
+        "prompt_chars": len(sys_prompt) + len(user_prompt),
+        "elapsed_ms":   int((_t.time() - t0) * 1000),
+    }
+
+
+async def code_review(file_path: str,
+                       review_type: str = "full") -> dict:
+    """Static code review via the existing AUREMCodeReviewer agent.
+
+    This is the deterministic peer — runs heuristics on the file
+    (FastAPI patterns, React hooks, Mongo anti-patterns, OWASP) and
+    returns a structured issue list + score. No LLM call needed.
+    """
+    if not _is_path_allowed(file_path):
+        return {"ok": False, "error": f"path not allowed: {file_path}"}
+    if not Path(file_path).is_file():
+        return {"ok": False, "error": f"not a file: {file_path}"}
+    if review_type not in ("full", "security", "style", "performance"):
+        return {"ok": False, "error": f"invalid review_type: {review_type}"}
+    try:
+        from services.aurem_agents.harness import get_agent_harness
+        harness = get_agent_harness()
+        r = await harness.delegate("code-reviewer", {
+            "file_path":   file_path,
+            "review_type": review_type,
+        })
+        # Reshape into the standard ora_tools envelope
+        return {
+            "ok":          bool(r.get("success", True)),
+            "file_path":   file_path,
+            "review_type": review_type,
+            "score":       r.get("score"),
+            "issues":      (r.get("issues") or [])[:30],
+            "issue_count": len(r.get("issues") or []),
+            "suggestions": (r.get("suggestions") or [])[:10],
+            "raw":         {k: v for k, v in r.items()
+                            if k not in ("issues", "suggestions")},
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:160]}"}
+
+
+async def security_scan(scan_type: str = "full",
+                         target: str = "backend") -> dict:
+    """Static security scan via the existing AUREMSecurityScanner agent.
+
+    Covers OWASP Top 10, auth/payment paths, MongoDB injection, frontend
+    XSS / CSRF / secret exposure. Returns vulnerability list + risk
+    score. No LLM call — pure heuristic + AST inspection."""
+    if scan_type not in ("full", "auth", "payment", "api", "frontend"):
+        return {"ok": False, "error": f"invalid scan_type: {scan_type}"}
+    if target not in ("backend", "frontend", "both"):
+        return {"ok": False, "error": f"invalid target: {target}"}
+    try:
+        from services.aurem_agents.harness import get_agent_harness
+        harness = get_agent_harness()
+        r = await harness.delegate("security-scanner", {
+            "scan_type": scan_type,
+            "target":    target,
+        })
+        return {
+            "ok":              bool(r.get("success", True)),
+            "scan_type":       scan_type,
+            "target":          target,
+            "risk_score":      r.get("risk_score"),
+            "vulnerabilities": (r.get("vulnerabilities") or [])[:25],
+            "vuln_count":      len(r.get("vulnerabilities") or []),
+            "recommendations": (r.get("recommendations") or [])[:10],
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:160]}"}
+
+
+async def council_consult(question: str, *,
+                            roles: list[str] | None = None,
+                            context: str = "") -> dict:
+    """Multi-peer council — fan out the same question to N specialists,
+    return all opinions in parallel. ORA uses this before high-impact
+    edits (auth changes, payment paths, schema migrations).
+
+    Args:
+        question: the proposed change / problem.
+        roles:    list of peer roles to consult. Default = security + backend + qa.
+        context:  optional diff / code / log shared with all peers.
+    """
+    if not roles:
+        roles = ["security", "backend", "qa"]
+    roles = [r for r in roles if r in _LLM_PEER_PROFILES]
+    if not roles:
+        return {"ok": False, "error": "no valid roles after filter",
+                "available_roles": sorted(_LLM_PEER_PROFILES)}
+    if len(roles) > 5:
+        return {"ok": False, "error": "max 5 peers per council call"}
+
+    # Parallel fanout — each peer review is independent.
+    results = await asyncio.gather(*[
+        peer_review(role, question, context=context) for role in roles
+    ], return_exceptions=True)
+
+    opinions = []
+    for role, res in zip(roles, results):
+        if isinstance(res, Exception):
+            opinions.append({"role": role, "ok": False,
+                              "error": f"{type(res).__name__}: {str(res)[:120]}"})
+        else:
+            opinions.append({
+                "role":       role,
+                "ok":         res.get("ok"),
+                "opinion":    res.get("opinion"),
+                "provider":   res.get("provider"),
+                "elapsed_ms": res.get("elapsed_ms"),
+            })
+    n_ok = sum(1 for o in opinions if o.get("ok"))
+    return {
+        "ok":          n_ok > 0,
+        "consulted":   roles,
+        "opinions":    opinions,
+        "consensus":   f"{n_ok}/{len(opinions)} peers responded",
+    }
 
 
 # ─── Registry ────────────────────────────────────────────────────────
@@ -932,6 +1160,63 @@ TOOL_REGISTRY: dict[str, dict] = {
             "<service>`. Whitelist hard-coded to backend + frontend only. "
             "Database / postgres / mongo / system services BLOCKED. "
             "Returns post-restart status so ORA can verify recovery."
+        ),
+    },
+    "peer_review": {
+        "fn": peer_review,
+        "args_spec": {
+            "role":       "str — one of: security, backend, devops, qa, design, finance, marketing, pricing",
+            "question":   "str (≤20KB) — the proposed change or problem",
+            "context":    "str (≤50KB) — optional diff/code/log to share",
+            "max_tokens": "int — defaults to role's recommended size",
+        },
+        "description": (
+            "ORA CTO P4 (iter 322eo) — LLM peer review by a specialist role. "
+            "Loads /app/backend/ora_skills/agent_<role>.md as the peer's "
+            "system prompt and asks it to critique ORA's proposed change. "
+            "Use BEFORE high-impact safe_edit / restart calls (auth, "
+            "payment, schema). Bypass-cached so every consult is fresh."
+        ),
+    },
+    "code_review": {
+        "fn": code_review,
+        "args_spec": {
+            "file_path":   "str — Python or JS file under /app/{backend,frontend/src}",
+            "review_type": "str — full | security | style | performance",
+        },
+        "description": (
+            "ORA CTO P4 (iter 322eo) — deterministic code review via the "
+            "existing AUREMCodeReviewer agent. Checks FastAPI patterns, "
+            "React hooks, Mongo anti-patterns, OWASP. Returns score + "
+            "issue list + suggestions. No LLM cost."
+        ),
+    },
+    "security_scan": {
+        "fn": security_scan,
+        "args_spec": {
+            "scan_type": "str — full | auth | payment | api | frontend",
+            "target":    "str — backend | frontend | both",
+        },
+        "description": (
+            "ORA CTO P4 (iter 322eo) — deterministic security audit via "
+            "the existing AUREMSecurityScanner. OWASP Top 10 + SaaS-"
+            "specific (auth, subs, payments) + MongoDB injection + "
+            "frontend XSS/CSRF/secrets. Returns risk_score + vuln list. "
+            "No LLM cost."
+        ),
+    },
+    "council_consult": {
+        "fn": council_consult,
+        "args_spec": {
+            "question": "str — the change / problem",
+            "roles":    "list[str] — peer roles to consult (default: security, backend, qa)",
+            "context":  "str — optional diff/code/log",
+        },
+        "description": (
+            "ORA CTO P4 (iter 322eo) — multi-peer parallel council. Fan out "
+            "the same question to N specialists, return all opinions. ORA "
+            "uses this before high-stakes edits (auth, payment, schema). "
+            "Max 5 peers per call."
         ),
     },
 }
