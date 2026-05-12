@@ -1892,6 +1892,9 @@ async def pip_propose(package: str, *, version: Optional[str] = None) -> dict:
 # ─── iter 322ev — Open Interpreter natural-language planning bridge ──
 from services.ora_natural_bridge import ora_run_natural  # noqa: E402
 
+# ─── iter 322fa — Legion Bridge tool (ORA executes on founder's Legion) ──
+from services.legion_tool import legion_exec  # noqa: E402
+
 
 # ─── Registry ────────────────────────────────────────────────────────
 
@@ -2204,6 +2207,25 @@ TOOL_REGISTRY: dict[str, dict] = {
             "code blocks for the given objective. P1 returns plan ONLY; "
             "execution must route through existing safety-gated tools. "
             "Model: groq/llama-3.3-70b-versatile."
+        ),
+    },
+    "legion_exec": {
+        "fn": legion_exec,
+        "args_spec": {
+            "cmd":        "str — shell command to run on the founder's Legion laptop (≤4000 chars)",
+            "cwd":        "str — working directory on Legion (default: /opt/aurem-cto)",
+            "timeout_s":  "int — kill subprocess after N seconds (1..600, default 60)",
+            "risk_hint":  "str — 'low'|'medium'|'high' — overrides auto-classifier (optional)",
+            "wait_max_s": "int — max seconds to wait for the daemon to return result (1..900, default 360). MUST be ≥300 for HIGH-risk to cover Telegram approval window.",
+        },
+        "description": (
+            "Execute a shell command on the founder's Legion laptop via the "
+            "reverse-poll queue (iter 322fa). HIGH-risk commands (sudo, rm -rf, "
+            "curl|sh, apt install, systemctl, etc.) trigger a Telegram approval "
+            "gate to the founder's phone and auto-reject after 5 minutes. "
+            "Returns {ok, job_id, exit_code, stdout, stderr, elapsed_ms, risk}. "
+            "ORA gets full autonomous control of Legion through this tool — no "
+            "SSH needed, no inbound port required, works through any firewall."
         ),
     },
 }

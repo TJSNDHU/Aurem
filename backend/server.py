@@ -2144,6 +2144,24 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] scout_ghost wire failed: {_e}")
 
+# iter 322fa — Legion Bridge (reverse-poll daemon queue → ORA controls Legion)
+try:
+    from routers.legion_queue_router import (
+        router as _legion_queue_router,
+        bootstrap_router as _legion_bootstrap_router,
+        set_db as _set_legion_db,
+    )
+    app.include_router(_legion_queue_router)
+    app.include_router(_legion_bootstrap_router)
+
+    @app.on_event("startup")
+    async def _wire_legion_db():
+        from server import db as _bound_db  # type: ignore
+        _set_legion_db(_bound_db)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] legion_queue wire failed: {_e}")
+
 # /.well-known/ucp moved to bootstrap.wellknown_routes (iter 263 final surgery).
 
 # Serve standalone tracking pixel
