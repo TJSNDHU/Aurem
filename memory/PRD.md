@@ -1543,3 +1543,37 @@ See `/app/memory/test_credentials.md`.
 
 ### Deferred (Stage B — future sprint)
 - E-commerce surgical removal from 18 mixed-purpose files (~200 code refs): `routers/server_misc_routes.py`, `routers/pwa_router.py`, `routers/ucp_router.py`, `services/email_templates.py`, `services/admin_action_ai.py`, `services/cron_schedulers.py`, etc. Requires 2-3 day dedicated sprint with per-file testing.
+
+## iter 322ef — Refactor: ORA Learning via OFFICIAL Channels + Backup Sync
+
+### Problem
+Prior teach-ORA script (iter 322ef original) wrote to ora_skills_library with the WRONG schema (`title`/`addendum` instead of official `name`/`description`/`body`). Also didn't sync to backup MongoDB.
+
+### Fix
+Replaced `/app/backend/scripts/teach_ora_iter_322.py` to use OFFICIAL channels:
+1. `ora_training_files` (canonical learning corpus, source_type="learning_brief", purpose="ora_self_learning")
+2. `ora_skills_library` (official AntiGravity schema: id/name/category/description/body)
+3. `ora_skills_broadcast` (merged with existing skills, NOT overwrite; target_agents="ALL" string, not list)
+4. **SECONDARY Atlas mirror** via targeted-collection sync (bypasses alphabetical full-mirror that aborts at 'b*' due to 500-collection cap)
+
+### Discovery
+**Secondary Atlas at hard 500-collection cap**: list_collection_names shows 387, but Atlas reserves additional slots → new collections fail. 113 phantom slots reserved.
+- ✅ `ora_training_files` synced (17 docs, 4 iter-322 learnings)
+- ✅ `ora_brain_thoughts` synced (last 1000 docs)
+- ❌ `ora_skills_library` + `ora_skills_broadcast` blocked by cap
+- **Mitigation**: All learning content is in `ora_training_files` which IS on secondary. Skills library/broadcast are LIVE config recreatable from training corpus.
+
+### Permanent Rule Documented
+**Created `/app/memory/ORA_LEARNING_WORKFLOW.md`** — hard rule for all future iterations.
+- Run `teach_ora_iter_<X>.py` after every significant iter
+- 4 mandatory channels: ora_training_files + ora_skills_library + ora_skills_broadcast + secondary mirror
+- Verification checklist at bottom
+
+### Verified end-to-end
+Sovereign LLM call asking about K8s probe restart → response literally cited "Apply the skill: K8s probe timeout = MongoDB Atlas pool exhaustion + scheduler burst (`322ea learning`)" — proving live broadcast pickup works.
+
+### Next Action Items
+1. **🥇 Redeploy to production** — all 322ea/ec/ed/ee/ef fixes live
+2. **Upgrade SECONDARY Atlas to M10+** (or prune harder) — full DR mirror currently broken at cap
+3. **Customer CSV upload UI** — Intelligence Merge match-rate unlock
+4. **Design-Extract integration** (1.5 days)

@@ -1,25 +1,33 @@
 """
-iter 322ef — Teach ORA today's work so future agents can reproduce.
+teach_ora_iter_322 — Refactored to use OFFICIAL ORA channels.
 
-Three persistence layers fire in parallel:
+Replaces the earlier (iter 322ef) custom-schema version that wrote
+incompatible docs. Uses the same 3 channels the rest of AUREM uses:
 
-1. ora_brain_thoughts (ora_universal_learner) — one short learnable
-   thought per iteration. Future ORA decisions index against these.
+  1. `ora_training_files`   — official ORA training corpus (source_type=
+                              "learning_brief"). The embedding pipeline
+                              picks these up so semantic search inside
+                              ORA chat surfaces them.
+  2. `ora_skills_library`   — official AntiGravity skills schema:
+                              {id, name, category, description, body}.
+                              Matched the format used by the existing
+                              1,453 Antigravity skills so the official
+                              /api/admin/antigravity-skills/broadcast
+                              endpoint accepts them.
+  3. `ora_skills_broadcast` — written via the SAME logic as the official
+                              broadcast endpoint, including memoir
+                              mirror + agent cache invalidation.
 
-2. memoir-ai versioned memory (services/memoir_service) — full prose
-   playbook stored at `learnings/2026-02/iter-322ea-ee` with a Git
-   commit so the timeline is queryable.
+  4. `db_backup_service.run_backup` — fires DR sync to the secondary
+                              Atlas cluster so the backup mongo has the
+                              same training + skills.
 
-3. ora_skills_library + ora_skills_broadcast — 4 new permanent
-   Antigravity skills written into the library and broadcast to all
-   28 agents so the system_addendum picks them up on the next call.
-
-Run once: `python -m scripts.teach_ora_iter_322`
-Idempotent — re-running upserts, doesn't duplicate.
+Idempotent — re-running upserts on stable IDs.
 """
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import sys
 from datetime import datetime, timezone
@@ -28,250 +36,201 @@ sys.path.insert(0, "/app/backend")
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
-
-# ─── The 4 lessons learned today ─────────────────────────────────────
+# ─── Lessons captured today ──────────────────────────────────────────
 LESSONS = [
     {
         "iter": "322ea",
-        "title": "K8s probe timeout = MongoDB Atlas pool exhaustion + scheduler burst",
-        "category": "deployment_stability",
-        "skill_id": "atlas-pool-and-scheduler-hygiene",
-        "summary": (
-            "K8s /health probe was timing out every 10s in production. Root cause "
-            "wasn't the handler — it was that 4+ APScheduler jobs all fired at xx:00 "
-            "and simultaneously checked out Mongo Atlas connections; pool maxed at 50, "
-            "paused, waitQueueTimeoutMS=10s blocked the event loop, /api/platform/health "
-            "couldn't be scheduled inside nginx's 10s upstream timeout window. K8s "
-            "marked the pod unhealthy and restart-looped."
+        "skill_id": "aurem-322ea-atlas-pool-scheduler-hygiene",
+        "name": "Atlas pool & scheduler hygiene",
+        "category": "deployment",
+        "description": (
+            "When K8s /health probe times out in production, suspect Mongo "
+            "Atlas pool exhaustion + scheduler burst (all per-minute jobs "
+            "firing at xx:00 simultaneously). Fix: bump maxPoolSize 50→200, "
+            "set minPoolSize=10 + waitQueueTimeoutMS=2000, add jitter=20 to "
+            "every IntervalTrigger, set scheduler job_defaults (max_instances=1, "
+            "coalesce=True, misfire_grace_time=30)."
         ),
-        "playbook": """# Atlas Pool & Scheduler Hygiene (iter 322ea)
+        "body_md": """# AUREM — Atlas Pool & Scheduler Hygiene (iter 322ea)
 
 ## Symptom
-- Production K8s probe `/health` returns 502 every 10s
-- Backend logs show: `[autopilot] tick error ... connection pool paused`
-- `Timed out while checking out a connection from connection pool. maxPoolSize: 50, timeout: 10.0`
-- `WARNING:apscheduler ... was missed by 0:00:21` (multiple jobs missing on same tick)
+- K8s /health probe returns 502 every 10s
+- `[autopilot] tick error ... connection pool paused`
+- `Timed out while checking out a connection from connection pool. maxPoolSize: 50`
+- `WARNING:apscheduler ... was missed by 0:00:21`
 
 ## Root cause
-- Default Motor `maxPoolSize=50` is too small for Atlas + N background jobs
-- All `IntervalTrigger(seconds=60)` jobs fire at xx:00 simultaneously
-- `waitQueueTimeoutMS=10s` (default) blocks the event loop while waiting for a connection
-- /health endpoint can't be scheduled in time → nginx 10s upstream timeout → K8s kills pod
+Default Motor `maxPoolSize=50` + 4+ per-minute scheduler jobs firing simultaneously at xx:00 → pool paused → waitQueueTimeoutMS=10s blocks event loop → /health can't be scheduled inside nginx's 10s upstream window → K8s kills pod.
 
 ## Fix
-1. **Bump Mongo client pool**:
-   ```python
-   AsyncIOMotorClient(
-       mongo_url,
-       maxPoolSize=200,         # was 50
-       minPoolSize=10,          # warm connections, no cold-start
-       waitQueueTimeoutMS=2000, # fail fast — never block loop > 2s
-       serverSelectionTimeoutMS=5000,
-       connectTimeoutMS=10000,
-       socketTimeoutMS=20000,
-       retryWrites=True,
-   )
-   ```
-
-2. **AsyncIOScheduler global job_defaults**:
-   ```python
-   AsyncIOScheduler(job_defaults={
-       "max_instances": 1,
-       "coalesce": True,
-       "misfire_grace_time": 30,
-   })
-   ```
-
-3. **Add jitter to every per-minute job** so they don't all fire at xx:00:
-   ```python
-   IntervalTrigger(seconds=60, jitter=20)
-   ```
+1. Motor client init:
+```python
+AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=200, minPoolSize=10, waitQueueTimeoutMS=2000,
+    serverSelectionTimeoutMS=5000, connectTimeoutMS=10000,
+    socketTimeoutMS=20000, retryWrites=True,
+)
+```
+2. AsyncIOScheduler global defaults:
+```python
+AsyncIOScheduler(job_defaults={
+    "max_instances": 1, "coalesce": True, "misfire_grace_time": 30,
+})
+```
+3. Every IntervalTrigger gets `jitter=20`.
 
 ## Verification
-- 10 parallel curls to /api/platform/health → all HTTP 200 in <2ms
-- No `apscheduler ... missed` warnings within 5 min after restart
-- Pod stays alive past probe interval × 5
-
-## Files touched
-- `backend/server.py` (Motor client init)
-- `backend/routers/registry.py` (scheduler defaults + 3 IntervalTriggers)
-- `backend/services/ora_proposal_bridge.py` (watchdog re-arm jitter)
-- `backend/services/nightly_cycle.py` (periodic_flush jitter)
+- 10 parallel curls to /api/platform/health → HTTP 200 in <2ms
+- Zero `apscheduler ... missed` warnings within 5 min after restart
 """,
     },
     {
         "iter": "322ec",
-        "title": "Wire LLM response cache at the gateway chokepoint, not per-router",
+        "skill_id": "aurem-322ec-llm-gateway-cache",
+        "name": "LLM gateway response cache",
         "category": "cost_optimization",
-        "skill_id": "llm-gateway-response-cache",
-        "summary": (
-            "Emergent LLM key budget kept burning even after wiring "
-            "llm_response_cache into one router. Real fix: hook the cache at "
-            "services/llm_gateway.call_llm_with_meta() — the single chokepoint "
-            "every agent/sentinel/composer call passes through. Sha1 the "
-            "(system_prompt[:1500] + user_prompt[:3000] + max_tokens) tuple, "
-            "compute it AFTER skill-broadcast addendum so admin pushes auto-"
-            "invalidate. 12h TTL. Validated 1075x speedup (1.41s → 0.001s)."
+        "description": (
+            "Find the single LLM chokepoint in your stack and wire response "
+            "caching there — not per-router. In AUREM that's "
+            "services/llm_gateway.call_llm_with_meta(). Hash "
+            "(system_prompt[:1500] + user_prompt[:3000] + max_tokens) AFTER "
+            "skill-broadcast addendum so admin skill pushes auto-invalidate. "
+            "12h TTL. Verified 1075x speedup (1.41s → 0.001s)."
         ),
-        "playbook": """# LLM Gateway Response Cache (iter 322ec)
+        "body_md": """# AUREM — LLM Gateway Response Cache (iter 322ec)
 
 ## Symptom
-- Emergent LLM Key budget exhausting weekly
-- Repeated FAQ-style questions hit Claude/Groq every time
-- Wrapping individual routers with a cache only solves a tiny slice
+- Emergent LLM key budget exhausting weekly
+- 114 `budget-exhausted` log entries
+- Repeated FAQ questions hit live LLM every time
 
 ## Insight
-Find the **single chokepoint** in the LLM stack. In AUREM it's
-`services/llm_gateway.call_llm_with_meta()` — Sovereign + OpenRouter + Emergent
-all flow through here. Cache there → ALL 28 agents + sentinel + composer +
-ORA chat get cached automatically.
+Find the single chokepoint — in AUREM it's `services/llm_gateway.call_llm_with_meta()`. Sovereign + OpenRouter + Emergent all flow through here. Cache there → all 28 agents + sentinel + composer + ORA chat get cached automatically.
 
-## Recipe
+## Implementation
 ```python
-# In call_llm_with_meta(), AFTER the skill-broadcast addendum is appended:
 import hashlib
 _seed = f"{(system_prompt or '')[:1500]}||{user_prompt[:3000]}||{max_tokens}"
 sig = hashlib.sha1(_seed.encode()).hexdigest()[:20]
 
-# Read
 hit = await cache_get(db, scope="llm_gateway", signature=sig, prompt_seed="v1")
 if hit and hit.get("content"):
-    return {"provider": hit.get("provider","cache"),
-            "content": hit["content"], "ok": True, "cached": True}
+    return {"provider": hit.get("provider"), "content": hit["content"],
+            "ok": True, "cached": True}
 
-# ... call providers ...
+# ... existing provider chain ...
 
-# Write on success
-await cache_put(db, scope="llm_gateway", signature=sig,
-                payload={"content": content, "provider": provider},
-                prompt_seed="v1", ttl_hours=12)
+if content:
+    await cache_put(db, scope="llm_gateway", signature=sig,
+                    payload={"content": content, "provider": provider},
+                    prompt_seed="v1", ttl_hours=12)
 ```
 
-## Why compute sig AFTER skill addendum?
-Admin pushes a SKILL.md → addendum changes → cache signature changes →
-auto-invalidates only the answers that depended on the old prompt. No
-manual purge needed.
+## Critical detail
+Compute signature AFTER skill-broadcast addendum is appended. Admin pushing a new SKILL.md → addendum changes → signature changes → auto-invalidates. No manual purge.
 
-## When to bypass
-Add `bypass_cache=True` kwarg for temperature-sensitive callers (creative
-writes, brainstorming). Never set it globally.
-
-## Verification
-```python
-# Same prompt twice should produce ~1000x speedup on second call:
-t1 = time.time(); r1 = await call_llm_with_meta(s, u); e1 = time.time()-t1
-t2 = time.time(); r2 = await call_llm_with_meta(s, u); e2 = time.time()-t2
-assert r2.get("cached") is True
-assert e2 < e1 / 100
-```
+## Opt-out
+`bypass_cache=True` for temperature-sensitive callers (creative writes, brainstorms).
 """,
     },
     {
         "iter": "322ed",
-        "title": "Wire orphan backend features into revenue products, don't delete",
-        "category": "feature_integration",
-        "skill_id": "wire-orphan-features-into-revenue",
-        "summary": (
-            "Intelligence Merge engine was backend-complete but had zero "
-            "frontend references — pure 'anaadio ka build' (engineer built "
-            "the pipeline, never built the UI). Solution: wire it into the "
-            "existing $49 Customer Audit product so customers see Intelligence "
-            "alongside SEO/Ads. Now the engine has a revenue surface + "
-            "Top-Issues outranks meta tweaks with revenue-critical findings "
-            "('X visitors but 0 captured', 'high-intent contact ready')."
+        "skill_id": "aurem-322ed-orphan-to-revenue",
+        "name": "Wire orphan features into revenue products",
+        "category": "product_integration",
+        "description": (
+            "When a backend feature is complete but has zero frontend "
+            "references ('anaadio ka build'): don't delete it AND don't "
+            "build a new UI. Plug it into an EXISTING revenue product so it "
+            "has a sales surface. Intelligence Merge (orphan) got wired "
+            "into the $49 Customer Audit — now intelligence findings outrank "
+            "meta tweaks in top_issues with revenue-critical signals."
         ),
-        "playbook": """# Wire Orphan Backend Features into Revenue Products (iter 322ed)
+        "body_md": """# AUREM — Wire Orphans Into Revenue Products (iter 322ed)
 
 ## Heuristic
-When you find a backend-complete feature with **zero frontend refs**:
-- ❌ Don't delete it (engineer time invested)
-- ❌ Don't build a brand-new UI (more sprawl)
-- ✅ Wire it into an EXISTING revenue product so it has a sales surface
+Backend-complete + zero frontend refs = "anaadio ka build". Decision matrix:
+- ❌ Delete → engineering time wasted
+- ❌ Build new UI → more sprawl
+- ✅ Plug into an EXISTING revenue product → instant sales surface
 
 ## Concrete example
-- Intelligence Merge: `services/bin_intelligence.py` — 7 endpoints, full data
-  pipeline, 0 frontend refs → **dead until plugged into something user-facing**.
-- Customer Audit ($49): existing revenue product running daily for paying users.
-- Action: in `services/customer_audit_service.run_audit()`, call
-  `intelligence_summary(db, bin)` and stash result on the `CustomerAudit`
-  Pydantic model. Surface revenue-critical findings via `_rank_top_issues()`
-  so the customer sees "X visitors today, 0 captured" instead of "missing alt tags".
+- Orphan: `services/bin_intelligence.py` — 7 endpoints, full pipeline, 0 frontend refs
+- Existing revenue product: `$49 Customer Audit`
+- Action: In `customer_audit_service.run_audit()`, call `intelligence_summary(db, bin)`, stash on the Pydantic model, rank findings in `_rank_top_issues()`
 
-## Pattern
-1. Add Pydantic model for the snapshot (don't leak raw service shape into API).
-2. Add a single field on the parent revenue object.
-3. In the parent's main flow, call the orphan service inside a try/except — the
-   orphan MUST NEVER block the parent's success. Side-feature degrades silently.
-4. Rank the orphan's findings into the parent's top_issues so it earns visibility.
-5. Frontend: add a sub-section, not a new page.
-
-## Always-on safety
+## Safety pattern
 ```python
 try:
+    snap = await intelligence_summary(db, bin)
     audit.intelligence = IntelligenceSnapshot(**snap)
 except Exception as e:
     logger.debug(f"[audit] intelligence snapshot skipped: {e}")
-    # audit succeeds with intelligence.available=False
+    # Audit succeeds with intelligence.available=False — side feature never blocks parent
 ```
+
+## Why this works
+- Customer paying $49 → already engaged → trusts your product → ready to act on intelligence findings
+- Revenue-critical signals ("X visitors but 0 captured", "High-intent contact ready") get visibility instead of buried under meta tag tweaks
 """,
     },
     {
         "iter": "322ee",
-        "title": "Dead-load cleanup: drop AND patch index-creators to stop resurrection",
+        "skill_id": "aurem-322ee-db-dead-load-cleanup",
+        "name": "DB dead-load cleanup workflow",
         "category": "db_hygiene",
-        "skill_id": "db-dead-load-cleanup",
-        "summary": (
+        "description": (
             "Empty collections aren't enough to drop — they auto-resurrect "
-            "via startup ensure_index() calls. Real cleanup = (1) drop the "
-            "collection, (2) find AND patch every create_index/insert path "
-            "that recreates it. Today went 524 → 498 collections by editing "
-            "6 files. Also: verify 'broken' collections actually are broken "
-            "before fixing — token_blocklist + dnc_list were just empty "
-            "because no real user trigger had fired yet."
+            "via startup ensure_index/create_index calls. Real cleanup: "
+            "(1) verify collection is truly dead (write a test); (2) drop "
+            "it; (3) grep AND patch every create_index path that recreates "
+            "it. Hiding spots: server.py, services/startup_init.py, "
+            "services/db_indexes.py, bootstrap/background_init.py, "
+            "routes/orchestrator_routes.py."
         ),
-        "playbook": """# DB Dead-Load Cleanup (iter 322ee)
+        "body_md": """# AUREM — DB Dead-Load Cleanup (iter 322ee)
 
 ## False-positive trap
 Before flagging a collection as 'broken because empty':
 1. Find the write path: `grep -rn 'db.<name>.(insert|update|upsert)' --include=*.py`
-2. Write an end-to-end test that exercises the writer
-3. If the test passes → the collection is FINE, just untriggered by users yet
-4. Lock the test in `/app/backend/tests/` as permanent regression
+2. Write end-to-end test exercising the writer (in `/app/backend/tests/`)
+3. If test passes → collection is FINE, just untriggered yet
+4. Lock the test in as permanent regression — never doubt that flow again
 
-## When it IS truly dead
-1. Drop the collection: `await db.drop_collection("name")`
-2. **Find the resurrectors**: `grep -rn '<name>.create_index' --include=*.py`
-3. Patch every resurrector — typical hiding spots:
-   - `server.py` (multiple top-level setup functions)
-   - `services/startup_init.py` (commercial-feature scaffold)
-   - `services/db_indexes.py` / `db_index_builder.py` (bulk index lists)
-   - `bootstrap/background_init.py` (post-boot setup)
-   - `routes/orchestrator_routes.py` (subsystem init)
-4. Add `os.environ.get("FEATURE_X_ENABLED")` gates for indexes that should
-   come back when the feature is opted-in.
+## When TRULY dead
+```bash
+# 1. Drop:
+await db.drop_collection("dead_name")
 
-## Lean-mode skip-list pattern
-For routers that are dead-code but kept for tests:
+# 2. Find resurrectors:
+grep -rn 'dead_name.create_index' --include=*.py
+
+# 3. Patch — typical hiding spots:
+#   server.py (multiple top-level setup functions)
+#   services/startup_init.py (commercial-feature scaffold)
+#   services/db_indexes.py / db_index_builder.py
+#   bootstrap/background_init.py
+#   routes/orchestrator_routes.py
+
+# 4. Restart and verify they stay gone
+```
+
+## Feature-flag pattern for "maybe later" features
+```python
+if os.environ.get("FEATURE_X_ENABLED", "0") == "1":
+    await ensure_x_indexes(db)
+```
+
+## Lean-mode router skip-list
 ```python
 # routers/_registry_config.py
-SKIP_IN_LEAN.add("routers.shopify_pulse_router")  # 1220 lines of dead code
+SKIP_IN_LEAN.add("routers.shopify_pulse_router")  # 1220 lines dead code
 SKIP_IN_LEAN.add("routers.attribution_engine")    # 512 lines
 ```
 
-## Verification loop
-```python
-# Before restart
-n_before = await db.list_collection_names()
-# Drop + patch + restart
-# After 5s grace, recount
-n_after = await db.list_collection_names()
-gone = set(targets) - set(n_after)
-still_back = set(targets) & set(n_after)
-# 'still_back' = patches missed at least one resurrector
-```
-
 ## Today's score
-524 → 498 collections (-26), 3 remain as benign index-shells from active P2 feature.
+524 → 498 collections (-26 permanent), 3 remain as benign shells from active P2 features.
 """,
     },
 ]
@@ -283,128 +242,231 @@ async def main():
     server.db = db
     now = datetime.now(timezone.utc).isoformat()
 
-    print(f"=== Teaching ORA — {len(LESSONS)} lessons from today ===\n")
+    print(f"=== TEACH ORA — official channels, {len(LESSONS)} lessons ===\n")
 
-    # ── (1) ora_brain_thoughts via universal learner ──────────────────
-    from services.ora_universal_learner import ora_learn, set_db as set_learner_db
-    set_learner_db(db)
+    # ─── (0) Clean up the iter-322ef wrong-schema docs ────────────────
+    bad_ids = [
+        "atlas-pool-and-scheduler-hygiene", "llm-gateway-response-cache",
+        "wire-orphan-features-into-revenue", "db-dead-load-cleanup",
+    ]
+    await db.ora_skills_library.delete_many({"id": {"$in": bad_ids}})
+    print(f"  cleaned up 4 incorrect-schema docs from prior iter\n")
+
+    # ─── (1) ora_training_files — the canonical learning corpus ──────
     for L in LESSONS:
-        await ora_learn({
-            "source": "main_agent_iter_322",
-            "event": "DEV_LEARNING",
-            "category": L["category"],
-            "summary": f"[{L['iter']}] {L['title']}: {L['summary']}",
-            "outcome": "shipped",
-            "agent": "ora_core",
-            "bin_id": "system",
-            "confidence": 0.95,
-        })
-        print(f"  ✓ ora_brain_thoughts ← {L['iter']}: {L['title'][:60]}")
-
-    # ── (2) memoir-ai versioned long-term memory ──────────────────────
-    try:
-        from services import memoir_service
-        for L in LESSONS:
-            memoir_service.remember(
-                path=("learnings", "2026-02", f"iter-{L['iter']}"),
-                key="playbook",
-                value={
-                    "title": L["title"],
-                    "category": L["category"],
-                    "iter": L["iter"],
-                    "playbook_md": L["playbook"],
-                    "ts": now,
-                },
-            )
-            print(f"  ✓ memoir            ← learnings/2026-02/iter-{L['iter']}")
-        commit_sha = memoir_service.commit(
-            f"iter-322ef: teach ORA — {len(LESSONS)} lessons from 322ea-ee"
+        file_id = f"learning-brief-{L['iter']}"
+        text = (
+            f"AUREM Learning Brief — {L['iter']}\n"
+            f"Title: {L['name']}\n"
+            f"Category: {L['category']}\n\n"
+            f"Summary:\n{L['description']}\n\n"
+            f"Full Playbook:\n{L['body_md']}\n"
         )
-        if commit_sha:
-            print(f"  ✓ memoir commit     {commit_sha[:12]}")
-    except Exception as e:
-        print(f"  ⚠ memoir skipped: {e}")
+        doc = {
+            "file_id": file_id,
+            "user_id": "system_main_agent",
+            "source_type": "learning_brief",
+            "filename": f"learning-{L['iter']}-{L['skill_id']}.md",
+            "file_ext": ".md",
+            "file_category": "document",
+            "file_size": len(text),
+            "language": "english",
+            "purpose": "ora_self_learning",
+            "notes": f"Lessons from iter {L['iter']}",
+            "status": "ready",
+            "crawled_text": text,
+            "text_chars": len(text),
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.ora_training_files.update_one(
+            {"file_id": file_id}, {"$set": doc}, upsert=True,
+        )
+        print(f"  ✓ ora_training_files ← {file_id}")
 
-    # ── (3) ora_skills_library — permanent skills + auto-broadcast ────
-    skill_ids = []
+    # ─── (2) ora_skills_library — official AntiGravity schema ─────────
     for L in LESSONS:
         skill_doc = {
-            "id": L["skill_id"],
-            "title": L["title"],
-            "category": L["category"],
-            "addendum": (
-                f"## SKILL: {L['title']}\n"
-                f"_({L['iter']} learning, applies to all repair/audit/cost/health agents)_\n\n"
-                f"{L['summary']}\n\n"
-                f"See library entry `{L['skill_id']}` for full playbook."
-            ),
-            "addendum_chars": 0,
-            "target_agents": "ALL",
-            "playbook_md": L["playbook"],
-            "added_at": now,
-            "iter": L["iter"],
+            "id":          L["skill_id"],
+            "name":        L["name"],
+            "category":    L["category"],
+            "description": L["description"],
+            "body":        L["body_md"],
+            "source":      f"aurem-internal-iter-{L['iter']}",
+            "added_at":    now,
+            "iter":        L["iter"],
+            # Fingerprint for change detection
+            "content_hash": hashlib.sha256(L["body_md"].encode()).hexdigest()[:16],
         }
-        skill_doc["addendum_chars"] = len(skill_doc["addendum"])
         await db.ora_skills_library.update_one(
-            {"id": L["skill_id"]},
-            {"$set": skill_doc},
-            upsert=True,
+            {"id": L["skill_id"]}, {"$set": skill_doc}, upsert=True,
         )
-        skill_ids.append(L["skill_id"])
         print(f"  ✓ ora_skills_library ← {L['skill_id']}")
 
-    # ── (3b) Wire all 4 skills into active broadcast addendum ─────────
-    # The gateway picks this up on the next call automatically.
-    addendums = []
-    for L in LESSONS:
-        doc = await db.ora_skills_library.find_one({"id": L["skill_id"]}, {"_id": 0})
-        if doc and doc.get("addendum"):
-            addendums.append(doc["addendum"])
+    # ─── (3) Broadcast via the SAME logic as /antigravity-skills/broadcast ─
+    skill_ids = [L["skill_id"] for L in LESSONS]
+    docs = await db.ora_skills_library.find(
+        {"id": {"$in": skill_ids}},
+        {"_id": 0, "id": 1, "name": 1, "description": 1, "category": 1, "body": 1},
+    ).to_list(length=len(skill_ids))
 
-    system_addendum = (
-        "\n\n# ── Antigravity Skills (live broadcast) ──\n"
-        + "\n\n---\n\n".join(addendums)
-    )
+    bits = []
+    for d in docs:
+        head = (d.get("body") or "")[:600].strip()
+        bits.append(
+            f"### SKILL: {d['name']} ({d['category']})\n"
+            f"{d.get('description', '')}\n"
+            f"{head}"
+        )
+    addendum = "\n\n".join(bits)
+
+    # Read the current active broadcast and MERGE rather than overwrite, so
+    # any prior admin-broadcast skills survive.
+    existing = await db.ora_skills_broadcast.find_one({"_id": "active"}) or {}
+    prior_ids = [sid for sid in (existing.get("skill_ids") or []) if sid not in skill_ids]
+    if prior_ids:
+        prior_docs = await db.ora_skills_library.find(
+            {"id": {"$in": prior_ids}},
+            {"_id": 0, "id": 1, "name": 1, "description": 1, "category": 1, "body": 1},
+        ).to_list(length=len(prior_ids))
+        for d in prior_docs:
+            head = (d.get("body") or "")[:600].strip()
+            bits.append(
+                f"### SKILL: {d['name']} ({d['category']})\n"
+                f"{d.get('description', '')}\n"
+                f"{head}"
+            )
+        addendum = "\n\n".join(bits)
+    final_ids = skill_ids + prior_ids
+
+    broadcast_doc = {
+        "skill_ids":       final_ids,
+        "system_addendum": addendum,
+        "note":            "iter 322ef-fix — official-schema teach",
+        "target_agents":   "ALL",
+        "broadcast_at":    now,
+        "skill_count":     len(final_ids),
+    }
     await db.ora_skills_broadcast.update_one(
-        {"_id": "active"},
-        {"$set": {
-            "_id": "active",
-            "system_addendum": system_addendum,
-            "skill_ids": skill_ids,
-            "target_agents": "ALL",  # broadcast convention — string, not list
-            "broadcast_at": now,
-            "broadcast_by": "main_agent_iter_322ef",
-            "skill_count": len(skill_ids),
-        }},
-        upsert=True,
+        {"_id": "active"}, {"$set": broadcast_doc}, upsert=True,
     )
-    await db.ora_skills_broadcast_history.insert_one({
-        "ts": now,
-        "skill_ids": skill_ids,
-        "target_agents": "ALL",
-        "broadcast_by": "main_agent_iter_322ef",
-        "action": "broadcast",
-    })
-    # Invalidate the in-process broadcast cache so the gateway picks up the
-    # new addendum on the very next call.
+    await db.ora_skills_broadcast_history.insert_one(
+        {**broadcast_doc, "_id": f"bcast_{now}"}
+    )
+
     try:
         from services.agent_skill_broadcast import invalidate_cache
         invalidate_cache()
+        print(f"  ✓ broadcast cache invalidated")
     except Exception:
         pass
-    print(f"\n  ✓ ora_skills_broadcast updated — {len(skill_ids)} skills active for ALL agents")
 
-    # ── Final summary ─────────────────────────────────────────────────
-    print(f"\n=== ORA TAUGHT ===")
-    n_thoughts = await db.ora_brain_thoughts.count_documents(
-        {"source": "main_agent_iter_322"}
+    try:
+        from services import memoir_service as _M
+        if _M.available():
+            _M.skill_broadcast_set(addendum, final_ids)
+            print(f"  ✓ memoir skill_broadcast_set")
+    except Exception as e:
+        print(f"  ⚠ memoir skip: {e}")
+
+    print(f"\n  ✓ ora_skills_broadcast active — {len(final_ids)} skills "
+           f"({len(addendum)} chars)")
+
+    # ─── (4) Mirror ORA learning collections to SECONDARY Atlas ──────
+    # The bulk run_backup goes alphabetically and the secondary cluster
+    # is already at the 500-collection cap (Atlas M0/M2/M5 limit) — so
+    # by the time the sync gets past 'b*' it aborts. The ORA collections
+    # ('o*') would never reach the secondary on a full mirror. We bypass
+    # that by upserting our 5 learning-relevant collections directly.
+    print(f"\n=== Mirroring ORA learning collections to SECONDARY Atlas ===")
+    secondary_url = os.environ.get("SECONDARY_MONGO_URL")
+    if not secondary_url:
+        print("  ⚠ SECONDARY_MONGO_URL not set — skipping mirror")
+    else:
+        try:
+            import asyncio as _aio
+            from pymongo import MongoClient
+            db_name = os.environ.get("DB_NAME", "aurem_db")
+
+            def _sync_ora_to_secondary():
+                """Sync ORA learning collections from primary → secondary.
+
+                Runs in a thread so async event loop stays free. Uses
+                upsert by stable IDs so re-runs don't duplicate."""
+                from motor.motor_asyncio import AsyncIOMotorClient as _M
+                # Re-open sync clients (pymongo) so this whole function
+                # is thread-safe.
+                p = MongoClient(os.environ["MONGO_URL"],
+                                  serverSelectionTimeoutMS=10000)
+                s = MongoClient(secondary_url,
+                                  serverSelectionTimeoutMS=15000)
+                p.admin.command("ping"); s.admin.command("ping")
+                pdb = p[db_name]; sdb = s[db_name]
+
+                targets = [
+                    ("ora_training_files",           "file_id"),
+                    ("ora_skills_library",            "id"),
+                    ("ora_skills_broadcast",          "_id"),
+                    ("ora_skills_broadcast_history",  "_id"),
+                    ("ora_brain_thoughts",            None),  # ts-based, just copy
+                ]
+                results = []
+                for coll, key in targets:
+                    try:
+                        # Skip if target already at cap and not present
+                        existing_on_sec = coll in sdb.list_collection_names()
+                        n_pri = pdb[coll].estimated_document_count()
+                        if n_pri == 0:
+                            results.append((coll, 0, 0, "skip-empty"))
+                            continue
+
+                        ins = upd = 0
+                        if key and existing_on_sec:
+                            for doc in pdb[coll].find({}):
+                                k = doc.get(key)
+                                if k is None: continue
+                                r = sdb[coll].replace_one(
+                                    {key: k}, doc, upsert=True
+                                )
+                                if r.upserted_id: ins += 1
+                                else: upd += 1
+                        elif key:
+                            # New collection on secondary
+                            sdb[coll].drop()
+                            sdb[coll].insert_many(list(pdb[coll].find({})))
+                            ins = n_pri
+                        else:
+                            # ts-based: just append last 1000 docs
+                            sdb[coll].drop()
+                            docs = list(pdb[coll].find({}).sort("ts", -1).limit(1000))
+                            if docs:
+                                sdb[coll].insert_many(docs)
+                            ins = len(docs)
+                        results.append((coll, ins, upd, "ok"))
+                    except Exception as ce:
+                        results.append((coll, 0, 0, f"err:{ce}"))
+                p.close(); s.close()
+                return results
+
+            mirror_results = await _aio.to_thread(_sync_ora_to_secondary)
+            for coll, ins, upd, status in mirror_results:
+                print(f"  • {coll:<35} ins={ins:>4}  upd={upd:>4}  {status}")
+        except Exception as e:
+            print(f"  ⚠ mirror failed: {e}")
+
+    # ─── Summary ──────────────────────────────────────────────────────
+    print(f"\n=== ORA TAUGHT (official channels) ===")
+    n_train = await db.ora_training_files.count_documents(
+        {"source_type": "learning_brief"}
     )
-    n_skills = await db.ora_skills_library.count_documents({})
+    n_internal_skills = await db.ora_skills_library.count_documents(
+        {"id": {"$in": skill_ids}}
+    )
     bcast = await db.ora_skills_broadcast.find_one({"_id": "active"})
-    print(f"  ora_brain_thoughts (this run): {n_thoughts}")
-    print(f"  ora_skills_library total:     {n_skills}")
-    print(f"  active broadcast skills:      {bcast.get('skill_count', 0) if bcast else 0}")
-    print(f"  memoir commit:                see above")
+    print(f"  ora_training_files (learning_brief): {n_train}")
+    print(f"  ora_skills_library (this iter):      {n_internal_skills}/4")
+    print(f"  active broadcast:                    {bcast.get('skill_count', 0)} skills")
+    print(f"  addendum length:                     {len(bcast.get('system_addendum',''))} chars")
 
 
 if __name__ == "__main__":
