@@ -643,6 +643,24 @@ async def _gather_live_system_scan(db) -> str:
     except Exception as e:
         lines.append(f"[Backend] /api/health FAILED: {type(e).__name__}: {str(e)[:60]}")
 
+    # 6. iter 322eh — DB Audit Scanner (5-layer hygiene scan + 3 proofs).
+    # This is what makes dev_system-scan a TRUE founder-grade scanner.
+    try:
+        from services.db_audit_scanner import (
+            scan_db_audit, gather_proofs, format_for_ora,
+        )
+        scan = await _aio.wait_for(
+            scan_db_audit(db, max_empties=30, full_grep=False),
+            timeout=50.0,
+        )
+        proofs = await gather_proofs(db)
+        lines.append("")
+        lines.append(format_for_ora(scan, proofs))
+    except Exception as e:
+        lines.append(
+            f"[DB Audit] FAILED: {type(e).__name__}: {str(e)[:120]}"
+        )
+
     return "\n".join(lines)
 
 

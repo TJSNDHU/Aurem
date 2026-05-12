@@ -1157,6 +1157,18 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] customer_audit_router skipped: {e}")
 
+    # iter 322eh — DB Audit Router (5-layer hygiene scan for ORA/admin)
+    if not _should_skip("routers.db_audit_router"):
+        try:
+            from routers.db_audit_router import (
+                router as db_audit_router, set_db as set_db_audit_db,
+            )
+            set_db_audit_db(db)
+            app.include_router(db_audit_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] db_audit_router skipped: {e}")
+
 
     # Memoir Router (Git-versioned semantic memory for 28 agents + ORA)
     if not _should_skip("routers.memoir_router"):

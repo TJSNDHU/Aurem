@@ -20,6 +20,7 @@ import {
 import { getPlatformToken } from '../../utils/secureTokenStore';
 import TrialBanner from '../TrialBanner';
 import AuditWidget from './AuditWidget';
+import IntelligenceWidget from './IntelligenceWidget';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -205,6 +206,14 @@ export default function CustomerHome({ ctx }) {
       {/* SEO + Ads Waste Audit widget (auto-runs on signup if URL captured) */}
       <div style={{ marginBottom: 18 }}>
         <AuditWidget />
+      </div>
+
+      {/* iter 322eh — Contact Intelligence widget (pixel + CSV + bucket merge).
+          Plugs the previously frontend-orphaned `bin_intelligence` stack into
+          the customer dashboard so they can upload invoice CSV + see live
+          identification rate + trigger merges on demand. */}
+      <div style={{ marginBottom: 18 }}>
+        <IntelligenceWidget />
       </div>
 
       {loading && (

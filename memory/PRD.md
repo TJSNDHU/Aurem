@@ -1613,3 +1613,41 @@ The 52 "dormant writes" all represent real features awaiting first trigger:
 - Site monitoring (`site_*`) — fires when customer enables monitoring
 
 These are not garbage. They're properly wired and waiting for activity.
+
+## iter 322eh — Real System Scanner + Intelligence Merge UI
+
+### Founder-grade DB scanner
+- **`services/db_audit_scanner.py`** (NEW): Real 5-layer scan with mandatory 3-proof footer
+  - L1 Enumerate: cols/empty/tiny/alive counts + top-5 by size
+  - L2 Categorize: pure_dead vs ghost_reads vs dormant_writes via regex grep
+  - L4 Resurrection: checks 28 historically-dropped names for resurrection
+  - L5 Duplicates: 5 pattern clusters (audit_log/campaigns/heartbeats/scans/skills)
+  - Caps: per-coll 0.5s, full scan 45s, per-grep 6s — never blocks event loop
+- **`routers/db_audit_router.py`** (NEW): Admin-only endpoints
+  - `GET /api/admin/db-audit/scan` — structured JSON
+  - `GET /api/admin/db-audit/scan/text` — ORA-formatted text + 3 proofs
+- **`ora_skills/dev_system-scan.md`** (REWRITTEN): Mandates 5-layer DB block + PROOFS BLOCK with real grep/curl/git output. NEVER skip proofs.
+- **`services/skill_router._gather_live_system_scan()`**: Now appends the DB audit + proofs to every dev_system-scan invocation. ORA's text response automatically includes them.
+
+### Intelligence Merge — Customer UI shipped
+Previously backend-complete + frontend-orphan. Now wired:
+- **`platform/customer/IntelligenceWidget.jsx`** (NEW, 312 lines): 4-section widget
+  - Summary tiles: visitors/forms/identified/emails/phones/past-clients (real counts)
+  - 3-bucket view: verified/likely/unknown with colored progress bar
+  - Top Action callout (high-intent contacts)
+  - CSV upload with CASL consent dialog (compliance-correct)
+  - Merge-Now trigger button
+- **`platform/customer/CustomerHome.jsx`**: Mounted below AuditWidget
+
+### Verified end-to-end
+- ✓ `/api/admin/db-audit/scan` → HTTP 200, 0.93s, all 5 layers, all 3 proofs (db_count=495, health=HTTP 200, 3 git commits)
+- ✓ `/api/customer/intelligence/summary` → 1 matched contact, 4 invoice clients
+- ✓ `/api/customer/intelligence/buckets` → 6 verified
+- ✓ `/api/customer/intelligence/merge-now` → 1 profile written
+- ✓ `/api/customer/intelligence/import-csv` (CASL=true) → 1 row accepted, consent_id logged
+
+### Pushed to ORA learning
+- ora_training_files: `learning-brief-322eh` (5010 chars)
+- ora_skills_library: `aurem-322eh-real-db-scan` (official schema)
+- ora_skills_broadcast: 9 active skills, 5010 chars addendum (was 8, +1 today)
+- Primary + Secondary Atlas both updated
