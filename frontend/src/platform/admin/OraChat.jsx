@@ -13,8 +13,13 @@ import {
   Crown, MessageSquare, Wrench, FileUp, Send, Upload,
   Trash2, ChevronRight, ExternalLink, Sparkles, Loader2,
   AlertTriangle, FileText, FileImage, FileAudio, FileVideo, FileQuestion,
-  RotateCcw,
+  RotateCcw, Copy, Check,
 } from "lucide-react";
+
+// Persistence keys (versioned so we can bump schema later without breaking)
+const LS_THREAD_KEY  = "aurem.ora-chat.thread.v1";
+const LS_HISTORY_KEY = "aurem.ora-chat.history.v1";
+const HISTORY_CAP    = 200;  // last N messages persisted (~quota safe)
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -88,8 +93,13 @@ export default function OraChat() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("chat");
   return (
-    <div data-testid="ora-chat" style={{ minHeight: "100vh", background: "#0A0A12", color: TEXT, padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+    <div data-testid="ora-chat"
+         style={{
+           height: "100vh", background: "#0A0A12", color: TEXT,
+           padding: "24px 24px 0 24px",
+           display: "flex", flexDirection: "column", overflow: "hidden",
+         }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flex: "0 0 auto" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Crown size={26} color={GOLD} />
@@ -107,7 +117,7 @@ export default function OraChat() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, flex: "0 0 auto" }}>
         {[
           ["chat", "General Chat", MessageSquare],
           ["cto",  "CTO Mode",     Wrench],
@@ -120,9 +130,11 @@ export default function OraChat() {
         ))}
       </div>
 
-      {tab === "chat"  && <ChatPane />}
-      {tab === "cto"   && <CTOPane />}
-      {tab === "files" && <FilesPane />}
+      <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", paddingBottom: 24 }}>
+        {tab === "chat"  && <ChatPane />}
+        {tab === "cto"   && <CTOPane />}
+        {tab === "files" && <FilesPane />}
+      </div>
     </div>
   );
 }
@@ -131,20 +143,73 @@ export default function OraChat() {
 // Tab 1 — General Chat
 // ──────────────────────────────────────────────────────────────────────
 function ChatPane() {
-  const [history, setHistory] = useState([]);  // {role, content, provider?, ms?}
+  // Persistent thread id — same across page reloads/route returns
+  const [sessionId] = useState(() => {
+    try {
+      let id = localStorage.getItem(LS_THREAD_KEY);
+      if (!id) {
+        id = `ora-chat-${Date.now().toString(36)}`;
+        localStorage.setItem(LS_THREAD_KEY, id);
+      }
+      return id;
+    } catch { return `ora-chat-${Date.now().toString(36)}`; }
+  });
+
+  // Hydrated history from localStorage so chat never vanishes on return
+  const [history, setHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_HISTORY_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
+  });
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sessionId] = useState(() => `ora-chat-${Date.now().toString(36)}`);
+  const [copiedIdx, setCopiedIdx] = useState(null);
   const scrollRef = useRef(null);
+
+  // Persist on every change (capped, fire-and-forget)
+  useEffect(() => {
+    try {
+      const trimmed = history.slice(-HISTORY_CAP);
+      localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(trimmed));
+    } catch { /* quota / private mode — ignore */ }
+  }, [history]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [history, busy]);
 
+  const copyToClipboard = async (text, idx) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Legacy fallback
+        const ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand("copy"); ta.remove();
+      }
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx((v) => (v === idx ? null : v)), 1500);
+    } catch { /* clipboard blocked — silent */ }
+  };
+
+  const clearChat = () => {
+    if (!confirm("Clear entire chat history? This cannot be undone.")) return;
+    setHistory([]);
+    try {
+      localStorage.removeItem(LS_HISTORY_KEY);
+      // Fresh thread id so server-side memory also splits
+      const fresh = `ora-chat-${Date.now().toString(36)}`;
+      localStorage.setItem(LS_THREAD_KEY, fresh);
+    } catch { /* ignore */ }
+  };
+
   const send = async () => {
     const q = input.trim();
     if (!q || busy) return;
-    setHistory((h) => [...h, { role: "user", content: q }]);
+    setHistory((h) => [...h, { role: "user", content: q, ts: Date.now() }]);
     setInput("");
     setBusy(true);
     try {
@@ -161,21 +226,41 @@ function ChatPane() {
         content: j.reply || j.detail || j.error || JSON.stringify(j),
         provider: j.provider || (isErr ? `HTTP ${j._http_status}` : undefined),
         ms: Date.now() - t0,
+        ts: Date.now(),
       }]);
     } catch (e) {
-      setHistory((h) => [...h, { role: "error", content: String(e) }]);
+      setHistory((h) => [...h, { role: "error", content: String(e), ts: Date.now() }]);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div style={{ ...GLASS, padding: 16, display: "grid", gridTemplateRows: "1fr auto", gap: 12, minHeight: 600 }}>
-      <div ref={scrollRef} style={{ overflowY: "auto", maxHeight: 540, paddingRight: 6 }}>
+    <div style={{
+      ...GLASS, padding: 16,
+      display: "flex", flexDirection: "column", gap: 12,
+      height: "100%", minHeight: 0,
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flex: "0 0 auto",
+      }}>
+        <div style={{ color: TEXT_DIM, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4 }}>
+          Thread · {sessionId.slice(-8)} · {history.length} msgs · saved locally
+        </div>
+        {history.length > 0 && (
+          <button data-testid="chat-clear-btn" onClick={clearChat} style={btn(false)}>
+            <Trash2 size={12} /> Clear chat
+          </button>
+        )}
+      </div>
+
+      <div ref={scrollRef} style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", paddingRight: 6 }}>
         {history.length === 0 && (
           <div style={{ color: TEXT_DIM, fontSize: 13, padding: 24, textAlign: "center" }}>
             <Sparkles size={28} color={GOLD} /> <br />
             Talk to ORA. She has access to AUREM's full skill library + Sovereign Node fallbacks.
+            <div style={{ marginTop: 8, fontSize: 11 }}>Chat history saves automatically.</div>
           </div>
         )}
         {history.map((m, i) => (
@@ -191,14 +276,29 @@ function ChatPane() {
                 : m.role === "error" ? "rgba(255,118,118,0.16)" : "rgba(255,255,255,0.05)",
               border: `1px solid ${BORDER}`,
               padding: "8px 12px", borderRadius: 12, maxWidth: "70%",
+              position: "relative",
             }}>
-              <div style={{ color: TEXT_DIM, fontSize: 10, marginBottom: 4,
-                              textTransform: "uppercase" }}>
-                {m.role === "user" ? "you" : m.role === "error" ? "error" : "ORA"}
-                {m.provider && <span style={{ marginLeft: 6 }}>· {m.provider}</span>}
-                {m.ms && <span style={{ marginLeft: 6 }}>· {m.ms}ms</span>}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div style={{ color: TEXT_DIM, fontSize: 10, marginBottom: 4,
+                                textTransform: "uppercase" }}>
+                  {m.role === "user" ? "you" : m.role === "error" ? "error" : "ORA"}
+                  {m.provider && <span style={{ marginLeft: 6 }}>· {m.provider}</span>}
+                  {m.ms && <span style={{ marginLeft: 6 }}>· {m.ms}ms</span>}
+                </div>
+                <button data-testid={`msg-copy-${i}`}
+                        onClick={() => copyToClipboard(String(m.content ?? ""), i)}
+                        title="Copy message"
+                        style={{
+                          background: "transparent", border: "none", cursor: "pointer",
+                          color: copiedIdx === i ? GREEN : TEXT_DIM,
+                          padding: 2, display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 10, fontWeight: 600, textTransform: "uppercase",
+                        }}>
+                  {copiedIdx === i ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedIdx === i ? "Copied" : "Copy"}
+                </button>
               </div>
-              <div style={{ fontSize: 13.5, whiteSpace: "pre-wrap" }}>{m.content}</div>
+              <div style={{ fontSize: 13.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}</div>
             </div>
           </div>
         ))}
@@ -208,7 +308,7 @@ function ChatPane() {
           </div>
         )}
       </div>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flex: "0 0 auto" }}>
         <input data-testid="chat-input" value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send()}
