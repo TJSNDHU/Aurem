@@ -533,7 +533,7 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '322as+'} | MAY 2026</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '322fa'} | MAY 2026</p>
 
           {/* ═══ SHARE BUTTON ═══ */}
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -747,6 +747,88 @@ export default function SystemOverview() {
               'LEAN prune logic → _registry_lean_prune.py (89 LOC)',
               'registry.py 2257 → 2126 LOC · behaviour-identical',
               'Phase 2 (scheduler block + 5 domain splits) deferred',
+            ]} />
+          </div>
+        </div>
+
+        {/* ═══ ITER 322eu → 322fa — MAY 12, 2026 — SOVEREIGN AUTONOMY BATCH ═══ */}
+        <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE80`, animation: 'sov-glow 5s ease-in-out infinite', background: 'linear-gradient(135deg, #0D0D0D, #0A1A0A)' }} data-testid="sov-iter322eu-fa-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: '#4ADE80' }}>ITER 322eu → 322fa — SOVEREIGN AUTONOMY BATCH · MAY 12, 2026</div>
+          <p className="sov-body" style={{ fontSize: 12, color: '#6A8A6A', marginBottom: 14, letterSpacing: '0.05em' }}>
+            29 ORA tools · 14 broadcast skills · 19/19 pytests · ZERO mocks · Real Camoufox · Real subprocess · Real LLM round-trips
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            <FeatureGrid title="LEGION BRIDGE (322fa) — NO SSH" accent="#4ADE80" items={[
+              'Reverse-poll daemon — Legion controls itself via HTTPS out',
+              'legion_exec tool = ORA executes shell on Legion laptop',
+              'Risk classifier: LOW auto / MED auto / HIGH Telegram-gated',
+              'HIGH-risk → Telegram alert to founder phone (Approve/Reject)',
+              'Real round-trip: cmd → daemon → subprocess → ack in 2-5s',
+              'curl -fsSL /api/legion/install | sudo bash — one-line bootstrap',
+              '8 queue jobs · 7 completed · 1 founder-rejected · audited',
+            ]} />
+            <FeatureGrid title="GHOST PROTOCOL SCOUT (322ez)" accent="#8B5CF6" items={[
+              'Camoufox 0.4.11 — Firefox 138 fork (binary-level stealth)',
+              'IP→timezone auto-match · locale map · WebRTC blocked',
+              'Bezier mouse paths + Markov-chain typing delays (4 states)',
+              'Decoy routine: visits 2 random sites before target',
+              'Cold storage: Fernet AES-128 on Legion disk',
+              'PII summarizer strips screenshots/HTML before cloud sync',
+              'Real run: example.com 5s · httpbin w/decoy 60s · 95-147KB encrypted',
+            ]} />
+            <FeatureGrid title="LOCAL LLM BRIDGE (322ez)" accent="#F59E0B" items={[
+              'Ollama HTTP bridge — Qwen 2.5 Coder 7B q4_K_M',
+              'Tier 3 fallback: Groq → OpenRouter → Emergent → LOCAL',
+              'Fits RTX 5060 8GB · ~42 t/s · sovereign + offline-safe',
+              'Background-worker target for bulk audits/scouts',
+              'Graceful degrade — returns None when Ollama unreachable',
+            ]} />
+            <FeatureGrid title="FOUNDER-SAVES LEDGER (322ey)" accent="#FBBF24" items={[
+              '/api/admin/founder-saves/{summary,timeline}',
+              'Unified audit: commits + council overrides + tool failures',
+              'Filter pills: All / Commit / Override / Tool fail',
+              '4 metric cards: 24h commits · overrides · failures · last save',
+              'Live values: 1 approved commit · 166 invocations · 0 overrides',
+              'Live page: /admin/founder-saves',
+            ]} />
+            <FeatureGrid title="DESIGN-EXTRACT PUBLIC (322ey)" accent="#64C8FF" items={[
+              'Public lead magnet at /design-extract (NO auth)',
+              'POST /api/design-extract/public/run — real httpx + regex',
+              'Extracts: colors (hex) · fonts · meta · headlines',
+              'Rate limit: 3 calls per email per 24h → HTTP 429',
+              'Captures emails to design_extract_public_captures',
+              'Live sample: Stripe (5 colors, 3 fonts) on page mount',
+            ]} />
+            <FeatureGrid title="DAY-7 UPSELL MODAL (322ey)" accent="#EF4444" items={[
+              '/app/frontend/src/platform/Day7UpsellModal.jsx',
+              '3 tiers: Starter $49 · Growth $149 (highlighted) · Enterprise $499',
+              'Computes days_left = max(0, 14 - elapsed)',
+              'ESC + backdrop dismiss · data-testid on every interactive',
+              'TODO: wire into trial onboarding (iter 322fb)',
+            ]} />
+            <FeatureGrid title="ORA NATURAL-LANGUAGE PLANNER (322ev)" accent="#8B5CF6" items={[
+              'Open Interpreter 0.4.3 → ora_run_natural tool',
+              'auto_run=False + offline=True + safe_mode=ask (3 safety belts)',
+              'Model: groq/llama-3.3-70b-versatile',
+              'Returns structured shell/python steps (dry-run only in P1)',
+              'Real test: 2s avg · "check docker" → 3 real apt commands',
+              'Combined with 27 tools = ORA can bootstrap Legion itself',
+            ]} />
+            <FeatureGrid title="AUREM-CTO SOVEREIGN (322ew → 322ex)" accent="#C9A84C" items={[
+              '/app/aurem-cto/ — 30 files / 1,731 lines deployable artifact',
+              'Hybrid Standalone: SQLite outbox → Atlas replay',
+              'docker-compose: api + ui + outbox + cloudflared tunnel',
+              'Sovereign LLM gateway (Groq→OpenRouter→Emergent SDK)',
+              'tools_bridge.py — HTTP-proxy to upstream 29-tool registry',
+              'Real E2E: provider=groq iters=3, returned real git hashes',
+            ]} />
+            <FeatureGrid title="ORA SELF-BUILD + TEACHING LOOP (322eu/322ey-fix)" accent="#4ADE80" items={[
+              '8 new self-build tools: create_file/dir, append, pip_propose',
+              'docker_compose · cloudflare_dns_{list,write}',
+              '6-lesson self-correction skill broadcast (71,484 chars)',
+              'Caught + taught: f-string backticks, _id vs email lookup',
+              'ISO-string vs datetime, schema parity, tool-failure honesty',
+              'Verified: ORA cites lessons by name in subsequent design calls',
             ]} />
           </div>
         </div>
