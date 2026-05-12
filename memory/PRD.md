@@ -1,5 +1,38 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322bz (2026-05-11) — DEPLOY FIX + ANTIGRAVITY SKILLS LIBRARY + ORA VOICE SHIPPED**
+>
+> Three things landed in this iteration:
+>
+> **1. K8s deploy /health probe timeout — FIXED.**
+> All blocking `await asyncio.wait_for(...)` calls in `startup_event` (validation, founder provisioning, auth-pool prewarm, auth client, cache_manager.connect, rate_limiter.connect, inbox indexes, bin_intelligence indexes) moved into `asyncio.create_task()` background tasks. `lifespan.startup` now returns in <500ms even on cold Atlas. Local `/health` responds 200 in 0.0006s (verified). Backend testing agent confirms <200ms on the production URL.
+>
+> **2. Antigravity Awesome Skills Library — 1,453 SKILL.md playbooks ingested.**
+> Repo `sickn33/antigravity-awesome-skills` shallow-cloned and bulk-upserted into MongoDB `ora_skills_library` (with text index). 72 categories. 924KB index. Search/list/detail/sync endpoints under `/api/admin/antigravity-skills`. Admin UI at `/admin/skills-library` lets the founder browse, search, select, and broadcast skills.
+>
+> **3. Real-time skill broadcast to all 28 agents — LIVE.**
+> Admin selects any subset of skills → `POST /broadcast` writes a singleton doc to `ora_skills_broadcast`. Every agent that routes through `services.llm_gateway.call_llm_with_meta()` automatically appends the broadcast's `system_addendum` to its system prompt (15s TTL cache, no event loop pressure). ORA chat (`public_ora_demo_router`) also injects the addendum. Result: any skill becomes part of every agent's runtime brain within 15 seconds of broadcast — no redeploy, no restart.
+>
+> **4. ORA TTS + STT activated.**
+> Browser-native Web Speech API (`/app/frontend/src/hooks/useVoice.js`) — zero API key, zero backend cost. Mic button in both `CustomerOra.jsx` (`/my/ora`) and `OraPWA.jsx` (`/ora`). Speaker button in CustomerOra toggles TTS for assistant replies. OraPWA already had OpenAI TTS via `/api/ora/tts`; the mic adds the missing STT half.
+>
+> **5. 1-Click ORA PWA from `/my` — wired.**
+> Customer Portal ORA page now has an "Open ORA Voice PWA →" button that passes `?token=...` to `/ora`. OraPWA reads the token from URL, stores it in localStorage, and strips it from history — no re-login.
+>
+> **Endpoints (new):**
+> - `GET  /api/admin/antigravity-skills/library/meta`
+> - `GET  /api/admin/antigravity-skills/library?q=&category=&risk=&limit=&skip=`
+> - `GET  /api/admin/antigravity-skills/library/categories`
+> - `GET  /api/admin/antigravity-skills/library/{skill_id}`
+> - `POST /api/admin/antigravity-skills/sync`
+> - `POST /api/admin/antigravity-skills/broadcast`
+> - `GET  /api/admin/antigravity-skills/broadcast/active`
+> - `POST /api/admin/antigravity-skills/broadcast/clear`
+>
+> **Testing:** Backend test agent ran 13/13 passing (100%) — health, library, broadcast, ORA integration. Test file: `/app/backend/tests/test_antigravity_skills.py`.
+
+---
+
 > **🟢 ITER 322av (2026-05-11) — FULLY AUTONOMOUS SCOUT + WATCHDOG SHIPPED**
 >
 > Zero manual triggers ever needed. ORA now operates the business 24/7 by itself.
