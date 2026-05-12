@@ -1,0 +1,27 @@
+# Real secrets — never commit these
+.env
+*.env.local
+data/
+*.sqlite3
+*.sqlite3-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

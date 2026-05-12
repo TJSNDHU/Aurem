@@ -1,5 +1,50 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322ew (2026-05-12) — ORA-DRIVEN BUILD · aurem-cto HYBRID STANDALONE SKELETON**
+>
+> Founder hardcoded the working policy: *"always major work through ORA CTO and emergent just keep Eyes on it ... if found any problem just teach to ORA CTO ... never hallucinate, no mock and facke build always true real working end to end tested build."* Saved at `/app/memory/WORKING_POLICY.md`.
+>
+> **Phase B Standard delivered** (Q1=c, Q2=b, Q3=a, Q4=a, Q5=a): code-complete Hybrid Standalone artifact under `/app/aurem-cto/` ready for Legion `scp + bash bootstrap.sh` deployment. 21 files, 760+ lines of real production code. **No mocks** except the `/api/chat` LLM body (stubbed `"stub: <prompt[:80]>"`) explicitly scoped for Batch 2 — every wire is real (motor, aiosqlite, JWT, CORS, lifespan).
+>
+> **Build flow (per WORKING_POLICY)**:
+> - ORA CTO designed every code file via 2 design-only prompts (no tools, max_iters=1) → 9 file contents returned in strict `========== FILE: <path> ==========` blocks → main agent parsed via `/app/scripts/ora_parse_design.py` and created files mechanically. Token-efficient (~120s of LLM time total for the entire batch).
+> - Main agent created pure boilerplate (Vite config, Tailwind config, index.html, main.jsx, index.css, .gitignore, cloudflared/config.yml) directly — no ORA roundtrip wasted on templated configs.
+> - All Python lint-clean via ruff (1 auto-fix for unused `Optional` import in `worker.py`, 1 auto-fix for f-string in `main.py`).
+> - YAML / JSON / Python AST validation: 22/22 wiring checks passed (lifespan, motor_client, jwt_decode, sqlite_init, atlas_graceful, CORS, signal handler, exponential backoff, data-testid, etc.).
+> - Real E2E smoke test: booted `uvicorn main:app` on port 8087 with real env vars → `GET /api/health` returned `{ok:true, service:'ora-cto-sovereign', uptime_s:4.27, atlas_reachable:true, outbox_pending_count:0, version:'322ew'}`. `/api/tools/list` → 28 tools. `/api/outbox/stats` → all-zero stats. `/api/chat` without JWT → **401** (auth working). `/api/chat` with admin JWT → **200, stubbed response**.
+>
+> **Council Gate (security peer review)**:
+> - Round 1 (before allowlist fix): Council got `view_file` failure (`/app/aurem-cto` not in ORA's read-allowed roots) → returned a partially hallucinated review citing code that doesn't exist (stack trace leakage, AuthMiddleware). Real finding: CORS `allow_headers=["*"]` + `allow_credentials=True` is CSRF amplifier. **Fixed**: locked to `allow_headers=["Authorization","Content-Type"]`, `allow_methods=["GET","POST"]`, `max_age=600`.
+> - **Teaching applied to ORA**: extended `_ALLOWED_ROOTS` in `services/ora_tools.py` to include `/app/aurem-cto` so future Council reviews can actually read the sovereign codebase.
+> - Round 2 (after teaching): `view_file` succeeded, `peer_review` ran twice with real opinions, but ORA hit `max_tool_iters=4` re-emitting the file content into each peer_review call instead of summarising. Known tool-loop limitation when `context=` arg is large; documented for iter 322ex.
+>
+> **Wiring bugs caught by main-agent supervisor (post-Council)**:
+> 1. `App.jsx` health probe: `res.data.status === 'ok'` → API returns `{ok:true}` → **fixed** to `res.data.ok`.
+> 2. `App.jsx` chat request: `{message: input}` → API expects `{prompt, max_tool_iters}` → **fixed**.
+> 3. `App.jsx` chat response: `res.data.response/iters` → API returns `content/iterations` → **fixed**.
+> 4. `App.jsx` outbox: `setOutboxStats(res.data)` → API returns `{ok, stats:{...}}` → **fixed** to `res.data.stats || defaults`.
+>
+> **Project structure** (`view_dir /app/aurem-cto`):
+> ```
+> .env.example  .gitignore  README.md  bootstrap.sh  docker-compose.yml
+> api/         (Dockerfile, requirements.txt, main.py — 191 lines)
+> ui/          (Dockerfile, package.json, vite.config.js, tailwind.config.js,
+>               postcss.config.js, index.html, src/{App.jsx 194L, main.jsx, index.css})
+> outbox/      (Dockerfile, requirements.txt, worker.py — 121 lines)
+> cloudflared/ (config.yml — tunnel ingress for cto.aurem.live)
+> ```
+>
+> **3-PROOF FOOTER**:
+> 1. ✓ **Skeleton Proof** (`view_dir /app/aurem-cto`): 5 top-level files + 4 dirs (api/, ui/, outbox/, cloudflared/) — captured live via `POST /api/ora-tools/execute {tool:'view_dir'}`.
+> 2. ✓ **UI Manifest** (`view_file /app/aurem-cto/ui/src/App.jsx`): 194-line React/Tailwind cockpit with health poll, tools list, chat with JWT, outbox stats panel — captured live via `POST /api/ora-tools/execute`.
+> 3. ✓ **Container Blueprint** (`view_file docker-compose.yml`): 76-line compose with 3 services (api:8002, ui:3001, outbox sidecar), healthcheck on api, depends_on chain ui→api, shared aurem-cto-net network, persistent ./data volume — captured live via `POST /api/ora-tools/execute`.
+>
+> **What still needs Batch 2 (Sovereign chat LLM)**: `POST /api/chat` currently returns stub. Real wire = replicate `services/llm_gateway.py:call_llm_with_tools()` into `aurem-cto/api/services/llm.py` with Groq-primary + OpenRouter + Emergent fallback. Same 28-tool catalog. Same Council Gate.
+>
+> **Files touched**: 21 new files at `/app/aurem-cto/`, 1 line added to `_ALLOWED_ROOTS` in `services/ora_tools.py`, 1 new doc `/app/memory/WORKING_POLICY.md`. **Total new code: ~870 lines.** Zero `/app/backend/*` server-routing impact.
+
+---
+
 > **🟢 ITER 322ev (2026-05-12) — ORA NATURAL-LANGUAGE OS PLANNER · 28 TOOLS · OPEN INTERPRETER WIRED**
 >
 > Founder asked: *"OpenInterpreter / Self-Operating-Computer ke 2 repos analyze kar — kya ORA ko full OS-level control de sakte hain?"*

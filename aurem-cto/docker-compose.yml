@@ -1,0 +1,75 @@
+# aurem-cto Hybrid Standalone — Legion Sovereign Stack
+# Survives Emergent outages. Shares Atlas MongoDB. Cloudflare-tunnelled.
+# iter 322ew
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: aurem-cto-api
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    environment:
+      - SERVICE_NAME=ora-cto-sovereign
+      - PORT=8002
+      - OUTBOX_DB_PATH=/data/outbox.sqlite3
+    volumes:
+      - ./data:/data
+      - ./api:/app:ro
+    networks:
+      - aurem-cto-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: aurem-cto-ui
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - VITE_API_URL=http://localhost:8002
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - aurem-cto-net
+
+  outbox:
+    build:
+      context: ./outbox
+      dockerfile: Dockerfile
+    container_name: aurem-cto-outbox
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - OUTBOX_DB_PATH=/data/outbox.sqlite3
+      - POLL_INTERVAL_S=5
+    volumes:
+      - ./data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - aurem-cto-net
+
+networks:
+  aurem-cto-net:
+    driver: bridge
+
+volumes:
+  aurem-cto-data:
+    driver: local

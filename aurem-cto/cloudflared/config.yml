@@ -1,0 +1,25 @@
+# Cloudflare Tunnel config for the Legion laptop
+# Copy this to /etc/cloudflared/config.yml after running:
+#   cloudflared tunnel login
+#   cloudflared tunnel create aurem-cto-legion
+#   cloudflared tunnel route dns aurem-cto-legion cto.aurem.live
+
+tunnel: aurem-cto-legion
+credentials-file: /etc/cloudflared/aurem-cto-legion.json
+
+ingress:
+  # Public API (FastAPI on Legion :8002)
+  - hostname: cto.aurem.live
+    path: ^/api/.*
+    service: http://localhost:8002
+
+  # Cockpit UI (Vite preview on Legion :3001)
+  - hostname: cto.aurem.live
+    service: http://localhost:3001
+
+  # Required catch-all
+  - service: http_status:404
+
+# Health probe
+metrics: 0.0.0.0:9000
+no-autoupdate: true

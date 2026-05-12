@@ -41,6 +41,10 @@ _ALLOWED_ROOTS = (
     "/app/memory",
     "/app/ora_skills",
     "/app/scripts",
+    # iter 322ew — ORA must be able to review/edit the sovereign aurem-cto
+    # codebase it just built (read+write). Same write-path safety still
+    # applies via `_WRITE_ALLOWED_ROOTS` enforcement elsewhere.
+    "/app/aurem-cto",
 )
 _FORBIDDEN_PATTERNS = (
     "/.env",          # secrets
