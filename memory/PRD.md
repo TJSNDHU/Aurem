@@ -1,5 +1,45 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322er (2026-05-12) — P5 GIT COMMIT GATE LIVE**
+>
+> **What landed**: ORA can no longer push commits without founder approval.
+> - **New ora_tool `propose_commit`** — records a proposal in `ora_commit_proposals` collection with the full diff (intent-to-add covers untracked files), validates rationale ≥10 chars, file paths under write-allowed roots, ≤30 files per proposal. NO actual `git commit` runs from ORA's side.
+> - **New admin router `/api/admin/git-gate/*`** — founder-only endpoints that run the REAL `git commit`. Identity stamped as `ORA (Sovereign CTO) <ora@aurem.live>` + message footer `ORA proposal: <id> — approved by <founder_email>`. Endpoints: `summary`, `proposals?status=*`, `proposals/{id}`, `approve`, `reject` (with required note), `hard-reset` (revert files), `history`.
+> - **New admin UI `/admin/git-gate`** — 2-pane: pending list (left) + full colorized diff + per-file numstat (right) + Approve / Reject / Reject+revert buttons. Live polling every 20s.
+> - **E2E proof** (real bytes on disk, real SHA): proposal `prop_3105004b27104b` → founder approval → `git commit` produced SHA `c3ff792298cfb03be8181886945cf30ff0b788a0`, author "ORA (Sovereign CTO) <ora@aurem.live>", file `memory/test_iter_322er_marker.md` now in HEAD.
+
+---
+
+> **🟢 ITER 322eq (2026-05-12) — GOVERNANCE LAYER LIVE (Council Gate + Cockpit + Quotas)**
+>
+> **The problem**: ORA had 16 tools (read, write, shell, restart, council) but no enforced safety gate. The dev-engineering-protocol skill said "if any peer says STOP, you don't commit" — but that was an advisory rule for ORA, not a hard gate. Anyone could `safe_edit` an auth file without consulting the council.
+>
+> **What landed**:
+>
+> **A. Council-Gate Wrappers** (`services/ora_tools.py`)
+>   - **`safe_edit_with_council`** — always consults the council (security+backend+qa by default; auth/payment paths add devops). REJECTS the edit if ANY peer's opinion contains DISSENT signals (`DO NOT`, `STOP`, `HARD NO`, `CRITICAL SECURITY`, etc.). Override requires `override_dissent=True` AND `override_reason ≥20 chars` (loud-logged to `ora_governance_overrides`).
+>   - **`shell_exec_with_council`** — same gate for risky shell commands (`rm`, `dd`, `mkfs`, `drop` auto-trigger HIGH risk and add security peer).
+>   - **Risk classifier**: `auth|bcrypt|jwt|stripe|payment|billing|migration|schema|webhook|admin` → high · `/services/, /routers/` → medium · others → low.
+>   - **Dissent detector**: 20 signal phrases, case-insensitive. False-positive bias (a single match flags dissent).
+>   - **E2E proof**: ORA proposed `bypass bcrypt for @aurem.live emails`. Both security + qa peers dissented. Edit **REJECTED**, file UNCHANGED (0 matches in target after attempt).
+>
+> **B. Per-Tool Hourly Quotas** (`_QUOTA_PER_HOUR` + `_check_quota`)
+>   - Caps enforced from real `ora_tool_invocations` rolling-hour counts:
+>     `shell_exec=60`, `safe_edit=30`, `restart_service=10`, `safe_edit_with_council=20`, `shell_exec_with_council=20`, `council_consult=40`, `peer_review=80`, `code_review=100`, `security_scan=60`, `propose_commit=15`.
+>   - Fail-open if Mongo blips (transient lockout would block the founder).
+>
+> **C. ORA CTO Cockpit** (`/admin/ora-cto` + `/api/admin/ora-cto/*`)
+>   - 5 KPI tiles (total invocations, last-24h, success rate, overrides, active tools)
+>   - 9 quota bars with live used/cap, color-coded (green/amber/red)
+>   - Per-tool rollup (clickable to filter the audit feed) with avg latency + OK%
+>   - LLM cost breakdown over selectable window (1h / 6h / 24h / 3d / 7d)
+>   - Council-override trail (loud red rows showing rationale + override_reason + dissenters)
+>   - Paginated recent-invocations feed with only-failures toggle
+>
+> **D. Regression suite** — 9 new pytests in `tests/test_iter_322eq_council_gate_and_cockpit.py`. Total 20/20 across iter 322ep + 322eq + 322er.
+
+---
+
 > **🟢 ITER 322ep (2026-05-12) — BROADCAST INJECTION FIX + 2 P0 ADMIN TOOLS**
 >
 > **Problem found**: ORA was hallucinating the "3-proof verification block" of the developer-engineering-protocol skill. Real proof: founder asked ORA to quote it — ORA invented `Lint / Test / Integration` (wrong) instead of the real `grep/curl/db count → health check → git log --oneline -3`. Skill was in `ora_skills_library` (9,690 chars, body intact) AND in active broadcast (`skill_ids` contained it) — but the broadcasted `system_addendum` did **not** contain the 3-proof block.

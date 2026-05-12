@@ -1150,6 +1150,26 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] design_extract_router skipped: {e}")
 
+    # iter 322er — Git Commit Gate (founder approves every ORA commit)
+    if not _should_skip("routers.git_gate_router"):
+        try:
+            from routers.git_gate_router import router as git_gate_router
+            app.include_router(git_gate_router)
+            logger.info("[REGISTRY] git_gate_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] git_gate_router skipped: {e}")
+
+    # iter 322eq — ORA CTO Cockpit (council history + cost + quotas)
+    if not _should_skip("routers.ora_cto_cockpit_router"):
+        try:
+            from routers.ora_cto_cockpit_router import router as ora_cto_cockpit_router
+            app.include_router(ora_cto_cockpit_router)
+            logger.info("[REGISTRY] ora_cto_cockpit_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_cto_cockpit_router skipped: {e}")
+
     # iter 322ep — ORA Optimize admin router (codeburn-pattern LLM budget watchdog)
     if not _should_skip("routers.ora_optimize_router"):
         try:

@@ -91,6 +91,8 @@ import AdminBrainPage from './platform/admin/AdminBrainPage';
 import CouncilAuditPage from './platform/admin/CouncilAuditPage';
 import DesignExtractStudio from './platform/admin/DesignExtractStudio';
 import OraOptimizer from './platform/admin/OraOptimizer';
+import OraCtoCockpit from './platform/admin/OraCtoCockpit';
+import GitCommitGate from './platform/admin/GitCommitGate';
 import MonitorFreeLanding from './platform/MonitorFreeLanding';
 import AdminSiteMonitor from './platform/AdminSiteMonitor';
 import PublicStatusPage from './platform/PublicStatusPage';
@@ -329,6 +331,8 @@ function AppRouter() {
         <Route path="/admin/council-audit" element={<CouncilAuditPage />} />
         <Route path="/admin/design-extract" element={<DesignExtractStudio />} />
         <Route path="/admin/ora-optimize" element={<OraOptimizer />} />
+        <Route path="/admin/ora-cto" element={<OraCtoCockpit />} />
+        <Route path="/admin/git-gate" element={<GitCommitGate />} />
         <Route path="/admin/links" element={<AdminLinksHub />} />
         <Route path="/admin/site-monitor" element={<AdminSiteMonitor />} />
         <Route path="/admin/system-audit" element={<AdminSystemAudit />} />

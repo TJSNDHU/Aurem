@@ -86,6 +86,8 @@ const SECTIONS = [
       { to: '/admin/stem-fix',           label: 'Stem-Fix · Refactor', icon: GitBranch,  hint: '' },
       { to: '/admin/self-repair',        label: 'Self-Repair',         icon: RotateCcw,  hint: '' },
       { to: '/admin/ora-optimize',       label: 'ORA Optimizer · $',   icon: Zap,        hint: '' },
+      { to: '/admin/ora-cto',            label: 'ORA CTO Cockpit',     icon: Crown,      hint: '' },
+      { to: '/admin/git-gate',           label: 'Git Commit Gate',     icon: GitBranch,  hint: '' },
     ],
   },
   {

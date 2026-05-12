@@ -1070,6 +1070,527 @@ async def council_consult(question: str, *,
     }
 
 
+# ─── iter 322eq — Session Quotas + Council-Gate Wrappers (Governance Layer) ───
+# Two new safety primitives:
+#   1. _check_quota(tool, actor) — hourly rolling cap per (tool, actor).
+#      Reads ora_tool_invocations directly so quotas survive backend
+#      restarts and stay consistent across processes.
+#   2. safe_edit_with_council / shell_exec_with_council — REJECT if any
+#      consulted peer dissents (CRITICAL / STOP / DO NOT keywords) unless
+#      the caller explicitly sets override_dissent=True with a recorded
+#      override_reason. The override is loud-logged.
+
+# Hourly cap per (tool, actor). actor "ora" = ORA itself; founder JWT
+# = "founder"; testing scripts = "test". These caps are intentionally
+# generous — they exist to catch runaway loops, not to gate normal work.
+_QUOTA_PER_HOUR: dict[str, int] = {
+    "shell_exec":              60,
+    "safe_edit":               30,
+    "restart_service":         10,
+    "safe_edit_with_council":  20,
+    "shell_exec_with_council": 20,
+    "council_consult":         40,
+    "peer_review":             80,
+    "code_review":             100,
+    "security_scan":           60,
+    "propose_commit":          15,
+}
+
+# Substrings (case-insensitive) which, when present in a peer's opinion,
+# mark them as DISSENTING. Tuned conservatively — false positives are
+# safer than false negatives in a governance gate.
+_DISSENT_SIGNALS = (
+    "do not proceed",
+    "do not commit",
+    "do not deploy",
+    "do not merge",
+    "do not edit",
+    "do not apply",
+    "do not drop",
+    "do not run",
+    "hard no",
+    "hard reject",
+    "critical risk",
+    "critical security",
+    "critical vulnerability",
+    "critical issue",
+    "must not",
+    "reject this",
+    "blocked",
+    "stop and",
+    "stop —",
+    "stop and escalate",
+    "this is dangerous",
+    "this is unsafe",
+    "this will break",
+)
+
+# Substrings that flag a shell command as inherently risky.
+_RISKY_SHELL_SIGNALS = (
+    "rm ", "rm-", "truncate", "drop ", "drop_", "drop-",
+    "format", "mkfs", "dd if=", ":wq!",
+)
+
+
+async def _check_quota(tool: str, actor: str) -> tuple[bool, dict]:
+    """Returns (allowed, {used, cap, window_h}).
+
+    Quotas are rolling-hourly and per (tool, actor). Failures default to
+    "allow" so a transient Mongo blip doesn't lock ORA out.
+    """
+    cap = _QUOTA_PER_HOUR.get(tool)
+    if cap is None or _db is None:
+        return True, {"used": 0, "cap": cap, "window_h": 1, "note": "no quota tracked"}
+    try:
+        since = datetime.now(timezone.utc).replace(microsecond=0)
+        # Subtract 1 hour exactly via timedelta
+        from datetime import timedelta as _td
+        since = since - _td(hours=1)
+        used = await _db[_INVOCATION_LOG].count_documents({
+            "tool":  tool,
+            "actor": actor,
+            "ts":    {"$gte": since.isoformat()},
+        })
+        return used < cap, {"used": used, "cap": cap, "window_h": 1}
+    except Exception as e:
+        logger.warning(f"[ora_tools] quota check failed for {tool}/{actor}: {e}")
+        return True, {"used": 0, "cap": cap, "window_h": 1, "note": "quota check errored — fail-open"}
+
+
+def _peer_dissents(opinion_text: str) -> tuple[bool, list[str]]:
+    """Returns (is_dissenter, matched_signals)."""
+    if not opinion_text or not isinstance(opinion_text, str):
+        return False, []
+    txt = opinion_text.lower()
+    hits = [s for s in _DISSENT_SIGNALS if s in txt]
+    return (len(hits) > 0), hits
+
+
+def _classify_edit_risk(path: str) -> str:
+    """Heuristic risk tier for a safe_edit target path.
+
+    high   — auth, billing, payment, migrations, schema, JWT, bcrypt
+    medium — backend services / routers (non-auth)
+    low    — frontend, memory, ora_skills, scripts, docs
+    """
+    p = path.lower()
+    high_signals = ("auth", "bcrypt", "jwt", "stripe", "payment", "billing",
+                     "subscription", "migration", "schema", "/admin_",
+                     "_admin.py", "credit", "refund", "webhook")
+    if any(s in p for s in high_signals):
+        return "high"
+    if "/app/backend/services/" in p or "/app/backend/routers/" in p:
+        return "medium"
+    return "low"
+
+
+async def safe_edit_with_council(
+    path: str,
+    find_string: str,
+    replace_string: str,
+    *,
+    expected_occurrences: int = 1,
+    rationale: str = "",
+    roles: list[str] | None = None,
+    override_dissent: bool = False,
+    override_reason: str = "",
+) -> dict:
+    """Council-gated safe_edit.
+
+    Workflow:
+      1. Classify the target path's risk (low / medium / high).
+      2. Consult the appropriate peer council (security+backend+qa by default;
+         medium-risk auto-adds qa; high-risk adds devops).
+      3. If any peer DISSENTS (matches dissent signals in opinion text):
+           - If override_dissent=False → REJECT, log loud, return error.
+           - If override_dissent=True  → require override_reason ≥20 chars, proceed but
+             stamp the audit log with the override.
+      4. If council passes (or override is honored), call safe_edit normally.
+
+    Returns the original safe_edit envelope augmented with `council`
+    (the consult result) and `gate` (decision metadata).
+    """
+    # Validate inputs early so we don't burn LLM tokens on garbage.
+    if not isinstance(path, str) or not path:
+        return {"ok": False, "error": "path required"}
+    ok_path, why = _is_write_path_allowed(path)
+    if not ok_path:
+        return {"ok": False, "error": f"path not allowed: {why}", "path": path}
+    if not isinstance(rationale, str) or len(rationale.strip()) < 10:
+        return {"ok": False, "error": "rationale required (≥10 chars) — what is this edit doing?"}
+
+    risk = _classify_edit_risk(path)
+    if roles is None:
+        if risk == "high":
+            roles = ["security", "backend", "devops", "qa"]
+        elif risk == "medium":
+            roles = ["backend", "qa"]
+        else:
+            roles = ["backend"]
+
+    # Build council question with concrete diff context
+    diff_context = (
+        f"FILE: {path}\nRISK_TIER: {risk}\n\n"
+        f"FIND:\n```\n{find_string[:2500]}\n```\n\n"
+        f"REPLACE:\n```\n{replace_string[:2500]}\n```\n"
+    )
+    council_question = (
+        f"ORA wants to edit `{path}` (risk tier: {risk}). Rationale: "
+        f"{rationale.strip()[:600]}. Should ORA proceed? If you see ANY "
+        "problem (security, correctness, regression risk, missing tests, "
+        "policy violation) — say so plainly. Start with VERDICT: APPROVE "
+        "or VERDICT: REJECT."
+    )
+    council = await council_consult(council_question, roles=roles, context=diff_context)
+
+    dissenters: list[dict] = []
+    for op in (council.get("opinions") or []):
+        is_diss, signals = _peer_dissents(op.get("opinion") or "")
+        if is_diss:
+            dissenters.append({
+                "role": op["role"],
+                "signals": signals,
+                "snippet": (op.get("opinion") or "")[:500],
+            })
+
+    gate_meta = {
+        "risk_tier":      risk,
+        "council_roles":  roles,
+        "dissenters":     dissenters,
+        "consensus":      council.get("consensus"),
+        "council_ok":     council.get("ok"),
+    }
+
+    if dissenters and not override_dissent:
+        return {
+            "ok": False,
+            "error": "council rejected the edit",
+            "gate": {**gate_meta, "decision": "rejected"},
+            "council": council,
+            "hint": ("Address each dissenter's concern, then retry. "
+                      "If you genuinely need to proceed despite dissent, set "
+                      "override_dissent=True AND override_reason='<≥20-char reason>'."),
+        }
+
+    if dissenters and override_dissent:
+        if not isinstance(override_reason, str) or len(override_reason.strip()) < 20:
+            return {
+                "ok": False,
+                "error": "override_dissent=True requires override_reason ≥20 chars",
+                "gate": {**gate_meta, "decision": "override_blocked_missing_reason"},
+            }
+        # Loud-log the override into a dedicated trail BEFORE proceeding
+        try:
+            if _db is not None:
+                await _db.ora_governance_overrides.insert_one({
+                    "ts":              _now_iso(),
+                    "tool":            "safe_edit_with_council",
+                    "path":            path,
+                    "risk_tier":       risk,
+                    "rationale":       rationale,
+                    "override_reason": override_reason,
+                    "dissenters":      dissenters,
+                    "council":         council,
+                })
+        except Exception as e:
+            logger.warning(f"[ora_tools] override audit failed: {e}")
+
+    # ✓ Council approved (or override honored) — proceed with the real edit
+    edit_res = await safe_edit(path, find_string, replace_string,
+                                 expected_occurrences=expected_occurrences)
+
+    return {
+        **edit_res,
+        "council": council,
+        "gate": {
+            **gate_meta,
+            "decision": (
+                "approved" if not dissenters
+                else "override_applied" if override_dissent
+                else "approved"
+            ),
+            "override_dissent": override_dissent and bool(dissenters),
+            "override_reason":  override_reason if override_dissent and dissenters else "",
+            "rationale":        rationale,
+        },
+    }
+
+
+async def shell_exec_with_council(
+    command: str,
+    args: list[str] | None = None,
+    *,
+    rationale: str = "",
+    roles: list[str] | None = None,
+    override_dissent: bool = False,
+    override_reason: str = "",
+) -> dict:
+    """Council-gated shell_exec.
+
+    Same workflow as safe_edit_with_council. Risk is determined by
+    matching argv tokens against `_RISKY_SHELL_SIGNALS` plus the
+    command name itself (e.g. `rm`, `dd`, `mkfs` are always high).
+    """
+    if not isinstance(command, str) or not command:
+        return {"ok": False, "error": "command required"}
+    if not isinstance(rationale, str) or len(rationale.strip()) < 10:
+        return {"ok": False, "error": "rationale required (≥10 chars) — why this shell command?"}
+
+    args = args or []
+    full = (command + " " + " ".join(map(str, args))).lower()
+    risk = "high" if any(s in full for s in _RISKY_SHELL_SIGNALS) else "medium"
+    if roles is None:
+        roles = ["devops", "security", "backend"] if risk == "high" else ["devops", "backend"]
+
+    council_question = (
+        f"ORA wants to run shell: `{command} {' '.join(map(str, args))[:300]}` "
+        f"(risk: {risk}). Rationale: {rationale.strip()[:600]}. "
+        "Should ORA proceed? Flag side-effects, idempotency issues, blast "
+        "radius. Start with VERDICT: APPROVE or VERDICT: REJECT."
+    )
+    council = await council_consult(council_question, roles=roles)
+
+    dissenters: list[dict] = []
+    for op in (council.get("opinions") or []):
+        is_diss, signals = _peer_dissents(op.get("opinion") or "")
+        if is_diss:
+            dissenters.append({
+                "role": op["role"], "signals": signals,
+                "snippet": (op.get("opinion") or "")[:400],
+            })
+
+    gate_meta = {
+        "risk_tier": risk, "council_roles": roles,
+        "dissenters": dissenters,
+        "consensus": council.get("consensus"),
+        "council_ok": council.get("ok"),
+    }
+
+    if dissenters and not override_dissent:
+        return {
+            "ok": False, "error": "council rejected the shell command",
+            "gate": {**gate_meta, "decision": "rejected"},
+            "council": council,
+            "hint": "Address each dissenter, or set override_dissent=True with override_reason.",
+        }
+    if dissenters and override_dissent:
+        if not isinstance(override_reason, str) or len(override_reason.strip()) < 20:
+            return {"ok": False, "error": "override_dissent=True requires override_reason ≥20 chars",
+                    "gate": {**gate_meta, "decision": "override_blocked_missing_reason"}}
+        try:
+            if _db is not None:
+                await _db.ora_governance_overrides.insert_one({
+                    "ts":              _now_iso(),
+                    "tool":            "shell_exec_with_council",
+                    "command":         command, "args": args,
+                    "risk_tier":       risk,
+                    "rationale":       rationale,
+                    "override_reason": override_reason,
+                    "dissenters":      dissenters,
+                    "council":         council,
+                })
+        except Exception as e:
+            logger.warning(f"[ora_tools] override audit failed: {e}")
+
+    exec_res = await shell_exec(command, args)
+    return {
+        **exec_res,
+        "council":  council,
+        "gate": {
+            **gate_meta,
+            "decision":         "approved" if not dissenters else "override_applied",
+            "override_dissent": override_dissent and bool(dissenters),
+            "override_reason":  override_reason if override_dissent and dissenters else "",
+            "rationale":        rationale,
+        },
+    }
+
+
+# ─── iter 322er — Git Commit Gate (P5 — founder approves every commit) ──
+# ORA can no longer commit directly. The `propose_commit` tool records
+# the intent + diff into `ora_commit_proposals` and returns a proposal
+# id. The founder reviews + approves via the /api/admin/git-gate UI,
+# which is the ONLY place that actually runs `git commit`. ORA's tool
+# surface still has zero direct write to git.
+
+_COMMIT_TITLE_MAX = 80
+_COMMIT_BODY_MAX = 4000
+_COMMIT_FILES_MAX = 30
+
+
+async def propose_commit(
+    title: str,
+    body: str = "",
+    file_paths: list[str] | None = None,
+    *,
+    rationale: str = "",
+) -> dict:
+    """Propose a git commit. NO commit is actually made — this just
+    records the proposal in `ora_commit_proposals` and stages the diff
+    so the founder can review.
+
+    Args:
+        title:      one-line conventional-commit summary (≤80 chars)
+        body:       longer explanation (≤4KB)
+        file_paths: list of files to include (all must already be
+                    write-allowed). If empty, stages everything dirty
+                    under `/app/{backend,frontend/src,memory,ora_skills}`.
+        rationale:  ≥10 chars — recorded in the audit trail.
+
+    Returns:
+        {ok, proposal_id, title, files, diff_preview, lines_added, lines_removed,
+         changed_count, ts}
+    """
+    if not isinstance(title, str) or not (3 <= len(title.strip()) <= _COMMIT_TITLE_MAX):
+        return {"ok": False, "error": f"title required (3-{_COMMIT_TITLE_MAX} chars)"}
+    if not isinstance(body, str) or len(body) > _COMMIT_BODY_MAX:
+        return {"ok": False, "error": f"body too long (>{_COMMIT_BODY_MAX})"}
+    if not isinstance(rationale, str) or len(rationale.strip()) < 10:
+        return {"ok": False, "error": "rationale required (≥10 chars) — explain what changed and why"}
+
+    file_paths = file_paths or []
+    if not isinstance(file_paths, list):
+        return {"ok": False, "error": "file_paths must be a list of strings"}
+    if len(file_paths) > _COMMIT_FILES_MAX:
+        return {"ok": False, "error": f"too many files (>{_COMMIT_FILES_MAX}); split the commit"}
+
+    # Validate each file is under a write-allowed root
+    for p in file_paths:
+        if not isinstance(p, str):
+            return {"ok": False, "error": "file_paths entries must be strings"}
+        ok_p, why = _is_write_path_allowed(p)
+        if not ok_p:
+            return {"ok": False, "error": f"file {p!r} not allowed: {why}"}
+
+    # ─── Collect diff via git ───────────────────────────────────────
+    try:
+        # If file_paths empty, use 'git status --porcelain' to detect
+        # all dirty paths inside the write-allowed roots, then constrain
+        # diff to those only.
+        if not file_paths:
+            st = await asyncio.to_thread(
+                subprocess.run,
+                ["git", "status", "--porcelain"],
+                capture_output=True, text=True, timeout=8, cwd="/app",
+            )
+            dirty = []
+            for line in (st.stdout or "").splitlines():
+                # porcelain format: "<XY> <path>"
+                p = line[3:].strip()
+                if not p:
+                    continue
+                # Filter to write-allowed roots only
+                abs_p = f"/app/{p}" if not p.startswith("/app/") else p
+                ok_p, _ = _is_write_path_allowed(abs_p)
+                if ok_p:
+                    dirty.append(p)
+            if not dirty:
+                return {"ok": False, "error": "no dirty files in write-allowed roots — nothing to commit"}
+            if len(dirty) > _COMMIT_FILES_MAX:
+                return {"ok": False, "error": f"too many dirty files ({len(dirty)} > {_COMMIT_FILES_MAX}); list explicit `file_paths` instead"}
+            file_paths_for_diff = dirty
+        else:
+            # Use repo-relative paths for git diff
+            file_paths_for_diff = [
+                p[len("/app/"):] if p.startswith("/app/") else p
+                for p in file_paths
+            ]
+
+        # iter 322er-fix — `git diff HEAD --` skips untracked files. Mark
+        # any new files as intent-to-add so they show in the diff as
+        # additions, without actually staging content. This keeps the
+        # working tree visible to the diff command while leaving the
+        # actual `git add` for the approval step.
+        try:
+            await asyncio.to_thread(
+                subprocess.run,
+                ["git", "add", "--intent-to-add", "--", *file_paths_for_diff],
+                capture_output=True, text=True, timeout=8, cwd="/app",
+            )
+        except Exception:
+            # Non-fatal — diff will simply skip the untracked file
+            pass
+
+        # Diff (working tree vs HEAD)
+        diff_proc = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "diff", "--unified=2", "--no-color", "--stat=200", "HEAD", "--", *file_paths_for_diff],
+            capture_output=True, text=True, timeout=10, cwd="/app",
+        )
+        diff_text = diff_proc.stdout or ""
+
+        # numstat for clean lines-changed counts
+        ns_proc = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "diff", "--numstat", "--no-color", "HEAD", "--", *file_paths_for_diff],
+            capture_output=True, text=True, timeout=10, cwd="/app",
+        )
+        lines_added = 0
+        lines_removed = 0
+        per_file_stat = []
+        for line in (ns_proc.stdout or "").splitlines():
+            parts = line.split("\t")
+            if len(parts) != 3:
+                continue
+            try:
+                a = int(parts[0]) if parts[0] != "-" else 0
+                r = int(parts[1]) if parts[1] != "-" else 0
+            except ValueError:
+                continue
+            lines_added += a
+            lines_removed += r
+            per_file_stat.append({"path": parts[2], "added": a, "removed": r})
+
+    except Exception as e:
+        return {"ok": False, "error": f"git diff failed: {type(e).__name__}: {str(e)[:120]}"}
+
+    if not diff_text.strip():
+        return {"ok": False, "error": "no diff between HEAD and working tree for the given files"}
+
+    # ─── Persist proposal ───────────────────────────────────────────
+    import uuid as _uuid
+    proposal_id = f"prop_{_uuid.uuid4().hex[:14]}"
+    proposal = {
+        "_id":           proposal_id,
+        "id":            proposal_id,
+        "title":         title.strip(),
+        "body":          body.strip(),
+        "rationale":     rationale.strip(),
+        "files":         file_paths_for_diff,
+        "per_file_stat": per_file_stat,
+        "diff":          diff_text[:200_000],  # cap at 200KB
+        "diff_truncated": len(diff_text) > 200_000,
+        "lines_added":   lines_added,
+        "lines_removed": lines_removed,
+        "status":        "pending",
+        "proposed_at":   _now_iso(),
+        "proposed_by":   "ora",
+        "decided_at":    None,
+        "decided_by":    None,
+        "decision_note": None,
+        "commit_sha":    None,
+    }
+    if _db is not None:
+        try:
+            await _db.ora_commit_proposals.insert_one(proposal)
+        except Exception as e:
+            logger.warning(f"[propose_commit] persist failed: {e}")
+
+    return {
+        "ok":            True,
+        "proposal_id":   proposal_id,
+        "title":         title.strip(),
+        "files":         file_paths_for_diff,
+        "lines_added":   lines_added,
+        "lines_removed": lines_removed,
+        "diff_preview":  diff_text[:2000],
+        "diff_truncated": len(diff_text) > 2000,
+        "status":        "pending",
+        "review_url":    "/admin/git-gate",
+        "hint":          "Founder must approve via /api/admin/git-gate/proposals/{id}/approve before the commit is actually made.",
+    }
+
+
 # ─── Registry ────────────────────────────────────────────────────────
 
 TOOL_REGISTRY: dict[str, dict] = {
@@ -1219,6 +1740,60 @@ TOOL_REGISTRY: dict[str, dict] = {
             "Max 5 peers per call."
         ),
     },
+    "safe_edit_with_council": {
+        "fn": safe_edit_with_council,
+        "args_spec": {
+            "path":                 "str — under /app/{backend,frontend/src,memory,ora_skills,scripts}",
+            "find_string":          "str — exact match, whitespace-sensitive",
+            "replace_string":       "str — the new code",
+            "expected_occurrences": "int 1-50 (default 1)",
+            "rationale":            "str ≥10 chars — what is this edit doing? Logged in audit trail.",
+            "roles":                "list[str] — peer roles (defaults to risk-tier auto-select)",
+            "override_dissent":     "bool — only true when caller explicitly accepts the dissent risk",
+            "override_reason":      "str ≥20 chars — required iff override_dissent=True",
+        },
+        "description": (
+            "GOVERNANCE GATE (iter 322eq) — safe_edit + mandatory peer "
+            "council. Auto-selects roles by path risk (auth/payment/schema "
+            "→ security+backend+devops+qa). REJECTS the edit if any peer "
+            "dissents (DO NOT / STOP / CRITICAL). Override requires loud "
+            "audit-logged reason ≥20 chars. USE THIS for any production "
+            "code change instead of bare safe_edit."
+        ),
+    },
+    "shell_exec_with_council": {
+        "fn": shell_exec_with_council,
+        "args_spec": {
+            "command":          "str — whitelisted shell command",
+            "args":             "list[str] — sanitised argv",
+            "rationale":        "str ≥10 chars — why this command?",
+            "roles":            "list[str] — peer roles (default: devops + backend)",
+            "override_dissent": "bool — explicit accept of dissent risk",
+            "override_reason":  "str ≥20 chars — required iff override_dissent=True",
+        },
+        "description": (
+            "GOVERNANCE GATE (iter 322eq) — shell_exec + mandatory peer "
+            "council. High-risk argv (rm/dd/drop/mkfs) auto-triggers "
+            "security review. REJECTS on any peer dissent unless override "
+            "with audit-logged reason."
+        ),
+    },
+    "propose_commit": {
+        "fn": propose_commit,
+        "args_spec": {
+            "title":      "str — one-line conventional-commit summary (3-80 chars)",
+            "body":       "str ≤4KB — longer description (optional)",
+            "file_paths": "list[str] — files to include (each under write-allowed roots, ≤30)",
+            "rationale":  "str ≥10 chars — why this commit? Logged in audit trail.",
+        },
+        "description": (
+            "GIT COMMIT GATE (iter 322er) — record a commit proposal for "
+            "founder review. ORA cannot actually commit; this tool only "
+            "writes to `ora_commit_proposals` with the diff. Founder "
+            "approves via /api/admin/git-gate/proposals/{id}/approve. "
+            "Default: stage all dirty files under write-allowed roots."
+        ),
+    },
 }
 
 
@@ -1229,16 +1804,29 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
         result = {"ok": False, "error": f"unknown tool: {name}",
                    "available_tools": sorted(TOOL_REGISTRY.keys())}
     else:
-        fn = TOOL_REGISTRY[name]["fn"]
-        # Light arg sanitisation — coerce dict
-        if not isinstance(args, dict):
-            args = {}
-        try:
-            result = await fn(**args)
-        except TypeError as e:
-            result = {"ok": False, "error": f"bad args for {name}: {str(e)[:120]}"}
-        except Exception as e:
-            result = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
+        # iter 322eq — hourly quota gate
+        allowed, q_meta = await _check_quota(name, actor)
+        if not allowed:
+            result = {
+                "ok": False,
+                "error": f"hourly quota exhausted for {name} (used {q_meta['used']}/{q_meta['cap']} in last 1h)",
+                "quota": q_meta,
+                "hint": "Wait for the rolling window to roll forward, or escalate to founder.",
+            }
+        else:
+            fn = TOOL_REGISTRY[name]["fn"]
+            # Light arg sanitisation — coerce dict
+            if not isinstance(args, dict):
+                args = {}
+            try:
+                result = await fn(**args)
+            except TypeError as e:
+                result = {"ok": False, "error": f"bad args for {name}: {str(e)[:120]}"}
+            except Exception as e:
+                result = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
+            # Attach quota state on the result for caller visibility
+            if isinstance(result, dict):
+                result.setdefault("quota", q_meta)
 
     elapsed_ms = int((time.time() - start) * 1000)
     result["tool"] = name
