@@ -90,38 +90,50 @@ class CustomerWorkspace:
         self.audit = get_audit_logger(db)
     
     async def ensure_indexes(self):
-        """Create all required indexes - handles existing indexes gracefully"""
+        """Create all required indexes - handles existing indexes gracefully.
+
+        iter 322eg — Split into 'live' (workspaces, usage) and 'dormant'
+        (contacts, conversations) groups. The dormant collections sit
+        empty until the multi-tenant commercial features ship, but their
+        index creation kept resurrecting empty shells in the DB audit.
+        Gated behind `AUREM_COMMERCIAL_FEATURES=1` matching the same
+        flag used in services/startup_init.init_aurem_indexes().
+        """
+        import os as _os
         async def safe_create_index(collection, keys, **kwargs):
             try:
                 await collection.create_index(keys, **kwargs)
             except Exception:
                 pass  # Index exists or conflict
-        
-        # Workspaces
+
+        # ── Always-on (live data flows through these) ───────────────
         await safe_create_index(self.workspaces, "business_id", unique=True)
         await safe_create_index(self.workspaces, "owner_email")
         await safe_create_index(self.workspaces, "status")
         await safe_create_index(self.workspaces, "stripe_customer_id")
-        
-        # Usage (monthly tracking)
         await safe_create_index(self.usage, [("business_id", 1), ("billing_period", 1)], unique=True)
-        
-        # Contacts (per business)
-        await safe_create_index(self.contacts, [("business_id", 1), ("contact_hash", 1)], unique=True)
-        await safe_create_index(self.contacts, "business_id")
-        
-        # Conversations (per business)
-        await self.conversations.create_index([
-            ("business_id", 1),
-            ("conversation_id", 1)
-        ], unique=True)
-        await self.conversations.create_index("business_id")
-        await self.conversations.create_index([
-            ("business_id", 1),
-            ("last_message_at", -1)
-        ])
-        
-        logger.info("[Workspace] Indexes created")
+
+        # ── Dormant (multi-tenant commercial — feature-gated) ───────
+        commercial = _os.environ.get(
+            "AUREM_COMMERCIAL_FEATURES", "0"
+        ).lower() in ("1", "true", "yes")
+        if commercial:
+            await safe_create_index(self.contacts, [("business_id", 1), ("contact_hash", 1)], unique=True)
+            await safe_create_index(self.contacts, "business_id")
+            await self.conversations.create_index([
+                ("business_id", 1),
+                ("conversation_id", 1)
+            ], unique=True)
+            await self.conversations.create_index("business_id")
+            await self.conversations.create_index([
+                ("business_id", 1),
+                ("last_message_at", -1)
+            ])
+
+        logger.info(
+            f"[Workspace] Indexes created "
+            f"(commercial={'on' if commercial else 'off'})"
+        )
     
     def generate_business_id(self) -> str:
         """Generate a unique business ID"""

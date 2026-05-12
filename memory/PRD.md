@@ -1577,3 +1577,39 @@ Sovereign LLM call asking about K8s probe restart → response literally cited "
 2. **Upgrade SECONDARY Atlas to M10+** (or prune harder) — full DR mirror currently broken at cap
 3. **Customer CSV upload UI** — Intelligence Merge match-rate unlock
 4. **Design-Extract integration** (1.5 days)
+
+## iter 322eg — Final DB Cleanup Pass
+
+### Found 3 auto-recreators after 322ee scan
+- `aurem_contacts` — WorkspaceService.ensure_indexes() always-on but contacts/conversations dormant
+- `mention_status_history` + `unlinked_mentions` — registry.py boot-time ensure_mention_indexes() runs unconditionally
+
+### Fixed (both with lazy-init pattern)
+- **`shared/commercial/workspace_service.py`**: Split ensure_indexes() into 'always-on' (workspaces, usage — live data) vs 'feature-gated' (contacts, conversations — only when `AUREM_COMMERCIAL_FEATURES=1`)
+- **`services/unlinked_mentions_service.py`**: `ensure_mention_indexes(db, force=False)` now skips when both collections are empty shells. Writer (`scan_for_unlinked_mentions` + status updater) passes `force=True` on first real insert to materialise indexes on demand.
+
+### Result — final DB state
+**524 → 495 collections (-29 total, all auto-recreators eliminated)**
+
+| Category | Count |
+|---|---|
+| Pure dead (0W+0R) | **0** ✓ |
+| Auto-recreators | **0** ✓ |
+| Empty dormant (write code, untriggered) | 52 (each is a real feature awaiting first user action) |
+| Tiny (1-4 docs) | 179 (config/state/audit-trail collections) |
+| Healthy (5+ docs) | 264 |
+
+### Verified
+- ✓ All 3 dropped collections stayed gone after 2 backend restarts
+- ✓ /api/platform/health 200
+- ✓ Zero exceptions in backend logs
+
+### Remaining "empty" collections are LEGITIMATE
+The 52 "dormant writes" all represent real features awaiting first trigger:
+- Trial system (`trial_*`) — fires on first paid trial
+- Voice calls (`voice_calls`, `sales_calls`) — fires when voice agent enabled
+- WhatsApp (`whatsapp_messages`) — disabled per registry config
+- DNC / token_blocklist — security/compliance, fires on first user trigger (verified WORKING via 322ee regression tests)
+- Site monitoring (`site_*`) — fires when customer enables monitoring
+
+These are not garbage. They're properly wired and waiting for activity.

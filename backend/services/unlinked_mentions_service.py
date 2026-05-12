@@ -297,6 +297,8 @@ async def scan_for_unlinked_mentions(
         # Persist the empty scan (upsert!) so we don't re-query for a day
         if db is not None:
             try:
+                # iter 322eg — lazy index materialisation on first real write
+                await ensure_mention_indexes(db, force=True)
                 await db[COLLECTION_MAIN].update_one(
                     {"business_name": business_name,
                      "scan_date":     today_start},
@@ -346,6 +348,8 @@ async def scan_for_unlinked_mentions(
     # ── Persist ──
     if db is not None:
         try:
+            # iter 322eg — lazy index materialisation on first real write
+            await ensure_mention_indexes(db, force=True)
             await db[COLLECTION_MAIN].update_one(
                 {"business_name": business_name,
                  "scan_date":     today_start},
@@ -415,6 +419,8 @@ async def update_mention_status(db, mention_id: str,
             }},
         )
         try:
+            # iter 322eg — lazy index materialisation on first real write
+            await ensure_mention_indexes(db, force=True)
             await db[COLLECTION_HIST].insert_one({
                 "mention_id":    mention_id,
                 "business_name": parent.get("business_name"),
@@ -501,10 +507,34 @@ async def send_reclamation_outreach(db, mention_id: str,
 # ─────────────────────────────────────────────────────────────────────
 # Indexes + health
 # ─────────────────────────────────────────────────────────────────────
-async def ensure_mention_indexes(db) -> None:
-    """TTL on both collections. Idempotent."""
+async def ensure_mention_indexes(db, *, force: bool = False) -> None:
+    """TTL on both collections. Idempotent.
+
+    iter 322eg — Lazy-init pattern. By default, only creates indexes if
+    at least one collection already has documents. This prevents the
+    `unlinked_mentions` + `mention_status_history` empty shells from
+    auto-resurrecting on every restart (a 322ee cleanup target).
+    Pass `force=True` from the actual writer (`scan_for_unlinked_mentions`)
+    before its first insert to materialise the indexes when needed.
+    """
     if db is None:
         return
+    if not force:
+        try:
+            existing = set(await db.list_collection_names())
+            if (COLLECTION_MAIN not in existing
+                    and COLLECTION_HIST not in existing):
+                # Neither collection exists yet → nothing to index. The
+                # writer will call us with force=True on first scan hit.
+                return
+            n_main = await db[COLLECTION_MAIN].estimated_document_count() \
+                     if COLLECTION_MAIN in existing else 0
+            n_hist = await db[COLLECTION_HIST].estimated_document_count() \
+                     if COLLECTION_HIST in existing else 0
+            if n_main == 0 and n_hist == 0:
+                return  # still empty shells, skip
+        except Exception:
+            pass
     try:
         await db[COLLECTION_MAIN].create_index(
             [("ts", 1)], expireAfterSeconds=TTL_MAIN_DAYS * 24 * 3600,
