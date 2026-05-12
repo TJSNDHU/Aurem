@@ -55,13 +55,17 @@ async def lifespan(app: FastAPI):
     # Initialize SQLite outbox
     os.makedirs(os.path.dirname(OUTBOX_DB_PATH), exist_ok=True)
     app.state.outbox_db = await aiosqlite.connect(OUTBOX_DB_PATH)
+    # iter 322ey — schema must include retry_count + processed_at because
+    # the outbox sidecar worker (outbox/worker.py) writes to those columns.
     await app.state.outbox_db.execute("""
         CREATE TABLE IF NOT EXISTS outbox_pending (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            created_at REAL NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending',
-            payload TEXT NOT NULL,
-            error TEXT
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at    REAL    NOT NULL,
+            status        TEXT    NOT NULL DEFAULT 'pending',
+            payload       TEXT    NOT NULL,
+            retry_count   INTEGER NOT NULL DEFAULT 0,
+            processed_at  TEXT,
+            error         TEXT
         )
     """)
     await app.state.outbox_db.commit()

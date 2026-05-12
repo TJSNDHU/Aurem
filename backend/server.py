@@ -2092,6 +2092,42 @@ from routers.registry import register_all_routers
 # Note: api_router is included here because it holds RLS endpoints
 app.include_router(api_router)
 
+# iter 322ey — Founder Saves Audit Router (direct register; registry block
+# wasn't being reached after hot-reload, so wire it here as a safety net).
+try:
+    from routers.founder_saves_router import (
+        router as _founder_saves_router,
+        set_db as _set_founder_saves_db,
+    )
+    # db wiring deferred until startup_event() runs and `db` is bound,
+    # but include the router immediately so routes register.
+    app.include_router(_founder_saves_router)
+
+    @app.on_event("startup")
+    async def _wire_founder_saves_db():
+        # Late-bind the db handle once it's initialized.
+        from server import db as _bound_db  # type: ignore
+        _set_founder_saves_db(_bound_db)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] founder_saves_router wire failed: {_e}")
+
+# iter 322ey — Public Design-Extract lead magnet (NO auth)
+try:
+    from routers.design_extract_public_router import (
+        router as _design_extract_public_router,
+        set_db as _set_dep_db,
+    )
+    app.include_router(_design_extract_public_router)
+
+    @app.on_event("startup")
+    async def _wire_design_extract_public_db():
+        from server import db as _bound_db  # type: ignore
+        _set_dep_db(_bound_db)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] design_extract_public wire failed: {_e}")
+
 # /.well-known/ucp moved to bootstrap.wellknown_routes (iter 263 final surgery).
 
 # Serve standalone tracking pixel

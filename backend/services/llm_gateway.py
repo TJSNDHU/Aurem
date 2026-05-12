@@ -333,6 +333,18 @@ async def call_llm_with_tools(
     invocations: list[dict] = []
     iters = 0
     final_provider = "?"
+    # iter 322ey — fingerprint each (tool, args) call to detect loops where
+    # the LLM re-emits the same expensive tool over and over (peer_review
+    # with huge `context=` was the original offender). Second sighting of
+    # the same fingerprint short-circuits straight to a synthesis prompt.
+    _seen_fingerprints: set[str] = set()
+    import hashlib as _hl
+
+    def _fp(call_obj: dict) -> str:
+        raw = call_obj.get("tool", "") + "::" + _json.dumps(
+            call_obj.get("args") or {}, sort_keys=True, default=str
+        )[:512]
+        return _hl.sha1(raw.encode("utf-8", "replace")).hexdigest()[:16]
 
     while iters < max_tool_iters:
         iters += 1
@@ -354,6 +366,30 @@ async def call_llm_with_tools(
                 "iterations":       iters,
                 "provider":         final_provider,
             }
+
+        # iter 322ey — loop-guard: detect tool-call replay.  If EVERY call
+        # in this iter was already executed earlier with the same args, we
+        # force a synthesis round instead of re-running the expensive work.
+        all_replays = all(_fp(c) in _seen_fingerprints for c in calls)
+        for c in calls:
+            _seen_fingerprints.add(_fp(c))
+
+        if all_replays:
+            logger.warning(
+                f"[llm_gateway] iter {iters}: all {len(calls)} tool calls "
+                f"are duplicates — forcing synthesis"
+            )
+            transcript = (
+                f"{transcript}\n\n"
+                f"=== SYSTEM NOTE (iter {iters}) ===\n"
+                f"You have already invoked {[c['tool'] for c in calls]} "
+                f"with identical arguments earlier in this conversation. "
+                f"Re-running them will give the same result. STOP calling "
+                f"tools and synthesise your FINAL answer using the prior "
+                f"tool results above. Do not emit another tool_call.\n"
+                f"=== END SYSTEM NOTE ===\n"
+            )
+            continue  # next iter: LLM should produce final text
 
         # Execute each tool call SERVER-SIDE with real subprocess/db.
         results_for_llm = []

@@ -1264,6 +1264,19 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] ora_chat_router skipped: {e}")
 
+    # iter 322ey — Founder Saves Audit Router (unified ledger view)
+    if not _should_skip("routers.founder_saves_router"):
+        try:
+            from routers.founder_saves_router import (
+                router as founder_saves_router, set_db as set_founder_saves_db,
+            )
+            set_founder_saves_db(db)
+            app.include_router(founder_saves_router)
+            logger.info("[REGISTRY] founder_saves_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] founder_saves_router skipped: {e}")
+
 
     # Memoir Router (Git-versioned semantic memory for 28 agents + ORA)
     if not _should_skip("routers.memoir_router"):

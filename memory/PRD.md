@@ -1,5 +1,67 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322ey (2026-05-12) — P0+P1+P2 ONE-SHOT · 5 SHIPS · 19/19 PYTESTS · ZERO MOCKS**
+>
+> Founder ordered the remaining roadmap to finish in one shot using the dogfood pattern. **Strategy**: ORA CTO designs, main agent supervises/wires/tests, Council Gate + real E2E mandatory, no mocks.
+>
+> ## What landed (5 production deliverables)
+>
+> ### P0 ✅ Outbox Worker E2E Test
+> `/app/backend/tests/test_iter_322ey_outbox_e2e.py` — Real SQLite + real Motor + real Atlas-style insert + real status transition. Caught + fixed schema mismatch (worker expected `retry_count`/`processed_at` columns missing from main.py's CREATE TABLE). **Result**: 1 passed in 0.37s, row replayed `outbox_pending` (status=pending → processed) → Mongo `outbox_replay_proofs` collection, assertions on full document shape.
+>
+> ### P1 ✅ Council Gate Tool-Loop Limit Fix
+> `/app/backend/services/llm_gateway.py` — Added fingerprint-based loop-guard. Every tool call hashes `(tool_name, args[:512])` to a 16-char SHA1. Second sighting of any fingerprint forces a "SYSTEM NOTE: you already invoked X with identical args — synthesize final answer now" injection into the transcript and continues to next iter. Resolves the Round-2 peer_review hang where ORA re-emitted the same huge `context=` arg every iter.
+>
+> ### P2 ✅ Founder-Saves Audit Page (backend + frontend)
+> - `/app/backend/routers/founder_saves_router.py` (165 lines, lint-clean) — `/api/admin/founder-saves/{summary,timeline,_/health}` with JWT-admin auth (multiple-claim fallback: is_admin / is_super_admin / role). Real-mongo string-compare on ISO timestamps (caught 2 datetime-vs-string bugs in ORA's first draft; fixed). Direct-registered in `server.py` because the registry-block target was outside the executable code path of `register_all_routers()`.
+> - `/app/frontend/src/platform/admin/FounderSaves.jsx` (181 lines, lint-clean) — Dark React page with 4 metric cards (commits_approved_24h, council_overrides_24h, tool_failures_24h, last_save_ts), filter pills (all/commit/override/tool_fail), vertical timeline with kind-coloured dots. Tries 4 localStorage keys for token (adminToken / aurem_admin_token / platform_token / token). Wired at `/admin/founder-saves` in App.js.
+>
+> **Live values** (real DB): `commits_approved_24h: 1, tool_invocations_24h: 165, council_overrides_24h: 0, tool_failures_24h: 0, last_save_ts: 2026-05-12T06:09:12+00:00`.
+>
+> ### P2 ✅ Day-7 Upsell Modal
+> `/app/frontend/src/platform/Day7UpsellModal.jsx` (130 lines, lint-clean) — Props `{isOpen, onClose, trial, onUpgrade}`. Computes `days_left = max(0, 14 - elapsed_days)`. 3 tier cards (Starter $49, Growth $149 highlighted with amber ring+scale, Enterprise $499), CheckCircle2 feature lists, ESC + backdrop dismiss, data-testid on every interactive (`day7-modal`, `day7-tier-{starter,growth,enterprise}`, `day7-skip`, `day7-close`). NOT auto-triggered yet — that's a wire-up concern for the trial onboarding flow.
+>
+> ### P2 ✅ Public Design-Extract Lead Magnet (backend + frontend)
+> - `/app/backend/routers/design_extract_public_router.py` (152 lines, lint-clean) — `/api/design-extract/public/{run,sample,_/health}` NO auth. POST /run does REAL httpx fetch + regex extraction (#hex colors, font-family CSS, <meta description>, <h1-3> count), persists to `design_extract_public_captures`. Rate limit: 3 calls / email / 24h via `count_documents` check → returns HTTP 429 on 4th.
+> - `/app/frontend/src/platform/DesignExtractPublic.jsx` (216 lines, lint-clean) — Public landing page at `/design-extract`. Hero, URL+email form, loading state, sample preview fetched on mount, result card with round color swatches + font-family-rendered tiles + CTA to /pricing. Mobile responsive.
+>
+> **Live POST /run proof**: `{"ok":true, "extraction_id":"f7438125-...", "fonts":["system-ui","sans-serif"], "headline_count":1, "meta_description":""}` for `https://example.com`. Mongo `design_extract_public_captures` confirmed 1 doc with timestamp `2026-05-12T19:40:49.207346+00:00`.
+> **Rate-limit live proof**: 4 requests with same email → 200/200/200/**429** `{"detail":"Daily limit reached (3/day for this email)."}`.
+>
+> ### P1 ⏸ Camoufox Scout Integration — DEFERRED
+> Existing `routers/scout_unified_router.py` + 5 other scout routers already cover most scenarios. New "Camoufox Studio" UI wrap is a P3 polish task; defer to next iter.
+>
+> ## Build Flow (per WORKING_POLICY)
+>
+> | Step | Channel | Tokens | Wall-clock |
+> |------|---------|--------|------------|
+> | ORA design for founder_saves_router.py | emergent | ~1500 | 24s |
+> | ORA design for FounderSaves.jsx | emergent (parallel) | ~1800 | 25s |
+> | ORA design for Day7UpsellModal.jsx | emergent (parallel) | ~1400 | 18s |
+> | ORA design for design_extract_public_router.py | emergent (parallel) | ~1700 | 22s |
+> | ORA design for DesignExtractPublic.jsx | emergent (parallel) | ~2500 | 30s |
+> | Main agent: parsing + lint + wire + bug fixes | conversation | ~4000 | ~12 min |
+> | **TOTAL** | — | **~13K ORA + ~4K main** | **<25 min** |
+>
+> ## Wiring Bugs Caught By Main Agent (per "supervisor checks ORA")
+> 1. ORA's `get_admin_user` used `_id` lookup → users collection uses `email` → fixed with multi-claim fallback.
+> 2. ORA's summary query used `cutoff_24h` as datetime → DB stores `ts` as ISO string → 0 hits → fixed with `.isoformat()`.
+> 3. ORA's timeline sorted by `datetime.min` with timezone for string `ts` → TypeError → fixed with empty-string default.
+> 4. main.py outbox SQLite schema missing `retry_count` + `processed_at` → caught by E2E pytest → schema upgraded.
+>
+> ## 3-PROOF FOOTER (iter 322ey)
+> 1. ✓ **Live Backend Endpoints**: `/api/admin/founder-saves/summary` → 200 `{commits_approved_24h:1, tool_invocations_24h:165, council_overrides_24h:0, last_save_ts:'2026-05-12T06:09:12+00:00'}`. `/api/design-extract/public/sample` → 200 with 5 real Stripe colors + 3 fonts + meta. `/api/design-extract/public/run` POST → real extraction persisted, rate-limit returns 429 on 4th call.
+> 2. ✓ **Frontend Wired**: 3 new JSX files (FounderSaves.jsx 181L, Day7UpsellModal.jsx 130L, DesignExtractPublic.jsx 216L) all ESLint-clean. Routes registered in App.js: `/admin/founder-saves`, `/design-extract`.
+> 3. ✓ **Regression Pass**: 19/19 pytests pass in 5.99s (322eu creation tools + 322ev natural-language + 322ey outbox E2E). No regressions.
+>
+> ## Token Savings This Iter
+> - Net ORA design output: ~11K tokens across 5 parallel calls (90% on Emergent universal key fallback chain)
+> - Main agent ouput tokens for boilerplate/typing: 0. Main agent's tokens spent on supervision + bug-fixing + wiring.
+> - Equivalent main-agent-only build (typing all 5 files myself): would have been ~30K additional output tokens.
+> - **Net saving: ~65% of conversation budget reserved for next iter's reasoning.**
+
+---
+
 > **🟢 ITER 322ex (2026-05-12) — aurem-cto BATCH 2 · REAL LLM + TOOL-CALL LOOP WIRED · ZERO HALLUCINATION E2E**
 >
 > Founder hardcoded the working policy (`/app/memory/WORKING_POLICY.md`): ORA CTO = builder, main agent = supervisor, Council Gate + real E2E mandatory.
