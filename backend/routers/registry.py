@@ -1126,6 +1126,20 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] ora_skills_router skipped: {e}")
 
 
+    # Antigravity Skills Router (1,453+ playbooks + broadcast to 28 agents)
+    if not _should_skip("routers.antigravity_skills_router"):
+        try:
+            from routers.antigravity_skills_router import (
+                router as antigravity_skills_router,
+                set_db as set_antigravity_skills_db,
+            )
+            set_antigravity_skills_db(db)
+            app.include_router(antigravity_skills_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] antigravity_skills_router skipped: {e}")
+
+
     # Dev Stack Health (Pillars Map green/red grid)
     if not _should_skip("routers.dev_stack_health_router"):
         try:

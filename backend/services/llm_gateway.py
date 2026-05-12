@@ -138,6 +138,24 @@ async def call_llm_with_meta(
     straight to OpenRouter → Emergent. Useful for long-context dev-mode
     skill calls where the ngrok tunnel adds latency that bursts past
     chat-handler budgets."""
+    # Live skill broadcast — admin can push Antigravity SKILL.md playbooks
+    # to ALL agents via /api/admin/antigravity-skills/broadcast. Every LLM
+    # call routed through this gateway picks them up at runtime.
+    try:
+        from services.agent_skill_broadcast import get_addendum
+        import os as _os
+        _db = None
+        # Try to grab the live db from server module without circular import
+        try:
+            import server as _srv  # noqa: WPS433
+            _db = getattr(_srv, "db", None)
+        except Exception:
+            _db = None
+        _ad = await get_addendum(_db, agent_name="GATEWAY")
+        if _ad:
+            system_prompt = (system_prompt or "") + _ad
+    except Exception:
+        pass
     providers = (
         ("sovereign",   _try_sovereign),
         ("openrouter",  _try_openrouter),

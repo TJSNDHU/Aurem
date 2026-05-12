@@ -35,6 +35,7 @@ import TrialBanner from './components/TrialBanner';
 import MyBilling from './pages/MyBilling';
 import AdminSSOT from './platform/AdminSSOT';
 import AdminConsole from './platform/AdminConsole';
+import AdminAntigravitySkills from './platform/AdminAntigravitySkills';
 import AWBCockpit from './platform/AWBCockpit';
 import AdminDiagnostics from './platform/AdminDiagnostics';
 import LeadsDashboard from './platform/LeadsDashboard';
@@ -300,6 +301,7 @@ function AppRouter() {
         <Route path="/admin/2fa" element={<Admin2FAEnroll />} />
         <Route path="/admin/ssot" element={<AdminSSOT />} />
         <Route path="/admin/console" element={<AdminConsole />} />
+        <Route path="/admin/skills-library" element={<AdminAntigravitySkills />} />
         <Route path="/admin/awb-cockpit" element={<AWBCockpit />} />
         <Route path="/admin/boardroom" element={<BoardroomPage />} />
         <Route path="/admin/mission-control" element={<AdminMissionControl />} />

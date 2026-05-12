@@ -848,6 +848,25 @@ export const ORAPage = () => {
 
   return (
     <PageShell icon={Sparkles} title="ORA" subtitle="The autonomous repair intelligence." testid="page-ora" fitViewport>
+      {/* 1-Click ORA PWA — passes the customer token so no re-login is needed */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <a
+          href={`/ora?token=${encodeURIComponent(token || '')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="ora-pwa-launch-btn"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '9px 16px', textDecoration: 'none',
+            background: 'linear-gradient(135deg, #D4AF37, #FF6B00)',
+            color: '#08080F', fontWeight: 700, fontSize: 12, letterSpacing: '0.5px',
+            borderRadius: 10, border: '1px solid rgba(212,175,55,0.45)',
+            boxShadow: '0 6px 18px rgba(212,175,55,0.25)',
+          }}
+        >
+          <Sparkles size={14} /> Open ORA Voice PWA →
+        </a>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, flex: '0 0 auto' }}>
         {agents.map((a, i) => {
           const active = String(a.status || '').toUpperCase() !== 'STANDBY';

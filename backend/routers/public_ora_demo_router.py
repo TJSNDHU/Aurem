@@ -582,6 +582,15 @@ async def public_demo_chat_stream(
         sys_prompt = prepend_date(sys_prompt)
     except Exception:
         pass
+    # Live skill broadcast — admin can push Antigravity skills to every agent
+    # via /api/admin/antigravity-skills/broadcast. ORA picks them up here.
+    try:
+        from services.agent_skill_broadcast import get_addendum
+        _ad = await get_addendum(_db, agent_name="ORA")
+        if _ad:
+            sys_prompt += _ad
+    except Exception:
+        pass
     sid = req.session_id or f"demo_{uuid.uuid4()}"
     bin_for_session = (user or {}).get("bin")
     history = await _load_history(sid, bin_for_session, limit=10)

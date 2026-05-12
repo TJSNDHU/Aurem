@@ -18,6 +18,7 @@ import { VideoOraSession } from "./VideoOraSession";
 import ORASelector from "../components/ORASelector";
 import WakeWordIndicator from "../components/WakeWordIndicator";
 import { LOCAL_STORAGE_KEY as ORA_AVATAR_KEY, getAvatarById } from "../config/ora_avatars.config";
+import useVoice from "../hooks/useVoice";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const HISTORY_KEY = "aurem_ora_history_v1";
@@ -53,6 +54,7 @@ html,body{margin:0 !important;padding:0 !important;height:100% !important;width:
 .orbit-ring:nth-child(4){inset:24px;border:1px solid rgba(255,107,0,0.1);animation-duration:4s;animation-direction:reverse;}
 .orbit-ring:nth-child(5){inset:32px;border:1px solid rgba(201,168,76,0.2);animation-duration:10s;}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.55);}50%{box-shadow:0 0 0 8px rgba(249,115,22,0);}}
 .orbit-dot{position:absolute;width:4px;height:4px;background:#FF6B00;border-radius:50%;top:0;left:50%;transform:translateX(-50%) translateY(-2px);}
 .ora-core{position:absolute;inset:38px;background:radial-gradient(circle,#FF6B00,#CC4400);border-radius:50%;box-shadow:0 0 20px rgba(255,107,0,0.6),0 0 40px rgba(255,107,0,0.3);}
 .splash-name{font-family:'Cinzel Decorative',serif;font-size:32px;font-weight:700;letter-spacing:0.15em;margin-bottom:4px;}
@@ -377,6 +379,15 @@ const OraPWA = () => {
     },
   ]);
   const [chatInput, setChatInput] = useState("");
+
+  // Speech-to-text (browser-native mic) — TTS already implemented via /api/ora/tts
+  const {
+    isListening, startListening, stopListening, supportedSTT,
+  } = useVoice({
+    onResult: (text) => {
+      if (text && text.trim()) setChatInput(text.trim());
+    },
+  });
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recState, setRecState] = useState("");
@@ -421,12 +432,31 @@ const OraPWA = () => {
   };
 
   // ── Auth token (used by chat + tabs + notif) ─────────────────
+  // 1-click access: if `?token=...` is in the URL (passed by /my → ORA),
+  // store it under aurem_platform_token so all subsequent requests work
+  // without re-login.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const t = (p.get("token") || "").trim();
+      if (t && t.length > 20) {
+        localStorage.setItem("aurem_platform_token", t);
+        // strip the token from the URL so it doesn't sit in history/screenshots
+        const url = new URL(window.location.href);
+        url.searchParams.delete("token");
+        window.history.replaceState({}, "", url.pathname + (url.search || ""));
+        // Also bypass the splash since the user already authenticated upstream.
+        try { localStorage.setItem("aurem_ora_entered_v1", "1"); } catch (_) {}
+      }
+    } catch (_) { /* ignore */ }
+  }, []);
   const authToken = (() => {
     try {
       return (
         localStorage.getItem("aurem_platform_token") ||
         localStorage.getItem("platform_token") ||
-        localStorage.getItem("admin_token") || ""
+        localStorage.getItem("admin_token") ||
+        localStorage.getItem("aurem_customer_token") || ""
       );
     } catch (_) { return ""; }
   })();
@@ -1524,10 +1554,31 @@ const OraPWA = () => {
                     console.debug('[ORA] paste:', pasted.length, 'chars');
                   } catch {}
                 }}
-                placeholder="Ask ORA anything… (paste freely · Shift+Enter for new line)"
+                placeholder={isListening ? "Listening… speak now" : "Ask ORA anything… (paste freely · Shift+Enter for new line)"}
                 data-testid="ora-chat-input"
                 style={{ resize: 'none', overflow: 'auto', maxHeight: 160 }}
               />
+              {supportedSTT && (
+                <button
+                  className={`icon-btn-pwa ${isListening ? 'active' : ''}`}
+                  onClick={() => (isListening ? stopListening() : startListening("en-IN"))}
+                  data-testid="ora-mic-btn"
+                  aria-label={isListening ? "Stop listening" : "Speak to ORA"}
+                  title={isListening ? "Stop listening" : "Tap to speak"}
+                  style={isListening ? { animation: "pulse 1.2s ease-in-out infinite" } : {}}
+                >
+                  {isListening ? (
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <rect x="6" y="2" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                      <path d="M3 8a5 5 0 0010 0M8 13v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                  )}
+                </button>
+              )}
               <button className="send-btn" onClick={() => sendMsg()} disabled={sending || !chatInput.trim()} data-testid="ora-send-btn" aria-label="Send">
                 <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
                   <path d="M1 6L11 6M11 6L7 2M11 6L7 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />

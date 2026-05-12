@@ -11,7 +11,8 @@
  *   - Error surfacing (no silent failures)
  */
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Send, Loader2, Sparkles, RefreshCw, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import useVoice from "../../hooks/useVoice";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -73,7 +74,28 @@ export default function CustomerOra() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [sessionId, setSessionId] = useState(null);
+  const [ttsOn, setTtsOn] = useState(false);
   const scrollRef = useRef(null);
+  const lastSpokenRef = useRef("");
+
+  const {
+    isListening, isSpeaking, startListening, stopListening,
+    speak, stopSpeaking, supportedSTT, supportedTTS,
+  } = useVoice({
+    onResult: (text) => {
+      if (text && text.trim()) setInput(text.trim());
+    },
+  });
+
+  // Speak assistant replies when TTS is on
+  useEffect(() => {
+    if (!ttsOn || busy) return;
+    const last = messages[messages.length - 1];
+    if (last && last.role === "assistant" && last.content && last.content !== lastSpokenRef.current) {
+      lastSpokenRef.current = last.content;
+      speak(last.content);
+    }
+  }, [messages, busy, ttsOn, speak]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -358,14 +380,14 @@ export default function CustomerOra() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Ask ORA anything — e.g., 'What's my hottest lead today?'"
+            placeholder={isListening ? "Listening… speak now" : "Ask ORA anything — e.g., 'What's my hottest lead today?'"}
             disabled={busy}
             rows={1}
             style={{
               flex: 1,
               padding: "10px 14px",
               background: "rgba(255,255,255,0.04)",
-              border: `1px solid ${COLORS.border}`,
+              border: `1px solid ${isListening ? COLORS.accent2 : COLORS.border}`,
               borderRadius: 10,
               color: COLORS.text,
               fontSize: 14,
@@ -376,6 +398,57 @@ export default function CustomerOra() {
               maxHeight: 120,
             }}
           />
+          {supportedSTT && (
+            <button
+              onClick={() => (isListening ? stopListening() : startListening("en-IN"))}
+              disabled={busy}
+              data-testid="ora-mic-btn"
+              title={isListening ? "Stop listening" : "Speak to ORA"}
+              style={{
+                padding: "10px 12px",
+                background: isListening
+                  ? `linear-gradient(135deg, ${COLORS.accent2}, #FF8C00)`
+                  : "rgba(255,255,255,0.04)",
+                border: `1px solid ${isListening ? COLORS.accent2 : COLORS.border}`,
+                borderRadius: 10,
+                color: isListening ? "#08080F" : COLORS.text,
+                cursor: busy ? "not-allowed" : "pointer",
+                minHeight: 42,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                animation: isListening ? "pulse 1.2s ease-in-out infinite" : "none",
+              }}
+            >
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+          )}
+          {supportedTTS && (
+            <button
+              onClick={() => {
+                if (ttsOn) stopSpeaking();
+                setTtsOn((v) => !v);
+              }}
+              data-testid="ora-tts-btn"
+              title={ttsOn ? "Mute ORA voice" : "Hear ORA's replies"}
+              style={{
+                padding: "10px 12px",
+                background: ttsOn
+                  ? `linear-gradient(135deg, ${COLORS.accent}, ${COLORS.accent2})`
+                  : "rgba(255,255,255,0.04)",
+                border: `1px solid ${ttsOn ? COLORS.accent : COLORS.border}`,
+                borderRadius: 10,
+                color: ttsOn ? "#08080F" : COLORS.text,
+                cursor: "pointer",
+                minHeight: 42,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              {ttsOn ? (isSpeaking ? <Volume2 size={16} /> : <Volume2 size={16} />) : <VolumeX size={16} />}
+            </button>
+          )}
           <button
             onClick={send}
             disabled={busy || !input.trim()}
@@ -424,6 +497,10 @@ export default function CustomerOra() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,0,0.5); }
+          50%      { box-shadow: 0 0 0 8px rgba(255,107,0,0); }
+        }
       `}</style>
     </div>
   );

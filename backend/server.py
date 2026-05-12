@@ -1123,52 +1123,36 @@ async def startup_event():
                     logging.warning(f"[STARTUP] TenantScopedDatabase not loaded: {e} — using raw db")
                 
                 # ════════════════════════════════════════════════════════════════
-                # STARTUP VALIDATION (from Reroots battle-tested pattern)
-                # [DEPLOY FIX iter 246] Hard 8s timeout so a slow Atlas DNS/SRV
-                # lookup or connection can't hang K8s readiness probes.
+                # [DEPLOY FIX iter 322bz] All Atlas-touching probes moved to a
+                # SINGLE background task so startup_event() returns in <500ms
+                # on cold Atlas. Without this, validation(8s)+founders(8s)+
+                # prewarm(8s) could push lifespan startup past the K8s probe
+                # budget and the pod is killed before /health ever responds.
                 # ════════════════════════════════════════════════════════════════
-                try:
-                    from services.startup_validation import run_startup_validation
-                    validation_passed = await asyncio.wait_for(
-                        run_startup_validation(db), timeout=8.0
-                    )
+                async def _bg_atlas_init():
+                    # 1. Startup validation
+                    try:
+                        from services.startup_validation import run_startup_validation
+                        validation_passed = await asyncio.wait_for(
+                            run_startup_validation(db), timeout=15.0
+                        )
+                        if validation_passed:
+                            logging.info("[STARTUP-BG] ✅ Startup validation passed")
+                        else:
+                            logging.warning("[STARTUP-BG] ⚠️ Startup validation failed (continuing)")
+                    except Exception as e:
+                        logging.warning(f"[STARTUP-BG] validation skipped: {e}")
 
-                    if not validation_passed:
-                        logging.error("[STARTUP] ❌ CRITICAL: Startup validation failed")
-                        logging.warning("[STARTUP] Server will continue but may not function correctly")
-                    else:
-                        logging.info("[STARTUP] ✅ Startup validation passed")
-                except asyncio.TimeoutError:
-                    logging.warning("[STARTUP] ⚠️  Startup validation timed out (8s) — continuing")
-                except Exception as e:
-                    logging.warning(f"[STARTUP] ⚠️  Startup validation error: {e}")
-                # ════════════════════════════════════════════════════════════════
+                    # 2. Founder auto-provision (idempotent)
+                    try:
+                        from services.founder_provision import ensure_founders
+                        fdr = await asyncio.wait_for(ensure_founders(db), timeout=15.0)
+                        logging.info(f"[STARTUP-BG] founders provisioned: {fdr}")
+                    except Exception as e:
+                        logging.warning(f"[STARTUP-BG] founders skipped: {e}")
 
-                # ════════════════════════════════════════════════════════════════
-                # FOUNDER AUTO-PROVISION — idempotent, runs every startup.
-                # Ensures founder accounts (teji.ss1986@gmail.com, admin@aurem.live)
-                # exist as LIFETIME ENTERPRISE in WHATEVER DB is connected
-                # (preview pod or Atlas production). Critical for production
-                # because Atlas != preview DB; without this founders show as
-                # STARTER/TRIAL on aurem.live.
-                # ════════════════════════════════════════════════════════════════
-                try:
-                    from services.founder_provision import ensure_founders
-                    fdr = await asyncio.wait_for(ensure_founders(db), timeout=8.0)
-                    logging.info(f"[STARTUP] founders provisioned: {fdr}")
-                except asyncio.TimeoutError:
-                    logging.warning("[STARTUP] ⚠️  Founder provisioning timed out — continuing")
-                except Exception as e:
-                    logging.warning(f"[STARTUP] ⚠️  Founder provisioning failed: {e}")
-                # ════════════════════════════════════════════════════════════════
-
-                # iter 322x — Mongo connection pool pre-warm.
-                # Send 5 parallel cheap queries against the auth-critical
-                # collections so the pool has live connections by the time
-                # the first real login lands. Eliminates the "Atlas cold-
-                # start returns None" failure mode for /api/auth/login.
-                try:
-                    async def _prewarm():
+                    # 3. Auth-pool pre-warm
+                    try:
                         cmds = [
                             db.users.estimated_document_count(),
                             db.platform_users.estimated_document_count(),
@@ -1176,59 +1160,57 @@ async def startup_event():
                             db.aurem_billing.estimated_document_count(),
                             db.command("ping"),
                         ]
-                        return await asyncio.gather(*cmds, return_exceptions=True)
-                    pw_t0 = time.time()
-                    pw_results = await asyncio.wait_for(_prewarm(), timeout=8.0)
-                    n_ok = sum(1 for r in pw_results if not isinstance(r, Exception))
-                    logging.warning(
-                        f"[STARTUP] auth-pool prewarm done in {(time.time()-pw_t0)*1000:.0f}ms "
-                        f"({n_ok}/{len(pw_results)} ok)"
-                    )
-                except asyncio.TimeoutError:
-                    logging.warning("[STARTUP] ⚠️  auth-pool prewarm timed out")
-                except Exception as e:
-                    logging.warning(f"[STARTUP] ⚠️  auth-pool prewarm failed: {e}")
+                        pw_t0 = time.time()
+                        pw_results = await asyncio.wait_for(
+                            asyncio.gather(*cmds, return_exceptions=True), timeout=15.0
+                        )
+                        n_ok = sum(1 for r in pw_results if not isinstance(r, Exception))
+                        logging.info(
+                            f"[STARTUP-BG] auth-pool prewarm done in {(time.time()-pw_t0)*1000:.0f}ms "
+                            f"({n_ok}/{len(pw_results)} ok)"
+                        )
+                    except Exception as e:
+                        logging.warning(f"[STARTUP-BG] auth-pool prewarm skipped: {e}")
+
+                asyncio.create_task(_bg_atlas_init())
+                logging.info("[STARTUP] Atlas-touching probes scheduled in background")
                 # ════════════════════════════════════════════════════════════════
                 
         except Exception as e:
             logging.error(f"❌ MongoDB client creation failed: {e}")
             logging.warning("Server will continue but database operations will fail")
         
-        # Initialize auth client immediately (fast) — with 3s timeout safety
-        t0 = time.time()
-        try:
-            await asyncio.wait_for(get_auth_client(), timeout=3.0)
-            logging.info(f"✓ Auth HTTP client initialized ({time.time()-t0:.2f}s)")
-        except asyncio.TimeoutError:
-            logging.warning("Auth HTTP client init timed out (3s) — continuing")
-        except Exception as e:
-            logging.warning(f"Auth HTTP client init failed: {e}")
+        # Initialize auth client immediately (fast) — moved to bg to never
+        # block lifespan startup. Client construction does no I/O; the
+        # check just happens to be wrapped in a coroutine.
+        async def _bg_auth_client_init():
+            try:
+                await asyncio.wait_for(get_auth_client(), timeout=10.0)
+                logging.info("[STARTUP-BG] Auth HTTP client initialized")
+            except Exception as e:
+                logging.warning(f"[STARTUP-BG] Auth HTTP client init failed: {e}")
+        asyncio.create_task(_bg_auth_client_init())
         
-        # Initialize Redis cache and warm hot data
-        # [DEPLOY FIX iter 246] Cache warming moved to background — it reads
-        # from DB and on cold Atlas can take 5-15s, adding to startup budget.
-        t0 = time.time()
-        try:
-            await asyncio.wait_for(cache_manager.connect(), timeout=3.0)
-            if cache_manager.available and db is not None:
-                asyncio.create_task(warm_cache_on_startup(cache_manager, db))
-                # Initialize cache routes with dependencies
-                init_cache_routes(cache_manager, db, warm_cache_on_startup)
-            logging.info(f"✓ Cache layer initialized ({time.time()-t0:.2f}s, warming in bg)")
-        except asyncio.TimeoutError:
-            logging.warning("Cache connect timed out (3s) — continuing with in-memory fallback")
-        except Exception as e:
-            logging.warning(f"Cache initialization skipped: {e}")
+        # Initialize Redis cache and warm hot data (all bg to keep lifespan fast)
+        async def _bg_cache_init():
+            try:
+                await asyncio.wait_for(cache_manager.connect(), timeout=10.0)
+                if cache_manager.available and db is not None:
+                    asyncio.create_task(warm_cache_on_startup(cache_manager, db))
+                    init_cache_routes(cache_manager, db, warm_cache_on_startup)
+                logging.info("[STARTUP-BG] Cache layer initialized")
+            except Exception as e:
+                logging.warning(f"[STARTUP-BG] Cache init skipped: {e}")
+        asyncio.create_task(_bg_cache_init())
         
-        # P0 FIX: Initialize Redis-backed rate limiter — with 3s timeout
-        t0 = time.time()
-        try:
-            await asyncio.wait_for(rate_limiter.connect(), timeout=3.0)
-            logging.info(f"✓ Rate limiter initialized ({time.time()-t0:.2f}s)")
-        except asyncio.TimeoutError:
-            logging.warning("Rate limiter connect timed out (3s) — using memory fallback")
-        except Exception as e:
-            logging.warning(f"Rate limiter initialization failed, using memory fallback: {e}")
+        # Rate limiter — bg init
+        async def _bg_ratelimit_init():
+            try:
+                await asyncio.wait_for(rate_limiter.connect(), timeout=10.0)
+                logging.info("[STARTUP-BG] Rate limiter initialized")
+            except Exception as e:
+                logging.warning(f"[STARTUP-BG] Rate limiter init failed: {e}")
+        asyncio.create_task(_bg_ratelimit_init())
         
         # Initialize DB Query routes with shared db connection
         if db is not None:
@@ -1997,10 +1979,10 @@ async def startup_event():
     except Exception as e:
         logging.warning(f"[SovereignWarmer] failed to start: {e}")
 
-    # Unified Inbox indexes (used by /api/customer/inbox/*)
+    # Unified Inbox indexes (used by /api/customer/inbox/*) — bg to never block startup
     try:
         from services.inbox_writer import ensure_indexes as _ensure_inbox_idx
-        await _ensure_inbox_idx(db)
+        asyncio.create_task(_ensure_inbox_idx(db))
     except Exception as e:
         logging.warning(f"[InboxWriter] index ensure failed: {e}")
 
@@ -2011,10 +1993,10 @@ async def startup_event():
             merge_loop as _intel_merge_loop,
             promote_loop as _intel_promote_loop,
         )
-        await _ensure_intel_idx(db)
+        asyncio.create_task(_ensure_intel_idx(db))
         asyncio.create_task(_intel_merge_loop(db))
         asyncio.create_task(_intel_promote_loop(db))
-        logging.info("[BinIntelligence] indexes + merge (15m) + promote (30m) loops attached")
+        logging.info("[BinIntelligence] indexes + merge (15m) + promote (30m) loops scheduled in bg")
     except Exception as e:
         logging.warning(f"[BinIntelligence] startup failed: {e}")
 
