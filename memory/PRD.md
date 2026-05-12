@@ -1475,3 +1475,46 @@ See `/app/memory/test_credentials.md`.
 - Tier 1 cleanup (drop 31 confirmed-dead collections) — awaiting approval
 - Tier 2/3 (duplicate merge, e-commerce skeleton removal) — deferred
 - Design-Extract integration — deferred
+
+## iter 322ed — Intelligence Merge Wired into $49 Audit + Live Admin Dashboard
+
+### Backend (3 files)
+- **`services/customer_audit_service.py`**:
+  - New `IntelligenceSnapshot` Pydantic model (pixel/email/phone/invoice counts + top_actions)
+  - Added `intelligence` field to `CustomerAudit` model
+  - `run_audit()` now calls `bin_intelligence.intelligence_summary(db, bin)` when bin is provided
+  - `_rank_top_issues()` accepts intelligence and surfaces revenue-critical issues:
+    - "X visitors today but 0 identified — pixel not capturing"
+    - "Forms filled but no email identified — check pixel field map"
+    - "No past clients imported — upload invoice CSV"
+    - "High-intent contact ready for outreach (score N)"
+
+- **`routers/customer_audit_router.py`**:
+  - New endpoint `GET /api/customer/audit/admin/live` (admin-only)
+  - Aggregates: counts (today/week/total/failed), 7d rollup (total $ waste + avg perf/seo), top recurring issues, intelligence coverage (BINs with pixel/signals, merged profiles, raw signals), latest 10 audits feed
+  - Reordered routes so `/admin/live` doesn't collide with `/{audit_id}`
+
+### Frontend (3 files)
+- **`platform/customer/AuditWidget.jsx`** (existing): Added "Intelligence Signals" section
+  - 6-tile grid: visitors today, forms filled, identified, emails on file, phones verified, past clients
+  - "Top action" callout with recommended action + score
+  - Highlights identified contacts in gold
+
+- **`platform/admin/AuditLiveDashboard.jsx`** (NEW): Full admin live dashboard
+  - 5 KPI tiles (audits today/7d/total/failed/$ waste)
+  - Score Averages card (Performance + SEO with colored bars)
+  - Intelligence Coverage card (pixel/signals/profiles)
+  - Top Recurring Issues list (8 items)
+  - Latest Audits feed (10 rows with perf/seo/waste/intel/status)
+  - 15s auto-refresh
+  - All elements `data-testid`'d
+
+- **`App.js`**: Mounted `/admin/audit-live` route
+- **`AdminRootCommand.jsx`**: Added "Audit Live" button in hero
+
+### Verification
+- ✓ End-to-end audit run with bin context returns `intelligence.available=true` with 1 matched contact, 1 phone verified, 4 invoice past clients, top_action (score 93)
+- ✓ Admin /live endpoint: 7 audits aggregated, $ waste rollup, intelligence coverage (2 BINs with pixel, 1 BIN with signals, 1 merged profile, 6 raw signals)
+- ✓ Frontend lint clean (0 issues both files)
+- ✓ `/admin/audit-live` route gated correctly (redirects to admin login when unauth)
+- ✓ Backend health 200, no regressions

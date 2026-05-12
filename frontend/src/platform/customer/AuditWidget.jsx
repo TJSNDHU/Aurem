@@ -188,7 +188,84 @@ export default function AuditWidget() {
         </div>
       )}
 
+      {/* iter 322ed — Intelligence Signals (wired from bin_intelligence) */}
+      {audit.intelligence && audit.intelligence.available && (
+        <div data-testid="audit-intelligence-section" style={{
+          marginTop: 16, paddingTop: 14, borderTop: `1px dashed ${COLORS.border}`,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%",
+                            background: COLORS.accent, boxShadow: `0 0 8px ${COLORS.accent}` }} />
+            <span style={{ fontSize: 11, color: COLORS.textD, textTransform: "uppercase", letterSpacing: 1 }}>
+              Intelligence signals
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            <IntelTile label="Visitors today"
+                        value={audit.intelligence.pixel_visitors_today}
+                        testid="intel-visitors" />
+            <IntelTile label="Forms filled"
+                        value={audit.intelligence.pixel_forms_today}
+                        testid="intel-forms" />
+            <IntelTile label="Identified"
+                        value={audit.intelligence.pixel_matched_contacts}
+                        testid="intel-matched"
+                        highlight={audit.intelligence.pixel_matched_contacts > 0} />
+            <IntelTile label="Emails on file"
+                        value={audit.intelligence.email_identified}
+                        testid="intel-emails" />
+            <IntelTile label="Phones verified"
+                        value={audit.intelligence.phone_verified}
+                        testid="intel-phones" />
+            <IntelTile label="Past clients (CSV)"
+                        value={audit.intelligence.invoice_past_clients}
+                        testid="intel-invoices" />
+          </div>
+          {audit.intelligence.top_actions && audit.intelligence.top_actions.length > 0 && (
+            <div data-testid="intel-top-actions" style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: COLORS.textD, textTransform: "uppercase",
+                             letterSpacing: 1, marginBottom: 6 }}>Top action</div>
+              {audit.intelligence.top_actions.slice(0, 1).map((a, i) => (
+                <div key={i} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "8px 10px", borderRadius: 8,
+                  background: `linear-gradient(135deg, rgba(212,175,55,0.10), rgba(255,107,0,0.04))`,
+                  border: `1px solid rgba(212,175,55,0.30)`, fontSize: 12,
+                }}>
+                  <span style={{ color: COLORS.text }}>
+                    {a.recommended_action || "Engage"} ·
+                    <span style={{ color: COLORS.textD, marginLeft: 4 }}>
+                      intent {a.intent_level || "—"}
+                    </span>
+                  </span>
+                  <span style={{ color: COLORS.accent, fontWeight: 700, fontFamily: "monospace" }}>
+                    {a.score ?? "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  );
+}
+
+function IntelTile({ label, value, testid, highlight }) {
+  return (
+    <div data-testid={testid} style={{
+      padding: "8px 10px", borderRadius: 10,
+      background: highlight ? "rgba(212,175,55,0.08)" : "rgba(255,255,255,0.03)",
+      border: `1px solid ${highlight ? "rgba(212,175,55,0.30)" : COLORS.border}`,
+      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
+    }}>
+      <span style={{ fontSize: 18, fontWeight: 700,
+                     color: highlight ? COLORS.accent : COLORS.text,
+                     fontFamily: "monospace", lineHeight: 1 }}>{value ?? 0}</span>
+      <span style={{ fontSize: 9, color: COLORS.textD,
+                     textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</span>
     </div>
   );
 }

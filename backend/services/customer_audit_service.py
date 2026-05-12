@@ -74,6 +74,22 @@ class AdsAudit(BaseModel):
     confidence: str = "low"  # low|medium|high
 
 
+# iter 322ed — Intelligence Merge Engine wired into $49 audit.
+# Pulls a snapshot of the BIN's contact-intelligence rollup so the
+# customer sees pixel+CSV+manual signals alongside their SEO/Ads score.
+# Bridges the previously "backend-complete, frontend-orphan" Intelligence
+# stack (services/bin_intelligence.py) into the revenue product surface.
+class IntelligenceSnapshot(BaseModel):
+    pixel_visitors_today: int = 0
+    pixel_forms_today: int = 0
+    pixel_matched_contacts: int = 0
+    email_identified: int = 0
+    phone_verified: int = 0
+    invoice_past_clients: int = 0
+    top_actions: list[dict] = Field(default_factory=list)
+    available: bool = False  # False when no bin or service unavailable
+
+
 class CustomerAudit(BaseModel):
     id: str = Field(default_factory=lambda: f"audit_{uuid.uuid4().hex[:12]}")
     customer_id: str
@@ -89,6 +105,8 @@ class CustomerAudit(BaseModel):
     core_vitals: CoreWebVitals = Field(default_factory=CoreWebVitals)
     seo: SeoMetadata = Field(default_factory=SeoMetadata)
     ads: AdsAudit = Field(default_factory=AdsAudit)
+    # iter 322ed — Intelligence Merge wired into $49 audit (bin scoped).
+    intelligence: IntelligenceSnapshot = Field(default_factory=IntelligenceSnapshot)
     top_issues: list[str] = Field(default_factory=list)
     error: Optional[str] = None
 
@@ -277,7 +295,8 @@ def _parse_ads(html: str, vitals: CoreWebVitals, seo: SeoMetadata) -> AdsAudit:
 # ─── Top issues ranking ───────────────────────────────────────────────
 def _rank_top_issues(scores: CategoryScores, vitals: CoreWebVitals,
                       seo: SeoMetadata, ads: AdsAudit,
-                      psi_available: bool = True) -> list[str]:
+                      psi_available: bool = True,
+                      intelligence: Optional["IntelligenceSnapshot"] = None) -> list[str]:
     issues: list[tuple[int, str]] = []
     # Skip Lighthouse-driven issues if PSI didn't run (avoids "Performance 0/100"
     # noise when the API key needs PageSpeed enabled on Google Cloud Console).
@@ -300,6 +319,27 @@ def _rank_top_issues(scores: CategoryScores, vitals: CoreWebVitals,
     if not seo.has_schema:
         issues.append((20, "No Schema.org JSON-LD — invisible to rich results."))
     issues.extend((50 + i * 5, s) for i, s in enumerate(ads.waste_signals[:3]))
+
+    # iter 322ed — Intelligence-driven issues outrank meta tweaks because
+    # they map directly to lost revenue (visitor that didn't get captured
+    # is a lead AUREM lost).
+    if intelligence and intelligence.available:
+        if intelligence.pixel_visitors_today > 0 and intelligence.pixel_matched_contacts == 0:
+            issues.append((85, f"{intelligence.pixel_visitors_today} visitors today but 0 identified — "
+                                f"pixel is firing but no email/phone capture yet."))
+        if intelligence.pixel_forms_today > 0 and intelligence.email_identified == 0:
+            issues.append((70, f"{intelligence.pixel_forms_today} forms filled but no email identified — "
+                                f"check form submission handler / pixel field map."))
+        if intelligence.invoice_past_clients == 0 and intelligence.email_identified == 0:
+            issues.append((45, "No past clients imported — upload your invoice CSV to unlock "
+                                "cross-source matching (2x lead quality)."))
+        # Surface 1 high-intent top action if available
+        for ta in (intelligence.top_actions or [])[:1]:
+            if ta.get("intent_level") in ("HIGH", "VERY_HIGH"):
+                issues.append((75, f"High-intent contact ready for outreach: "
+                                    f"{ta.get('recommended_action','Engage now')} "
+                                    f"(score {ta.get('score','?')})."))
+
     issues.sort(key=lambda x: -x[0])
     return [s for _, s in issues[:6]]
 
@@ -334,9 +374,32 @@ async def run_audit(
         audit.core_vitals = CoreWebVitals(**vitals_d) if vitals_d else CoreWebVitals()
         audit.seo = _parse_seo(html)
         audit.ads = _parse_ads(html, audit.core_vitals, audit.seo)
+
+        # iter 322ed — Pull intelligence snapshot when bin is present.
+        # `bin_intelligence.intelligence_summary` returns counts-only so
+        # no PII crosses this boundary. Failures degrade silently — the
+        # SEO/Ads parts of the audit must never block on a side feature.
+        if bin:
+            try:
+                from services.bin_intelligence import intelligence_summary
+                snap = await intelligence_summary(db, bin)
+                audit.intelligence = IntelligenceSnapshot(
+                    pixel_visitors_today=(snap.get("pixel") or {}).get("visitors_today", 0),
+                    pixel_forms_today=(snap.get("pixel") or {}).get("forms_today", 0),
+                    pixel_matched_contacts=(snap.get("pixel") or {}).get("matched_contacts", 0),
+                    email_identified=(snap.get("email") or {}).get("identified", 0),
+                    phone_verified=(snap.get("phone") or {}).get("verified", 0),
+                    invoice_past_clients=(snap.get("invoice") or {}).get("past_clients", 0),
+                    top_actions=snap.get("top_actions") or [],
+                    available=True,
+                )
+            except Exception as e:
+                logger.debug(f"[audit] intelligence snapshot skipped: {e}")
+
         audit.top_issues = _rank_top_issues(
             audit.scores, audit.core_vitals, audit.seo, audit.ads,
             psi_available=(audit.psi_status == "ok"),
+            intelligence=audit.intelligence,
         )
         audit.status = "completed"
     except Exception as e:

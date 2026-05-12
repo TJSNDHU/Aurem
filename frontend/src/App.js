@@ -73,6 +73,7 @@ import FrameworkMap from './platform/FrameworkMap';
 import SystemOverviewPublic from './platform/SystemOverviewPublic';
 import SEOAuditPage from './platform/SEOAuditPage';
 import AdminRootCommand from './platform/AdminRootCommand';
+import AuditLiveDashboard from './platform/admin/AuditLiveDashboard';
 import AdminStemFix from './platform/AdminStemFix';
 import AdminPillarsMap from './platform/AdminPillarsMap';
 import AdminSidebarBlocks from './platform/AdminSidebarBlocks';
@@ -312,6 +313,7 @@ function AppRouter() {
         <Route path="/admin/sentinel" element={<AdminDiagnostics />} />
         <Route path="/admin/auto-fixer" element={<Navigate to="/admin/sentinel" replace />} />
         <Route path="/admin/root-command" element={<AdminRootCommand />} />
+        <Route path="/admin/audit-live" element={<AuditLiveDashboard />} />
         <Route path="/admin/stem-fix" element={<AdminStemFix />} />
         <Route path="/admin/pillars-map" element={<AdminPillarsMap />} />
         <Route path="/admin/blocks" element={<AdminSidebarBlocks />} />

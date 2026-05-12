@@ -202,6 +202,14 @@ export default function AdminRootCommand() {
           <div className="flex items-center gap-3">
             <Badge status={verdict} />
             <button
+              onClick={() => window.location.assign("/admin/audit-live")}
+              data-testid="root-command-go-audit-live"
+              className="flex items-center gap-2 px-3 py-1.5 bg-orange-900/30 border border-orange-700/40 text-orange-200 rounded text-sm hover:bg-orange-800/40"
+              title="Open Audit Live Dashboard (SEO + Intelligence rollup)"
+            >
+              <TrendingDown className="w-4 h-4" /> Audit Live
+            </button>
+            <button
               onClick={() => window.location.assign("/admin/pillars-map")}
               data-testid="root-command-go-pillars-map"
               className="flex items-center gap-2 px-3 py-1.5 bg-amber-900/30 border border-amber-700/40 text-amber-200 rounded text-sm hover:bg-amber-800/40"
