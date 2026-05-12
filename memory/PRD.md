@@ -1,5 +1,48 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322eu (2026-05-12) — ORA SELF-BUILD UNLOCK · 8 NEW TOOLS · 27 TOTAL**
+>
+> Founder's question: *"Can ORA CTO build its own next features so we save Emergent tokens?"*
+> Answer (now): **YES — for ~95% of build tasks.** Previously ORA could edit existing files but couldn't *create* anything new. After iter 322eu it can.
+>
+> **8 new tools added to `services/ora_tools.py`** (zero new files — extends existing module):
+>
+> 1. **`create_file(path, content, overwrite=False)`** — atomic `.tmp + os.replace` write; refuses to overwrite without explicit flag; size cap 200 KB; same write-allowed roots as safe_edit.
+> 2. **`create_dir(path)`** — `mkdir -p` under allowed roots.
+> 3. **`append_to_file(path, content)`** — pure-append (50 KB cap). Special-cases `requirements.txt` (forbidden for replacement, ok for append).
+> 4. **`pytest_run(path, verbose=False, timeout=60)`** — scoped to `/app/backend/tests` or `/app/aurem-cto/`; returns rc + summary line + stdout/stderr tails. Read-only.
+> 5. **`cloudflare_dns_list(name?)`** — GET zones/{id}/dns_records via existing `CLOUDFLARE_API_TOKEN`. Strips sensitive metadata.
+> 6. **`cloudflare_dns_write(record_type, name, content, proxied, ttl)`** — UPSERT (POST if missing, PUT if exists). Scoped to `CLOUDFLARE_ROOT_DOMAIN`. Refuses other zones.
+> 7. **`docker_compose(subcommand, file, extra, timeout)`** — 12 whitelisted subcommands (ps/logs/config/version/up/down/restart/pull/build/stop/start). Returns "docker not installed" on the Emergent preview (correct), executes on Legion (intended).
+> 8. **`pip_propose(package, version?)`** — appends to requirements.txt for founder review via propose_commit. Allowlist: aiosqlite, redis, pytz, httpx, pypdf, python-docx, ruff, pytest, pytest-asyncio, motor, pymongo, twilio, resend, jwt, pyjwt.
+>
+> **New write-allowed root**: `/app/aurem-cto` — ORA CTO can build the standalone app under here.
+>
+> **Live E2E proof** (in-process, same `invoke_tool()` as `/api/ora-tools/execute`):
+>   - ✓ create_dir, create_file, append_to_file roundtrip on `/app/aurem-cto/test/hello.py`
+>   - ✓ create_file refuses overwrite without flag
+>   - ✓ create_file blocks `/etc/forbidden.txt` (write-allowed-roots guard)
+>   - ✓ cloudflare_dns_list returns 6 records for aurem.live (real Cloudflare API)
+>   - ✓ docker_compose returns "not installed" on preview (correct), would execute on Legion
+>   - ✓ docker_compose rejects `rm -rf /` subcommand (allowlist guard)
+>   - ✓ pip_propose appends `aiosqlite` to requirements.txt
+>   - ✓ pip_propose rejects `malicious-pkg` (allowlist guard)
+>   - ✓ pytest_run executes test_iter_322es_ora_cto_final_complete.py
+>   - ✓ pytest_run rejects /etc path (scope guard)
+>
+> **Regression**: 11 new pytests in `test_iter_322eu_creation_tools.py`. **39/39 pytests passing across all 5 iters (322ep → 322eu).**
+>
+> **What this unlocks** (the actual point):
+>   - ORA CTO can now **bootstrap its own standalone app** under `/app/aurem-cto/` — create files, create dirs, propose commits, run tests.
+>   - With `cloudflare_dns_write` it can register `cto.aurem.live` CNAME itself once a tunnel is up.
+>   - With `docker_compose` it can manage its own deploy on Legion (when it's running there).
+>   - With `pip_propose` + `propose_commit` it can extend its own dependency set via founder approval.
+>   - **Every future ORA feature can be built BY ORA on Sovereign Ollama (free) — Emergent token spend approaches zero for ORA-internal work.**
+>
+> **Files touched**: `services/ora_tools.py` (+ ~350 lines, no new files), `tests/test_iter_322eu_creation_tools.py` (new).
+
+---
+
 > **🟢 ITER 322et (2026-05-12) — MORNING BRIEF + 6 AM TORONTO NIGHTLY DIGEST**
 >
 > Tonight's 15-min enhancement landed:

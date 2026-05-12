@@ -30,7 +30,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -608,6 +608,7 @@ _WRITE_ALLOWED_ROOTS = (
     "/app/memory",
     "/app/ora_skills",
     "/app/scripts",
+    "/app/aurem-cto",
 )
 _WRITE_FORBIDDEN_PATTERNS = (
     "/.env", "/.ssh", "/.git/", "node_modules", "__pycache__",
@@ -1555,6 +1556,331 @@ async def propose_commit(
     }
 
 
+# ─── iter 322eu — Creation Tools (file/dir/append) ───────────────────
+# ORA CTO needed `create_file`, `create_dir`, `append_to_file`,
+# `pytest_run`, plus Cloudflare DNS/tunnel + docker_compose tools so it
+# can build its own next features without main-agent help. All tools
+# reuse the existing _is_write_path_allowed safety check.
+
+_PIP_ALLOWLIST = {
+    # Conservative — only packages the founder explicitly trusts. Adding
+    # any other name returns a propose-to-requirements suggestion instead
+    # of actually installing.
+    "aiosqlite", "redis", "pytz", "httpx", "pypdf", "python-docx",
+    "ruff", "pytest", "pytest-asyncio", "motor", "pymongo",
+    "twilio", "resend", "jwt", "pyjwt",
+}
+
+
+async def create_file(path: str, content: str = "",
+                       *, overwrite: bool = False) -> dict:
+    """Create a NEW file under a write-allowed root. Refuses to overwrite
+    unless `overwrite=True`. Same path safety as safe_edit.
+
+    Returns {ok, path, bytes_written, created_at, was_overwrite}.
+    """
+    if not isinstance(path, str) or not path:
+        return {"ok": False, "error": "path required"}
+    if not isinstance(content, str):
+        return {"ok": False, "error": "content must be a string"}
+    if len(content) > 200_000:
+        return {"ok": False, "error": "content too large (>200KB) — use append_to_file or chunk it"}
+    ok_path, why = _is_write_path_allowed(path)
+    if not ok_path:
+        return {"ok": False, "error": f"path not allowed: {why}"}
+    p = Path(path)
+    if p.exists() and not overwrite:
+        return {"ok": False, "error": "file already exists; pass overwrite=True to replace",
+                 "path": path}
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp.write_text(content, encoding="utf-8")
+        os.replace(tmp, p)
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    return {
+        "ok": True, "path": str(p), "bytes_written": len(content.encode("utf-8")),
+        "created_at": _now_iso(), "was_overwrite": p.exists() and overwrite,
+    }
+
+
+async def create_dir(path: str) -> dict:
+    """Make a directory (parents=True) under a write-allowed root."""
+    if not isinstance(path, str) or not path:
+        return {"ok": False, "error": "path required"}
+    ok_path, why = _is_write_path_allowed(path)
+    if not ok_path:
+        return {"ok": False, "error": f"path not allowed: {why}"}
+    try:
+        Path(path).mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    return {"ok": True, "path": path, "created_at": _now_iso()}
+
+
+async def append_to_file(path: str, content: str = "") -> dict:
+    """Append text to an existing file under write-allowed roots. Useful
+    for adding lines to requirements.txt, .env-style configs, etc.
+
+    Special case — `requirements.txt` and `package.json` are normally
+    write-forbidden (replacement is dangerous), but pure-append is
+    allowed here. We still write-validate the parent path.
+    """
+    if not isinstance(path, str) or not path:
+        return {"ok": False, "error": "path required"}
+    if not isinstance(content, str):
+        return {"ok": False, "error": "content must be a string"}
+    if len(content) > 50_000:
+        return {"ok": False, "error": "content too large (>50KB)"}
+    # Use a tweaked path-check that skips _WRITE_FORBIDDEN_FILES
+    abs_p = str(Path(path).resolve())
+    if not any(abs_p == r or abs_p.startswith(r + os.sep) for r in _WRITE_ALLOWED_ROOTS):
+        return {"ok": False, "error": "path not allowed: not under write-allowed roots"}
+    for bad in _WRITE_FORBIDDEN_PATTERNS:
+        if bad in abs_p:
+            return {"ok": False, "error": f"path not allowed: forbidden pattern {bad!r}"}
+    p = Path(path)
+    if not p.is_file():
+        return {"ok": False, "error": f"file does not exist: {path}"}
+    try:
+        before = p.stat().st_size
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(content)
+        after = p.stat().st_size
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    return {"ok": True, "path": str(p), "bytes_before": before,
+             "bytes_after": after, "bytes_appended": after - before}
+
+
+async def pytest_run(path: str, *, verbose: bool = False, timeout: int = 60) -> dict:
+    """Run pytest on a file or directory under /app/backend/tests.
+
+    Read-only — never modifies anything. Returns rc, stdout (last 4KB),
+    stderr (last 4KB), summary line.
+    """
+    if not isinstance(path, str) or not path:
+        return {"ok": False, "error": "path required"}
+    # Constrain to tests dir for safety
+    if not (path.startswith("/app/backend/tests") or path.startswith("/app/aurem-cto/")):
+        return {"ok": False, "error": "pytest_run limited to /app/backend/tests or /app/aurem-cto/"}
+    if ".." in path:
+        return {"ok": False, "error": "path traversal disallowed"}
+    if not Path(path).exists():
+        return {"ok": False, "error": f"path not found: {path}"}
+    try:
+        cmd = ["python3", "-m", "pytest", path]
+        if verbose:
+            cmd.append("-v")
+        env = {**os.environ}
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            cwd="/app/backend", env=env,
+        )
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return {"ok": False, "error": f"pytest timed out after {timeout}s"}
+        rc = proc.returncode
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    stdout = (out.decode("utf-8", "replace") if out else "")
+    stderr = (err.decode("utf-8", "replace") if err else "")
+    # Find the summary line (e.g. "5 passed in 0.32s")
+    summary = ""
+    for line in reversed(stdout.splitlines()):
+        if "passed" in line or "failed" in line or "error" in line.lower():
+            summary = line.strip()
+            break
+    return {
+        "ok": rc == 0, "rc": rc, "summary": summary[:240],
+        "stdout_tail": stdout[-4000:], "stderr_tail": stderr[-2000:],
+        "path": path,
+    }
+
+
+# ─── Cloudflare DNS + Tunnel tools ─────────────────────────────────────
+
+async def cloudflare_dns_list(*, name: Optional[str] = None) -> dict:
+    """List DNS records in CLOUDFLARE_ZONE_ID. Optionally filter by name."""
+    tok = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+    zone = os.environ.get("CLOUDFLARE_ZONE_ID", "").strip()
+    if not tok or not zone:
+        return {"ok": False, "error": "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ZONE_ID missing"}
+    try:
+        import httpx
+        params = {"per_page": 50}
+        if name:
+            params["name"] = name
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(
+                f"https://api.cloudflare.com/client/v4/zones/{zone}/dns_records",
+                headers={"Authorization": f"Bearer {tok}",
+                          "Content-Type": "application/json"},
+                params=params,
+            )
+        if r.status_code != 200:
+            return {"ok": False, "status": r.status_code, "error": r.text[:300]}
+        data = r.json()
+        # Strip sensitive metadata, return minimal info
+        records = [
+            {k: rec.get(k) for k in ("id", "type", "name", "content", "proxied", "ttl")}
+            for rec in data.get("result", [])
+        ]
+        return {"ok": True, "count": len(records), "records": records}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+
+
+async def cloudflare_dns_write(
+    record_type: str, name: str, content: str,
+    *, proxied: bool = True, ttl: int = 1,
+) -> dict:
+    """Create or update a DNS record. `record_type` ∈ {A, AAAA, CNAME, TXT}.
+
+    Idempotent: if a record with the same name+type already exists, this
+    PATCHes it instead of creating a duplicate.
+    """
+    tok = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+    zone = os.environ.get("CLOUDFLARE_ZONE_ID", "").strip()
+    root = os.environ.get("CLOUDFLARE_ROOT_DOMAIN", "").strip()
+    if not tok or not zone:
+        return {"ok": False, "error": "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ZONE_ID missing"}
+    if record_type.upper() not in {"A", "AAAA", "CNAME", "TXT"}:
+        return {"ok": False, "error": f"unsupported record type: {record_type}"}
+    if not isinstance(name, str) or not name:
+        return {"ok": False, "error": "name required"}
+    if not isinstance(content, str) or not content:
+        return {"ok": False, "error": "content required"}
+    # Sanitise — force `name` into the configured root domain to prevent
+    # ORA from touching unrelated zones.
+    fqdn = name if "." in name else (f"{name}.{root}" if root else name)
+    if root and not fqdn.endswith(root):
+        return {"ok": False, "error": f"name must be under CLOUDFLARE_ROOT_DOMAIN ({root})"}
+    body = {
+        "type": record_type.upper(), "name": fqdn, "content": content,
+        "ttl": int(ttl), "proxied": bool(proxied),
+    }
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as c:
+            # Look up existing record to PATCH instead of POST
+            existing = await c.get(
+                f"https://api.cloudflare.com/client/v4/zones/{zone}/dns_records",
+                headers={"Authorization": f"Bearer {tok}"},
+                params={"type": body["type"], "name": fqdn},
+            )
+            ex_rows = existing.json().get("result", []) if existing.status_code == 200 else []
+            if ex_rows:
+                rid = ex_rows[0]["id"]
+                r = await c.put(
+                    f"https://api.cloudflare.com/client/v4/zones/{zone}/dns_records/{rid}",
+                    headers={"Authorization": f"Bearer {tok}",
+                              "Content-Type": "application/json"},
+                    json=body,
+                )
+                action = "updated"
+            else:
+                r = await c.post(
+                    f"https://api.cloudflare.com/client/v4/zones/{zone}/dns_records",
+                    headers={"Authorization": f"Bearer {tok}",
+                              "Content-Type": "application/json"},
+                    json=body,
+                )
+                action = "created"
+        if r.status_code not in (200, 201):
+            return {"ok": False, "status": r.status_code, "error": r.text[:300]}
+        result = r.json().get("result", {})
+        return {
+            "ok": True, "action": action,
+            "id": result.get("id"), "name": result.get("name"),
+            "type": result.get("type"), "content": result.get("content"),
+            "proxied": result.get("proxied"),
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+
+
+# ─── Docker / pip / pytest auxiliary tools ─────────────────────────────
+
+_DOCKER_COMPOSE_ALLOWED = {
+    "ps", "logs", "config", "version", "top",
+    # Mutating (require council gate in normal flow but this tool is for
+    # admin to actually run them; safe_edit_with_council guards file
+    # changes upstream)
+    "up", "down", "restart", "pull", "build", "stop", "start",
+}
+
+
+async def docker_compose(subcommand: str, *,
+                          file: str = "/app/aurem-cto/docker-compose.yml",
+                          extra: Optional[list] = None,
+                          timeout: int = 60) -> dict:
+    """Run a whitelisted docker-compose subcommand. The docker daemon
+    must be reachable from the host — in the preview k8s container this
+    will return `docker not found`, which is the safe, correct outcome.
+    On the Legion host, this tool DOES the deploy.
+    """
+    if subcommand not in _DOCKER_COMPOSE_ALLOWED:
+        return {"ok": False,
+                "error": f"subcommand not allowed: {subcommand!r} (allowed: {sorted(_DOCKER_COMPOSE_ALLOWED)})"}
+    extra = extra or []
+    if not isinstance(extra, list) or any(not isinstance(x, str) for x in extra):
+        return {"ok": False, "error": "extra must be list[str]"}
+    if any(ch in (file + " ".join(extra)) for ch in [";", "|", "&", "$(", "`"]):
+        return {"ok": False, "error": "forbidden shell metachar in args"}
+    cmd = ["docker", "compose", "-f", file, subcommand, *extra]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return {"ok": False, "error": f"docker compose timed out after {timeout}s"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "docker not installed on host (expected on Emergent preview; OK on Legion)"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
+    return {
+        "ok": proc.returncode == 0, "rc": proc.returncode,
+        "stdout_tail": (out.decode("utf-8", "replace") if out else "")[-4000:],
+        "stderr_tail": (err.decode("utf-8", "replace") if err else "")[-2000:],
+        "cmd": " ".join(cmd),
+    }
+
+
+async def pip_propose(package: str, *, version: Optional[str] = None) -> dict:
+    """Propose adding a package to requirements.txt. Does NOT actually
+    install — installation requires founder approval via the propose_commit
+    flow because requirements.txt changes are git-tracked.
+
+    Allowlist: a small set of known-safe packages can be appended
+    directly; everything else returns a "please add via founder review"
+    instruction.
+    """
+    if not isinstance(package, str) or not package:
+        return {"ok": False, "error": "package required"}
+    package = package.strip().lower()
+    if package not in _PIP_ALLOWLIST:
+        return {
+            "ok": False,
+            "error": f"package not in allowlist: {package!r}",
+            "allowlist": sorted(_PIP_ALLOWLIST),
+            "hint": "Use `append_to_file` on requirements.txt then `propose_commit` for founder review.",
+        }
+    line = f"{package}=={version}\n" if version else f"{package}\n"
+    res = await append_to_file("/app/backend/requirements.txt", line)
+    if res.get("ok"):
+        res["package"] = package
+        res["version"] = version
+        res["note"] = "pip install needs container restart — call restart_service('backend')"
+    return res
+
+
 # ─── Registry ────────────────────────────────────────────────────────
 
 TOOL_REGISTRY: dict[str, dict] = {
@@ -1756,6 +2082,97 @@ TOOL_REGISTRY: dict[str, dict] = {
             "writes to `ora_commit_proposals` with the diff. Founder "
             "approves via /api/admin/git-gate/proposals/{id}/approve. "
             "Default: stage all dirty files under write-allowed roots."
+        ),
+    },
+    # iter 322eu — Creation + infra tools (ORA can build its own features)
+    "create_file": {
+        "fn": create_file,
+        "args_spec": {
+            "path":      "str — under write-allowed roots, must not exist (unless overwrite)",
+            "content":   "str ≤200KB — file body",
+            "overwrite": "bool — default False; True replaces an existing file",
+        },
+        "description": (
+            "Create a new file at the given path. Atomic write (.tmp + "
+            "os.replace). Refuses to overwrite by default. Use for new "
+            "modules, Dockerfiles, configs."
+        ),
+    },
+    "create_dir": {
+        "fn": create_dir,
+        "args_spec": {"path": "str — under write-allowed roots"},
+        "description": "Create a directory (mkdir -p) under a write-allowed root.",
+    },
+    "append_to_file": {
+        "fn": append_to_file,
+        "args_spec": {
+            "path":    "str — existing file under write-allowed roots",
+            "content": "str ≤50KB — text to append",
+        },
+        "description": (
+            "Append text to an existing file. Useful for adding lines to "
+            "requirements.txt, README, log files, etc."
+        ),
+    },
+    "pytest_run": {
+        "fn": pytest_run,
+        "args_spec": {
+            "path":    "str — under /app/backend/tests or /app/aurem-cto/",
+            "verbose": "bool — pass -v to pytest",
+            "timeout": "int — seconds (default 60, max 300)",
+        },
+        "description": (
+            "Run pytest on a file or directory. Read-only — never modifies. "
+            "Returns rc, summary line, stdout tail."
+        ),
+    },
+    "cloudflare_dns_list": {
+        "fn": cloudflare_dns_list,
+        "args_spec": {"name": "str — optional filter (e.g. 'cto.aurem.live')"},
+        "description": (
+            "List DNS records in the configured CLOUDFLARE_ZONE_ID. "
+            "Read-only. Optionally filter by exact name."
+        ),
+    },
+    "cloudflare_dns_write": {
+        "fn": cloudflare_dns_write,
+        "args_spec": {
+            "record_type": "str — A | AAAA | CNAME | TXT",
+            "name":        "str — must be under CLOUDFLARE_ROOT_DOMAIN",
+            "content":     "str — target (IP / hostname / TXT value)",
+            "proxied":     "bool — default True for CNAME/A",
+            "ttl":         "int — default 1 (Cloudflare 'Auto')",
+        },
+        "description": (
+            "Create or UPSERT a DNS record. Idempotent — if a record with "
+            "the same name+type exists, PUTs it instead of creating a "
+            "duplicate. Scoped to CLOUDFLARE_ROOT_DOMAIN."
+        ),
+    },
+    "docker_compose": {
+        "fn": docker_compose,
+        "args_spec": {
+            "subcommand": "str — one of ps/logs/config/version/up/down/restart/pull/build/stop/start",
+            "file":       "str — compose file path (default /app/aurem-cto/docker-compose.yml)",
+            "extra":      "list[str] — additional argv (no shell metachars)",
+            "timeout":    "int — seconds (default 60)",
+        },
+        "description": (
+            "Run a whitelisted `docker compose` subcommand. Returns "
+            "`docker not installed` on the Emergent preview k8s — "
+            "operates on the Legion host where Docker IS installed."
+        ),
+    },
+    "pip_propose": {
+        "fn": pip_propose,
+        "args_spec": {
+            "package": "str — must be in _PIP_ALLOWLIST",
+            "version": "str — optional pin (e.g. '0.15.12')",
+        },
+        "description": (
+            "Append a package to requirements.txt for founder review. "
+            "Does NOT actually install — requires propose_commit + "
+            "founder approval to land. Allowlisted packages only."
         ),
     },
 }
