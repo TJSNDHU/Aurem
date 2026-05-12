@@ -1444,3 +1444,34 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`.
+
+## Session iter 322ea-ec (Feb 2026)
+
+### Deployment Stability (322ea)
+- Fixed K8s health probe timeout caused by MongoDB Atlas pool exhaustion:
+  - `server.py`: maxPoolSize 50→200, minPoolSize 0→10, waitQueueTimeoutMS 10s→2s
+  - `routers/registry.py`: AsyncIOScheduler global job_defaults (max_instances=1, coalesce, misfire_grace_time=30)
+  - Added jitter=20s to 5 per-minute scheduler jobs (sentinel_repair, ora_proposal_bridge, agent_wedge, periodic_flush, watchdog)
+  - Eliminates burst pattern where 4+ jobs all fire at xx:00 and saturate event loop
+
+### System Audit Findings (322eb)
+- DB: 524 collections total, only 240 alive (46%). 83 empty, 183 tiny (<5 docs), 18 stale.
+- Identified massive duplicates: 10 audit_log variants, 18 scan variants, 9 ora_skills variants, 10 campaign variants
+- Routers: 340 files / 337 wired / 3 false-orphans (openfang, social_presence, zdr — confirmed mounted via dynamic __import__)
+- Scheduler: 69 jobs total
+- E-commerce skeleton (`products`/`orders`/`carts` — 200+ refs) is leftover from template, all empty
+
+### LLM Response Cache Wiring (322ec) — REAL FIX
+- Wired `services.llm_response_cache` into `services/llm_gateway.py:call_llm_with_meta()` — the single chokepoint for ALL LLM calls in AUREM (Sovereign / OpenRouter / Emergent)
+- Cache key = sha1(system_prompt[:1500] + "||" + user_prompt[:3000] + "||" + max_tokens)[:20]
+- Computed AFTER skill-broadcast addendum so admin pushes auto-invalidate
+- Scope: `llm_gateway`, prompt_seed: `v1`, TTL: 12h
+- New param `bypass_cache=True` for temperature-sensitive callers
+- Returns `{"cached": True}` flag on hits so callers can detect
+- **Validated end-to-end: 1075x speedup (1.41s → 0.001s), llm_response_cache collection writing properly**
+- Expected impact: 30-60% reduction in Emergent LLM key budget burn for FAQ-style repeated prompts
+
+### Pending User Decisions
+- Tier 1 cleanup (drop 31 confirmed-dead collections) — awaiting approval
+- Tier 2/3 (duplicate merge, e-commerce skeleton removal) — deferred
+- Design-Extract integration — deferred

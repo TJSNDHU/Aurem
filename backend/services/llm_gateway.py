@@ -131,31 +131,61 @@ async def call_llm_with_meta(
     max_tokens: int = 600,
     *,
     skip_sovereign: bool = False,
+    bypass_cache: bool = False,
 ) -> dict:
     """Return {provider, content, ok} — never raises.
 
     iter 282al-13 — `skip_sovereign=True` skips the local node and goes
     straight to OpenRouter → Emergent. Useful for long-context dev-mode
     skill calls where the ngrok tunnel adds latency that bursts past
-    chat-handler budgets."""
+    chat-handler budgets.
+
+    iter 322ec — Response cache wired here (the single chokepoint for
+    every Claude/Groq/Sovereign call in AUREM). Identical (system, user)
+    prompt pairs hit `llm_response_cache` instead of burning Emergent key
+    budget. Pass `bypass_cache=True` for temperature-sensitive callers
+    (creative writes, brainstorm). 12h TTL — short enough to drift with
+    skill broadcast updates, long enough to absorb FAQ-style burst."""
     # Live skill broadcast — admin can push Antigravity SKILL.md playbooks
     # to ALL agents via /api/admin/antigravity-skills/broadcast. Every LLM
     # call routed through this gateway picks them up at runtime.
+    _db = None
+    try:
+        import server as _srv  # noqa: WPS433
+        _db = getattr(_srv, "db", None)
+    except Exception:
+        _db = None
     try:
         from services.agent_skill_broadcast import get_addendum
-        import os as _os
-        _db = None
-        # Try to grab the live db from server module without circular import
-        try:
-            import server as _srv  # noqa: WPS433
-            _db = getattr(_srv, "db", None)
-        except Exception:
-            _db = None
         _ad = await get_addendum(_db, agent_name="GATEWAY")
         if _ad:
             system_prompt = (system_prompt or "") + _ad
     except Exception:
         pass
+
+    # ── Cache lookup ────────────────────────────────────────────────
+    # Compute the signature AFTER the skill-broadcast addendum so that
+    # admin pushing a new SKILL.md auto-invalidates stale answers (the
+    # signature changes with the addendum content).
+    _cache_sig = ""
+    if not bypass_cache and _db is not None and user_prompt:
+        try:
+            import hashlib as _hl
+            _seed = f"{(system_prompt or '')[:1500]}||{user_prompt[:3000]}||{max_tokens}"
+            _cache_sig = _hl.sha1(_seed.encode("utf-8")).hexdigest()[:20]
+            from services.llm_response_cache import cache_get as _cg
+            _hit = await _cg(_db, scope="llm_gateway",
+                              signature=_cache_sig, prompt_seed="v1")
+            if _hit and isinstance(_hit, dict) and _hit.get("content"):
+                logger.info(f"[llm_gateway] cache HIT sig={_cache_sig[:8]} "
+                            f"({_hit.get('provider','?')}, $0.00)")
+                return {"provider": _hit.get("provider", "cache"),
+                        "content": _hit["content"], "ok": True,
+                        "cached": True}
+        except Exception as _ce:
+            logger.debug(f"[llm_gateway] cache_get failed: {_ce}")
+            _cache_sig = ""  # don't try to write later if read path broke
+
     providers = (
         ("sovereign",   _try_sovereign),
         ("openrouter",  _try_openrouter),
@@ -170,6 +200,16 @@ async def call_llm_with_meta(
             logger.debug(f"[llm_gateway] {provider} raised: {e}")
             continue
         if content:
+            # ── Cache write (success only) ──────────────────────────
+            if _cache_sig and _db is not None:
+                try:
+                    from services.llm_response_cache import cache_put as _cp
+                    await _cp(_db, scope="llm_gateway",
+                              signature=_cache_sig,
+                              payload={"content": content, "provider": provider},
+                              prompt_seed="v1", ttl_hours=12)
+                except Exception as _ce:
+                    logger.debug(f"[llm_gateway] cache_put failed: {_ce}")
             return {"provider": provider, "content": content, "ok": True}
     return {"provider": "fallback", "content": FAIL_MSG, "ok": False}
 
@@ -180,11 +220,13 @@ async def call_llm(
     max_tokens: int = 600,
     *,
     skip_sovereign: bool = False,
+    bypass_cache: bool = False,
 ) -> str:
     """String-only convenience wrapper."""
     r = await call_llm_with_meta(
         system_prompt, user_prompt, max_tokens,
         skip_sovereign=skip_sovereign,
+        bypass_cache=bypass_cache,
     )
     return r["content"]
 

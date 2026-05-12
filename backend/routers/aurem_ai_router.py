@@ -4,12 +4,15 @@ Brand: AUREM by Polaris Built Inc.
 Products: OROÉ only
 """
 
+import hashlib
+import logging
+import os
+import re
+from typing import List, Optional
+
+from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
-import os
-import logging
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv(override=False)
@@ -20,8 +23,48 @@ from utils.aurem_prompt import AUREM_SYSTEM_PROMPT, AUREM_WELCOME_MESSAGE, QUICK
 # Import Emergent LLM integration
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
+# iter 322eb — wire llm_response_cache into the customer-facing AUREM AI
+# chat. Caches Claude responses keyed on the normalized user question so
+# repeated FAQ-style asks ("what does AUREM do", "pricing", "how does
+# ORA work") hit the cache instead of burning Emergent LLM key budget.
+from services.llm_response_cache import cache_get, cache_put
+
 router = APIRouter(prefix="/api/aurem-ai", tags=["AUREM AI"])
 logger = logging.getLogger(__name__)
+
+# Module-level db handle — wired from registry.set_db() at startup.
+_db = None
+
+
+def set_db(db):
+    """Inject the live Motor handle so the cache layer can read/write."""
+    global _db
+    _db = db
+
+
+_CACHE_SCOPE = "aurem_ai_chat"
+# Bump this token if AUREM_SYSTEM_PROMPT changes substantively — forces a
+# cache miss on the new prompt and re-learns fresh responses.
+_PROMPT_SEED = "v1"
+
+
+def _normalize_for_cache(text: str) -> str:
+    """Lower, strip punctuation, collapse whitespace, cap length.
+    Same question phrased slightly differently maps to the same key."""
+    if not text:
+        return ""
+    t = text.lower().strip()
+    t = re.sub(r"[^\w\s]", " ", t)
+    t = re.sub(r"\s+", " ", t)
+    return t[:500]
+
+
+def _cache_signature(message: str) -> str:
+    """Deterministic 16-char hex of the normalized message."""
+    norm = _normalize_for_cache(message)
+    if not norm:
+        return ""
+    return hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
 
 # ══════════════════════════════════════════════════════════════
 # MODELS
@@ -57,7 +100,8 @@ async def get_welcome():
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
-    """AUREM AI Chat endpoint — uses Emergent LLM integration with Claude"""
+    """AUREM AI Chat endpoint — uses Emergent LLM integration with Claude.
+    Caches identical FAQ-style messages (no history) for 24h to cut LLM cost."""
     try:
         # Get Emergent LLM key
         api_key = os.environ.get("EMERGENT_LLM_KEY")
@@ -69,6 +113,19 @@ async def chat(request: ChatRequest):
             )
         
         logger.info(f"[AUREM AI] Processing chat request with session: {request.session_id}")
+
+        # ── Cache lookup (only for stateless asks — history makes replies context-bound) ──
+        has_history = bool(request.history and len(request.history) > 0)
+        sig = _cache_signature(request.message) if not has_history else ""
+        if sig and _db is not None:
+            try:
+                cached = await cache_get(_db, scope=_CACHE_SCOPE, signature=sig, prompt_seed=_PROMPT_SEED)
+                if cached and isinstance(cached, dict) and cached.get("response"):
+                    logger.info(f"[AUREM AI] cache HIT sig={sig[:8]} — Claude call skipped")
+                    return ChatResponse(response=cached["response"])
+            except Exception as ce:
+                # Cache must never break the chat — fall through to live call.
+                logger.debug(f"[AUREM AI] cache_get failed: {ce}")
         
         # Initialize chat with Emergent integration
         chat_instance = LlmChat(
@@ -79,7 +136,7 @@ async def chat(request: ChatRequest):
         
         # Build the message with history context if needed
         message_text = request.message
-        if request.history and len(request.history) > 0:
+        if has_history:
             # Add context from recent history
             context_parts = []
             for msg in request.history[-6:]:  # Last 6 messages for context
@@ -96,6 +153,22 @@ async def chat(request: ChatRequest):
         response = await chat_instance.send_message(user_message)
         
         logger.info("[AUREM AI] Response generated successfully")
+
+        # ── Cache write (only on success + no history + non-empty reply) ──
+        if sig and _db is not None and response:
+            try:
+                await cache_put(
+                    _db,
+                    scope=_CACHE_SCOPE,
+                    signature=sig,
+                    payload={"response": response},
+                    prompt_seed=_PROMPT_SEED,
+                    ttl_hours=24,
+                )
+                logger.debug(f"[AUREM AI] cache PUT sig={sig[:8]}")
+            except Exception as ce:
+                logger.debug(f"[AUREM AI] cache_put failed: {ce}")
+
         return ChatResponse(response=response)
             
     except Exception as e:

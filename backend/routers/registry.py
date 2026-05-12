@@ -889,7 +889,8 @@ def register_all_routers(app, db):
     # AUREM AI Chat Router
     if not _should_skip("routers.aurem_ai_router"):
         try:
-            from routers.aurem_ai_router import router as aurem_ai_router
+            from routers.aurem_ai_router import router as aurem_ai_router, set_db as set_aurem_ai_db
+            set_aurem_ai_db(db)  # iter 322eb — enable llm_response_cache writes
             app.include_router(aurem_ai_router)
         except Exception:
             pass
