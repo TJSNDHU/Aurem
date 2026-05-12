@@ -67,6 +67,33 @@ Template for fix prompts:
 > `<one sentence>`. Use these tools to investigate: `<tool list>`. Then
 > propose a fix via `safe_edit`. Do NOT commit yet — founder reviews diff.
 
+### iter 322ey-fix — Teaching Loop is MANDATORY, not optional
+
+When the supervisor catches an ORA bug and patches it, the fix is
+INCOMPLETE until BOTH of the following are done:
+
+1. **Code patch** — fix the actual file (`safe_edit` / `search_replace`).
+2. **Broadcast skill update** — append the lesson to
+   `/app/backend/ora_skills/dev_<iter>-ora-mistakes-lessons.md` (or
+   adjacent skill doc) AND re-broadcast via:
+   - upsert into `ora_skills_library` collection, then
+   - update `ora_skills_broadcast/_id=active` with the new skill_id,
+   - regenerate `system_addendum` (concat of all skill bodies),
+   - rely on the 15s TTL cache to propagate.
+
+Code-only fixes do NOT propagate to future ORA chat sessions because
+each session reads the skill broadcast fresh. Without the broadcast
+update, ORA repeats the same bug in the next iteration.
+
+### Verification
+
+After updating the broadcast, send a short test prompt that would have
+triggered the original bug. Confirm ORA cites the lesson by name (e.g.
+"per iter 322ey lesson #2") AND emits the corrected pattern. If she
+still emits the broken pattern, the broadcast didn't reach her — check
+that `server.db` is wired in the calling script (see
+`/app/scripts/ora_direct_v2.py` for the canonical pattern).
+
 ## 7. Scope of Project
 
 - Repo: `/app` (Emergent preview) + `/app/aurem-cto/` (Legion sovereign).

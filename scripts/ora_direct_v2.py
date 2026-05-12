@@ -18,6 +18,17 @@ except ImportError:
 
 async def main(prompt_path, out_path):
     spec = json.loads(Path(prompt_path).read_text())
+    # iter 322ey — wire server.db so agent_skill_broadcast.get_addendum()
+    # actually finds the active broadcast. Without this the gateway's
+    # `_db = getattr(server, "db", None)` returns None → empty addendum →
+    # ORA never sees the live skill teachings. THIS WAS THE REAL BUG
+    # behind "ORA didn't pick up the lesson" during my verification.
+    from motor.motor_asyncio import AsyncIOMotorClient
+    import server as _srv
+    _srv.db = AsyncIOMotorClient(
+        os.environ["MONGO_URL"], serverSelectionTimeoutMS=5000,
+    )[os.environ.get("DB_NAME", "aurem_db")]
+
     from services.llm_gateway import call_llm_with_meta
     sys_prompt = spec.get("system") or (
         "You are ORA CTO Sovereign. Output exactly the format requested. "

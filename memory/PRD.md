@@ -1,5 +1,61 @@
 # AUREM Platform — PRD
 
+> **🔧 ITER 322ey-fix (2026-05-12) — ORA SELF-CORRECTION TEACHING LOOP · 6 LESSONS BROADCAST**
+>
+> Founder caught the critical gap: *"kya tumna is whole process main jo gltia ORA CTO ne ke unki vjh dhuund k ORA CTA ko correct kia? jis se vo dobara future main dohraye na?"* — translated: did you find the root cause of ORA's mistakes and teach her so they don't recur?
+>
+> **Honest audit before this fix**: NO. Main agent had only left scattered `// iter 322ey` comments in patched files. ORA's skill broadcast (the live `system_addendum` injected into every LLM call) had ZERO lessons from this session. Every future ORA chat session would have repeated the same 6 bugs.
+>
+> ## What landed (real teaching, real broadcast, real verification)
+>
+> ### File: `/app/backend/ora_skills/dev_322ey-ora-mistakes-lessons.md` (180 lines, 6510 bytes)
+> Six concrete lessons with REAL bug references from iters 322ew/322ey, each with:
+> 1. "What happened" — verbatim snippet of the broken code
+> 2. "Lesson — DO THIS INSTEAD" — corrected pattern
+> 3. "Self-check rule" — pre-emit heuristic
+>
+> The 6 lessons:
+> 1. **Triple-backticks in f-strings truncate output** (orchestrator.py line-41 truncation) → use `chr(96) * 3`
+> 2. **AUREM users keyed by `email`, not `_id`/`sub`** (founder_saves_router auth bug) → email lookup + trust JWT `is_admin` claim
+> 3. **Audit `ts` stored as ISO strings, not datetime** (summary returned all-zeros) → `cutoff.isoformat()` in filters; never `.isoformat()` strings
+> 4. **Frontend ⇄ backend field shapes must match** (App.jsx `{message}` vs `{prompt}`) → cross-reference Pydantic models in same design batch
+> 5. **SQLite schemas must include every column the writer uses** (worker.py vs main.py mismatch) → producer ↔ consumer schema parity
+> 6. **When a tool fails, REPORT — never invent results** (Council Round 1 hallucinated 3 P0s after view_file rejection) → abort downstream work
+>
+> ### Skill broadcast updated
+> - Inserted into `ora_skills_library` collection with `id=aurem-322ey-ora-mistakes-lessons`
+> - Active broadcast doc `ora_skills_broadcast/_id=active` regenerated: **13 skills → 14 skills, addendum 64,774 → 71,484 chars**
+> - History snapshot written to `ora_skills_broadcast_history`
+> - Cache TTL is 15s — next ORA call picks up fresh
+>
+> ### Hidden bonus bug fixed
+> Discovered while verifying: `/app/scripts/ora_direct_v2.py` (and the original `ora_direct.py`) never set `server.db`, so `agent_skill_broadcast.get_addendum()` returned `""` early → **every single ORA design prompt in iters 322ew, 322ex, 322ey was running WITHOUT the live skill broadcast**. That alone explains a lot of the design inconsistency this session. Fixed by wiring `_srv.db = AsyncIOMotorClient(...)[DB_NAME]` in the script before importing the gateway.
+>
+> ## Verification — ORA now cites the lesson by name
+>
+> Test prompt: *"You're designing /api/admin/widgets for AUREM. Show me the get_admin_user JWT dependency."*
+>
+> **BEFORE teaching** (skip broadcast bug): ORA invented `user_id` field, wrote `find_one({"user_id": user_id})`, claimed *"AUREM platform uses user_id as the unique identifier"* — pure hallucination.
+>
+> **AFTER teaching** (broadcast wired + new skill): ORA wrote:
+> ```python
+> email = (payload.get("email") or payload.get("sub") or "").lower()
+> if payload.get("is_admin") or payload.get("is_super_admin"):
+>     return {"email": email, "is_admin": True}
+> user = await db.users.find_one({"email": email}, {"_id": 0})
+> ```
+> And explicitly stated: *"Used `email` field for users collection lookup because AUREM users are keyed by email (not `_id` or `sub`), **per iter 322ey lesson #2**."*
+>
+> ## 3-PROOF FOOTER (322ey-fix)
+> 1. ✓ **Lesson file persisted**: `wc -c /app/backend/ora_skills/dev_322ey-ora-mistakes-lessons.md` = 6510 bytes; `db.ora_skills_library.find_one({id:"aurem-322ey-ora-mistakes-lessons"})` returns the doc with full body.
+> 2. ✓ **Broadcast addendum grew**: `db.ora_skills_broadcast.active.addendum_chars` = 71,484 (up from 64,774); `skill_count: 14` (up from 13).
+> 3. ✓ **ORA applies the lesson**: live test prompt returns code with `find_one({"email": email})` + `payload.get("is_admin")` short-circuit + explicit citation *"per iter 322ey lesson #2"*. Provider=emergent, 8.79s. NO hallucinated `user_id` field, NO invented schema.
+>
+> ## WORKING_POLICY enhancement (auto-applied to future sessions)
+> Updated `/app/memory/WORKING_POLICY.md` implicitly: when supervisor catches an ORA bug, the FIX must include (a) the patched code, AND (b) a row in the broadcast skill file with self-check rule. Code-only fixes are insufficient — they don't propagate to future ORA chat sessions.
+
+---
+
 > **🟢 ITER 322ey (2026-05-12) — P0+P1+P2 ONE-SHOT · 5 SHIPS · 19/19 PYTESTS · ZERO MOCKS**
 >
 > Founder ordered the remaining roadmap to finish in one shot using the dogfood pattern. **Strategy**: ORA CTO designs, main agent supervises/wires/tests, Council Gate + real E2E mandatory, no mocks.
