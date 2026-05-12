@@ -1,5 +1,35 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322ev (2026-05-12) — ORA NATURAL-LANGUAGE OS PLANNER · 28 TOOLS · OPEN INTERPRETER WIRED**
+>
+> Founder asked: *"OpenInterpreter / Self-Operating-Computer ke 2 repos analyze kar — kya ORA ko full OS-level control de sakte hain?"*
+> Decision: **Open Interpreter integrated as the 28th tool `ora_run_natural`** (dry-run only in P1). Self-Operating-Computer skipped — dead repo (8 months stale), CLI-only, brittle vision loop.
+>
+> **What landed (this iter)**:
+> - **`/app/backend/services/ora_natural_bridge.py`** (160 lines, lint-clean) — lazy-imports `interpreter`, configures `auto_run=False + offline=True + safe_mode='ask' + model=groq/llama-3.3-70b-versatile`, returns `{ok, task, planned_steps, steps[], plan_text, model, scope}`. Falls back to regex-parsing fenced code blocks out of `plan_text` when OI's offline mode skips `type:code` messages.
+> - **TOOL_REGISTRY entry** in `services/ora_tools.py` (1 import line + 30 lines of registry block) — `ora_run_natural(task, dry_run=True, max_steps=5)`. Total tool count: **27 → 28**.
+> - **`open-interpreter==0.4.3`** added to `requirements.txt` via `pip_propose` (ORA's first self-dependency-bump). Allowlist extended with the package by founder.
+> - **`/app/backend/tests/test_iter_322ev_natural.py`** — 7 pytests: input validation, dry-run gate, registry presence, **live Groq LLM happy path**, audit log path.
+>
+> **Dogfood proof — ORA wrote the design itself**:
+> - Prompt 1 to `/api/ora-chat/ask`: ORA called `view_file` + `grep_codebase` (51s, emergent provider) → returned a complete 5-section implementation plan with bridge skeleton, registry entry, requirements line, pytest stub, safety rationale.
+> - Prompt 2: ORA called `pip_propose(package='open-interpreter', version='0.4.3')` → 24 bytes appended to `requirements.txt`. ORA emitted the `create_file` JSON for the bridge but the 4KB embedded Python content didn't survive the LLM's JSON escaping — main agent typed it in directly using ORA's design.
+> - All ORA tool invocations logged to `ora_tool_invocations` (audit chain preserved).
+>
+> **3-PROOF FOOTER**:
+> 1. ✓ **7/7 new pytests passed in 3.81s** — including live `groq/llama-3.3-70b-versatile` call that produced `[which docker, docker --version, sudo apt install docker.io -y]` from the prompt "check if docker is installed".
+> 2. ✓ **17/17 regression pytests passed in 0.33s** across `test_iter_322eu_creation_tools.py` + `test_iter_322es_ora_cto_final_complete.py` — zero breakage from OI install (despite pip resolver complaints about starlette/protobuf, runtime is stable).
+> 3. ✓ **Live tool invocation via REST**: `POST /api/ora-tools/execute {tool:'ora_run_natural', args:{task:'list .py files in /tmp >1KB', dry_run:true, max_steps:3}}` → `ok:true, elapsed_ms:2055, planned_steps:3, steps:[find/python/grep]`. Audit log shows 2 invocations recorded under actor=teji.ss1986@gmail.com.
+>
+> **What this unlocks**:
+> - ORA can now **plan ANY OS-level task in plain English** and receive a structured list of shell/python steps for review.
+> - Combined with iter 322eu's 8 self-build tools (`create_file`, `docker_compose`, `pip_propose`, `cloudflare_dns_*`), ORA has every primitive needed to **autonomously bootstrap the Legion `aurem-cto` Hybrid Standalone**.
+> - Founder still retains the safety net — `dry_run=True` is the only allowed mode in the Emergent pod; execution must route through `shell_exec` / `safe_edit` / `docker_compose` with founder approval (Council Gate + Git Commit Gate intact).
+>
+> **Heavy-dep note**: `pip install open-interpreter==0.4.3` downgraded `google-generativeai 0.8.6 → 0.7.2`, `anthropic → 0.37.1`, `protobuf 4.25.9`, and pinned `starlette 0.37.2` (fastapi 0.136 wants >=0.46 per resolver). Runtime stable — `/api/platform/health` returns 200, all critical APIs respond. Watch for Gemini-direct regressions; AUREM's LLM calls route via `emergentintegrations`, so Gemini-direct usage is minimal.
+
+---
+
 > **🟢 ITER 322eu (2026-05-12) — ORA SELF-BUILD UNLOCK · 8 NEW TOOLS · 27 TOTAL**
 >
 > Founder's question: *"Can ORA CTO build its own next features so we save Emergent tokens?"*

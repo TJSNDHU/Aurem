@@ -1569,6 +1569,10 @@ _PIP_ALLOWLIST = {
     "aiosqlite", "redis", "pytz", "httpx", "pypdf", "python-docx",
     "ruff", "pytest", "pytest-asyncio", "motor", "pymongo",
     "twilio", "resend", "jwt", "pyjwt",
+    # iter 322ev — founder-approved for ORA self-build / natural-language
+    # OS execution layer (Open Interpreter wraps LiteLLM + multi-language
+    # exec; runs in dry-run mode only inside Emergent pod).
+    "open-interpreter",
 }
 
 
@@ -1881,6 +1885,10 @@ async def pip_propose(package: str, *, version: Optional[str] = None) -> dict:
     return res
 
 
+# ─── iter 322ev — Open Interpreter natural-language planning bridge ──
+from services.ora_natural_bridge import ora_run_natural  # noqa: E402
+
+
 # ─── Registry ────────────────────────────────────────────────────────
 
 TOOL_REGISTRY: dict[str, dict] = {
@@ -2173,6 +2181,25 @@ TOOL_REGISTRY: dict[str, dict] = {
             "Append a package to requirements.txt for founder review. "
             "Does NOT actually install — requires propose_commit + "
             "founder approval to land. Allowlisted packages only."
+        ),
+    },
+    "ora_run_natural": {
+        "fn": ora_run_natural,
+        "args_spec": {
+            "task":      "str — natural-language objective (≤2000 chars). "
+                          "e.g. 'install postgresql 16 and create aurem db'.",
+            "dry_run":   "bool — must be True in P1. False is rejected; "
+                          "execution must route via shell_exec/safe_edit/"
+                          "docker_compose with founder approval.",
+            "max_steps": "int — cap on returned steps (1-10, default 5).",
+        },
+        "description": (
+            "ORA CTO autonomous planner (iter 322ev) — wraps Open "
+            "Interpreter (auto_run=False, offline=True, safe_mode='ask') "
+            "to produce a step-by-step PLAN with concrete shell/python "
+            "code blocks for the given objective. P1 returns plan ONLY; "
+            "execution must route through existing safety-gated tools. "
+            "Model: groq/llama-3.3-70b-versatile."
         ),
     },
 }

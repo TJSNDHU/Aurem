@@ -338,3 +338,4 @@ zipp==3.23.0
 zopfli==0.4.1
 zstandard==0.25.0
 ruff==0.15.12
+open-interpreter==0.4.3
