@@ -232,6 +232,167 @@ async def call_llm(
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Tool-calling loop (iter 322el) — for ORA / agents that need real
+# investigation. Detects tool-call JSON in the LLM response, executes
+# the tool server-side, feeds the REAL output back, re-invokes the LLM.
+# Caps total iterations so it can't loop forever.
+# ─────────────────────────────────────────────────────────────────────
+import json as _json
+import re as _re
+
+_TOOL_CALL_RE = _re.compile(
+    r"```(?:tool_call|json)?\s*"
+    r"(\{[\s\S]*?\"tool\"[\s\S]*?\})"
+    r"\s*```",
+    _re.IGNORECASE,
+)
+
+
+def _extract_tool_calls(text: str) -> list[dict]:
+    """Parse all valid `{"tool": "...", "args": {...}}` JSON blocks from
+    the LLM response. Returns [] if none. Tolerates extra prose around
+    the JSON — LLMs love to wrap things in explanation."""
+    if not text:
+        return []
+    calls = []
+    for m in _TOOL_CALL_RE.finditer(text):
+        raw = m.group(1)
+        try:
+            obj = _json.loads(raw)
+        except Exception:
+            # Try to recover from trailing comma / single quotes
+            try:
+                obj = _json.loads(raw.replace("'", '"'))
+            except Exception:
+                continue
+        if isinstance(obj, dict) and isinstance(obj.get("tool"), str):
+            calls.append({
+                "tool": obj["tool"],
+                "args": obj.get("args") or {},
+            })
+    return calls
+
+
+async def call_llm_with_tools(
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 800,
+    *,
+    max_tool_iters: int = 4,
+    actor: str = "ora",
+) -> dict:
+    """Full tool-calling loop:
+        1. Call LLM with user prompt + system prompt + skill addendum +
+           tool catalog appended.
+        2. If response contains tool-call JSON blocks, execute each via
+           services.ora_tools.invoke_tool (real subprocess / db / curl).
+        3. Append tool results back into the conversation, re-call LLM.
+        4. Repeat up to `max_tool_iters` times until LLM produces a final
+           answer (no more tool calls) OR cap is hit.
+
+    Returns:
+        {
+            ok:               bool,
+            content:          str   (final LLM answer),
+            tool_calls_run:   int,
+            tool_invocations: [{tool, args, ok, elapsed_ms, ...}, ...],
+            iterations:       int,
+            provider:         str,
+        }
+
+    Used by the ORA chat handler when the user asks for live system data
+    so the LLM can ACTUALLY check Mongo / grep code / curl endpoints
+    instead of fabricating numbers (the iter 322ek hallucination trap).
+    """
+    from services.ora_tools import invoke_tool, list_tools
+
+    # Inject the tool catalog so the LLM knows what's callable + the
+    # exact JSON shape to emit.
+    tool_catalog = list_tools()
+    tool_help = (
+        "\n\n# AVAILABLE TOOLS — call them when you need REAL data.\n"
+        "Emit a JSON block (fenced with ```tool_call) like:\n"
+        '```tool_call\n{\"tool\": \"<name>\", \"args\": {...}}\n```\n'
+        "Then STOP. The gateway will execute it and feed you the real "
+        "result. After the result lands, give your final answer.\n\n"
+        "Tool catalog:\n"
+    )
+    for t in tool_catalog:
+        tool_help += f"- {t['name']}: {t['description']}\n  args: {t['args_spec']}\n"
+
+    enhanced_system = (system_prompt or "") + tool_help
+    transcript = user_prompt
+    invocations: list[dict] = []
+    iters = 0
+    final_provider = "?"
+
+    while iters < max_tool_iters:
+        iters += 1
+        # Bypass cache because the conversation diverges each iter
+        meta = await call_llm_with_meta(
+            enhanced_system, transcript, max_tokens, bypass_cache=True,
+        )
+        content = meta.get("content") or ""
+        final_provider = meta.get("provider") or final_provider
+
+        calls = _extract_tool_calls(content)
+        if not calls:
+            # No more tool calls — this is the final answer.
+            return {
+                "ok":               meta.get("ok", True),
+                "content":          content,
+                "tool_calls_run":   len(invocations),
+                "tool_invocations": invocations,
+                "iterations":       iters,
+                "provider":         final_provider,
+            }
+
+        # Execute each tool call SERVER-SIDE with real subprocess/db.
+        results_for_llm = []
+        for call in calls:
+            res = await invoke_tool(call["tool"], call["args"], actor=actor)
+            invocations.append({
+                "tool":       call["tool"],
+                "args":       call["args"],
+                "ok":         res.get("ok"),
+                "elapsed_ms": res.get("elapsed_ms"),
+                "error":      res.get("error"),
+                # Keep result compact for the next LLM turn — cap fields
+                "result_preview": {
+                    k: (v if not isinstance(v, str) else v[:400])
+                    for k, v in res.items()
+                    if k not in ("tool", "ts", "elapsed_ms", "ok")
+                },
+            })
+            results_for_llm.append({
+                "tool": call["tool"],
+                "args": call["args"],
+                "result": res,
+            })
+
+        # Feed real results back into the transcript and continue.
+        transcript = (
+            f"{transcript}\n\n"
+            f"=== TOOL RESULTS (iter {iters}) ===\n"
+            f"{_json.dumps(results_for_llm, default=str)[:4000]}\n"
+            f"=== END TOOL RESULTS ===\n"
+            f"Now give your FINAL answer using only these real results "
+            f"(or call more tools if you need them)."
+        )
+
+    # Cap hit — return whatever the LLM said last
+    return {
+        "ok":               True,
+        "content":          content,
+        "tool_calls_run":   len(invocations),
+        "tool_invocations": invocations,
+        "iterations":       iters,
+        "provider":         final_provider,
+        "max_iters_hit":    True,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Health — for Pillars Map + admin chip
 # ─────────────────────────────────────────────────────────────────────
 async def sovereign_health() -> dict:

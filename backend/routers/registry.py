@@ -1169,6 +1169,30 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] db_audit_router skipped: {e}")
 
+    # iter 322ej — ORA Tools Router (read-only investigation hands for ORA)
+    if not _should_skip("routers.ora_tools_router"):
+        try:
+            from routers.ora_tools_router import (
+                router as ora_tools_router, set_db as set_ora_tools_db,
+            )
+            set_ora_tools_db(db)
+            app.include_router(ora_tools_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_tools_router skipped: {e}")
+
+    # iter 322el — ORA Chat Router (tool-grounded conversational endpoint)
+    if not _should_skip("routers.ora_chat_router"):
+        try:
+            from routers.ora_chat_router import (
+                router as ora_chat_router, set_db as set_ora_chat_db,
+            )
+            set_ora_chat_db(db)
+            app.include_router(ora_chat_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_chat_router skipped: {e}")
+
 
     # Memoir Router (Git-versioned semantic memory for 28 agents + ORA)
     if not _should_skip("routers.memoir_router"):
