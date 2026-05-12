@@ -1157,6 +1157,18 @@ def register_all_routers(app, db):
             logging.getLogger(__name__).warning(f"[REGISTRY] customer_audit_router skipped: {e}")
 
 
+    # Memoir Router (Git-versioned semantic memory for 28 agents + ORA)
+    if not _should_skip("routers.memoir_router"):
+        try:
+            from routers.memoir_router import router as memoir_router
+            from services import memoir_service
+            memoir_service.init()
+            app.include_router(memoir_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] memoir_router skipped: {e}")
+
+
     # Dev Stack Health (Pillars Map green/red grid)
     if not _should_skip("routers.dev_stack_health_router"):
         try:

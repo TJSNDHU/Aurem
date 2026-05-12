@@ -365,6 +365,23 @@ async def run_audit(
         except Exception as e:
             logger.warning(f"[audit] persist failed: {e}")
 
+    # Memoir mirror — fast recall by customer email, Git-versioned.
+    try:
+        from services import memoir_service as _M
+        if _M.available():
+            _M.customer_save_audit(customer_id, {
+                "id": audit.id,
+                "url": audit.url,
+                "status": audit.status,
+                "psi_status": audit.psi_status,
+                "scores": audit.scores.model_dump(),
+                "estimated_waste_usd": audit.ads.estimated_monthly_waste_usd,
+                "top_issues": audit.top_issues,
+                "completed_at": audit.completed_at,
+            })
+    except Exception:
+        pass
+
     return audit
 
 

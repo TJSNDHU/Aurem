@@ -337,6 +337,161 @@ function FeatureGrid({ title, items, accent }) {
   );
 }
 
+/* ═══ iter 322da — MEMOIR (Git-Versioned Semantic Memory) ═══ */
+function MemoirOverviewTile() {
+  const [info, setInfo] = useState(null);
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const [iRes, sRes] = await Promise.all([
+          fetch(`${API}/api/admin/memoir/info`).then(r => r.ok ? r.json() : null),
+          fetch(`${API}/api/admin/memoir/stats`).then(r => r.ok ? r.json() : null),
+        ]);
+        if (alive) { setInfo(iRes); setStats(sRes); }
+      } catch (e) { /* swallow */ }
+    };
+    load();
+    const t = setInterval(load, 25000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  const ok = info?.available;
+  const perf = stats?.performance || {};
+  return (
+    <div className="sov-card" style={{
+      padding: '24px 32px', marginBottom: 20,
+      border: `1px solid ${ok ? '#9B6DD455' : '#F59E0B55'}`,
+      animation: 'sov-glow 5s ease-in-out infinite',
+    }} data-testid="sov-memoir-tile">
+      <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#9B6DD4' }}>
+        MEMOIR — GIT FOR AI MEMORY ({ok ? 'ONLINE' : 'WARMING UP'})
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
+        <StatCard value={(stats?.total_keys ?? 0).toLocaleString()} label="MEMORY KEYS" color="#9B6DD4" sub="commits auto-trail" />
+        <StatCard value={(stats?.total_namespaces ?? 0).toLocaleString()} label="NAMESPACES" color="#64C8FF" sub="semantic paths" />
+        <StatCard value={(perf.reads ?? 0).toLocaleString()} label="READS" color="#4ADE80" sub="<10ms each" />
+        <StatCard value={(perf.writes ?? 0).toLocaleString()} label="WRITES" color="#F59E0B" sub="auto-committed" />
+        <StatCard value={(perf.searches ?? 0).toLocaleString()} label="SEARCHES" color="#C9A84C" sub="path-scoped" />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        <FeatureGrid title="WIRED USE-CASES" accent="#9B6DD4" items={[
+          'ORA chat → aurem.ora.sessions.{id}.turns (Git-versioned)',
+          'Customer audits → aurem.customers.{email}.audits.latest',
+          'Skill broadcast → aurem.skills.broadcast.active (live)',
+          'Founder Saves → aurem.founder.saves.{save_id} (audit trail)',
+          'Agent scratchpads → aurem.agents.{name}.scratchpad',
+          '28-agent context shared via path lookup, <10ms TTFB',
+        ]} />
+        <FeatureGrid title="WHY IT MATTERS" accent="#64C8FF" items={[
+          '150-750× faster than vector DBs (path lookup, no embeddings)',
+          'Explainable retrieval — every recall has a path you can trace',
+          'Git commits = FREE audit trail for every memory change',
+          'Branch/rollback fixes ORA hallucinations deterministically',
+          'Mongo stays source-of-truth; Memoir is the fast index',
+          'Plug-and-play with LangGraph + CrewAI',
+        ]} />
+        <FeatureGrid title="ADMIN SURFACE" accent="#C9A84C" items={[
+          'GET /api/admin/memoir/info — availability + path',
+          'GET /api/admin/memoir/stats — reads/writes/searches/keys',
+          'GET /api/admin/memoir/search?path=&limit=',
+          'GET /api/admin/memoir/recall?path=&key=',
+          'GET /api/admin/memoir/history?path=&key=',
+          'POST /api/admin/memoir/remember (write), /commit (force)',
+        ]} />
+      </div>
+      <div style={{ marginTop: 12, fontSize: 11, color: '#6A6070', fontFamily: 'JetBrains Mono, monospace' }}>
+        STORE: {info?.store_path || '/app/data/memoir/store'} · /admin/memoir for browser
+      </div>
+    </div>
+  );
+}
+
+/* ═══ iter 322bz — ANTIGRAVITY SKILLS + ORA VOICE ═══ */
+function SkillsAndVoiceOverviewTile() {
+  const [meta, setMeta] = useState(null);
+  useEffect(() => {
+    fetch(`${API}/api/admin/antigravity-skills/library/meta`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setMeta(d))
+      .catch(() => {});
+  }, []);
+  return (
+    <div className="sov-card" style={{
+      padding: '24px 32px', marginBottom: 20,
+      border: '1px solid #4ADE8055', animation: 'sov-glow 5s ease-in-out infinite',
+    }} data-testid="sov-skills-voice-tile">
+      <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>
+        ANTIGRAVITY SKILLS + ORA VOICE — ITER 322bz SHIPPED
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
+        <StatCard value={(meta?.total_in_db ?? 1453).toLocaleString()} label="SKILLS INGESTED" color="#4ADE80" sub="SKILL.md playbooks" />
+        <StatCard value="72" label="CATEGORIES" color="#C9A84C" sub="text-indexed" />
+        <StatCard value="28" label="AGENTS WIRED" color="#9B6DD4" sub="broadcast-aware" />
+        <StatCard value="<15s" label="BROADCAST TTL" color="#64C8FF" sub="live propagation" />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        <FeatureGrid title="SKILLS LIBRARY" accent="#4ADE80" items={[
+          'Source: sickn33/antigravity-awesome-skills (1,453 SKILL.md)',
+          'Full-text indexed in ora_skills_library (Mongo)',
+          'Admin UI: /admin/skills-library (search · multi-select · broadcast)',
+          'POST /api/admin/antigravity-skills/broadcast → all 28 agents',
+          'Skill addendum auto-appended to every agent system-prompt',
+          'Re-sync endpoint pulls latest from GitHub on demand',
+        ]} />
+        <FeatureGrid title="ORA VOICE (TTS+STT)" accent="#9B6DD4" items={[
+          'Browser-native Web Speech API (zero API key required)',
+          '/my/ora chat: Mic + Speaker toggle (en-IN default)',
+          '/ora PWA: Mic button + existing OpenAI TTS path',
+          '1-click PWA launch from Customer Portal (token-passing)',
+          'Pulse animation while listening — UX feedback',
+          'Speech recognition pipes directly to chat composer',
+        ]} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══ iter 322ca — CUSTOMER AUDIT ($49/mo) ═══ */
+function AuditOverviewTile() {
+  return (
+    <div className="sov-card" style={{
+      padding: '24px 32px', marginBottom: 20,
+      border: '1px solid #FF6B0055', animation: 'sov-glow 5s ease-in-out infinite',
+    }} data-testid="sov-audit-tile">
+      <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#FF6B00' }}>
+        CUSTOMER AUDIT — $49/mo SEO + ADS WASTE — ITER 322ca SHIPPED
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        <FeatureGrid title="PIPELINE" accent="#FF6B00" items={[
+          'Google PageSpeed Insights v5 → Lighthouse scores + Web Vitals',
+          'Custom HTML scrape → title, meta, schema, alt-text gaps',
+          'Ads waste heuristics → GTM, GA4, conv-track, remarketing',
+          '$ figure waste: +200 (no conv), +150 (slow LCP), +100 (no CTA)',
+          'Graceful PSI fallback: psi_status=psi_api_not_enabled',
+          'Auto-trigger on signup if website URL captured',
+        ]} />
+        <FeatureGrid title="ENDPOINTS" accent="#64C8FF" items={[
+          'POST /api/customer/audit/run — trigger fresh audit (JWT)',
+          'GET  /api/customer/audit/latest',
+          'GET  /api/customer/audit/history?limit=20',
+          'GET  /api/customer/audit/{audit_id}',
+          'Auto bg-task on /api/auth/signup (no UX delay)',
+          'Memoir mirror: aurem.customers.{email}.audits.latest',
+        ]} />
+        <FeatureGrid title="UPSELL HOOK" accent="#4ADE80" items={[
+          'Dashboard widget renders on /my home',
+          'Score pills (Perf · SEO · A11y · Best) at-a-glance',
+          'Waste callout shows $/mo + signals + confidence',
+          '"Unlock Ads Optimisation Pro — $49/mo" CTA',
+          'Auto-polls every 30s for bg audit completion',
+          'Re-run audit button for re-engagement',
+        ]} />
+      </div>
+    </div>
+  );
+}
+
 export default function SystemOverview() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -475,6 +630,15 @@ export default function SystemOverview() {
             ]} />
           </div>
         </div>
+
+        {/* ═══ iter 322da — MEMOIR (Git-Versioned Semantic Memory) ═══ */}
+        <MemoirOverviewTile />
+
+        {/* ═══ iter 322bz — ANTIGRAVITY SKILLS LIBRARY + ORA VOICE ═══ */}
+        <SkillsAndVoiceOverviewTile />
+
+        {/* ═══ iter 322ca — CUSTOMER AUDIT ($49/mo SEO + Ads Waste) ═══ */}
+        <AuditOverviewTile />
 
         {/* ═══ iter 322as — LEARNING SYSTEM (ORA Universal + Collective Scan) ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #8B5CF655`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-learning-system">

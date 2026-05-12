@@ -170,6 +170,14 @@ async def broadcast_skills(req: BroadcastRequest, _=Depends(_require_admin)):
         invalidate_cache()
     except Exception:
         pass
+    # Mirror to Memoir — Git-versioned single source of truth for the
+    # 28 agents that read via services.agent_skill_broadcast.
+    try:
+        from services import memoir_service as _M
+        if _M.available():
+            _M.skill_broadcast_set(addendum, list(found_ids))
+    except Exception:
+        pass
     return {
         "ok": True,
         "broadcast_at": now,

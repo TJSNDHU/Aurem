@@ -627,6 +627,14 @@ async def public_demo_chat_stream(
 
         # Persist + metrics (non-blocking)
         asyncio.create_task(_save_turn(sid, bin_for_session, text, full))
+        # Memoir mirror — Git-versioned turn history (audit trail FREE).
+        try:
+            from services import memoir_service as _M
+            if _M.available():
+                _M.ora_remember_turn(sid, "user", text)
+                _M.ora_remember_turn(sid, "assistant", full)
+        except Exception:
+            pass
         total_ms = int((_time.monotonic() - t0) * 1000)
         try:
             if _db is not None:

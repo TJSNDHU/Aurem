@@ -73,6 +73,7 @@ const SECTIONS = [
       { to: '/admin/vanguard',           label: 'Vanguard',            icon: Sword,   hint: '' },
       { to: '/admin/root-command',       label: 'Root Command',        icon: Terminal,hint: 'g r' },
       { to: '/admin/skills-library',     label: 'Skills Library · 1.4k',icon: Sparkles,hint: 'g l' },
+      { to: '/admin/memoir',             label: 'Memoir · Memory',     icon: GitBranch,hint: 'g M' },
     ],
   },
   {
