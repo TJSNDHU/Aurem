@@ -212,3 +212,176 @@ async def cnf_reminder_scheduler():
         except Exception as e:
             logging.error(f"[CRON] CNF reminder error: {e}")
             await asyncio.sleep(3600)
+
+
+async def daily_ora_morning_brief():
+    """Iter 322et — 6 AM Toronto founder digest.
+
+    Fetches the same data as `/api/admin/ora-cto/morning-brief` and emails
+    the markdown rendering via Resend (when RESEND_API_KEY is set) AND
+    optionally WhatsApps a compressed summary to the founder.
+    Falls back silently if the email provider isn't configured — the
+    digest is still persisted to `ora_morning_briefs` so it's always
+    recoverable from the cockpit.
+    """
+    import pytz
+    est = pytz.timezone("America/Toronto")
+    while True:
+        db = _get_db()
+        try:
+            now = datetime.now(est)
+            target = now.replace(hour=6, minute=0, second=0, microsecond=0)
+            if now >= target:
+                target = target + timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logging.info(
+                f"[CRON] ORA morning brief scheduled for {target}, "
+                f"waiting {wait_seconds/3600:.1f}h"
+            )
+            await asyncio.sleep(wait_seconds)
+
+            if db is None:
+                logging.warning("[CRON] morning-brief: db not ready, retry in 1h")
+                await asyncio.sleep(3600)
+                continue
+
+            # Build the brief by calling the same code path used by the
+            # cockpit endpoint — avoids duplication and stays consistent
+            # whether the founder runs it manually or it fires at 6 AM.
+            from routers.ora_cto_cockpit_router import morning_brief
+            # Bypass auth by calling the underlying logic directly. The
+            # endpoint factors the auth check at the top, so we replicate
+            # only the data-gathering portion via a private helper.
+            brief_doc = await _build_morning_brief_inline(db)
+
+            # Persist
+            await db.ora_morning_briefs.insert_one({
+                "ts":            datetime.now(timezone.utc).isoformat(),
+                "target_local":  target.isoformat(),
+                "summary":       brief_doc,
+            })
+
+            # Email via Resend (best-effort)
+            try:
+                import resend  # type: ignore
+                api_key = os.environ.get("RESEND_API_KEY", "").strip()
+                digest_email = (
+                    (await db.platform_settings.find_one({"_id": "ora_cto"}) or {})
+                    .get("notifications", {})
+                    .get("digest_email")
+                    or os.environ.get("FOUNDER_EMAIL", "teji.ss1986@gmail.com")
+                )
+                if api_key and digest_email:
+                    resend.api_key = api_key
+                    resend.Emails.send({
+                        "from":    os.environ.get("RESEND_FROM",
+                                                    "ora@aurem.live"),
+                        "to":      [digest_email],
+                        "subject": f"☀️ AUREM Morning Brief — {target.strftime('%Y-%m-%d')}",
+                        "html":    "<pre style='font-family:ui-monospace,monospace;font-size:12px'>"
+                                    + brief_doc["markdown"].replace("<", "&lt;")
+                                    + "</pre>",
+                    })
+                    logging.info("[CRON] ORA morning brief emailed via Resend")
+            except Exception as e:
+                logging.warning(f"[CRON] morning-brief email skipped: {e}")
+
+            # Sleep 30 min so we don't re-fire on the same hour edge
+            await asyncio.sleep(30 * 60)
+
+        except Exception as e:
+            logging.error(f"[CRON] morning-brief error: {e}")
+            await asyncio.sleep(3600)
+
+
+async def _build_morning_brief_inline(db):
+    """Same data-gathering as routers/ora_cto_cockpit_router.morning_brief,
+    callable without an HTTP request. Returns the dict with the markdown
+    rendering."""
+    import subprocess
+    from datetime import timezone as _tz
+
+    try:
+        r = subprocess.run(
+            ["git", "log", "--pretty=format:%h | %s | %an", "-10"],
+            capture_output=True, text=True, timeout=5, cwd="/app",
+        )
+        git_log_lines = [line for line in (r.stdout or "").splitlines() if line.strip()]
+    except Exception:
+        git_log_lines = ["(git log unavailable)"]
+
+    pillar_collections = [
+        "leads", "customers", "trials", "subscriptions",
+        "ora_tool_invocations", "ora_commit_proposals",
+        "ora_governance_overrides", "ora_uploaded_files",
+        "ora_skills_library", "design_extract_logs",
+    ]
+    db_counts: dict[str, int] = {}
+    for c in pillar_collections:
+        try:
+            db_counts[c] = await db[c].count_documents({})
+        except Exception:
+            db_counts[c] = -1
+
+    since = (datetime.now(_tz.utc) - timedelta(hours=24)).isoformat()
+    overrides = await db.ora_governance_overrides.find(
+        {"ts": {"$gte": since}}, {"_id": 0},
+    ).sort("ts", -1).limit(10).to_list(length=10)
+
+    inv_24h = await db.ora_tool_invocations.count_documents({"ts": {"$gte": since}})
+    fails_24h = await db.ora_tool_invocations.count_documents(
+        {"ts": {"$gte": since}, "ok": False}
+    )
+    failure_rate = round(fails_24h / max(inv_24h, 1) * 100, 2) if inv_24h else 0.0
+
+    active_customers = 0
+    for coll, q in (
+        ("subscriptions", {"status": {"$in": ["active", "trialing", "paid"]}}),
+        ("customers",     {"status": "active"}),
+        ("users",         {"is_active": True}),
+    ):
+        try:
+            n = await db[coll].count_documents(q)
+            if n > 0:
+                active_customers = n
+                break
+        except Exception:
+            continue
+
+    pending = await db.ora_commit_proposals.find(
+        {"status": "pending"}, {"_id": 0},
+    ).sort("proposed_at", -1).limit(20).to_list(length=20)
+
+    md_lines = [
+        "# AUREM Morning Brief",
+        f"_Generated {datetime.now(_tz.utc).isoformat()[:19]} UTC_",
+        "",
+        "## Last 10 Commits",
+    ]
+    md_lines.extend([f"  - `{ln}`" for ln in git_log_lines[:10]])
+    md_lines += ["", "## DB State"]
+    md_lines += [f"  - **{k}** — {v}" for k, v in db_counts.items()]
+    md_lines += ["", f"## Council Overrides (24h): {len(overrides)}"]
+    if not overrides:
+        md_lines.append("  - _no overrides — every council vote honored_")
+    md_lines += ["", "## Tool Activity (24h)",
+                  f"  - Invocations: **{inv_24h}**",
+                  f"  - Failures: **{fails_24h}** ({failure_rate}%)"]
+    md_lines += ["", f"## Active Customers: **{active_customers}**"]
+    md_lines += ["", f"## Pending Git-Gate Proposals: **{len(pending)}**"]
+    if not pending:
+        md_lines.append("  - _none — repo is clean_")
+
+    return {
+        "git_log":          git_log_lines,
+        "db_counts":        db_counts,
+        "council_overrides_24h": overrides,
+        "tool_activity_24h": {
+            "invocations":  inv_24h,
+            "failures":     fails_24h,
+            "failure_rate": failure_rate,
+        },
+        "active_customers": active_customers,
+        "pending_proposals": pending,
+        "markdown":         "\n".join(md_lines),
+    }

@@ -226,6 +226,8 @@ function CTOPane() {
   const [recent, setRecent] = useState([]);
   const [error, setError] = useState(null);
   const [backups, setBackups] = useState([]);
+  const [brief, setBrief] = useState(null);
+  const [briefBusy, setBriefBusy] = useState(false);
   const navigate = useNavigate();
 
   const loadRecent = async () => {
@@ -243,6 +245,20 @@ function CTOPane() {
       const j = await r.json();
       if (j?.ok) setBackups(j.rows || []);
     } catch { /* soft fail */ }
+  };
+  const runMorningBrief = async () => {
+    setBriefBusy(true);
+    try {
+      const r = await fetch(`${API}/api/admin/ora-cto/morning-brief`,
+                             { headers: authHeaders() });
+      const j = await r.json();
+      if (j?.ok) setBrief(j);
+      else setError(j?.detail || "morning-brief failed");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBriefBusy(false);
+    }
   };
   useEffect(() => {
     loadRecent(); loadBackups();
@@ -376,6 +392,35 @@ function CTOPane() {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 14 }}>
       {/* LEFT: quick actions + output */}
       <div style={{ display: "grid", gap: 12 }}>
+        {/* Morning Brief banner */}
+        <div style={{ ...GLASS, padding: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>☀️ Morning Brief</div>
+              <div style={{ color: TEXT_DIM, fontSize: 11 }}>
+                git log · DB counts · overrides · failures · customers · pending proposals
+              </div>
+            </div>
+            <button data-testid="morning-brief-btn" onClick={runMorningBrief}
+                    disabled={briefBusy} style={btn(true, briefBusy)}>
+              {briefBusy ? <Loader2 size={12} className="spin" /> : <Sparkles size={12} />}
+              {brief ? "Refresh brief" : "Run brief"}
+            </button>
+          </div>
+          {brief && (
+            <pre data-testid="morning-brief-output"
+                  style={{
+                    marginTop: 12, padding: 12, borderRadius: 8,
+                    background: "rgba(0,0,0,0.4)", border: `1px solid ${BORDER}`,
+                    color: TEXT, fontSize: 11.5, lineHeight: 1.5,
+                    whiteSpace: "pre-wrap", maxHeight: 360, overflow: "auto",
+                    fontFamily: "ui-monospace,monospace",
+                  }}>
+              {brief.markdown}
+            </pre>
+          )}
+        </div>
+
         <div style={{ ...GLASS, padding: 16 }}>
           <div style={{ color: TEXT_DIM, fontSize: 12, textTransform: "uppercase", marginBottom: 8 }}>
             Quick actions

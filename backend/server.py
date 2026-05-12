@@ -1721,6 +1721,8 @@ async def startup_event():
 
             _si_safe_task(_pixel_install_reminder_loop(db), "pixel_install_reminder_loop")
             _si_safe_task(_trial_expiry_reminder_loop(db), "trial_expiry_reminder_loop")
+            # iter 322et — ORA morning brief at 6 AM Toronto
+            _si_safe_task(daily_ora_morning_brief(), "ora_morning_brief_6am_toronto")
             logging.info("[STARTUP] post-orchestrator migration + reminder tasks armed")
         except Exception as _e:
             logging.warning(f"[STARTUP] post-orchestrator tasks failed: {_e}")
@@ -2025,6 +2027,7 @@ from services.cron_schedulers import (
     daily_stock_alert_scheduler,
     weekly_revenue_summary_scheduler,
     cnf_reminder_scheduler,
+    daily_ora_morning_brief,
     set_db as set_cron_db,
 )
 

@@ -1,5 +1,17 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322et (2026-05-12) — MORNING BRIEF + 6 AM TORONTO NIGHTLY DIGEST**
+>
+> Tonight's 15-min enhancement landed:
+>
+> - **`GET /api/admin/ora-cto/morning-brief`** — single-call aggregator over 6 founder-facing panels: `git_log -10`, DB counts across 10 critical collections (`leads`, `customers`, `trials`, `subscriptions`, `ora_tool_invocations`, `ora_commit_proposals`, `ora_governance_overrides`, `ora_uploaded_files`, `ora_skills_library`, `design_extract_logs`), council overrides 24h, tool failure rate 24h, active customers count, pending git-gate proposals. Returns both structured JSON and a markdown rendering ready to paste into Slack/WhatsApp.
+> - **"☀️ Morning Brief" banner at top of /admin/ora-chat CTO Mode tab** — one-click "Run brief" / "Refresh brief" button, full markdown output rendered in glass-bubble pre block.
+> - **6 AM Toronto nightly digest cron** — `daily_ora_morning_brief()` in `services/cron_schedulers.py` wired into `_deferred_post_orch_tasks()` in `server.py`. Uses pytz `America/Toronto` for precise local-time scheduling. Persists every digest to `ora_morning_briefs` and emails the markdown via Resend if `RESEND_API_KEY` is set (digest_email pulled from the `platform_settings/ora_cto` notifications section).
+>
+> **Verified live**: endpoint returned `ok=true` with `git_log_lines=10`, `tool_activity_24h={invocations:107, failures:36, failure_rate:33.64%}`, `active_customers=1`, `pending_proposals=0`. Top of the markdown rendering shows 4 real ORA-signed commits (`9359820`, `3615044`, `a89babc`, `c3ff792`).
+
+---
+
 > **🟢 ITER 322es (2026-05-12) — ORA CTO 100% COMPLETE · NO BROKEN ENDS**
 >
 > Founder ordered: finish the ORA CTO stack fully before Camoufox. Cost-tracking and quotas explicitly skipped (AUREM is self-hosted, single-founder — meter customers, not yourself). Council gate + git commit gate are the safety net.
