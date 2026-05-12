@@ -1140,6 +1140,27 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] antigravity_skills_router skipped: {e}")
 
+    # iter 322ep — Design Extract admin router (DTCG/shadcn tokens from competitor URLs)
+    if not _should_skip("routers.design_extract_router"):
+        try:
+            from routers.design_extract_router import router as design_extract_router
+            app.include_router(design_extract_router)
+            logger.info("[REGISTRY] design_extract_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] design_extract_router skipped: {e}")
+
+    # iter 322ep — ORA Optimize admin router (codeburn-pattern LLM budget watchdog)
+    if not _should_skip("routers.ora_optimize_router"):
+        try:
+            from routers.ora_optimize_router import router as ora_optimize_router
+            app.include_router(ora_optimize_router)
+            logger.info("[REGISTRY] ora_optimize_router loaded")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] ora_optimize_router skipped: {e}")
+
+
 
     # Customer Site Audit Router ($49/mo SEO + Ads Waste detector)
     if not _should_skip("routers.customer_audit_router"):

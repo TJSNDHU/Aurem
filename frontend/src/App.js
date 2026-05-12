@@ -89,6 +89,8 @@ import AvatarManager from './platform/admin/AvatarManager';
 import CustomerHealthPanel from './platform/admin/CustomerHealthPanel';
 import AdminBrainPage from './platform/admin/AdminBrainPage';
 import CouncilAuditPage from './platform/admin/CouncilAuditPage';
+import DesignExtractStudio from './platform/admin/DesignExtractStudio';
+import OraOptimizer from './platform/admin/OraOptimizer';
 import MonitorFreeLanding from './platform/MonitorFreeLanding';
 import AdminSiteMonitor from './platform/AdminSiteMonitor';
 import PublicStatusPage from './platform/PublicStatusPage';
@@ -325,6 +327,8 @@ function AppRouter() {
         <Route path="/admin/customer-health" element={<CustomerHealthPanel />} />
         <Route path="/admin/brain" element={<AdminBrainPage />} />
         <Route path="/admin/council-audit" element={<CouncilAuditPage />} />
+        <Route path="/admin/design-extract" element={<DesignExtractStudio />} />
+        <Route path="/admin/ora-optimize" element={<OraOptimizer />} />
         <Route path="/admin/links" element={<AdminLinksHub />} />
         <Route path="/admin/site-monitor" element={<AdminSiteMonitor />} />
         <Route path="/admin/system-audit" element={<AdminSystemAudit />} />

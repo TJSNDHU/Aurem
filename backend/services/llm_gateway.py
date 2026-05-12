@@ -102,7 +102,15 @@ async def _try_emergent(system_prompt: str, user_prompt: str,
         return None
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = (LlmChat(api_key=api_key, session_id="gateway",
+        # iter 322ep — use a UNIQUE session_id per call so the upstream
+        # Emergent wrapper never carries stale conversation history
+        # across unrelated gateway invocations. Reusing the literal
+        # "gateway" session_id caused new skill broadcasts to be
+        # ignored because Emergent's session cache pinned the old
+        # system_message + assistant history.
+        import uuid as _uuid
+        sid = f"gw-{_uuid.uuid4().hex[:12]}"
+        chat = (LlmChat(api_key=api_key, session_id=sid,
                          system_message=system_prompt or "")
                 .with_model("anthropic", "claude-sonnet-4-5-20250929"))
         try:

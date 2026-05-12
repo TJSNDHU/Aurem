@@ -141,11 +141,17 @@ def _flatten_tokens(tokens: Dict[str, Any]) -> Dict[str, Any]:
 async def _run_cli(url: str, outdir: str, name: str,
                     timeout: int) -> Dict[str, Any]:
     cmd = ["npx", "--yes", "designlang", url, "--out", outdir, "--name", name]
+    # Ensure the CLI inherits the playwright browsers path so the
+    # subprocess can find chromium even when the parent supervisor
+    # didn't pre-set this env.
+    env = os.environ.copy()
+    env.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/pw-browsers")
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd="/tmp",
+        env=env,
     )
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)

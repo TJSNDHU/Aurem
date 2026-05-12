@@ -85,6 +85,7 @@ const SECTIONS = [
       { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity,   hint: 'g h' },
       { to: '/admin/stem-fix',           label: 'Stem-Fix · Refactor', icon: GitBranch,  hint: '' },
       { to: '/admin/self-repair',        label: 'Self-Repair',         icon: RotateCcw,  hint: '' },
+      { to: '/admin/ora-optimize',       label: 'ORA Optimizer · $',   icon: Zap,        hint: '' },
     ],
   },
   {
@@ -94,6 +95,7 @@ const SECTIONS = [
       { to: '/admin/control-center',     label: 'Control Center',      icon: Hammer,     hint: 'g c' },
       { to: '/admin/evolver',            label: 'EvoMap Evolver',      icon: Sparkles,   hint: 'g e' },
       { to: '/admin/case-study',         label: 'Case Study Builder',  icon: FileText,   hint: 'g k' },
+      { to: '/admin/design-extract',     label: 'Design Extract',      icon: Sparkles,   hint: '' },
     ],
   },
   {

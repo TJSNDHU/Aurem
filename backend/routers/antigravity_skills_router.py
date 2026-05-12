@@ -138,13 +138,24 @@ async def broadcast_skills(req: BroadcastRequest, _=Depends(_require_admin)):
     if missing:
         raise HTTPException(404, f"Unknown skills: {missing}")
 
+    # iter 322ej-fix: full-body for skills ≤10K chars, head only beyond.
+    # Reason: pre-fix the 600-char truncation hid the mandatory 3-proof
+    # block (lived at ~6700 chars of dev-engineering-protocol body) →
+    # ORA hallucinated the proof rules. Total broadcast still fits in
+    # any LLM context window (≤60K chars across all skills).
+    FULL_BODY_LIMIT = 10_000
+    HEAD_LEN = 1_200  # fallback head for oversized skills
     bits: list[str] = []
     for d in docs:
-        head = (d.get("body") or "")[:600].strip()
+        body = (d.get("body") or "").strip()
+        if len(body) <= FULL_BODY_LIMIT:
+            content = body
+        else:
+            content = body[:HEAD_LEN].strip() + "\n[...truncated for size, see full skill in library...]"
         bits.append(
             f"### SKILL: {d['name']} ({d['category']})\n"
             f"{d.get('description', '')}\n"
-            f"{head}"
+            f"{content}"
         )
     addendum = "\n\n".join(bits)
 

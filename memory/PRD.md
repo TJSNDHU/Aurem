@@ -1,5 +1,55 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322ep (2026-05-12) — BROADCAST INJECTION FIX + 2 P0 ADMIN TOOLS**
+>
+> **Problem found**: ORA was hallucinating the "3-proof verification block" of the developer-engineering-protocol skill. Real proof: founder asked ORA to quote it — ORA invented `Lint / Test / Integration` (wrong) instead of the real `grep/curl/db count → health check → git log --oneline -3`. Skill was in `ora_skills_library` (9,690 chars, body intact) AND in active broadcast (`skill_ids` contained it) — but the broadcasted `system_addendum` did **not** contain the 3-proof block.
+>
+> **Root cause**: `routers/antigravity_skills_router.py:broadcast_skills()` truncated each skill body to first **600 chars** before writing to `system_addendum`. The 3-proof block lives at ~6,700 chars deep in the dev-engineering-protocol body → never reached the LLM's system prompt. Same bug silently dropped the operational rules of every long skill.
+>
+> **Fix** (`routers/antigravity_skills_router.py`): full-body injection when `body ≤ 10,000 chars`, else first 1,200 chars + truncation marker. Total addendum across 12 active skills = **58,754 chars** (was 12,398). Well within any LLM context window. Verified via real `string in addendum` greps + a re-run LLM call (Claude Sonnet 4.5) which now answers **3/3 verbatim**.
+>
+> **Also fixed** — `services/llm_gateway.py:_try_emergent()`: was reusing `session_id="gateway"` across every call, causing Emergent's session cache to pin stale conversation history (new skill broadcasts ignored). Switched to per-call `uuid.uuid4()` session IDs.
+>
+> **Persisted as a permanent ORA skill** (`aurem-322ep-broadcast-content-injection-fix`, category `ora_memory_integrity`) — teaches that "broadcast row exists" is NOT proof the LLM sees the rules. The only valid proof is a `string in addendum` grep + a behaviour LLM test.
+>
+> **2 New P0 Admin Tools shipped**:
+>
+> **A. Design Extract Studio** (`/admin/design-extract` + `/api/admin/design-extract/*`)
+>   - Pull DTCG tokens, Tailwind config, shadcn variables, and CSS from any competitor URL
+>   - Powered by `npx designlang` (FREE, 0 paid keys)
+>   - Endpoints: `POST /run`, `GET /history`, `GET /summary`, `GET /export/{tailwind|css|shadcn|tokens|theme}`, `POST /compare`
+>   - Fixed inherited Playwright env var so subprocess finds chromium (was failing pre-322ep)
+>   - **Verified live on https://stripe.com**: score 88/100, primary=#533afd, accent extracted, 12-color palette, sohne-var fonts, 7 raw export files generated in 7.6s.
+>
+> **B. ORA Optimizer** (`/admin/ora-optimize` + `/api/admin/ora-optimize/*`)
+>   - "Codeburn-pattern" LLM budget watchdog. Reads `llm_costs` + `llm_response_cache`.
+>   - Surfaces: top expensive task_types, provider mix, cache hit ratio, stale-cache drop candidates, prioritized recommendations with $-savings estimates
+>   - Endpoints: `GET /scan`, `GET /summary`, `GET /stale-cache`, `POST /purge-stale`, `POST /clear-cache` (founder-confirm only)
+>   - **Verified live**: 325 cache rows · 5 hot (3+ hits) · 246 stale (zero hits) → "Drop 246 zero-hit cache rows" recommendation surfaced with one-click purge
+>
+> **Regression locked**: 5/5 tests passing in `/app/backend/tests/test_iter_322ep_broadcast_and_admin_tools.py`. The broadcast-truncation test fails fast if anyone reverts to 600-char head.
+>
+> **Files**:
+>   - `/app/backend/routers/antigravity_skills_router.py` (broadcast truncation fix)
+>   - `/app/backend/services/llm_gateway.py` (session_id uniqueness)
+>   - `/app/backend/services/design_extractor.py` (env propagation for npx)
+>   - `/app/backend/routers/design_extract_router.py` (new)
+>   - `/app/backend/routers/ora_optimize_router.py` (new)
+>   - `/app/backend/routers/registry.py` (wired both)
+>   - `/app/backend/ora_skills/dev_broadcast-content-injection-fix.md` (new skill)
+>   - `/app/backend/scripts/teach_ora_iter_322ep.py` (4-channel teach script)
+>   - `/app/frontend/src/platform/admin/DesignExtractStudio.jsx` (new UI page)
+>   - `/app/frontend/src/platform/admin/OraOptimizer.jsx` (new UI page)
+>   - `/app/frontend/src/App.js` (routes wired)
+>   - `/app/frontend/src/platform/AdminShell.jsx` (sidebar links added — BUILD + HEALTH sections)
+>
+> **3 Proofs** ✓
+>   1. `curl /api/admin/design-extract/_/health → HTTP 200`, `curl /api/admin/ora-optimize/_/health → HTTP 200`
+>   2. `MANDATORY 3 PROOFS`, `git log --oneline -3`, `/api/platform/health` ALL present in 58,754-char live addendum
+>   3. `144baf6 auto-commit for 41dffba1-0074-4cf1-9f74-353bba9b1229` (git log oneline -3 — real shell output)
+
+---
+
 > **🟢 ITER 322db (2026-05-12) — ENDPOINT GOVERNANCE LEAKY 882→0**
 >
 > **Problem:** Pillars-Map Evidence Classifier was reporting 882 LEAKY endpoints (score=2 = no traffic + no UI surface). Most were false positives — legit webhooks, OAuth callbacks, server-to-server APIs, and POST-only event endpoints that simply don't have a `/admin/...` page in the surface index.
