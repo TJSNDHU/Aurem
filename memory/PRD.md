@@ -1,5 +1,51 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322ca (2026-05-11) — $49/mo CUSTOMER AUDIT (SEO + ADS WASTE) SHIPPED**
+>
+> Revenue-generating upsell feature shipped. Customer signs up → AUREM automatically:
+>   1. Runs SEO + performance audit on their website
+>   2. Detects Google Ads waste indicators
+>   3. Shows results in the `/my` dashboard
+>   4. Upsells "Ads Optimisation Pro — $49/mo" when waste is detected
+>
+> **Pipeline (per audit, ~700ms with PSI / 1-3s without):**
+>   - Google PageSpeed Insights v5 (free key, optional) → Lighthouse scores + Core Web Vitals
+>   - Custom HTML scrape → title, meta-desc, H1 count, OG image, JSON-LD schema, alt-text gaps
+>   - Ads waste heuristics → detects Google Ads, GTM, GA4, conversion tracking, remarketing
+>   - Estimated $/mo waste signal: +$200 (no conversion tracking), +$150 (slow LCP),
+>     +$100 (generic landing page), +$80 (no remarketing), +$50 (no schema)
+>   - Graceful PSI fallback: if Google Cloud key doesn't have PageSpeed API enabled,
+>     `psi_status='psi_api_not_enabled'` and the audit still ships scraping + heuristics.
+>
+> **Auto-trigger on signup:** if the signup form captured `website`/`domain`/`company_website`,
+> the audit fires as a bg task so the customer sees a populated dashboard widget within ~60s
+> of landing on `/my`. Sticky hook for the $49/mo upsell.
+>
+> **Endpoints (new):**
+>   - `POST /api/customer/audit/run` — fire audit (JWT required)
+>   - `GET  /api/customer/audit/latest`
+>   - `GET  /api/customer/audit/history?limit=20`
+>   - `GET  /api/customer/audit/{audit_id}`
+>   - `GET  /api/customer/audit/_/health` (Pillars-Map probe)
+>
+> **Files added/changed:**
+>   - `/app/backend/services/customer_audit_service.py` (new — audit pipeline)
+>   - `/app/backend/routers/customer_audit_router.py` (new — REST + JWT auth)
+>   - `/app/backend/routers/platform_auth_router.py` (auto-audit hook on signup)
+>   - `/app/backend/routers/registry.py` (wired)
+>   - `/app/frontend/src/platform/customer/AuditWidget.jsx` (new — dashboard widget)
+>   - `/app/frontend/src/platform/customer/CustomerHome.jsx` (widget mounted)
+>
+> **Testing:** 10/10 backend tests passing (100%). PSI 403 graceful fallback confirmed.
+> Auth (401), isolation (404), retrieval (200), heuristics output all verified.
+> Test file: `/app/backend/tests/test_customer_audit.py`. Report: `/app/test_reports/iteration_322ca.json`.
+>
+> **Action for user:** enable "PageSpeed Insights API" on the existing Google Cloud project
+> for `GOOGLE_PAGESPEED_API_KEY` to unlock Lighthouse scores. Without it the audit still ships
+> SEO + ads-waste signals from HTML scrape (PSI is additive).
+
+---
+
 > **🟢 ITER 322bz (2026-05-11) — DEPLOY FIX + ANTIGRAVITY SKILLS LIBRARY + ORA VOICE SHIPPED**
 >
 > Three things landed in this iteration:
