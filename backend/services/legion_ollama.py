@@ -93,7 +93,7 @@ async def ask_legion_ollama(
 
     result = await legion_exec(
         cmd=cmd,
-        cwd="/opt/aurem-cto",
+        cwd="/tmp",
         timeout_s=t + 10,        # daemon-side timeout (curl's own + small grace)
         risk_hint="low",         # plain HTTP to localhost — no Telegram gate
         wait_max_s=wait_max_s,   # pod-side wait for daemon ack
@@ -148,7 +148,7 @@ async def ollama_health() -> dict:
         f"cat /tmp/.aurem-ollama-tags.json"
     )
     result = await legion_exec(
-        cmd=cmd, cwd="/opt/aurem-cto", timeout_s=15,
+        cmd=cmd, cwd="/tmp", timeout_s=15,
         risk_hint="low", wait_max_s=20,
     )
     if not result.get("ok"):

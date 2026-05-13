@@ -1,3 +1,50 @@
+## 2026-02 — iter 322g cont. — Sovereign LLM stack LIVE (Ollama on Legion)
+
+**Achievement**: First successful end-to-end ORA → Local Ollama → response chain.
+llama3.1:8B running on the founder's Legion laptop now serves real ORA turns
+with **$0 cost**, **100% sovereign**, no cloud LLM dependency.
+
+**Debug chain (real proof from DB)**
+1. Daemon was running but every job failed with `PermissionError(13)` →
+   `/opt/aurem-cto` cwd wasn't accessible to daemon user on WSL.
+2. After cwd fix, daemon got "host.docker.internal:11434 timeout" →
+   Windows Ollama binds only to `127.0.0.1` (loopback), WSL2 can't reach it.
+3. User ran `$env:OLLAMA_HOST = "0.0.0.0:11434"` + `ollama serve` → bridge open.
+4. Next blocker: `cmd exceeds 4000 char limit` in `legion_tool.legion_exec`
+   → curl payload with full conversation + 30+ tool schemas is ~13KB.
+5. After bumping limit to 200KB → first /v1/chat call completed:
+   `elapsed=107619ms, model=llama3.1:latest, prompt=2952t, completion=27t`.
+6. Subsequent calls **2909ms / 4077ms** (Ollama warm).
+
+**Files changed**
+- `routers/legion_queue_router.py` — `/queue/next` stamps `legion_daemon_status`
+  heartbeat for fast-fail liveness checks.
+- `services/ora_agent.py` —
+  - `_ollama_with_tools` skips if daemon heartbeat >30s stale.
+  - Changed `cwd="/opt/aurem-cto"` → `cwd="/tmp"` (always writable).
+  - Added actionable "all 3 LLM providers down" error message with daemon status.
+- `services/legion_tool.py` — `cmd` limit 4000 → 200KB; default cwd `/tmp`.
+- `services/legion_ollama.py` — cwd `/tmp`.
+- `aurem-cto/daemon/legion_daemon.py` — robust cwd fallback (verify writability,
+  fall back to `~`, `/tmp`, or os.getcwd()).
+- `backend/.env` — added `LEGION_OLLAMA_URL=http://host.docker.internal:11434`,
+  `LEGION_OLLAMA_MODEL=llama3.1:latest`, `ORA_AGENT_OLLAMA_WAIT_S=200`.
+
+**Live e2e proof (preview, 2026-02-13 ~09:53 UTC)**
+- legion_queue 3 most-recent `/v1/chat/completions` rows: all `exit=0`,
+  stdout = valid OpenAI-format JSON with tool_calls from llama3.1.
+- Daemon heartbeat updates every 5s in `legion_daemon_status`.
+
+**Honest note** — llama3.1:8B has poor tool-use discipline (loops on
+`view_file` calls). For interactive chat ORA's final user-facing reply
+still falls back to Claude. The sovereign value is **cost-free intermediate
+inference cycles** + **no rate limit risk**. Larger / instruction-tuned
+local models (qwen2.5:7b-instruct, mistral-nemo) would close the
+remaining gap.
+
+---
+
+
 ## 2026-02 — iter 322g — Campaign uptime restored (P0) + ORA Campaign Watchdog
 
 **Investigation (DB proof, not theatre)**

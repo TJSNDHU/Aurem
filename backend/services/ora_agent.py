@@ -227,6 +227,7 @@ async def _llm_turn(
             else:
                 continue
             if msg is not None:
+                logger.info(f"[ora-agent] provider={provider} served reply")
                 return msg
         except Exception as e:
             logger.warning(
@@ -333,14 +334,15 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
         f"{url.rstrip('/')}/v1/chat/completions"
     )
     result = await legion_exec(
-        cmd=cmd, cwd="/opt/aurem-cto",
+        cmd=cmd, cwd="/tmp",
         timeout_s=timeout_s + 10, risk_hint="low",
-        wait_max_s=int(os.environ.get("ORA_AGENT_OLLAMA_WAIT_S", "120")),
+        wait_max_s=int(os.environ.get("ORA_AGENT_OLLAMA_WAIT_S", "200")),
     )
-    if not result.get("ok") or int(result.get("exit_code", -1)) != 0:
+    if not result.get("ok") or int(result.get("exit_code") or -1) != 0:
         logger.info(
             f"[ora-agent] ollama miss: ok={result.get('ok')} "
-            f"exit={result.get('exit_code')} stderr={(result.get('stderr','') or '')[:160]}"
+            f"exit={result.get('exit_code')} err={result.get('error')!r} "
+            f"stderr={(result.get('stderr','') or '')[:160]}"
         )
         return None
     stdout = (result.get("stdout") or "").strip()
@@ -349,9 +351,15 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     try:
         data = _json.loads(stdout)
     except _json.JSONDecodeError as e:
-        logger.info(f"[ora-agent] ollama non-JSON: {e} body={stdout[:200]}")
+        logger.info(f"[ora-agent] ollama non-JSON: {e} body={stdout[:300]}")
         return None
-    return (data.get("choices") or [{}])[0].get("message") or {}
+    msg = (data.get("choices") or [{}])[0].get("message") or {}
+    logger.info(
+        f"[ora-agent] ollama OK: model={data.get('model')} "
+        f"tokens={data.get('usage',{}).get('total_tokens')} "
+        f"elapsed={result.get('elapsed_ms')}ms"
+    )
+    return msg
 
 
 async def _claude_text_fallback(messages: list[dict[str, Any]]) -> dict[str, Any] | None:

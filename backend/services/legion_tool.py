@@ -22,8 +22,12 @@ async def legion_exec(
     # ── Input validation ─────────────────────────────────────
     if not cmd or not isinstance(cmd, str):
         return {'ok': False, 'error': 'cmd must be a non-empty string'}
-    if len(cmd) > 4000:
-        return {'ok': False, 'error': 'cmd exceeds 4000 char limit'}
+    if len(cmd) > 200_000:
+        # iter 322g — bumped from 4000 to 200KB. The old limit blocked
+        # Ollama curl calls (full conversation + tool schemas serialize
+        # to ~20–50KB JSON in the -d body). Linux ARG_MAX is ~2MB so
+        # 200KB is well within shell safety.
+        return {'ok': False, 'error': 'cmd exceeds 200KB limit'}
     if not (1 <= int(timeout_s) <= 600):
         return {'ok': False, 'error': 'timeout_s must be 1..600'}
     if not (1 <= int(wait_max_s) <= 900):
