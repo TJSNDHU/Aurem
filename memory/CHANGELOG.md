@@ -1,3 +1,50 @@
+## 2026-02 — iter 322g part 3 — Local-only mode LIVE, qwen2.5:7b-instruct
+
+**User mandate**: "Sab kuch chod, koi claude ya groq nahi. Bas mera local pe chla de. Speed best chahiye."
+
+**Achievement**: ORA chat running 100% on user's Legion laptop. qwen2.5:7b-instruct, native /api/chat, keep_alive=60m. Warm reply 1.4–1.8 sec.
+
+**Live e2e proof (preview, 4 sequential ORA chat calls)**:
+```
+Call 1: 6s  ollama=1.47s  "oran bien, gracias!..."
+Call 2: 8s  ollama=1.40s  "orangetto here!..."
+Call 3: 13s ollama=1.55s  "I'm operational and ready..."
+Call 4: 18s ollama=1.78s  "I'm functioning well..."
+content_len: 36–62 chars  tool_calls: 0
+```
+
+**Changes**
+- `.env`: `ORA_AGENT_PROVIDER_ORDER=legion_ollama` (cloud disabled).
+- `.env`: `LEGION_OLLAMA_MODEL=qwen2.5:7b-instruct` (better tool-use, less looping).
+- `services/ora_agent.py::_ollama_with_tools`:
+  - Switched from OpenAI-compat `/v1/chat/completions` to Ollama native `/api/chat`
+    to support `keep_alive: "60m"` (model stays in RAM long-term).
+  - Native shape parsing: `data['message']` instead of `data['choices'][0]['message']`.
+  - **Critical fix**: `int(result.get("exit_code") or -1) != 0` was buggy — Python
+    short-circuits `0 or -1` → `-1`, so successful runs (exit=0) were being
+    rejected. Changed to `result.get("exit_code") != 0`. Without this fix every
+    Ollama success was being treated as a miss.
+- `services/ora_agent.py`: hard timeouts per provider (60s/20s/15s) so Cloudflare
+  100s edge timeout never trips.
+- `services/ora_agent.py`: liveness gate now checks BOTH heartbeat AND in-flight
+  jobs (daemon is single-threaded — busy = stale heartbeat ≠ dead).
+- `services/ora_agent.py`: actionable local-only error message when daemon down.
+- `pillars/sales/worker.py`: disabled `ollama_warmer` — it was jamming the
+  single-threaded daemon queue. Ollama's built-in 60m `keep_alive` is enough.
+- Installed qwen2.5:7b-instruct (4466MB) on user's laptop via daemon remote-exec.
+
+**Daemon throughput cap (acknowledged)**
+The Legion daemon polls /next every 5s but is **single-threaded** — one job at a
+time. Under heavy load (multiple parallel chats) jobs queue up serially. For now
+this is fine (single-user dev). For multi-user prod a worker pool in the daemon
+would be needed.
+
+**Cloud chain status**: DISABLED via env. Code path preserved — re-enable by
+setting `ORA_AGENT_PROVIDER_ORDER=legion_ollama,groq,claude`.
+
+---
+
+
 ## 2026-02 — iter 322g cont. — Sovereign LLM stack LIVE (Ollama on Legion)
 
 **Achievement**: First successful end-to-end ORA → Local Ollama → response chain.

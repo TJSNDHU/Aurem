@@ -347,29 +347,32 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     url   = os.environ.get("LEGION_OLLAMA_URL", "http://localhost:11434")
     timeout_s = int(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "180"))
 
+    # iter 322g — use Ollama native /api/chat so we can set keep_alive
+    # (OpenAI-compat /v1/chat/completions ignores keep_alive). keep_alive
+    # = "60m" means model stays in RAM for 60min after last use, so
+    # subsequent chats stay sub-5s.
     payload: dict[str, Any] = {
         "model":       model,
         "messages":    messages,
         "tools":       all_agent_tool_schemas(),
-        "tool_choice": "auto",
-        "temperature": 0.25,
-        "max_tokens":  1000,
         "stream":      False,
+        "keep_alive":  "60m",
+        "options":     {"temperature": 0.25, "num_predict": 1000},
     }
     body = _json.dumps(payload, ensure_ascii=False)
     cmd = (
         f"curl -sS --max-time {timeout_s} "
         f"-H 'Content-Type: application/json' "
         f"-d {shlex.quote(body)} "
-        f"{url.rstrip('/')}/v1/chat/completions"
+        f"{url.rstrip('/')}/api/chat"
     )
     result = await legion_exec(
         cmd=cmd, cwd="/tmp",
         timeout_s=timeout_s + 10, risk_hint="low",
         wait_max_s=int(os.environ.get("ORA_AGENT_OLLAMA_WAIT_S", "200")),
     )
-    if not result.get("ok") or int(result.get("exit_code") or -1) != 0:
-        logger.info(
+    if not result.get("ok") or result.get("exit_code") != 0:
+        logger.warning(
             f"[ora-agent] ollama miss: ok={result.get('ok')} "
             f"exit={result.get('exit_code')} err={result.get('error')!r} "
             f"stderr={(result.get('stderr','') or '')[:160]}"
@@ -377,17 +380,29 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
         return None
     stdout = (result.get("stdout") or "").strip()
     if not stdout:
+        logger.warning("[ora-agent] ollama empty stdout")
         return None
     try:
         data = _json.loads(stdout)
     except _json.JSONDecodeError as e:
-        logger.info(f"[ora-agent] ollama non-JSON: {e} body={stdout[:300]}")
+        logger.warning(f"[ora-agent] ollama non-JSON: {e} body={stdout[:300]}")
         return None
-    msg = (data.get("choices") or [{}])[0].get("message") or {}
-    logger.info(
+    # iter 322g — native /api/chat returns {message: {...}} directly,
+    # NOT OpenAI's {choices: [{message: {...}}]} shape.
+    msg = data.get("message") or {}
+    if not msg and (data.get("choices") or []):
+        # Defensive: in case Ollama compat layer is hit instead.
+        msg = (data.get("choices") or [{}])[0].get("message") or {}
+    if not msg:
+        logger.warning(f"[ora-agent] ollama no msg: keys={list(data.keys())[:8]} body={stdout[:200]}")
+        return None
+    logger.warning(
         f"[ora-agent] ollama OK: model={data.get('model')} "
-        f"tokens={data.get('usage',{}).get('total_tokens')} "
-        f"elapsed={result.get('elapsed_ms')}ms"
+        f"eval_count={data.get('eval_count')} "
+        f"total_duration_ms={int((data.get('total_duration') or 0) / 1e6)} "
+        f"elapsed={result.get('elapsed_ms')}ms "
+        f"content_len={len(msg.get('content') or '')} "
+        f"tool_calls={len(msg.get('tool_calls') or [])}"
     )
     return msg
 

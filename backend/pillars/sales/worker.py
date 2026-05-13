@@ -88,16 +88,20 @@ def start_pillar1_worker(db, news_monitor_coro_factory=None) -> dict:
         failed.append({"task": "ora_campaign_watchdog", "error": str(e)})
         print(f"[p1-worker] ✗ ORA Campaign Watchdog failed: {e}", flush=True)
 
-    # ---- Ollama Model Warmer (iter 322g — keep llama3.1 hot in RAM) -----
-    try:
-        from services.ollama_warmer import warmer_loop, set_db as set_warm_db
-        set_warm_db(db)
-        _safe_task(warmer_loop(), "ollama_warmer")
-        started.append("ollama_warmer (3min cycle)")
-        print("[p1-worker] ✓ Ollama warmer attached", flush=True)
-    except Exception as e:
-        failed.append({"task": "ollama_warmer", "error": str(e)})
-        print(f"[p1-worker] ✗ Ollama warmer failed: {e}", flush=True)
+    # ---- Ollama Model Warmer (DISABLED iter 322g — daemon is single-threaded;
+    # warmer pings were jamming the queue. qwen2.5:7b-instruct stays in
+    # RAM for ~5min after last use by Ollama's default keepalive, which
+    # is sufficient for chat-active sessions. Re-enable if multi-threaded
+    # daemon is built.
+    # try:
+    #     from services.ollama_warmer import warmer_loop, set_db as set_warm_db
+    #     set_warm_db(db)
+    #     _safe_task(warmer_loop(), "ollama_warmer")
+    #     started.append("ollama_warmer (3min cycle)")
+    #     print("[p1-worker] ✓ Ollama warmer attached", flush=True)
+    # except Exception as e:
+    #     failed.append({"task": "ollama_warmer", "error": str(e)})
+    #     print(f"[p1-worker] ✗ Ollama warmer failed: {e}", flush=True)
 
     # ---- Phase 1: T1 Pipeline subscriptions (Closer + Followup + Referral) ─
     # Register A2A bus handlers once at boot.
