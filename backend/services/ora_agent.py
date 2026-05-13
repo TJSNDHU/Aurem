@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from uuid import uuid4
@@ -218,17 +219,24 @@ async def _llm_turn(
 
     for provider in order:
         try:
+            # iter 322g — wrap each provider in a HARD timeout so no single
+            # call can stall the chat beyond Cloudflare's 100s edge cutoff
+            # (which surfaces as HTTP 524 to users). Total worst case across
+            # 3 providers must stay <95s. Ollama gets the largest slice.
             if provider in ("legion_ollama", "ollama", "legion"):
-                msg = await _ollama_with_tools(messages)
+                msg = await asyncio.wait_for(_ollama_with_tools(messages), timeout=60)
             elif provider == "groq":
-                msg = await _groq_with_tools(messages, model=model)
+                msg = await asyncio.wait_for(_groq_with_tools(messages, model=model), timeout=20)
             elif provider == "claude":
-                msg = await _claude_text_fallback(messages)
+                msg = await asyncio.wait_for(_claude_text_fallback(messages), timeout=15)
             else:
                 continue
             if msg is not None:
                 logger.info(f"[ora-agent] provider={provider} served reply")
                 return msg
+        except asyncio.TimeoutError:
+            logger.warning(f"[ora-agent] provider={provider} hard-timeout — skipping")
+            continue
         except Exception as e:
             logger.warning(
                 f"[ora-agent] provider={provider} crashed: {type(e).__name__}: {e}"
@@ -296,7 +304,7 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
             last_ts = float((status or {}).get("last_poll_ts") or 0)
             import time as _t
             age = _t.time() - last_ts if last_ts else 999.0
-            if age > 30:
+            if age > 15:
                 logger.info(
                     f"[ora-agent] ollama skipped: daemon offline "
                     f"(last_poll {age:.0f}s ago)"
