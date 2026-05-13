@@ -1,3 +1,67 @@
+## 2026-02 — iter 322g part 5 — System scanner + intent fast-path
+
+**User mandate**: "Sara system scan kr, bugs find kr, fix kr automatically.
+ORA ko teach kr ke self-driven bana — token bachao."
+
+**Two new pieces live**
+
+1. **`services/ora_system_scanner.py`** — runs every 5min on Pillar-1 worker.
+   Scans 5 surfaces:
+   - supervisor STOPPED services → auto-restart
+   - backend err.log tracebacks (Traceback / CRITICAL / connection refused
+     / DuplicateKeyError) → upsert finding
+   - legion_queue jobs claimed/running >10min → auto-cancel
+   - legion_daemon_status >5min stale → P0 finding
+   - ruff lint on services/ (every 30min) → P2 findings
+   Writes to `ora_system_findings` collection (dedup by fingerprint hash).
+
+2. **`run_turn` intent fast-path** in `services/ora_agent.py`:
+   - Regex matches greetings (hi/hello/namaste/thanks/etc, also "thanks bhai") →
+     reply from template in <200ms.
+   - Regex matches "campaign status / kya haal / update" → call
+     `campaign_status` tool inline (5ms) → format reply → <500ms total.
+   - All other messages fall through to the full Ollama tool-loop.
+
+**Live test results**
+```
+"hi"               → 125ms     fast_path=true ✓
+"namaste"          → 121ms     fast_path=true ✓
+"thanks bhai"      → 130ms     fast_path=true ✓ (after regex fix)
+"campaign status"  → 343ms     real DB snapshot returned
+"build a feature"  → 30-60s    full tool loop (unchanged)
+```
+
+**Auto-recovery proof (no human)**
+17:03 UTC: zero_sent_streak hit 3 → autofix fired:
+- channel_gating_reseed: seeded 5 leads
+- force_blast_cycle: processed=5, **sent=2 real prospects**:
+  • `agenda@johntheplumber.ca` (Resend ID 9d3d1d44...)
+  • `customercare@realtor.com` (Resend ID 02ad8ea2...)
+- engine.last_run_sent: 0 → 5 → engine recovered
+
+**Honest disclosure on GitHub push + Deploy (platform-gated)**
+ORA's `git_commit_local` works on the pod (verified, commit 4edc950). But
+**actual `git push origin main` requires Emergent's "Save to GitHub" UI button**
+because no GitHub auth token exists in the pod by design. Same for deploy.
+These are deliberate platform safety gates — not ORA limitations. ORA can:
+  • Stage and commit locally (✓ done)
+  • Detect bugs and apply fixes (✓ done via scanner)
+  • Tell founder to click "Save to GitHub" + "Deploy" (only manual step)
+
+**Schedulers running on Pillar-1 worker (9 total, was 5)**
+- chain_advance_scheduler
+- proactive_outreach
+- news_auto_monitor
+- ora_campaign_watchdog
+- closer_followup_referral_pipeline
+- autonomous_warmer (NEW)
+- autonomous_autofix (NEW)
+- ora_system_scanner (NEW)
+- (one more — see worker.py)
+
+---
+
+
 ## 2026-02 — iter 322g part 4 — Full Autonomous Mode LIVE
 
 **User mandate**: "Autonomous loop main daal — daily 2-4 times — ORA khud kre.
