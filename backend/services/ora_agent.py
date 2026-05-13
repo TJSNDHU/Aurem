@@ -790,36 +790,84 @@ async def _continue_loop(
         msg = await _llm_turn(history)
         if msg is None:
             await _save_history(session_id, history)
-            # iter 322g — local-only mode. Diagnose Legion daemon state.
-            diag_lines = []
+            # iter 322g+ graceful degrade — when Ollama unreachable, surface
+            # a CAMPAIGN-STATS reply instead of a raw error. Founder's real
+            # concern is "paisa aa raha hai ki nahi" — campaign engine runs
+            # on the cloud pod 100% independently, so we read DB and show
+            # the founder their revenue heartbeat. Their laptop being asleep
+            # never blocks money flow.
+            diag_lines: list[str] = []
+            campaign_lines: list[str] = []
             try:
                 if _db is not None:
                     import time as _t
+                    # Daemon liveness (informational)
                     status = await _db.legion_daemon_status.find_one(
                         {"_id": "global"}, {"_id": 0, "last_poll_at": 1, "last_poll_ts": 1}
                     )
                     last_ts = float((status or {}).get("last_poll_ts") or 0)
                     age = _t.time() - last_ts if last_ts else None
                     if age is None:
-                        diag_lines.append("🔴 Legion daemon: NEVER polled")
+                        diag_lines.append("🔴 Legion daemon: NEVER polled — laptop daemon start kar")
                     elif age < 60:
-                        diag_lines.append(f"🟢 Legion daemon: alive ({int(age)}s ago) — Ollama inference failed")
+                        diag_lines.append(f"🟢 Legion daemon alive ({int(age)}s ago) — Ollama inference failed, model evicted ho gaya hoga")
                     elif age < 300:
-                        diag_lines.append(f"🟡 Legion daemon: busy/slow ({int(age)}s since last poll)")
+                        diag_lines.append(f"🟡 Legion daemon busy ({int(age)}s since last poll)")
                     else:
-                        diag_lines.append(f"🔴 Legion daemon: OFFLINE ({int(age)}s since last poll)")
-            except Exception:
-                pass
-            reply = (
-                "**Local Ollama me problem hai abhi (cloud bypass enabled):**\n\n"
-                + "\n".join(diag_lines)
-                + "\n\n**Laptop pe check kar:**\n"
-                  "1. **Daemon running hai?** `tail -5 ~/legion_daemon.log`\n"
-                  "2. **Ollama serve chalu hai?** PowerShell: `ollama list`\n"
-                  "3. **Daemon restart kar** (if needed):\n"
-                  "   `pkill -9 -f legion_daemon.py; cd ~; nohup python3 ~/legion_daemon.py > ~/legion_daemon.log 2>&1 &`"
-            )
-            return {"ok": False, "error": "llm_unavailable", "reply": reply}
+                        diag_lines.append(f"🔴 Legion daemon OFFLINE ({int(age/60)} min) — laptop sleeping/closed")
+
+                    # Campaign heartbeat — what founder actually cares about
+                    cfg = await _db.auto_blast_config.find_one(
+                        {"tenant_id": "global"}, {"_id": 0}
+                    ) or {}
+                    last_run = cfg.get("last_run_at", "never")
+                    last_sent = cfg.get("last_run_sent", 0)
+                    last_processed = cfg.get("last_run_processed", 0)
+                    enabled = cfg.get("enabled", False)
+
+                    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+                    since = (_dt.now(_tz.utc) - _td(hours=24)).isoformat()
+                    sent_24h = await _db.outreach_history.count_documents(
+                        {"sent_at": {"$gte": since}}
+                    )
+                    queued = await _db.campaign_leads.count_documents(
+                        {"last_blast_at": {"$exists": False},
+                         "status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]}}
+                    )
+                    health = await _db.ora_campaign_health.find_one(
+                        {"_id": "global"}, {"_id": 0}
+                    ) or {}
+                    tripped = health.get("tripped") or []
+                    streak = int(health.get("zero_sent_streak") or 0)
+
+                    health_emoji = "🟢" if (enabled and sent_24h > 0 and not tripped) else "🟡" if enabled else "🔴"
+                    campaign_lines = [
+                        f"{health_emoji} **Campaign Engine: {'ON' if enabled else 'OFF'}** (runs on cloud pod 24/7 — laptop independent)",
+                        f"  • Sent in last 24h: **{sent_24h}** emails/SMS",
+                        f"  • Last cycle: sent={last_sent} processed={last_processed} at {last_run[:16] if last_run != 'never' else 'never'}",
+                        f"  • Queued leads: {queued}",
+                        f"  • Watchdog: {'🟢 healthy' if not tripped else '🟡 ' + ','.join(tripped) + f' (streak={streak})'}",
+                    ]
+            except Exception as _e:
+                logger.warning(f"[ora-agent] degrade-stats failed: {_e}")
+
+            reply_lines = ["**Bhai ORA chat abhi local Ollama pe nahi pahuch paa raha,** but tension nahi:"]
+            if campaign_lines:
+                reply_lines.append("")
+                reply_lines.extend(campaign_lines)
+                reply_lines.append("")
+                reply_lines.append("**Campaign cloud pe alag chal raha hai — paisa flow uninterrupted.**")
+            reply_lines.append("")
+            reply_lines.extend(diag_lines)
+            reply_lines.extend([
+                "",
+                "**Laptop pe quick checks:**",
+                "1. Daemon: `tail -5 ~/legion_daemon.log`",
+                "2. Ollama: `ollama list` (model loaded hai?)",
+                "3. Restart: `pkill -9 -f legion_daemon.py && nohup python3 ~/legion_daemon.py > ~/legion_daemon.log 2>&1 &`",
+            ])
+            reply = "\n".join(reply_lines)
+            return {"ok": True, "error": "llm_unavailable_graceful", "reply": reply, "degraded": True}
 
         tool_calls = msg.get("tool_calls") or []
         content = (msg.get("content") or "").strip()

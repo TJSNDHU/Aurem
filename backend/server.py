@@ -2172,6 +2172,22 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] legion_queue wire failed: {_e}")
 
+# iter 322g+ — System uptime endpoint (revenue heartbeat from phone)
+try:
+    from routers.system_uptime_router import (
+        router as _system_uptime_router,
+        set_db as _set_uptime_db,
+    )
+    app.include_router(_system_uptime_router)
+
+    @app.on_event("startup")
+    async def _wire_uptime_db():
+        from server import db as _bound_db  # type: ignore
+        _set_uptime_db(_bound_db)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] system_uptime wire failed: {_e}")
+
 # /.well-known/ucp moved to bootstrap.wellknown_routes (iter 263 final surgery).
 
 # Serve standalone tracking pixel
