@@ -1,5 +1,34 @@
 # AUREM Platform — PRD
 
+> **🟢 ITER 322fc–322fh (2026-05-13) — CHAT UI · ANTI-HALLUCINATION · AUTO-TOOLS · FULL INCIDENT PIPELINE · LEGION DEPLOY FIX · CLAUDE FALLBACK**
+>
+> 6 iterations shipped in one session. Every claim verified via the new `claim_build_done` tool — no theater, every byte real.
+>
+> ## Landed in this batch
+> 1. **iter 322fc** — `OraChat.jsx`: full-height viewport (100vh flex), per-message Copy button (clipboard API + legacy fallback), localStorage persistence (`aurem.ora-chat.thread.v1` + `.history.v1`, capped 200 msgs), Clear-chat button with confirm.
+> 2. **iter 322fd** — Anti-hallucination guardrails:
+>    - New `claim_build_done(files, endpoints, label)` tool (`ora_tools.py:+150L`) — real os.stat() + curl verification, returns `verified: bool` + verdict.
+>    - `ORA_SYSTEM_PROMPT` patch (`aurem_chat.py`) — "BUILD RECEIPT LAW" forbidding ASCII success boxes and fake `ls`/`curl` output.
+>    - Permanent lesson #6 in `ora_skills/dev_322ey-ora-mistakes-lessons.md` — full incident_bus.py fabrication write-up.
+> 3. **iter 322fe** — Auto tool execution in chat (`/api/public/ora/chat`):
+>    - New `services/ora_chat_tools.py` (282L) — 11 safe read-only tools wired to Groq function-calling.
+>    - `public_ora_demo_router.py` patched: authenticated users → tools-enabled path; never silently falls through to lying LLM.
+>    - Response now exposes `auto_tools_on` + `tool_calls[]` audit trail.
+> 4. **iter 322ff** — Full incident pipeline (Detect → Triage → Fix → Verify):
+>    - `services/incident_bus.py` — ingest + sha1 dedup + Mongo persist + P0 Telegram alert. Collections: `incident_ledger`, `incident_fingerprints`.
+>    - `services/triage_brain.py` — hybrid: fingerprint cache → deterministic rules → Groq LLM fallback.
+>    - `routers/incident_router.py` — 7 endpoints (`/report` open + rate-limited, others admin-only).
+>    - `middleware/exception_to_incident.py` — auto-captures every 5xx + unhandled exception.
+>    - `utils/incidentReporter.js` — `window.onerror` + `unhandledrejection` hooks.
+>    - `platform/admin/IncidentLedger.jsx` — founder cockpit at `/admin/incident-ledger`.
+> 5. **iter 322fg** — Legion daemon production deploy fix:
+>    - Mirror `legion_daemon.py` + `install.sh` into `/app/backend/legion_assets/` (ships with backend bundle).
+>    - `legion_queue_router.py` falls back to mirror when `/app/aurem-cto/` absent in prod deploy.
+> 6. **iter 322fh** — Claude fallback when Groq quota dies:
+>    - Provider order: `claude,groq`. Tested live: Groq dead, Claude rescued ORA (3.6s).
+
+
+
 > **🟢 ITER 322fa (2026-05-12) — LEGION BRIDGE · ORA AUTONOMOUS CONTROL OF LEGION · 29 TOOLS · ZERO MOCKS**
 >
 > Founder demanded: *"give full access and make it happen i must want to ORA capable to do this too"*. Built without SSH — using **reverse-poll daemon** pattern (like Ansible Pull / Salt Reactor). Founder chose FULL SHELL + Telegram HIGH-risk approval gate hybrid.

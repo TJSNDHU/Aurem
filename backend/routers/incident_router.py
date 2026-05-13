@@ -21,7 +21,7 @@ import logging
 import os
 import time
 from collections import defaultdict, deque
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
