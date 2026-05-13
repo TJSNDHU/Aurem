@@ -63,8 +63,16 @@ chown aurem-cto:aurem-cto /opt/aurem-cto/daemon/.env
 ok "Wrote /opt/aurem-cto/daemon/.env (chmod 600)"
 
 # ── 6. Python + httpx ───────────────────────────────────────────────
-command -v python3 >/dev/null || apt-get install -y python3 python3-pip
-python3 -c "import httpx" 2>/dev/null || pip3 install --quiet httpx
+# Ensure python3 AND pip3 BOTH exist. Some minimal Ubuntu/WSL images have
+# python3 but not python3-pip (iter 322fi fix — caught in field install).
+command -v python3 >/dev/null || apt-get install -y python3
+if ! command -v pip3 >/dev/null; then
+    apt-get update -qq
+    apt-get install -y python3-pip
+fi
+python3 -m pip install --quiet --upgrade pip 2>/dev/null || true
+python3 -c "import httpx" 2>/dev/null || python3 -m pip install --quiet --break-system-packages httpx \
+                                     || python3 -m pip install --quiet httpx
 ok "Python3 + httpx ready"
 
 # ── 7. Pull the daemon source from the pod ──────────────────────────
