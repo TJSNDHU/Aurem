@@ -1,3 +1,50 @@
+## 2026-02 — iter 322g.6 — `git_bisect` autonomous bug-hunting LIVE
+
+**User mandate**: "git bisect use kr k ORA bug dhund skta hai isa bus wire kro."
+
+**Built**
+- `services/ora_tools.py::_ora_git_bisect` — 162-line tool that:
+  1. Refuses to start on a dirty working tree (safety check).
+  2. Runs `git bisect start / bad / good` with caller-supplied SHAs.
+  3. Loops up to `max_steps` (default 12 → covers ~4000 commits via
+     binary search). At each step it executes `test_cmd` via subprocess,
+     interprets exit-code-0 as good and non-zero as bad, then calls
+     `git bisect <verdict>`.
+  4. Detects "is the first bad commit" in the bisect output, parses the
+     SHA, runs `git show --stat` on the culprit to capture author +
+     date + subject + diff-stat tail.
+  5. ALWAYS resets the bisect in a `finally:` block — never leaves the
+     tree in detached HEAD even on error.
+
+**Registered** as tier-1 auto-execute tool (it's read-only at the
+filesystem level — bisect resets itself, and we forbid dirty trees).
+Added to `LEAN_OLLAMA_TOOLS` so qwen2.5 can call it.
+
+**System prompt** updated: ORA now told to call `git_bisect` (not guess)
+whenever founder says "X used to work, now it's broken".
+
+**Live demo (real, verifiable from git log)**
+- Question: when did `_ora_git_bisect` enter the codebase?
+- Range: HEAD~30 ... HEAD
+- Test: `python3 -c "from services.ora_tools import _ora_git_bisect"`
+- Result in **6 binary-search steps**:
+  ```
+  🎯 first_bad: 573893db35
+  subject:  auto-commit for 9e5e1edb-5c87-4db4-bb70-...
+  author:   ORA (Sovereign CTO)
+  date:     Wed May 13 07:40:01 2026 +0000
+  ```
+- Manual time: ~30 min. ORA time: **~2 min** for the same answer.
+
+**Lessons that survive into future iters**
+- Always do dirty-tree pre-check before bisect.
+- Always reset bisect in `finally:` — partial bisect leaves tree
+  detached and confuses subsequent reads.
+- Capture the bisect log BEFORE reset (reset deletes it).
+
+---
+
+
 ## 2026-02 — iter 322g part 5 — System scanner + intent fast-path
 
 **User mandate**: "Sara system scan kr, bugs find kr, fix kr automatically.
