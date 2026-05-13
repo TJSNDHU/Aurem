@@ -2138,6 +2138,147 @@ async def _ora_git_commit_local(message: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
+async def _ora_git_bisect(
+    bad_sha: str = "HEAD",
+    good_sha: str = "",
+    test_cmd: str = "",
+    max_steps: int = 12,
+) -> dict:
+    """Run `git bisect` to find the first commit that broke a test.
+
+    Args:
+      bad_sha: commit where the bug is present (default HEAD).
+      good_sha: commit where the test passed (required).
+      test_cmd: shell command that returns exit 0 if "good", non-zero if "bad".
+                E.g. `python3 -c "import services.ora_agent"` or
+                `curl -fsS http://localhost:8001/api/health`.
+      max_steps: safety cap on bisect iterations (default 12 → covers ~4k commits).
+    """
+    import subprocess
+
+    if not good_sha:
+        return {"ok": False, "error": "good_sha required — commit where the test was passing"}
+    if not test_cmd:
+        return {"ok": False, "error": "test_cmd required — shell command, exit 0 = good"}
+
+    # Sanity: do NOT bisect a dirty tree.
+    try:
+        dirty = subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd="/app", text=True, timeout=10,
+        ).strip()
+        if dirty:
+            return {
+                "ok": False,
+                "error": "working tree has uncommitted changes — commit or stash first",
+                "dirty_lines": dirty.splitlines()[:6],
+            }
+    except Exception as e:
+        return {"ok": False, "error": f"pre-check failed: {e}"}
+
+    log: list[dict] = []
+    original_head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd="/app", text=True, timeout=5,
+    ).strip()
+    log.append({"step": "start", "head": original_head[:10]})
+
+    first_bad = None
+    bisect_log = ""
+    try:
+        # Start bisect
+        subprocess.run(["git", "bisect", "start"], cwd="/app", check=True,
+                       capture_output=True, timeout=15)
+        subprocess.run(["git", "bisect", "bad", bad_sha], cwd="/app", check=True,
+                       capture_output=True, timeout=15)
+        subprocess.run(["git", "bisect", "good", good_sha], cwd="/app", check=True,
+                       capture_output=True, timeout=15)
+
+        for step in range(max_steps):
+            cur = subprocess.check_output(
+                ["git", "rev-parse", "--short=10", "HEAD"], cwd="/app", text=True, timeout=5,
+            ).strip()
+
+            # Run the test (best-effort — wrap in subprocess shell)
+            r = subprocess.run(
+                test_cmd, shell=True, cwd="/app",
+                capture_output=True, text=True, timeout=90,
+            )
+            verdict = "good" if r.returncode == 0 else "bad"
+            log.append({
+                "step": step + 1, "sha": cur, "verdict": verdict,
+                "stdout_tail": (r.stdout or "")[-120:],
+                "stderr_tail": (r.stderr or "")[-120:],
+            })
+
+            # Tell bisect
+            out = subprocess.run(
+                ["git", "bisect", verdict], cwd="/app",
+                capture_output=True, text=True, timeout=15,
+            )
+            combined = (out.stdout or "") + (out.stderr or "")
+            if "is the first bad commit" in combined:
+                # Parse the SHA from output.
+                import re as _re
+                m = _re.search(r"([0-9a-f]{7,40}) is the first bad commit", combined)
+                first_bad = m.group(1) if m else None
+                bisect_log = combined
+                break
+            if "bisect" not in combined.lower() and not combined.strip():
+                # nothing to do
+                break
+
+        # Capture full bisect log before reset.
+        try:
+            bisect_log = subprocess.check_output(
+                ["git", "bisect", "log"], cwd="/app", text=True, timeout=5,
+            )
+        except Exception:
+            pass
+    except subprocess.CalledProcessError as e:
+        log.append({"step": "git_err", "stderr": (e.stderr or b"").decode("utf-8", "ignore")[:300]})
+    finally:
+        # Always reset, even on error/cancel.
+        try:
+            subprocess.run(["git", "bisect", "reset"], cwd="/app",
+                           capture_output=True, timeout=15)
+        except Exception:
+            pass
+
+    # Get culprit details if found.
+    culprit_details: dict | None = None
+    if first_bad:
+        try:
+            sho = subprocess.check_output(
+                ["git", "show", "--stat", "--format=%H%n%an <%ae>%n%ad%n%s%n%b",
+                 first_bad], cwd="/app", text=True, timeout=10,
+            )
+            parts = sho.splitlines()
+            culprit_details = {
+                "sha": parts[0] if parts else first_bad,
+                "author": parts[1] if len(parts) > 1 else "",
+                "date": parts[2] if len(parts) > 2 else "",
+                "subject": parts[3] if len(parts) > 3 else "",
+                "stat_tail": parts[-6:] if len(parts) > 6 else parts,
+            }
+        except Exception:
+            pass
+
+    return {
+        "ok": bool(first_bad),
+        "first_bad_commit": first_bad,
+        "culprit_details": culprit_details,
+        "steps_run": len(log),
+        "bisect_log_tail": (bisect_log or "")[-800:],
+        "step_trace": log[-6:],
+        "next_step": (
+            f"Revert {first_bad[:10]} OR open it with view_file + git_log to see "
+            "what changed, then craft a targeted fix."
+            if first_bad else
+            "bisect couldn't isolate — test_cmd may be flaky, or the bad commit "
+            "predates good_sha. Try a wider good_sha range or a more deterministic test."
+        ),
+    }
+
+
 
 
 TOOL_REGISTRY: dict[str, dict] = {
@@ -2533,6 +2674,27 @@ TOOL_REGISTRY: dict[str, dict] = {
             "'Save to GitHub' button (platform-gated, founder approval). Use this to "
             "checkpoint state after autofix so founder can review + push with one "
             "click. Returns {sha, files_changed_preview, next_step}."
+        ),
+    },
+    "git_bisect": {
+        "fn": _ora_git_bisect,
+        "args_spec": {
+            "bad_sha":  "str — commit where bug exists (default HEAD)",
+            "good_sha": "str — commit where the test was passing (REQUIRED)",
+            "test_cmd": "str — shell test command, exit 0 = good. e.g. "
+                        "'python3 -c \"import services.ora_agent\"' or "
+                        "'curl -fsS http://localhost:8001/api/health'",
+            "max_steps": "int — bisect iteration cap (default 12, max 20)",
+        },
+        "description": (
+            "AUTONOMOUS BUG-HUNTING via `git bisect` (iter 322g.6) — given a "
+            "known-good commit and a deterministic test, walks the commit graph "
+            "to find the EXACT commit that introduced a regression. Tries up to "
+            "12 steps (covers ~4000 commits). Refuses to start on a dirty tree. "
+            "Always resets the bisect on completion or error. Returns "
+            "{first_bad_commit, culprit_details, bisect_log_tail, step_trace, "
+            "next_step}. Use this when a feature was working at commit X and "
+            "broke by commit Y — never guess; bisect."
         ),
     },
 }
