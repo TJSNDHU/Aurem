@@ -823,7 +823,7 @@ async def public_demo_chat(
     claude_ms = 0
     groq_ms = 0
 
-    order = (os.environ.get("ORA_PROVIDER_ORDER", "groq,claude")
+    order = (os.environ.get("ORA_PROVIDER_ORDER", "claude,groq")
              .lower().replace(" ", "").split(","))
 
     async def _try_claude() -> Optional[str]:
@@ -900,10 +900,9 @@ async def public_demo_chat(
             return None
 
     # iter 322fe — Authenticated users → tools-enabled Groq path first.
-    # If with-tools fails (rate limit, network), DO NOT silently fall through
-    # to a plain LLM that can hallucinate — return an honest "couldn't
-    # verify" reply instead. This is the founder's anti-hallucination
-    # mandate: better to admit 'rate limit hit' than fabricate an answer.
+    # If with-tools fails (rate limit, network), we fall back to plain Claude
+    # (different provider, different quota) so ORA stays online when Groq
+    # daily TPD hits 100k. Only if BOTH fail do we surface an honest message.
     auto_tools_on = bool(user)
     auto_tools_failed = False
     if auto_tools_on:
@@ -915,13 +914,15 @@ async def public_demo_chat(
         else:
             auto_tools_failed = True
             logger.warning(
-                f"[public-ora-demo] auto-tools path returned None for "
-                f"authenticated user sid={sid} — refusing plain-LLM fallback"
+                f"[public-ora-demo] auto-tools path failed for user sid={sid} "
+                f"— trying Claude fallback (iter 322fh)"
             )
 
-    # Only fall through to plain LLM for UNAUTHENTICATED visitors
-    # (or when auto_tools_on is False).
-    if not out and not auto_tools_on:
+    # iter 322fh — when auto-tools fails OR user is anon, try Claude/Groq
+    # in normal text mode. Claude has a different daily quota and an
+    # entirely separate key path via Emergent universal LLM key, so it
+    # rescues us when Groq hits its rate limit.
+    if not out:
         for provider in order:
             if provider == "groq":
                 _g0 = _time.monotonic()
@@ -935,19 +936,17 @@ async def public_demo_chat(
                 out = await _try_claude()
                 claude_ms = int((_time.monotonic() - _c0) * 1000)
                 if out:
-                    llm_source = "claude"
+                    llm_source = "claude" + ("-fallback" if auto_tools_failed else "")
                     break
 
-    # Authenticated user + tools path failed → honest non-LLM reply.
+    # Both providers dead → honest non-LLM reply (anti-hallucination).
     if not out and auto_tools_failed:
         out = (
-            "Bhai, abhi main tool verify nahi kar pa raha — looks like the "
-            "Groq daily token quota is exhausted (resets in a few hours). "
-            "Rather than make up an answer, I'm telling you straight up. "
-            "Retry in 10-15 minutes, or switch to CTO Mode and run the "
-            "tool manually."
+            "Bhai, dono LLM providers abhi quiet hain (Groq rate-limit + "
+            "Claude bhi reach nahi ho raha). 10-15 min me retry kar — "
+            "ya CTO Mode tab me ja ke tool manually run kar le."
         )
-        llm_source = "tools-unavailable-honest-fallback"
+        llm_source = "all-providers-down-honest-fallback"
 
     # If both providers are unreachable AND we know the user, give a
     # deterministic identity reply (zero LLM, zero hallucination).
