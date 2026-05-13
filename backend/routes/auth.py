@@ -358,6 +358,7 @@ async def login(credentials: UserLogin):
 
                 token_payload = {
                     "user_id": team_member["id"],
+                    "email": team_member.get("email"),
                     "is_admin": True,
                     "is_team_member": True,
                     "exp": datetime.now(timezone.utc) + timedelta(days=7),
@@ -515,6 +516,7 @@ async def admin_login(credentials: UserLogin, request: Request):
     user_agent = request.headers.get("user-agent", "")[:300]
     token_payload = {
         "user_id": user["id"],
+        "email": user.get("email"),
         "is_admin": True,
         "is_super_admin": True,
         "role": "super_admin",
@@ -667,6 +669,7 @@ async def admin_refresh(body: _RefreshBody, request: Request):
     token = jwt.encode(
         {
             "user_id": user["id"],
+            "email": user.get("email"),
             "is_admin": True,
             "is_super_admin": True,
             "role": "super_admin",
@@ -762,6 +765,7 @@ async def process_admin_google_session(data: dict, response: Response):
 
         token_payload = {
             "user_id": team_member["id"],
+            "email": team_member.get("email"),
             "is_admin": True,
             "is_team_member": True,
             "exp": expires_at,

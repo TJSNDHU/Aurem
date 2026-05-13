@@ -37,6 +37,16 @@ def set_db(database):
 
 
 async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)):
+    """Resolve admin from JWT.
+
+    Production token shapes vary across login endpoints:
+      • /api/auth/admin/login  → {user_id, is_admin, is_super_admin, role, exp}  (NO email)
+      • /api/auth/login        → {user_id, is_admin, email, exp}
+      • /api/platform/auth/login → {email, role, jti, user_id, is_admin, ...}
+
+    We accept ANY of: email / sub / user_id. If only user_id is present,
+    we hydrate the email from the users collection.
+    """
     if not creds:
         raise HTTPException(401, "Missing bearer token")
     secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
@@ -48,11 +58,38 @@ async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)
         raise HTTPException(401, "Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Invalid token")
+
     email = (payload.get("email") or payload.get("sub") or "").lower()
+    user_id = payload.get("user_id") or payload.get("uid") or ""
+    is_admin_claim = bool(
+        payload.get("is_admin")
+        or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+    )
+
+    # Hydrate email from DB if missing but user_id is present (admin/login tokens).
+    if not email and user_id:
+        if _db is None:
+            raise HTTPException(500, "DB not wired")
+        row = await _db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "email": 1, "is_admin": 1, "is_super_admin": 1, "role": 1},
+        )
+        if row:
+            email = (row.get("email") or "").lower()
+            is_admin_claim = is_admin_claim or bool(
+                row.get("is_admin")
+                or row.get("is_super_admin")
+                or row.get("role") in ("admin", "super_admin")
+            )
+
     if not email:
         raise HTTPException(401, "Invalid token claims")
-    if payload.get("is_admin") or payload.get("is_super_admin"):
+
+    if is_admin_claim:
         return {"email": email, "is_admin": True}
+
+    # No admin flag in token — last-chance DB check by email.
     if _db is None:
         raise HTTPException(500, "DB not wired")
     user = await _db.users.find_one(

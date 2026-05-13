@@ -1,3 +1,30 @@
+## 2026-02 — JWT shape fix for Autonomous CTO chat (P0)
+
+**Bug**
+Production chat at `/api/ora/agent/run` returned **401 "Invalid token claims"** /
+"Missing token". Root cause: `routes/auth.py::admin_login` and `admin_refresh`
+issued JWTs containing only `{user_id, is_admin, is_super_admin, role, exp}` —
+**no `email` or `sub`**. `routers/ora_agent_router.py::get_admin_user` required
+`email`/`sub`, so every admin-console login was instantly locked out of ORA.
+
+**Fix**
+- `routers/ora_agent_router.py::get_admin_user` — now also accepts `user_id` and
+  hydrates the email from `_db.users` when `email`/`sub` are absent. Works for
+  every legacy token already in user browsers.
+- `routes/auth.py` — added `email` claim to:
+  • `admin_login` token
+  • `admin_refresh` token
+  • team-member token in `/api/auth/login`
+  • team-member token in `/api/auth/google/admin-session`
+
+**Verified (preview)**
+- `POST /api/auth/admin/login` → token payload now contains `email='teji.ss1986@gmail.com'`.
+- `POST /api/ora/agent/run` with that token → **200 OK** with ORA reply.
+- Forged legacy-shape token (no email, only `user_id`) on `GET /api/ora/agent/pending` → **200 OK**.
+
+---
+
+
 ## 2026-05-11 — iter 322bg — Unified Sign-In, BIN+PIN, ORA PWA 1-Click SSO
 
 **Backend**
