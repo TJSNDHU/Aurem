@@ -219,12 +219,12 @@ async def _llm_turn(
 
     for provider in order:
         try:
-            # iter 322g — wrap each provider in a HARD timeout so no single
-            # call can stall the chat beyond Cloudflare's 100s edge cutoff
-            # (which surfaces as HTTP 524 to users). Total worst case across
-            # 3 providers must stay <95s. Ollama gets the largest slice.
+            # iter 322g — user requested local-only mode. Ollama path gets
+            # a HARD timeout to avoid hanging the request forever, but no
+            # automatic cloud fallback. If Ollama fails, user gets a clear
+            # diagnostic and they bring the daemon back up.
             if provider in ("legion_ollama", "ollama", "legion"):
-                msg = await asyncio.wait_for(_ollama_with_tools(messages), timeout=60)
+                msg = await asyncio.wait_for(_ollama_with_tools(messages), timeout=270)
             elif provider == "groq":
                 msg = await asyncio.wait_for(_groq_with_tools(messages, model=model), timeout=20)
             elif provider == "claude":
@@ -294,22 +294,44 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     Returns the OpenAI-format `message` dict (may have tool_calls).
     """
     # ── Daemon liveness gate (added iter 322g) ───────────────────────
-    # If the daemon hasn't polled /queue/next in the last 30s, skip
-    # Ollama entirely and let the chain fall through to Groq/Claude.
+    # If the daemon hasn't polled /queue/next in the last 120s, skip
+    # Ollama entirely. NOTE: the daemon is single-threaded — while a
+    # long /v1/chat inference is running on the laptop (60-120s), it
+    # stops polling. So we use 120s window AND check if there's an
+    # active job in flight (claimed/running status). Either signal
+    # = daemon alive.
     try:
         if _db is not None:
+            import time as _t
+            now = _t.time()
             status = await _db.legion_daemon_status.find_one(
                 {"_id": "global"}, {"_id": 0, "last_poll_ts": 1}
             )
             last_ts = float((status or {}).get("last_poll_ts") or 0)
-            import time as _t
-            age = _t.time() - last_ts if last_ts else 999.0
-            if age > 15:
-                logger.info(
-                    f"[ora-agent] ollama skipped: daemon offline "
-                    f"(last_poll {age:.0f}s ago)"
-                )
-                return None
+            age = now - last_ts if last_ts else 999.0
+            # Heartbeat fresh? Good.
+            if age <= 120:
+                pass
+            else:
+                # Heartbeat stale — but maybe daemon is busy running a long
+                # job. Check for any in-flight job <300s old.
+                from datetime import datetime, timezone, timedelta
+                cutoff = (datetime.now(timezone.utc) - timedelta(seconds=300)).isoformat()
+                in_flight = await _db.legion_queue.count_documents({
+                    "status": {"$in": ["claimed", "running", "ack_pending"]},
+                    "enqueued_at": {"$gte": cutoff},
+                })
+                if in_flight == 0:
+                    logger.info(
+                        f"[ora-agent] ollama skipped: daemon offline "
+                        f"(last_poll {age:.0f}s ago, no in-flight jobs)"
+                    )
+                    return None
+                else:
+                    logger.info(
+                        f"[ora-agent] ollama: daemon stale poll {age:.0f}s "
+                        f"but {in_flight} in-flight job(s) — proceeding"
+                    )
     except Exception as e:
         logger.debug(f"[ora-agent] ollama liveness check skipped: {e}")
     # ─────────────────────────────────────────────────────────────────
@@ -610,36 +632,34 @@ async def _continue_loop(
         msg = await _llm_turn(history)
         if msg is None:
             await _save_history(session_id, history)
-            # iter 322g — diagnose WHICH provider died so the founder gets
-            # an actionable error instead of "10 min me retry".
+            # iter 322g — local-only mode. Diagnose Legion daemon state.
             diag_lines = []
             try:
                 if _db is not None:
+                    import time as _t
                     status = await _db.legion_daemon_status.find_one(
                         {"_id": "global"}, {"_id": 0, "last_poll_at": 1, "last_poll_ts": 1}
                     )
-                    import time as _t
                     last_ts = float((status or {}).get("last_poll_ts") or 0)
                     age = _t.time() - last_ts if last_ts else None
                     if age is None:
-                        diag_lines.append("🔴 Legion daemon: NEVER polled (start it on laptop)")
-                    elif age < 30:
-                        diag_lines.append(f"🟢 Legion daemon: online ({int(age)}s ago) — but Ollama call failed")
+                        diag_lines.append("🔴 Legion daemon: NEVER polled")
+                    elif age < 60:
+                        diag_lines.append(f"🟢 Legion daemon: alive ({int(age)}s ago) — Ollama inference failed")
+                    elif age < 300:
+                        diag_lines.append(f"🟡 Legion daemon: busy/slow ({int(age)}s since last poll)")
                     else:
                         diag_lines.append(f"🔴 Legion daemon: OFFLINE ({int(age)}s since last poll)")
             except Exception:
                 pass
-            diag_lines.append("🔴 Groq: daily TPD limit hit (resets daily)")
-            diag_lines.append("🔴 Claude (Universal Key): budget exhausted")
             reply = (
-                "**Saare 3 LLM providers down hain abhi:**\n\n"
+                "**Local Ollama me problem hai abhi (cloud bypass enabled):**\n\n"
                 + "\n".join(diag_lines)
-                + "\n\n**Fix kar (any one):**\n"
-                  "1. **Legion laptop pe daemon start kar** — Ollama free + sovereign hai:\n"
-                  "   `cd ~/aurem-cto && python3 legion_daemon.py`\n"
-                  "2. **Universal Key balance add kar** — Profile → Universal Key → Add Balance\n"
-                  "3. **Groq quota reset** — wait until UTC 00:00\n\n"
-                  "Daemon start hote hi ORA wapas chal jayega — koi redeploy nahi chahiye."
+                + "\n\n**Laptop pe check kar:**\n"
+                  "1. **Daemon running hai?** `tail -5 ~/legion_daemon.log`\n"
+                  "2. **Ollama serve chalu hai?** PowerShell: `ollama list`\n"
+                  "3. **Daemon restart kar** (if needed):\n"
+                  "   `pkill -9 -f legion_daemon.py; cd ~; nohup python3 ~/legion_daemon.py > ~/legion_daemon.log 2>&1 &`"
             )
             return {"ok": False, "error": "llm_unavailable", "reply": reply}
 
