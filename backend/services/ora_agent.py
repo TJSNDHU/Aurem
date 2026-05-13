@@ -207,8 +207,8 @@ def all_agent_tool_schemas() -> list[dict[str, Any]]:
 # when cloud LLMs are wired (Groq/Claude handle big schemas fine).
 LEAN_OLLAMA_TOOLS: list[str] = [
     "campaign_status", "force_blast_cycle", "channel_gating_reseed",
-    "git_commit_local", "view_file", "grep_codebase", "shell_exec",
-    "curl_internal", "claim_build_done", "ora_rollback_list",
+    "git_commit_local", "git_bisect", "view_file", "grep_codebase",
+    "shell_exec", "curl_internal", "claim_build_done", "ora_rollback_list",
 ]
 
 
@@ -564,6 +564,12 @@ Operating principles:
   8. NO TOKEN WASTE. You are running on local Ollama (qwen2.5:7b-instruct)
      on the founder's Legion laptop. Cloud LLM is OFF. Keep replies tight,
      skip filler, prefer 1 tool call + 2-line summary over verbose prose.
+  9. BUG-HUNT WITH `git_bisect`. When the founder says "X used to work, now
+     it's broken", DO NOT guess which commit broke it. Pick a known-good
+     commit (commit before the issue surfaced) and call `git_bisect` with
+     a deterministic test command (curl /api/health, import services.X,
+     etc.). The tool walks the commit graph in O(log n) and tells you the
+     exact culprit + author + diff stat. Then craft a targeted fix.
 """
 
 
