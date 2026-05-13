@@ -2188,6 +2188,22 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] system_uptime wire failed: {_e}")
 
+# iter 322g+ — CSV/JSON manual leads upload (founder bulk-prospect ingest)
+try:
+    from routers.csv_leads_upload_router import (
+        router as _csv_leads_router,
+        set_db as _set_csv_db,
+    )
+    app.include_router(_csv_leads_router)
+
+    @app.on_event("startup")
+    async def _wire_csv_leads_db():
+        from server import db as _bound_db  # type: ignore
+        _set_csv_db(_bound_db)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] csv_leads wire failed: {_e}")
+
 # /.well-known/ucp moved to bootstrap.wellknown_routes (iter 263 final surgery).
 
 # Serve standalone tracking pixel
