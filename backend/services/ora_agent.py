@@ -49,6 +49,8 @@ TIER_1_AUTO: set[str] = {
     "view_file", "view_dir", "grep_codebase", "curl_internal",
     "db_count", "db_distinct", "git_log", "health_check",
     "lint_python", "shell_exec", "claim_build_done",
+    # iter 322fi-rollback — read-only diagnostics for recovery flows
+    "council_consult", "ora_rollback_list",
 }
 TIER_2_APPROVE: set[str] = {
     # Mutates state but reversible — inline [Approve]/[Reject] card.
@@ -162,9 +164,12 @@ def _tool_schemas_for_tier(*tiers: str) -> list[dict[str, Any]]:
     tier is in `tiers`. Each tier set is precomputed."""
     allowed: set[str] = set()
     for t in tiers:
-        if t == "tier1_auto":         allowed |= TIER_1_AUTO  # noqa: E701
-        elif t == "tier2_approve":    allowed |= TIER_2_APPROVE
-        elif t == "tier3_high_risk": allowed |= TIER_3_HIGH_RISK
+        if t == "tier1_auto":
+            allowed |= TIER_1_AUTO
+        elif t == "tier2_approve":
+            allowed |= TIER_2_APPROVE
+        elif t == "tier3_high_risk":
+            allowed |= TIER_3_HIGH_RISK
     out: list[dict[str, Any]] = []
     for name in sorted(allowed):
         meta = TOOL_REGISTRY.get(name) or {}
@@ -332,9 +337,11 @@ Operating principles:
   4. EXPLAIN. When you queue a tier 2/3 action, include in your message what
      it does, why it's needed, and what could go wrong. The approval card
      shows your summary — make it useful.
-  5. RECOVER. If a tool fails, do not silently move on. Either retry with
-     better args (max 2 attempts), call ora_rollback_restore, or stop and
-     ask the founder.
+  5. RECOVER. If a tool fails, you'll receive a `_recovery_directive` tool
+     observation. Read its recovery_options + hard_rules and pick exactly
+     one path: retry with better args (max 1 retry), call council_consult,
+     call ora_rollback_list, or explain_and_stop. NEVER blindly retry the
+     same arguments. NEVER claim success when a tool returned ok:false.
   6. HONEST. If you can't do something, say so. If a quota is exhausted,
      say "Groq quota dead, try in 10 min" — do NOT make up answers.
 """
@@ -423,6 +430,10 @@ async def resume_after_decision(
             "name": row["tool"],
             "content": _format_tool_result(row["tool"], result),
         })
+        # iter 322fi-rollback: tier-2 destructive call failed? Inject a
+        # recovery directive so ORA's next turn can suggest rollback.
+        if isinstance(result, dict) and result.get("ok") is False:
+            history.append(_recovery_directive(row["tool"], result, attempt=1))
     else:
         await _db[PENDING_COLLECTION].update_one(
             {"_id": action_id},
@@ -450,15 +461,24 @@ async def _continue_loop(
     founder_email: str,
 ) -> dict[str, Any]:
     """Inner loop — keep calling tier-1 tools automatically; pause on
-    tier 2/3 by writing a pending action and returning action_required."""
+    tier 2/3 by writing a pending action and returning action_required.
+
+    iter 322fi-rollback: when a tool execution fails (ok=False), we
+    inject a structured RECOVERY_DIRECTIVE so the LLM picks one of:
+      • retry with adjusted args (max 2 attempts per tool)
+      • call ora_rollback_list / council_consult to diagnose
+      • stop and ask founder
+    Same-tool consecutive-fail counter is tracked per turn.
+    """
     iterations = 0
+    fail_counts: dict[str, int] = {}    # tool_name → consecutive fails
     while iterations < MAX_TOOL_ITERATIONS:
         iterations += 1
         msg = await _llm_turn(history)
         if msg is None:
             await _save_history(session_id, history)
             return {"ok": False, "error": "llm_unavailable",
-                    "reply": "Groq abhi reach nahi ho raha. 10 min me retry kar."}
+                    "reply": "Groq + Claude dono down. 10 min me retry kar."}
 
         tool_calls = msg.get("tool_calls") or []
         content = (msg.get("content") or "").strip()
@@ -490,8 +510,27 @@ async def _continue_loop(
                 "name":         call["name"],
                 "content":      _format_tool_result(call["name"], result),
             })
-            # If the model returned MORE tool calls in the same turn,
-            # ignore the rest (force step-by-step). They'll re-emerge next loop.
+
+            # Auto-recovery: did this tool fail?
+            tool_ok = bool(result) and bool(result.get("ok", True))
+            if not tool_ok:
+                fail_counts[call["name"]] = fail_counts.get(call["name"], 0) + 1
+                history.append(_recovery_directive(call["name"], result,
+                                                    fail_counts[call["name"]]))
+            else:
+                # Success resets the consecutive-fail counter for this tool
+                fail_counts.pop(call["name"], None)
+
+            # If we've hit the recovery ceiling for this tool, stop & ask
+            if fail_counts.get(call["name"], 0) >= 2:
+                stop_msg = (
+                    f"Tool `{call['name']}` failed twice consecutively. "
+                    f"Stopping auto-recovery loop — founder se discuss kar lo."
+                )
+                history.append({"role": "assistant", "content": stop_msg})
+                await _save_history(session_id, history)
+                return {"ok": True, "reply": stop_msg, "iterations": iterations,
+                        "done": True, "halted_for": "fail_ceiling"}
             continue
 
         # Tier 2 / Tier 3 → pause, write pending row, return to UI
@@ -529,6 +568,46 @@ async def _continue_loop(
                   "infinite loop na ho. Bata kya next?"),
         "iterations": iterations,
         "done": True,
+    }
+
+
+def _recovery_directive(tool: str, result: dict, attempt: int) -> dict[str, Any]:
+    """Build a 'tool' role message that nudges the LLM toward recovery.
+
+    The directive is JSON so the model treats it as a tool observation and
+    plans a next action accordingly. We never prescribe a SPECIFIC tool —
+    we just describe the options. The LLM picks.
+    """
+    err = (result or {}).get("error") or result.get("detail") or "unspecified error"
+    body = {
+        "RECOVERY_DIRECTIVE":         True,
+        "failed_tool":                tool,
+        "consecutive_fails":          attempt,
+        "fail_excerpt":               str(err)[:300],
+        "remaining_attempts_before_halt": max(0, 2 - attempt),
+        "recovery_options": [
+            ("retry_once_with_better_args  — Only if you know the exact arg "
+             "that was wrong. Do NOT retry the same args verbatim."),
+            ("call_council_consult       — Get a second opinion from the "
+             "AUREM council for risky/architectural calls."),
+            ("call_ora_rollback_list     — See what backups exist before "
+             "destructive moves; restore via tier-2 ora_rollback_restore."),
+            ("explain_and_stop           — If the fix needs founder input "
+             "(missing creds, business decision), produce a final assistant "
+             "message describing what happened and stop calling tools."),
+        ],
+        "hard_rules": [
+            "If the failed tool is tier 2/3 (mutating), DO NOT silently retry. "
+            "Either explain_and_stop or propose ora_rollback_restore so the "
+            "founder can approve.",
+            "Do NOT fabricate success. The previous turn FAILED — say so.",
+        ],
+    }
+    return {
+        "role":         "tool",
+        "tool_call_id": f"_recovery_{tool}_{attempt}",
+        "name":         "_recovery_directive",
+        "content":      json.dumps(body, default=str)[:2200],
     }
 
 

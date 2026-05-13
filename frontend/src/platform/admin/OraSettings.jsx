@@ -346,11 +346,11 @@ export default function OraSettings() {
             <button data-testid="export-csv" onClick={exportCsv} style={btn(false)}>
               <Download size={14} /> Export CSV (5000 rows)
             </button>
-            <button data-testid="view-cockpit" onClick={() => navigate("/admin/ora-cto")} style={btn(false)}>
-              <FileText size={14} /> View Cockpit
+            <button data-testid="view-cockpit" onClick={() => navigate("/admin/ora-chat")} style={btn(false)}>
+              <FileText size={14} /> Open ORA Chat
             </button>
             <button data-testid="view-rollbacks" onClick={() => navigate("/admin/ora-chat")} style={btn(false)}>
-              <RotateCcw size={14} /> Rollbacks (in CTO Mode)
+              <RotateCcw size={14} /> Rollbacks (ask ORA in chat)
             </button>
           </div>
         </Card>
