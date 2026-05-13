@@ -214,9 +214,12 @@ async def list_recent(
     if _db is None:
         return {"ok": False, "error": "DB not set", "rows": []}
     q: dict[str, Any] = {}
-    if status:   q["status"] = status
-    if severity: q["severity"] = severity
-    if category: q["category"] = category
+    if status:
+        q["status"] = status
+    if severity:
+        q["severity"] = severity
+    if category:
+        q["category"] = category
     if since_hours:
         q["last_seen"] = {"$gte": _now() - timedelta(hours=since_hours)}
     cursor = _db[LEDGER].find(q, {"_id": 0}).sort([("last_seen", -1)]).limit(max(1, min(limit, 200)))
@@ -243,9 +246,12 @@ async def update_status(
     if status not in ("open", "triaged", "fixing", "resolved", "escalated"):
         return {"ok": False, "error": f"bad status: {status}"}
     set_fields: dict[str, Any] = {"status": status}
-    if playbook is not None:        set_fields["playbook"] = playbook
-    if auto_fixable is not None:    set_fields["auto_fixable"] = bool(auto_fixable)
-    if triage_summary is not None:  set_fields["triage_summary"] = triage_summary
+    if playbook is not None:
+        set_fields["playbook"] = playbook
+    if auto_fixable is not None:
+        set_fields["auto_fixable"] = bool(auto_fixable)
+    if triage_summary is not None:
+        set_fields["triage_summary"] = triage_summary
     if status == "resolved":
         doc = await _db[LEDGER].find_one({"incident_id": incident_id}, {"created_at": 1, "_id": 0})
         now = _now()
@@ -255,9 +261,12 @@ async def update_status(
                 ca = doc["created_at"]
                 if isinstance(ca, str):
                     ca = datetime.fromisoformat(ca.replace("Z", "+00:00"))
+                # Motor returns naive datetimes from Mongo — normalise to UTC
+                if isinstance(ca, datetime) and ca.tzinfo is None:
+                    ca = ca.replace(tzinfo=timezone.utc)
                 set_fields["mttr_ms"] = int((now - ca).total_seconds() * 1000)
-            except Exception:
-                pass
+            except Exception as _mttr_err:
+                logger.debug(f"[incident_bus] mttr calc failed: {_mttr_err}")
 
     update: dict[str, Any] = {"$set": set_fields}
     if fix_step is not None:
