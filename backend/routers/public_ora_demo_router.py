@@ -849,21 +849,105 @@ async def public_demo_chat(
         groq_messages.append({"role": "user", "content": text})
         return await _groq_fallback(groq_messages)
 
-    for provider in order:
-        if provider == "groq":
-            _g0 = _time.monotonic()
-            out = await _try_groq()
-            groq_ms = int((_time.monotonic() - _g0) * 1000)
-            if out:
-                llm_source = "groq"
-                break
-        elif provider == "claude":
-            _c0 = _time.monotonic()
-            out = await _try_claude()
-            claude_ms = int((_time.monotonic() - _c0) * 1000)
-            if out:
-                llm_source = "claude"
-                break
+    # iter 322fe — Auto tool-calling for authenticated founder/admin chats.
+    # Public visitors stay on the plain LLM path (token cost guard). When
+    # the user is authenticated (admin or paying customer), ORA gets the
+    # 11 read-only tools (view_file, grep, curl_internal, db_count, git_log,
+    # health_check, lint_python, shell_exec, view_dir, db_distinct, and the
+    # all-important claim_build_done anti-hallucination receipt).
+    _tool_audit: List[Dict[str, Any]] = []
+
+    async def _try_groq_with_tools() -> Optional[str]:
+        try:
+            from services.ora_chat_tools import groq_chat_with_tools
+        except Exception as _ie:
+            logger.debug(f"[public-ora-demo] ora_chat_tools import failed: {_ie}")
+            return None
+        # Augment system prompt with the tool-use directive ONCE here so
+        # we don't bloat the default prompt for unauthenticated visitors.
+        sys_for_tools = sys_prompt + (
+            "\n\nTOOL-USE DIRECTIVE (iter 322fe): You have these REAL tools "
+            "available — view_file, view_dir, grep_codebase, curl_internal, "
+            "db_count, db_distinct, git_log, health_check, lint_python, "
+            "shell_exec, claim_build_done. Use them whenever you need to "
+            "VERIFY a claim before answering. NEVER fabricate file paths, "
+            "ls/stat output, curl responses, byte counts, or timestamps — "
+            "call the appropriate tool and quote the real result. Before "
+            "any 'I built X / shipped Y / X is now active' message, call "
+            "claim_build_done with the actual files and endpoints first. "
+            "If its verdict is FABRICATED_CLAIM_DETECTED, admit plainly "
+            "that the build is not done — do not invent."
+        )
+        tools_messages = [{"role": "system", "content": sys_for_tools}]
+        for t in history[-6:]:
+            tools_messages.append({
+                "role": "user" if t.get("role") == "user" else "assistant",
+                "content": t.get("text", ""),
+            })
+        tools_messages.append({"role": "user", "content": text})
+        try:
+            client = _get_groq_client()
+            reply, audit = await groq_chat_with_tools(
+                tools_messages,
+                client=client,
+                max_iters=5,
+                actor=f"ora-chat:{sid}",
+            )
+            _tool_audit.extend(audit)
+            return reply
+        except Exception as e:
+            logger.warning(f"[public-ora-demo] groq with-tools failed: {type(e).__name__}: {e}")
+            return None
+
+    # iter 322fe — Authenticated users → tools-enabled Groq path first.
+    # If with-tools fails (rate limit, network), DO NOT silently fall through
+    # to a plain LLM that can hallucinate — return an honest "couldn't
+    # verify" reply instead. This is the founder's anti-hallucination
+    # mandate: better to admit 'rate limit hit' than fabricate an answer.
+    auto_tools_on = bool(user)
+    auto_tools_failed = False
+    if auto_tools_on:
+        _g0 = _time.monotonic()
+        out = await _try_groq_with_tools()
+        groq_ms = int((_time.monotonic() - _g0) * 1000)
+        if out:
+            llm_source = "groq-tools"
+        else:
+            auto_tools_failed = True
+            logger.warning(
+                f"[public-ora-demo] auto-tools path returned None for "
+                f"authenticated user sid={sid} — refusing plain-LLM fallback"
+            )
+
+    # Only fall through to plain LLM for UNAUTHENTICATED visitors
+    # (or when auto_tools_on is False).
+    if not out and not auto_tools_on:
+        for provider in order:
+            if provider == "groq":
+                _g0 = _time.monotonic()
+                out = await _try_groq()
+                groq_ms = max(groq_ms, int((_time.monotonic() - _g0) * 1000))
+                if out:
+                    llm_source = "groq"
+                    break
+            elif provider == "claude":
+                _c0 = _time.monotonic()
+                out = await _try_claude()
+                claude_ms = int((_time.monotonic() - _c0) * 1000)
+                if out:
+                    llm_source = "claude"
+                    break
+
+    # Authenticated user + tools path failed → honest non-LLM reply.
+    if not out and auto_tools_failed:
+        out = (
+            "Bhai, abhi main tool verify nahi kar pa raha — looks like the "
+            "Groq daily token quota is exhausted (resets in a few hours). "
+            "Rather than make up an answer, I'm telling you straight up. "
+            "Retry in 10-15 minutes, or switch to CTO Mode and run the "
+            "tool manually."
+        )
+        llm_source = "tools-unavailable-honest-fallback"
 
     # If both providers are unreachable AND we know the user, give a
     # deterministic identity reply (zero LLM, zero hallucination).
@@ -915,4 +999,8 @@ async def public_demo_chat(
         "llm_source": llm_source,
         "session_id": sid,
         "latency_ms": total_ms,
+        # iter 322fe — surface auto tool-call receipts so the founder can
+        # see which real tools ORA invoked while composing this reply.
+        "auto_tools_on": auto_tools_on,
+        "tool_calls":   _tool_audit,
     }
