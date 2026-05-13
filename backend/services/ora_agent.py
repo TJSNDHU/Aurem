@@ -52,12 +52,16 @@ TIER_1_AUTO: set[str] = {
     "lint_python", "shell_exec", "claim_build_done",
     # iter 322fi-rollback — read-only diagnostics for recovery flows
     "council_consult", "ora_rollback_list",
+    # iter 322g — autonomous campaign ops (no approval needed; cost <$0.10)
+    "campaign_status", "force_blast_cycle", "channel_gating_reseed",
 }
 TIER_2_APPROVE: set[str] = {
     # Mutates state but reversible — inline [Approve]/[Reject] card.
     "safe_edit", "restart_service", "propose_commit", "save_to_github",
     "ora_rollback_list", "ora_rollback_restore", "kv_set", "feature_flag_set",
     "create_file", "delete_file",
+    # iter 322g — local git checkpoint (push still needs founder click)
+    "git_commit_local",
 }
 TIER_3_HIGH_RISK: set[str] = {
     # Destructive / external — same inline UI but card is red-banded and
@@ -194,6 +198,35 @@ def _tool_schemas_for_tier(*tiers: str) -> list[dict[str, Any]]:
 def all_agent_tool_schemas() -> list[dict[str, Any]]:
     """Every tool ORA can invoke autonomously or via approval."""
     return _tool_schemas_for_tier("tier1_auto", "tier2_approve", "tier3_high_risk")
+
+
+# iter 322g — qwen2.5:7b-instruct on local Legion freezes when given 30+ tool
+# schemas (92s empty generations observed). We keep a hand-picked lean set
+# of the most-used tools for the Ollama path. The full schema is still used
+# when cloud LLMs are wired (Groq/Claude handle big schemas fine).
+LEAN_OLLAMA_TOOLS: list[str] = [
+    "campaign_status", "force_blast_cycle", "channel_gating_reseed",
+    "git_commit_local", "view_file", "grep_codebase", "shell_exec",
+    "curl_internal", "claim_build_done", "ora_rollback_list",
+]
+
+
+def lean_ollama_tool_schemas() -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for name in LEAN_OLLAMA_TOOLS:
+        meta = TOOL_REGISTRY.get(name) or {}
+        params_props: dict[str, Any] = {}
+        for arg_name, arg_desc in (meta.get("args_spec") or {}).items():
+            params_props[arg_name] = {"type": "string", "description": str(arg_desc)[:180]}
+        out.append({
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": (meta.get("description") or name)[:300],
+                "parameters": {"type": "object", "properties": params_props},
+            },
+        })
+    return out
 
 
 # ── Groq LLM call with tools ─────────────────────────────────────────
@@ -354,7 +387,7 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     payload: dict[str, Any] = {
         "model":       model,
         "messages":    messages,
-        "tools":       all_agent_tool_schemas(),
+        "tools":       lean_ollama_tool_schemas(),
         "stream":      False,
         "keep_alive":  "60m",
         "options":     {"temperature": 0.25, "num_predict": 1000},
@@ -487,11 +520,12 @@ expects YOU to drive the work — no manual tool-picking, no copy-pasting
 commands.
 
 Three risk tiers govern tool execution:
-  • TIER 1 (auto) — view_file, grep, curl, db reads, lint, shell_exec, claim_build_done.
+  • TIER 1 (auto) — view_file, grep, curl, db reads, lint, shell_exec, claim_build_done,
+    campaign_status, force_blast_cycle, channel_gating_reseed.
     These execute IMMEDIATELY when you call them — no approval needed.
   • TIER 2 (approve) — safe_edit, restart_service, propose_commit, save_to_github,
-    create_file, delete_file, rollback. These pause for the founder to tap
-    [Approve] in the chat UI. Be SPECIFIC in your request so they can decide fast.
+    create_file, delete_file, rollback, git_commit_local. These pause for the
+    founder to tap [Approve] in the chat UI. Be SPECIFIC so they can decide fast.
   • TIER 3 (high risk) — legion_exec, supervisor_restart_all, prod env edits,
     stripe_charge, send_bulk_email. These ALSO pause for approval, marked red.
 
@@ -514,6 +548,21 @@ Operating principles:
      same arguments. NEVER claim success when a tool returned ok:false.
   6. HONEST. If you can't do something, say so. If a quota is exhausted,
      say "Groq quota dead, try in 10 min" — do NOT make up answers.
+  7. AUTONOMOUS CAMPAIGN OPS (iter 322g law). The founder doesn't want to
+     approve every blast or check every cycle. When you see ANY of these
+     signals you must SELF-DRIVE the fix without asking:
+       • Founder asks "how is campaign?" → call `campaign_status` FIRST,
+         report numbers, then offer one concrete next action.
+       • `zero_sent_streak >= 3` in campaign_status → call
+         `channel_gating_reseed` then `force_blast_cycle` in the same turn.
+       • `veto_rate_1h >= 0.9` → call `channel_gating_reseed` only.
+       • Engine sent 0 in last cycle → diagnose using `campaign_status`,
+         do not blindly retry.
+     After any meaningful autofix, call `git_commit_local` so the founder
+     can review + push to GitHub with one click.
+  8. NO TOKEN WASTE. You are running on local Ollama (qwen2.5:7b-instruct)
+     on the founder's Legion laptop. Cloud LLM is OFF. Keep replies tight,
+     skip filler, prefer 1 tool call + 2-line summary over verbose prose.
 """
 
 

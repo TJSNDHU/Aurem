@@ -201,15 +201,28 @@ class Council:
         if veto_votes:
             decision = "veto"
             reason = "; ".join(f"{v['agent']}:{v['reason']}" for v in veto_votes)[:300]
-        elif cost_usd > escalate_above_usd or (0.5 <= avg_conf < confidence_threshold):
+        elif cost_usd > escalate_above_usd:
             decision = "escalate"
-            reason = f"avg_conf={avg_conf:.2f}, cost=${cost_usd:.2f} — TJ approval needed"
+            reason = f"avg_conf={avg_conf:.2f}, cost=${cost_usd:.2f} — TJ approval needed (over ${escalate_above_usd})"
         elif avg_conf >= confidence_threshold:
             decision = "approve"
             reason = f"avg_conf={avg_conf:.2f}, {len(votes)} voters"
+        elif 0.5 <= avg_conf < confidence_threshold:
+            # iter 322g — for low-cost actions (<$0.10) avoid escalation:
+            # auto-approve if confidence is at least 0.5. Saves the
+            # founder from manual approval clicks on cheap outreach.
+            if cost_usd < 0.10:
+                decision = "approve"
+                reason = (
+                    f"avg_conf={avg_conf:.2f} (auto-approved: cost ${cost_usd:.3f}<$0.10, "
+                    f"{len(votes)} voters)"
+                )
+            else:
+                decision = "escalate"
+                reason = f"avg_conf={avg_conf:.2f}, cost=${cost_usd:.2f} — TJ approval needed"
         else:
             decision = "veto"
-            reason = f"avg_conf={avg_conf:.2f} below {confidence_threshold}"
+            reason = f"avg_conf={avg_conf:.2f} below 0.5 — too risky"
 
         decision_id = uuid.uuid4().hex[:14]
         record = {

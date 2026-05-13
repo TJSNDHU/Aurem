@@ -103,6 +103,23 @@ def start_pillar1_worker(db, news_monitor_coro_factory=None) -> dict:
     #     failed.append({"task": "ollama_warmer", "error": str(e)})
     #     print(f"[p1-worker] ✗ Ollama warmer failed: {e}", flush=True)
 
+    # ---- Autonomous Ops (iter 322g — 4x/day warmer + watchdog auto-fix) -
+    try:
+        from services.ora_autonomous_ops import (
+            ollama_warmer_autonomous_loop,
+            watchdog_autofix_loop,
+            set_db as set_auto_db,
+        )
+        set_auto_db(db)
+        _safe_task(ollama_warmer_autonomous_loop(), "autonomous_warmer")
+        _safe_task(watchdog_autofix_loop(), "autonomous_autofix")
+        started.append("autonomous_warmer (6h cycle)")
+        started.append("autonomous_autofix (90s cycle)")
+        print("[p1-worker] ✓ Autonomous warmer + autofix attached", flush=True)
+    except Exception as e:
+        failed.append({"task": "autonomous_ops", "error": str(e)})
+        print(f"[p1-worker] ✗ Autonomous ops failed: {e}", flush=True)
+
     # ---- Phase 1: T1 Pipeline subscriptions (Closer + Followup + Referral) ─
     # Register A2A bus handlers once at boot.
     try:

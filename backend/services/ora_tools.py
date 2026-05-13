@@ -2031,6 +2031,115 @@ async def claim_build_done(
     }
 
 
+# ── iter 322g — Autonomous ops tools (forward-declared for TOOL_REGISTRY) ─
+async def _ora_campaign_status() -> dict:
+    """Live snapshot for ORA's autonomous decisions."""
+    if _db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        cfg = await _db.auto_blast_config.find_one({"tenant_id": "global"}, {"_id": 0}) or {}
+        health = await _db.ora_campaign_health.find_one({"_id": "global"}, {"_id": 0}) or {}
+        autonomous_log = []
+        async for d in _db.ora_autonomous_log.find({}, {"_id": 0}).sort("ts", -1).limit(5):
+            autonomous_log.append({
+                "ts": d.get("ts"), "playbook": d.get("playbook"),
+                "summary": d.get("summary"),
+            })
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0).isoformat()
+        outreach_today = await _db.outreach_history.count_documents(
+            {"created_at": {"$gte": today}}
+        )
+        return {
+            "ok": True,
+            "engine": {
+                "enabled": cfg.get("enabled"),
+                "last_run_at": cfg.get("last_run_at"),
+                "last_run_sent": cfg.get("last_run_sent"),
+                "last_run_processed": cfg.get("last_run_processed"),
+                "max_per_cycle": cfg.get("max_per_cycle"),
+            },
+            "watchdog": {
+                "zero_sent_streak": health.get("zero_sent_streak"),
+                "veto_rate_1h": health.get("veto_rate_1h"),
+                "tripped": health.get("tripped"),
+                "checked_at": health.get("checked_at"),
+            },
+            "outreach_events_today": outreach_today,
+            "recent_autonomous_actions": autonomous_log,
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+async def _ora_force_blast_cycle(max_leads: int = 5) -> dict:
+    if _db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        max_leads = max(1, min(int(max_leads), 25))
+        await _db.auto_blast_config.update_one(
+            {"tenant_id": "global"},
+            {"$set": {"max_per_cycle": max_leads}},
+        )
+        from services import auto_blast_engine
+        auto_blast_engine.set_db(_db)
+        r = await asyncio.wait_for(
+            auto_blast_engine.run_auto_blast_cycle(force=True), timeout=90,
+        )
+        return {
+            "ok": True,
+            "processed": r.get("total_processed"),
+            "sent": r.get("total_sent"),
+            "max_leads_used": max_leads,
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+async def _ora_channel_gating_reseed() -> dict:
+    if _db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        from services.ora_autonomous_ops import _autofix_channel_gating, set_db as setdb
+        setdb(_db)
+        return await _autofix_channel_gating()
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+async def _ora_git_commit_local(message: str) -> dict:
+    import subprocess
+    msg = f"ora-autofix: {(message or '')[:140]}"
+    try:
+        subprocess.run(["git", "add", "-A"], cwd="/app", check=True, timeout=20)
+        subprocess.run(
+            ["git", "commit", "-m", msg, "--allow-empty"],
+            cwd="/app", check=True, capture_output=True, text=True, timeout=20,
+        )
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short=10", "HEAD"], cwd="/app", text=True, timeout=10,
+        ).strip()
+        files = subprocess.check_output(
+            ["git", "show", "--stat", "--name-only", "HEAD"],
+            cwd="/app", text=True, timeout=10,
+        )
+        changed = [ln for ln in files.splitlines() if ln and not ln.startswith("commit ")][1:6]
+        return {
+            "ok": True,
+            "sha": sha,
+            "message": msg,
+            "files_changed_preview": changed,
+            "next_step": "Founder must click 'Save to GitHub' in Emergent UI to push to remote.",
+        }
+    except subprocess.CalledProcessError as e:
+        return {"ok": False, "error": f"git: {e.stderr or e.stdout or 'unknown'}"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+
+
 TOOL_REGISTRY: dict[str, dict] = {
     "grep_codebase":  {
         "fn": grep_codebase,
@@ -2380,7 +2489,168 @@ TOOL_REGISTRY: dict[str, dict] = {
             "not exist on disk."
         ),
     },
+    "campaign_status": {
+        "fn": _ora_campaign_status,
+        "args_spec": {},
+        "description": (
+            "AUTONOMOUS OPS DASHBOARD (iter 322g) — returns the live snapshot ORA "
+            "uses to make decisions WITHOUT asking the founder. Reads: "
+            "auto_blast_config, ora_campaign_health, ora_autonomous_log (last 5). "
+            "Call this BEFORE answering any campaign-state question, and BEFORE "
+            "firing any blast-related tool. NEVER guess these numbers."
+        ),
+    },
+    "force_blast_cycle": {
+        "fn": _ora_force_blast_cycle,
+        "args_spec": {
+            "max_leads": "int — cap leads in this cycle (default 5, max 25)",
+        },
+        "description": (
+            "AUTONOMOUS REMEDIATION (iter 322g) — triggers ONE auto-blast cycle "
+            "right now (bypassing the 2-min wait). Use after founder reports "
+            "campaign stuck OR when zero_sent_streak >= 3. Returns {processed, sent}. "
+            "If sent=0, immediately follow up with channel_gating_reseed + retry."
+        ),
+    },
+    "channel_gating_reseed": {
+        "fn": _ora_channel_gating_reseed,
+        "args_spec": {},
+        "description": (
+            "AUTONOMOUS REMEDIATION (iter 322g) — re-seeds channel_gating for every "
+            "unsent lead from raw email/phone, and purges junk domains (wikipedia/"
+            "autozone/etc.). Same logic as the watchdog autofix loop. Call when "
+            "founder demands an immediate fix. Returns {fixed, purged, skipped}."
+        ),
+    },
+    "git_commit_local": {
+        "fn": _ora_git_commit_local,
+        "args_spec": {
+            "message": "str — concise commit message (will be prefixed with 'ora-autofix: ')",
+        },
+        "description": (
+            "AUTONOMOUS GIT STAGING (iter 322g) — runs `git add -A && git commit -m` "
+            "on the backend pod. The actual GitHub PUSH must be done via Emergent's "
+            "'Save to GitHub' button (platform-gated, founder approval). Use this to "
+            "checkpoint state after autofix so founder can review + push with one "
+            "click. Returns {sha, files_changed_preview, next_step}."
+        ),
+    },
 }
+
+
+
+# ── iter 322g ORA autonomous-ops shortcut tools ─────────────────────────
+async def _ora_campaign_status() -> dict:
+    """Live snapshot for ORA's autonomous decisions."""
+    from services.ora_tools import _db as db
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        cfg = await db.auto_blast_config.find_one({"tenant_id": "global"}, {"_id": 0}) or {}
+        health = await db.ora_campaign_health.find_one({"_id": "global"}, {"_id": 0}) or {}
+        autonomous_log = []
+        async for d in db.ora_autonomous_log.find({}, {"_id": 0}).sort("ts", -1).limit(5):
+            autonomous_log.append({
+                "ts": d.get("ts"), "playbook": d.get("playbook"),
+                "summary": d.get("summary"),
+            })
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0).isoformat()
+        outreach_today = await db.outreach_history.count_documents(
+            {"created_at": {"$gte": today}}
+        )
+        return {
+            "ok": True,
+            "engine": {
+                "enabled": cfg.get("enabled"),
+                "last_run_at": cfg.get("last_run_at"),
+                "last_run_sent": cfg.get("last_run_sent"),
+                "last_run_processed": cfg.get("last_run_processed"),
+                "max_per_cycle": cfg.get("max_per_cycle"),
+            },
+            "watchdog": {
+                "zero_sent_streak": health.get("zero_sent_streak"),
+                "veto_rate_1h": health.get("veto_rate_1h"),
+                "tripped": health.get("tripped"),
+                "checked_at": health.get("checked_at"),
+            },
+            "outreach_events_today": outreach_today,
+            "recent_autonomous_actions": autonomous_log,
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+async def _ora_force_blast_cycle(max_leads: int = 5) -> dict:
+    from services.ora_tools import _db as db
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        max_leads = max(1, min(int(max_leads), 25))
+        await db.auto_blast_config.update_one(
+            {"tenant_id": "global"},
+            {"$set": {"max_per_cycle": max_leads}},
+        )
+        from services import auto_blast_engine
+        auto_blast_engine.set_db(db)
+        r = await asyncio.wait_for(
+            auto_blast_engine.run_auto_blast_cycle(force=True), timeout=90,
+        )
+        return {
+            "ok": True,
+            "processed": r.get("total_processed"),
+            "sent": r.get("total_sent"),
+            "max_leads_used": max_leads,
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+async def _ora_channel_gating_reseed() -> dict:
+    from services.ora_tools import _db as db
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        from services.ora_autonomous_ops import _autofix_channel_gating, set_db as setdb
+        setdb(db)
+        return await _autofix_channel_gating()
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+async def _ora_git_commit_local(message: str) -> dict:
+    import subprocess
+    msg = f"ora-autofix: {message[:140]}"
+    try:
+        # stage everything
+        subprocess.run(["git", "add", "-A"], cwd="/app", check=True, timeout=20)
+        # commit (allow empty)
+        proc = subprocess.run(
+            ["git", "commit", "-m", msg, "--allow-empty"],
+            cwd="/app", check=True, capture_output=True, text=True, timeout=20,
+        )
+        # head sha
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short=10", "HEAD"], cwd="/app", text=True, timeout=10,
+        ).strip()
+        # changed file list
+        files = subprocess.check_output(
+            ["git", "show", "--stat", "--name-only", "HEAD"],
+            cwd="/app", text=True, timeout=10,
+        )
+        changed = [ln for ln in files.splitlines() if ln and not ln.startswith("commit ")][1:6]
+        return {
+            "ok": True,
+            "sha": sha,
+            "message": msg,
+            "files_changed_preview": changed,
+            "next_step": "Founder must click 'Save to GitHub' in Emergent UI to push to remote.",
+        }
+    except subprocess.CalledProcessError as e:
+        return {"ok": False, "error": f"git: {e.stderr or e.stdout or 'unknown'}"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
 async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:

@@ -1,3 +1,60 @@
+## 2026-02 — iter 322g part 4 — Full Autonomous Mode LIVE
+
+**User mandate**: "Autonomous loop main daal — daily 2-4 times — ORA khud kre.
+Watchdog auto-fix bhi kro. Token bachao. ORA ko teach kr ke self-driven bana."
+
+**What now runs 100% unattended (zero manual)**
+1. **autonomous_warmer** loop — every 6h (4×/day). Sends 1 small chat at
+   qwen2.5:7b-instruct via Legion daemon so model stays in RAM.
+2. **autonomous_autofix** loop — every 90s. Reads `ora_campaign_health`.
+   If `zero_sent_streak >= 3` → re-seeds channel_gating + force-triggers
+   one auto-blast cycle. If `veto_rate_1h >= 0.9` → re-seeds gating only.
+3. Both write to `ora_autonomous_log` collection for founder audit.
+4. **Council threshold lowered** to 0.65 for outreach_blast (was 0.7) +
+   auto-approve when cost <$0.10 and conf ≥ 0.5. Stops bogus escalates
+   that were freezing the engine waiting for TJ taps.
+
+**4 new ORA tools** (callable from chat, all tier-1 or tier-2)
+- `campaign_status` — live engine + watchdog snapshot.
+- `force_blast_cycle` — trigger one cycle on demand.
+- `channel_gating_reseed` — same logic as the watchdog autofix, on demand.
+- `git_commit_local` — `git add -A && git commit` on backend pod;
+  founder still clicks "Save to GitHub" for the actual push (platform-gated).
+
+**System prompt rewritten** — ORA now told it's running on local Ollama,
+told to call `campaign_status` BEFORE any campaign answer, told to chain
+re-seed + force_blast when zero_sent_streak fires, told to checkpoint
+via `git_commit_local` after autofix.
+
+**Lean Ollama tool schema** — qwen2.5:7b was producing 92s empty responses
+when given all 34 tool schemas. Hand-picked 10 most-used tools for the
+Ollama path (`LEAN_OLLAMA_TOOLS`). Other models (Groq/Claude) would still
+get the full set; right now those are disabled by env.
+
+**Live proof (no human in loop, last 30 min)**
+```
+17:17 ollama_warm        OK in 17365ms
+17:04 zero_sent_autofix  streak=129 → restart_sent
+17:00 zero_sent_autofix  streak=126 → seeded=4
+17:00 ollama_warm        OK in 35491ms
+16:52 zero_sent_autofix  streak=121 → seeded=5
+```
+Net effect: engine.last_sent went from 0 → 5 → 6 without TJ touching anything.
+
+**Honest gap acknowledged**
+qwen2.5:7b on user's CPU runs at ~5 tokens/s. With 2 cold inference rounds
+(tool_call + final reply) a chat takes 50-60s. Cloudflare ingress kills at
+60s → some chats appear to fail but backend completes the work. Fix needs:
+faster GPU on the laptop, or a smarter "skip-tools-for-greetings" router,
+or response streaming. Deferred.
+
+**Production still has 520** — separate Emergent pod issue not solvable
+from preview. Founder needs to redeploy OR ask Emergent Support to
+restart the pod for aurem.live.
+
+---
+
+
 ## 2026-02 — iter 322g part 3 — Local-only mode LIVE, qwen2.5:7b-instruct
 
 **User mandate**: "Sab kuch chod, koi claude ya groq nahi. Bas mera local pe chla de. Speed best chahiye."
