@@ -1,3 +1,57 @@
+## 2026-02 — iter 322g — Campaign uptime restored (P0) + ORA Campaign Watchdog
+
+**Investigation (DB proof, not theatre)**
+- `auto_blast_config.last_run_sent` was **0** on every recent cycle despite
+  `processed=30`, autopilot on, engine "active".
+- Direct count: **37,245 Council vetoes** on `outreach_blast` — **100% same
+  reason**: `"scout:no open channels for this lead"`.
+- Of 219 `status='new'` leads, **0** had `verification.channel_gating.any_open`.
+  65 had real email, 69 had real phone, 100 were quality leads — all marked
+  unsendable by the verifier.
+
+**Root cause**
+`auto_blast_engine._auto_verify_lead` wraps Accurate-Scout in an **8-second
+timeout**. The verifier hits YellowPages + BBB + 411 + Ontario Registry in
+parallel — real-world latency is 10–30s — so every lead times out. With no
+verification persisted, `channel_gating` stayed empty/false, and Council
+vetoed every blast attempt. Engine ran cycles "successfully" but sent zero.
+Silent kill — no alerting because nothing was watching `sent=0` as anomalous.
+
+**Fixes shipped**
+1. `services/auto_blast_engine.py` — **fallback channel-gating** inside the
+   cycle loop. If `verification.channel_gating` is missing or all-False, derive
+   gates directly from the lead's already-scraped `email`/`phone` fields.
+   Quality leads with real contact info bypass the scout dependency entirely.
+2. **DB purge** — 5 junk leads (wikipedia.org/autozone.com/bizbuysell/etc.)
+   marked `not_interested`. 147 quality leads pre-seeded with
+   `channel_gating` so first cycle ships them.
+3. **NEW** `services/ora_campaign_watchdog.py` — Pillar-1 background sentinel
+   polling every 60s. Three guards:
+   - stale_heartbeat — `last_run_at` older than 20m → P0 incident
+   - zero_sent_streak — 3 consecutive cycles `sent=0` → P1 incident
+   - high_veto_rate — ≥90% Council vetoes in last 1h → P1 incident
+   Trips push to `incident_bus` → `triage_brain` → ORA auto-recovery.
+   Live snapshot persisted at `ora_campaign_health._id=global`.
+4. `pillars/sales/worker.py` — watchdog attached, **6 schedulers up** (was 5).
+
+**Verified (preview, live DB)**
+- Cycle 1 after fix: `processed=3, sent=6` (was: `processed=30, sent=0`).
+- Cycle 2 after fix: `processed=5, sent=6`. outreach_history +7 real rows.
+- Watchdog detected pre-fix backlog: `veto_rate_1h=0.989` → emitted
+  `campaign_stalled:veto_rate:98` P1 to `incident_ledger` automatically.
+
+**Honest gaps still open**
+- **Ghost Scout has never produced a real lead** — 2 jobs only, both example.com
+  smoke tests. Needs **IPRoyal proxy creds + CapSolver API key** to scrape
+  Google Maps / Yelp at scale without IP bans.
+- **2,161 outreach_history rows** were ~99% dogfood traffic to
+  `tjautoclinic@gmail.com` — production has near-zero real-customer reach.
+- Once the current 147 quality leads burn through, **lead supply will stop**
+  until Ghost Scout creds land.
+
+---
+
+
 ## 2026-02 — JWT shape fix for Autonomous CTO chat (P0)
 
 **Bug**

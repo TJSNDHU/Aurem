@@ -261,6 +261,28 @@ async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
                 # 1) verify (so channel_gating is populated)
                 verified = await _auto_verify_lead(db, lead)
 
+                # ── FALLBACK CHANNEL GATING (iter 322g) ─────────────────
+                # The Accurate-Scout 8s timeout was silently killing 100%
+                # of sends — verification.channel_gating never got saved
+                # for real leads, so Council vetoed every blast with
+                # "scout:no open channels". 37,245 vetoes recorded.
+                # If verification is missing or all-False, derive gates
+                # directly from the lead's already-scraped email/phone.
+                _v = verified.get("verification") or {}
+                _gates = _v.get("channel_gating") or {}
+                if not any(_gates.values()):
+                    _email = (verified.get("email") or lead.get("email") or "").strip()
+                    _phone = (verified.get("phone") or lead.get("phone") or "").strip()
+                    _gates = {
+                        "email":    bool(_email and "@" in _email),
+                        "call":     bool(_phone),
+                        "sms":      bool(_phone),
+                        "whatsapp": bool(_phone),
+                    }
+                    _v["channel_gating"] = _gates
+                    verified["verification"] = _v
+                # ────────────────────────────────────────────────────────
+
                 # iter 296 — Council pre-action gate
                 decision = await council.deliberate(
                     action_kind="outreach_blast",

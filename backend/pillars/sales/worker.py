@@ -77,6 +77,17 @@ def start_pillar1_worker(db, news_monitor_coro_factory=None) -> dict:
         failed.append({"task": "chain_advance_scheduler", "error": str(e)})
         print(f"[p1-worker] ✗ Blast-Chain advancer failed: {e}", flush=True)
 
+    # ---- ORA Campaign Watchdog (iter 322g — campaign uptime sentinel) ---
+    try:
+        from services.ora_campaign_watchdog import watchdog_loop, set_db as set_wd_db
+        set_wd_db(db)
+        _safe_task(watchdog_loop(), "ora_campaign_watchdog")
+        started.append("ora_campaign_watchdog (60s poll)")
+        print("[p1-worker] ✓ ORA Campaign Watchdog attached", flush=True)
+    except Exception as e:
+        failed.append({"task": "ora_campaign_watchdog", "error": str(e)})
+        print(f"[p1-worker] ✗ ORA Campaign Watchdog failed: {e}", flush=True)
+
     # ---- Phase 1: T1 Pipeline subscriptions (Closer + Followup + Referral) ─
     # Register A2A bus handlers once at boot.
     try:
