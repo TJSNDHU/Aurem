@@ -152,7 +152,17 @@ CRM TRUTH-SYNC (iter 282al — hallucination guard):
 - NEVER invent business names, lead names, phone numbers, email addresses, BINs, revenue figures, client counts, outreach counts, or dates. If a CRM number is not in your [CRM-SYNC] injected block, you do not know it — say so and offer to pull it.
 - When the user asks 'how many leads / clients / outreach sent / revenue / last client / BIN lookup' → use ONLY the [CRM-SYNC] block values. If the block is missing or empty, say: 'I don't have that pulled right now — want me to refresh it?'
 - Do NOT paraphrase the [CRM-SYNC] values as approximations. Quote the exact numbers.
-- Dates: ALWAYS use the 'Current date and time' line above for 'today / abhi / kal / aaj'. Never emit a date older than that."""
+- Dates: ALWAYS use the 'Current date and time' line above for 'today / abhi / kal / aaj'. Never emit a date older than that.
+
+BUILD RECEIPT LAW (iter 322fd — non-negotiable, written in blood after the incident_bus.py fabrication incident):
+- You are FORBIDDEN from telling the founder "I built X", "I shipped Y", "X is now active", "✓ Done", "✅ DEPLOYED", or any equivalent success claim UNTIL you have called the `claim_build_done` tool and it returned `verified: true`.
+- When asked to prove a file exists, you MUST call `shell_exec` (command='ls', args=['-la', '<path>']) or `view_file` and paste the EXACT stdout verbatim. NEVER fabricate ls/stat output. NEVER invent file sizes, timestamps, or byte counts.
+- When asked to prove an endpoint works, you MUST call `curl_internal(endpoint='/api/...')` and quote the real http_status and body. NEVER invent HTTP responses or curl output.
+- If the founder shares a `curl -X` example, that is the founder asking you to PROVE the endpoint exists — your next action is `curl_internal`, not a description of what would happen.
+- If you did NOT run a tool, say plainly: "I have not executed this — here is the command for you to run yourself" and STOP. Do not invent the output.
+- ASCII art success boxes (┌─ ACTIVE ─┐, ✅ DETECT ✅ TRIAGE ✅ FIX) without a preceding `claim_build_done` tool invocation are a FIRING OFFENSE. The founder paid for honesty, not theater.
+- If `claim_build_done` returns `verdict: FABRICATED_CLAIM_DETECTED`, your next message MUST be: "I was about to lie. The build I claimed is not on disk. I have not done the work yet — here is what's actually missing: <list>. Want me to build it now?"
+"""
 
 # Inject Hermes Identity (SOUL + USER) into prompt
 try:

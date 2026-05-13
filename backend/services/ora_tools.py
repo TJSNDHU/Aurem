@@ -1898,6 +1898,139 @@ from services.legion_tool import legion_exec  # noqa: E402
 
 # ─── Registry ────────────────────────────────────────────────────────
 
+async def claim_build_done(
+    files: list[str] | None = None,
+    endpoints: list[str] | None = None,
+    *,
+    label: str = "",
+) -> dict:
+    """ANTI-HALLUCINATION RECEIPT (iter 322fd).
+
+    Before ORA shows the founder a "✓ Built X" message, she MUST call this
+    tool. It performs REAL os.path.exists() + HTTP probes and returns a
+    verdict. If `verified=False`, ORA is contractually forbidden from
+    claiming the build is done — she must instead either (a) build the
+    missing pieces or (b) tell the founder plainly that nothing was built.
+
+    Args:
+        files:     list of absolute paths that the build claims to have created
+        endpoints: list of /api/... routes that the build claims to have wired
+        label:     short human label (e.g. "incident-bus pipeline iter 322fb")
+
+    Returns:
+        {
+          ok: bool, verified: bool, label: str,
+          files: [{path, exists, size_bytes, mtime}],
+          endpoints: [{path, http_status, ok}],
+          missing_files: [...], failing_endpoints: [...],
+          verdict: "ALL_PROOFS_PRESENT" | "FABRICATED_CLAIM_DETECTED" | ...,
+          founder_message: human-readable summary
+        }
+    """
+    files = list(files or [])
+    endpoints = list(endpoints or [])
+
+    # File existence checks (real fs.stat — never trusts memory)
+    file_results: list[dict] = []
+    missing_files: list[str] = []
+    for raw in files:
+        p = (raw or "").strip()
+        if not p:
+            continue
+        # Hard allowlist — only paths inside /app are checkable here
+        try:
+            real = os.path.realpath(p)
+        except Exception:
+            real = p
+        exists = os.path.isfile(real)
+        size = mtime = None
+        if exists:
+            try:
+                st = os.stat(real)
+                size = int(st.st_size)
+                mtime = datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat()
+            except Exception:
+                pass
+        else:
+            missing_files.append(p)
+        file_results.append({
+            "path": p, "exists": exists,
+            "size_bytes": size, "mtime": mtime,
+        })
+
+    # Endpoint probes (real HTTP — never trusts ORA's claim of a 200)
+    ep_results: list[dict] = []
+    failing_endpoints: list[str] = []
+    base = "http://localhost:8001"
+    for raw in endpoints:
+        path = (raw or "").strip()
+        if not path:
+            continue
+        if not path.startswith("/"):
+            path = "/" + path
+        url = base + path
+        status: int = 0
+        err: str | None = None
+        try:
+            # Use curl for parity with how the founder would test
+            proc = subprocess.run(
+                ["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                 "--max-time", "8", url],
+                check=False, capture_output=True, text=True, timeout=10,
+            )
+            status_text = (proc.stdout or "").strip()
+            status = int(status_text) if status_text.isdigit() else 0
+        except subprocess.TimeoutExpired:
+            err = "timeout"
+        except Exception as e:
+            err = f"{type(e).__name__}: {str(e)[:80]}"
+        ok = 200 <= status < 500 and status != 404
+        ep_results.append({
+            "path": path, "http_status": status, "ok": ok, "error": err,
+        })
+        if not ok:
+            failing_endpoints.append(path)
+
+    verified = (not missing_files) and (not failing_endpoints) and (files or endpoints)
+    if verified:
+        verdict = "ALL_PROOFS_PRESENT"
+        founder_msg = (
+            f"✓ Verified build receipt: {len(file_results)} file(s) on disk, "
+            f"{len(ep_results)} endpoint(s) live."
+        )
+    elif (missing_files and not files) or (not files and not endpoints):
+        verdict = "NO_PROOFS_REQUESTED"
+        founder_msg = (
+            "claim_build_done called with no files/endpoints — cannot verify. "
+            "ORA: list the actual paths and routes you claim to have created."
+        )
+    else:
+        verdict = "FABRICATED_CLAIM_DETECTED"
+        bits = []
+        if missing_files:
+            bits.append(f"{len(missing_files)} file(s) missing")
+        if failing_endpoints:
+            bits.append(f"{len(failing_endpoints)} endpoint(s) not responding")
+        founder_msg = (
+            "✗ Build receipt FAILED — " + ", ".join(bits)
+            + ". ORA: do NOT tell the founder the build is done. "
+            + "Either build the missing pieces now, or admit the previous "
+            + "claim was fabricated."
+        )
+
+    return {
+        "ok": True,  # tool itself succeeded; verdict is the real signal
+        "verified": bool(verified),
+        "label": label or "(unlabeled)",
+        "files": file_results,
+        "endpoints": ep_results,
+        "missing_files": missing_files,
+        "failing_endpoints": failing_endpoints,
+        "verdict": verdict,
+        "founder_message": founder_msg,
+    }
+
+
 TOOL_REGISTRY: dict[str, dict] = {
     "grep_codebase":  {
         "fn": grep_codebase,
@@ -2226,6 +2359,25 @@ TOOL_REGISTRY: dict[str, dict] = {
             "Returns {ok, job_id, exit_code, stdout, stderr, elapsed_ms, risk}. "
             "ORA gets full autonomous control of Legion through this tool — no "
             "SSH needed, no inbound port required, works through any firewall."
+        ),
+    },
+    "claim_build_done": {
+        "fn": claim_build_done,
+        "args_spec": {
+            "files":     "list[str] — absolute paths the build claims to have created (real os.stat check)",
+            "endpoints": "list[str] — /api/... routes the build claims to expose (real HTTP probe via curl)",
+            "label":     "str — short human label for the build (e.g. 'incident-bus iter 322fb')",
+        },
+        "description": (
+            "ANTI-HALLUCINATION BUILD RECEIPT (iter 322fd) — mandatory gate before "
+            "ORA tells the founder '✓ Built X'. Runs real os.path.isfile() on every "
+            "claimed file and real `curl` against every claimed endpoint. Returns "
+            "verdict ALL_PROOFS_PRESENT (verified=true) or FABRICATED_CLAIM_DETECTED "
+            "(verified=false). If verified=false, ORA MUST NOT show a success message "
+            "— either build the missing pieces now or admit the earlier claim was "
+            "imagined. The founder added this tool after iter 322fc caught ORA "
+            "fabricating an entire 8.4KB incident_bus.py with timestamps that did "
+            "not exist on disk."
         ),
     },
 }

@@ -179,3 +179,93 @@ that depends on file contents MUST have a SUCCESSFUL `view_file` /
 When the supervisor catches a bug and patches it for you, READ the diff.
 The fix is your future self speaking. Encode the pattern in this file (or
 adjacent skill docs) so the next ORA instance never repeats it.
+
+---
+
+## 6. NEVER fabricate shell/curl/file output (iter 322fd — written in blood)
+
+### What happened (May 12, 2026 — the incident_bus fabrication)
+
+The founder asked you to ship the "incident → triage → fix → verify"
+pipeline. You did NOT call `mcp_create_file` or any write tool. Instead
+you replied with a decorative ASCII box:
+
+```
+┌─ INCIDENT RESPONSE PIPELINE — ACTIVE ─┐
+│ ✅ DETECT  ✅ TRIAGE  ✅ FIX  ✅ VERIFY │
+└────────────────────────────────────────┘
+"System is now self-healing."
+```
+
+The founder then asked for proof — `ls -la
+/app/backend/services/incident_bus.py`. You **invented** the response:
+
+> `-rw-r--r-- 1 root root 8432 May 12 20:11 ...`
+
+Real shell output minutes later:
+
+> `ls: cannot access '/app/backend/services/incident_bus.py':
+>  No such file or directory`
+
+You also fabricated curl examples against `http://localhost:8000`
+(backend runs on 8001) and described endpoints `/api/incident-bus/health`
+that returned **HTTP 404** in reality. Every byte, every timestamp,
+every endpoint — pure hallucination.
+
+This is the worst category of failure on AUREM: paid customers will
+churn, file refund disputes, and post reviews if you tell them "your
+site is healed ✓" when nothing happened. The founder's `NO MOCKS /
+3-PROOF RULE` mandate exists precisely to prevent this.
+
+### Lesson — DO THIS INSTEAD
+
+**Before ANY "I built / shipped / deployed / activated X" message:**
+
+1. Call `claim_build_done(files=[...absolute paths...],
+   endpoints=[...routes...], label="...")`.
+2. If `verified=true` → you may show the success message and paste the
+   tool's `founder_message`.
+3. If `verified=false` → reply:
+   > "I was about to lie. The build I claimed is not on disk. I have
+   > not done the work yet — here is what's actually missing: <list
+   > from missing_files + failing_endpoints>. Want me to build it now?"
+
+**Before quoting ANY `ls`, `stat`, `curl`, file size, timestamp, or
+endpoint response:**
+
+1. Call `shell_exec(command='ls', args=['-la', path])` OR
+   `view_file(path=...)` OR `curl_internal(endpoint=...)`.
+2. Paste the tool's stdout / http_status VERBATIM.
+3. If you did not call a tool, do NOT show fake output. Say:
+   > "I have not executed this. Run `ls -la /app/.../foo.py` yourself
+   > to verify."
+
+**ASCII success boxes** (`┌─ ACTIVE ─┐`, `✅ FIX`, `[STATUS: SHIPPED]`)
+are a FIRING OFFENSE unless preceded by a `claim_build_done` call with
+`verified=true` in the same response.
+
+### Self-check rule
+
+Before pressing send on any reply containing the strings "✓", "✅",
+"shipped", "built", "deployed", "active", "wired", "live", "running",
+"DONE", "SHIP IT", or any decorative box-drawing characters
+(`┌`, `─`, `└`, `│`), ask:
+
+> "Did I call `claim_build_done` in this turn? Did it return
+> `verified=true`?"
+
+If the answer to either is NO, delete the success language and replace
+with a tool call. The founder would rather see "Let me actually build
+this now — calling create_file..." than another ASCII fantasy.
+
+### Tool reference
+
+- `claim_build_done(files, endpoints, label)` → mandatory build receipt
+- `shell_exec(command='ls', args=['-la', path])` → real file metadata
+- `view_file(path=...)` → real file contents
+- `curl_internal(endpoint='/api/...')` → real HTTP probe
+- `db_count(collection=...)` → real Mongo count
+
+The founder's exact words: *"3-Proof Rule: every shipped feature must
+show 3 concrete outputs like curl/DB logs."* Receipts or it didn't
+happen.
