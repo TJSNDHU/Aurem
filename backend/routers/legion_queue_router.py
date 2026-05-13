@@ -149,21 +149,39 @@ async def reject(job_id: str, user: dict = Depends(get_admin_user)):
 
 _DAEMON_PATH  = _Path('/app/aurem-cto/daemon/legion_daemon.py')
 _INSTALL_PATH = _Path('/app/aurem-cto/daemon/install.sh')
+# iter 322fg — production deploys ship only /app/backend/, NOT /app/aurem-cto/.
+# Mirror copies live in /app/backend/legion_assets/ so prod can still serve
+# the daemon bootstrap to founders' laptops. We try the canonical path
+# first (so dev edits flow through), then fall back to the backend mirror.
+_DAEMON_FALLBACK  = _Path(__file__).parent.parent / 'legion_assets' / 'legion_daemon.py'
+_INSTALL_FALLBACK = _Path(__file__).parent.parent / 'legion_assets' / 'install.sh'
 
 bootstrap_router = APIRouter(prefix='/api/legion', tags=['legion'])
+
+
+def _read_one_of(*candidates: _Path) -> str | None:
+    for p in candidates:
+        try:
+            if p.is_file():
+                return p.read_text()
+        except Exception:
+            continue
+    return None
 
 
 @bootstrap_router.get('/daemon-source', response_class=PlainTextResponse)
 async def daemon_source():
     """Returns the legion_daemon.py source code. Used by install.sh."""
-    if not _DAEMON_PATH.exists():
+    src = _read_one_of(_DAEMON_PATH, _DAEMON_FALLBACK)
+    if src is None:
         raise HTTPException(status_code=503, detail='daemon source not deployed')
-    return _DAEMON_PATH.read_text()
+    return src
 
 
 @bootstrap_router.get('/install', response_class=PlainTextResponse)
 async def install_script():
     """Returns the install.sh script. Use with: curl -fsSL .../install | sudo bash"""
-    if not _INSTALL_PATH.exists():
+    src = _read_one_of(_INSTALL_PATH, _INSTALL_FALLBACK)
+    if src is None:
         raise HTTPException(status_code=503, detail='install script not deployed')
-    return _INSTALL_PATH.read_text()
+    return src
