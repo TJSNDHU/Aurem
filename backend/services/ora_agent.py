@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -608,7 +609,71 @@ async def run_turn(
         history = [{"role": "system", "content": SYSTEM_PROMPT}]
     history.append({"role": "user", "content": user_text})
 
+    # iter 322g part 5 — intent fast-path. For obvious greetings / status
+    # questions, skip the entire tool-loop and reply directly from a
+    # template. qwen2.5:7b on user CPU takes 30s+ per Ollama round; this
+    # keeps 80% of chats sub-2s.
+    fast_reply = await _maybe_fast_reply(user_text)
+    if fast_reply is not None:
+        history.append({"role": "assistant", "content": fast_reply})
+        await _save_history(session_id, history)
+        return {"ok": True, "reply": fast_reply, "done": True,
+                "history_len": len(history), "fast_path": True}
+
     return await _continue_loop(session_id, history, founder_email)
+
+
+# iter 322g part 5 — intent classifier (rule-based; cheap & deterministic).
+_GREETING_RE = re.compile(
+    r"^\s*(hi|hii+|hello+|hey+|namaste|namaskar|salam|good\s+(morning|evening|afternoon|night)|"
+    r"ok\.?|okay\.?|cool\.?|nice\.?|wow|gm|gn|tq|thanks?|thank\s+you|thx|"
+    r"yo|sup|haan|han|ji|haan?ji|theek\s+hai|tk|tkk|hmm+|hmmmm+|good)"
+    r"(\s+(bhai|ji|sir|boss|yaar|man|dear))?"
+    r"[\s!.,?]*$",
+    re.IGNORECASE,
+)
+_CAMPAIGN_STATUS_RE = re.compile(
+    r"(campaign|blast)\s*(status|kya|ka haal|update|chal raha|chl rha|kaisa)",
+    re.IGNORECASE,
+)
+
+
+async def _maybe_fast_reply(text: str) -> str | None:
+    t = (text or "").strip()
+    if not t or len(t) > 80:
+        return None
+    if _GREETING_RE.match(t):
+        return (
+            "Namaste! 🟢 ORA online — sovereign Ollama running, "
+            "campaign autopilot ON, watchdog active. Kya kaam karna hai?"
+        )
+    # Campaign status question → call the tool inline (5ms) and reply directly.
+    if _CAMPAIGN_STATUS_RE.search(t):
+        try:
+            from services.ora_tools import invoke_tool
+            res = await invoke_tool("campaign_status", {})
+            eng = res.get("engine", {})
+            wd = res.get("watchdog", {})
+            tripped = wd.get("tripped") or []
+            health = "🟢 GREEN" if not tripped else f"🟡 {','.join(tripped)}"
+            recent = res.get("recent_autonomous_actions", [])[:3]
+            recent_str = "\n".join(
+                f"  • {a.get('ts','')[:16]}  {a.get('playbook')}  {a.get('summary','')[:60]}"
+                for a in recent
+            )
+            return (
+                f"**Campaign Status — {health}**\n\n"
+                f"• Engine: enabled={eng.get('enabled')}  "
+                f"last_sent={eng.get('last_run_sent')}  "
+                f"last_processed={eng.get('last_run_processed')}\n"
+                f"• Watchdog: zero_sent_streak={wd.get('zero_sent_streak')}  "
+                f"veto_rate_1h={wd.get('veto_rate_1h')}\n"
+                f"• Outreach events today: {res.get('outreach_events_today')}\n\n"
+                f"**Last 3 autonomous actions:**\n{recent_str or '  (none yet)'}"
+            )
+        except Exception:
+            return None
+    return None
 
 
 async def resume_after_decision(

@@ -120,6 +120,17 @@ def start_pillar1_worker(db, news_monitor_coro_factory=None) -> dict:
         failed.append({"task": "autonomous_ops", "error": str(e)})
         print(f"[p1-worker] ✗ Autonomous ops failed: {e}", flush=True)
 
+    # ---- System Scanner (iter 322g part 5 — self-diagnosis + autofix) ----
+    try:
+        from services.ora_system_scanner import scanner_loop, set_db as set_scan_db
+        set_scan_db(db)
+        _safe_task(scanner_loop(), "ora_system_scanner")
+        started.append("ora_system_scanner (5min cycle)")
+        print("[p1-worker] ✓ ORA System Scanner attached", flush=True)
+    except Exception as e:
+        failed.append({"task": "ora_system_scanner", "error": str(e)})
+        print(f"[p1-worker] ✗ System Scanner failed: {e}", flush=True)
+
     # ---- Phase 1: T1 Pipeline subscriptions (Closer + Followup + Referral) ─
     # Register A2A bus handlers once at boot.
     try:
