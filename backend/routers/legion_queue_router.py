@@ -67,7 +67,12 @@ def require_daemon_token(authorization: Optional[str] = Header(None)):
 
 class EnqueueRequest(BaseModel):
     cmd: str = Field(min_length=1, max_length=4000)
-    cwd: str = '/opt/aurem-cto'
+    # iter 322g — default to /tmp instead of /opt/aurem-cto. The original
+    # default required `sudo install.sh` to create /opt/aurem-cto with
+    # daemon-user perms. On WSL / non-systemd installs the daemon user
+    # can't chdir into that path → 100% jobs fail with PermissionError.
+    # /tmp is world-writable on every POSIX system.
+    cwd: str = '/tmp'
     timeout_s: int = Field(default=60, ge=1, le=600)
     env: dict = {}
     risk_hint: Optional[str] = None

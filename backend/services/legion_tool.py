@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 async def legion_exec(
     cmd: str,
-    cwd: str = '/opt/aurem-cto',
+    cwd: str = '/tmp',
     timeout_s: int = 60,
     risk_hint: Optional[str] = None,
     wait_max_s: int = 360

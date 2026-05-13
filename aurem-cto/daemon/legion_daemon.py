@@ -72,13 +72,25 @@ async def claim_next() -> dict | None:
 
 async def execute_cmd(job: dict) -> dict:
     cmd     = job["cmd"]
-    cwd     = job.get("cwd", "/opt/aurem-cto")
+    cwd     = job.get("cwd", "/tmp")
     timeout = int(job.get("timeout_s", 60))
     env     = {**os.environ, **(job.get("env") or {})}
+    # iter 322g — robust cwd fallback. mkdir(exist_ok=True) silently passes
+    # if the dir EXISTS but the daemon user has no perm → subprocess then
+    # crashes with PermissionError. Verify access explicitly; on any
+    # failure use the user's home dir (always accessible) or /tmp.
     try:
         Path(cwd).mkdir(parents=True, exist_ok=True)
+        if not os.access(cwd, os.R_OK | os.X_OK):
+            raise PermissionError(f"no access to {cwd}")
     except Exception:
-        cwd = os.getcwd()
+        for candidate in (os.path.expanduser("~"), "/tmp", os.getcwd()):
+            try:
+                if os.access(candidate, os.R_OK | os.W_OK | os.X_OK):
+                    cwd = candidate
+                    break
+            except Exception:
+                continue
 
     start = time.time()
     try:
