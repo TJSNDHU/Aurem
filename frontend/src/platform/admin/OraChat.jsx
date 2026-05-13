@@ -254,6 +254,7 @@ export default function OraChat() {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
               ORA · Autonomous CTO
             </h1>
+            <StatusPill busy={busy} pending={!!pending} error={!!error} />
           </div>
           <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 2 }}>
             iter 322fi · Thread {sessionId.slice(-8)} · One chat, no tabs
@@ -341,6 +342,16 @@ export default function OraChat() {
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes robotBob {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          25%      { transform: translateY(-2px) rotate(-6deg); }
+          50%      { transform: translateY(0) rotate(0deg); }
+          75%      { transform: translateY(-1px) rotate(6deg); }
+        }
       `}</style>
     </div>
   );
@@ -520,6 +531,48 @@ function _safeArgs(raw) {
   if (typeof raw === "object") return raw;
   try { return JSON.parse(raw); }
   catch { return { _raw: String(raw).slice(0, 200) }; }
+}
+
+/**
+ * StatusPill — small robot 🤖 badge next to the title.
+ * - Idle (default): grey "🤖 IDLE"
+ * - Working: gold pulse "🤖 WORKING…" with shimmer
+ * - Awaiting approval: amber "🤖 NEEDS YOU"
+ * - Error: red "🤖 STUCK"
+ */
+function StatusPill({ busy, pending, error }) {
+  let label = "IDLE", color = TEXT_DIM, pulse = false;
+  if (error)       { label = "STUCK";      color = RED; }
+  else if (pending){ label = "NEEDS YOU";  color = AMBER; pulse = true; }
+  else if (busy)   { label = "WORKING…";   color = GOLD;  pulse = true; }
+  return (
+    <span data-testid="ora-status-pill"
+           style={{
+             display: "inline-flex", alignItems: "center", gap: 6,
+             padding: "3px 10px",
+             background: `${color}22`,
+             border: `1px solid ${color}66`,
+             borderRadius: 999,
+             fontSize: 10.5, fontWeight: 700,
+             color, letterSpacing: 0.5, textTransform: "uppercase",
+             marginLeft: 6,
+             position: "relative", overflow: "hidden",
+           }}>
+      <span style={{
+        fontSize: 12, display: "inline-block",
+        animation: pulse ? "robotBob 1.4s ease-in-out infinite" : "none",
+      }}>🤖</span>
+      <span style={{ position: "relative", zIndex: 1 }}>{label}</span>
+      {pulse && (
+        <span style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(90deg, transparent, ${color}33, transparent)`,
+          animation: "shimmer 1.8s linear infinite",
+          pointerEvents: "none",
+        }} />
+      )}
+    </span>
+  );
 }
 
 function btn(primary, disabled) {
