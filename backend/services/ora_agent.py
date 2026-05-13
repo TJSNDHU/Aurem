@@ -278,8 +278,33 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     call is made FROM the Legion laptop (curl localhost:11434) — pod
     just enqueues + waits.
 
+    iter 322g — fast-fail when daemon is offline. Without this, every
+    chat turn wasted 120s waiting for an ack that would never come,
+    making ORA feel "dead" whenever the founder's laptop slept.
+
     Returns the OpenAI-format `message` dict (may have tool_calls).
     """
+    # ── Daemon liveness gate (added iter 322g) ───────────────────────
+    # If the daemon hasn't polled /queue/next in the last 30s, skip
+    # Ollama entirely and let the chain fall through to Groq/Claude.
+    try:
+        if _db is not None:
+            status = await _db.legion_daemon_status.find_one(
+                {"_id": "global"}, {"_id": 0, "last_poll_ts": 1}
+            )
+            last_ts = float((status or {}).get("last_poll_ts") or 0)
+            import time as _t
+            age = _t.time() - last_ts if last_ts else 999.0
+            if age > 30:
+                logger.info(
+                    f"[ora-agent] ollama skipped: daemon offline "
+                    f"(last_poll {age:.0f}s ago)"
+                )
+                return None
+    except Exception as e:
+        logger.debug(f"[ora-agent] ollama liveness check skipped: {e}")
+    # ─────────────────────────────────────────────────────────────────
+
     try:
         from services.legion_tool import legion_exec
     except Exception:
@@ -569,8 +594,38 @@ async def _continue_loop(
         msg = await _llm_turn(history)
         if msg is None:
             await _save_history(session_id, history)
-            return {"ok": False, "error": "llm_unavailable",
-                    "reply": "Groq + Claude dono down. 10 min me retry kar."}
+            # iter 322g — diagnose WHICH provider died so the founder gets
+            # an actionable error instead of "10 min me retry".
+            diag_lines = []
+            try:
+                if _db is not None:
+                    status = await _db.legion_daemon_status.find_one(
+                        {"_id": "global"}, {"_id": 0, "last_poll_at": 1, "last_poll_ts": 1}
+                    )
+                    import time as _t
+                    last_ts = float((status or {}).get("last_poll_ts") or 0)
+                    age = _t.time() - last_ts if last_ts else None
+                    if age is None:
+                        diag_lines.append("🔴 Legion daemon: NEVER polled (start it on laptop)")
+                    elif age < 30:
+                        diag_lines.append(f"🟢 Legion daemon: online ({int(age)}s ago) — but Ollama call failed")
+                    else:
+                        diag_lines.append(f"🔴 Legion daemon: OFFLINE ({int(age)}s since last poll)")
+            except Exception:
+                pass
+            diag_lines.append("🔴 Groq: daily TPD limit hit (resets daily)")
+            diag_lines.append("🔴 Claude (Universal Key): budget exhausted")
+            reply = (
+                "**Saare 3 LLM providers down hain abhi:**\n\n"
+                + "\n".join(diag_lines)
+                + "\n\n**Fix kar (any one):**\n"
+                  "1. **Legion laptop pe daemon start kar** — Ollama free + sovereign hai:\n"
+                  "   `cd ~/aurem-cto && python3 legion_daemon.py`\n"
+                  "2. **Universal Key balance add kar** — Profile → Universal Key → Add Balance\n"
+                  "3. **Groq quota reset** — wait until UTC 00:00\n\n"
+                  "Daemon start hote hi ORA wapas chal jayega — koi redeploy nahi chahiye."
+            )
+            return {"ok": False, "error": "llm_unavailable", "reply": reply}
 
         tool_calls = msg.get("tool_calls") or []
         content = (msg.get("content") or "").strip()

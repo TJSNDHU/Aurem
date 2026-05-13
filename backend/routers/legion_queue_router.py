@@ -101,6 +101,21 @@ async def enqueue(req: EnqueueRequest, user: dict = Depends(get_admin_user)):
 
 @router.get('/next')
 async def next_job(_daemon: bool = Depends(require_daemon_token)):
+    # iter 322g — stamp daemon heartbeat on every poll so ora_agent can
+    # fast-fail the 120s ollama wait when the laptop is offline.
+    try:
+        if _db is not None:
+            from datetime import datetime, timezone
+            await _db.legion_daemon_status.update_one(
+                {'_id': 'global'},
+                {'$set': {
+                    'last_poll_at': datetime.now(timezone.utc).isoformat(),
+                    'last_poll_ts': datetime.now(timezone.utc).timestamp(),
+                }},
+                upsert=True,
+            )
+    except Exception as e:
+        logger.debug(f'[legion] heartbeat write skipped: {e}')
     res = await claim_next_job()
     return res or {'job_id': None}
 
