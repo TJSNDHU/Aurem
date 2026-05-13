@@ -823,7 +823,7 @@ async def public_demo_chat(
     claude_ms = 0
     groq_ms = 0
 
-    order = (os.environ.get("ORA_PROVIDER_ORDER", "claude,groq")
+    order = (os.environ.get("ORA_PROVIDER_ORDER", "legion_ollama,claude,groq")
              .lower().replace(" ", "").split(","))
 
     async def _try_claude() -> Optional[str]:
@@ -848,6 +848,48 @@ async def public_demo_chat(
             })
         groq_messages.append({"role": "user", "content": text})
         return await _groq_fallback(groq_messages)
+
+    # iter 322fi-ollama — Sovereign LLM: ask the founder's Legion laptop
+    # via the reverse-poll queue. Local Ollama (qwen2.5:7b by default)
+    # → zero cost, no quota, works even when Groq/Claude/Cloudflare are
+    # all on fire. Slower (~5-12s) but indestructible.
+    legion_ollama_ms = 0
+
+    async def _try_legion_ollama() -> Optional[str]:
+        nonlocal legion_ollama_ms
+        try:
+            from services.legion_ollama import ask_legion_ollama
+        except Exception as _ie:
+            logger.debug(f"[public-ora-demo] legion_ollama import failed: {_ie}")
+            return None
+        # Build a flat prompt so we don't depend on Ollama's chat template
+        convo: list[str] = []
+        for t in history[-4:]:
+            role = "User" if t.get("role") == "user" else "ORA"
+            convo.append(f"{role}: {t.get('text','')}")
+        convo.append(f"User: {text}")
+        convo.append("ORA:")
+        prompt = "\n".join(convo)
+        _o0 = _time.monotonic()
+        try:
+            res = await ask_legion_ollama(
+                prompt=prompt,
+                system=sys_prompt[:3000],   # qwen handles system separately
+                max_tokens=600,
+                temperature=0.4,
+                wait_max_s=int(os.environ.get("ORA_LEGION_WAIT_S", "60")),
+            )
+            legion_ollama_ms = int((_time.monotonic() - _o0) * 1000)
+            if res.get("ok"):
+                return (res.get("reply") or "").strip() or None
+            logger.info(f"[public-ora-demo] legion-ollama miss: "
+                        f"{res.get('error')} (stderr={res.get('stderr','')[:120]})")
+            return None
+        except Exception as e:
+            legion_ollama_ms = int((_time.monotonic() - _o0) * 1000)
+            logger.warning(f"[public-ora-demo] legion-ollama exception: "
+                           f"{type(e).__name__}: {e}")
+            return None
 
     # iter 322fe — Auto tool-calling for authenticated founder/admin chats.
     # Public visitors stay on the plain LLM path (token cost guard). When
@@ -937,6 +979,11 @@ async def public_demo_chat(
                 claude_ms = int((_time.monotonic() - _c0) * 1000)
                 if out:
                     llm_source = "claude" + ("-fallback" if auto_tools_failed else "")
+                    break
+            elif provider in ("legion_ollama", "ollama", "legion"):
+                out = await _try_legion_ollama()
+                if out:
+                    llm_source = "legion-ollama"
                     break
 
     # Both providers dead → honest non-LLM reply (anti-hallucination).
