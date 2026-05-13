@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { installSentinel } from "./lib/sentinel";
+// iter 322ff — incident reporter auto-wires window.onerror +
+// unhandledrejection → POST /api/incident/report. Side-effect import only.
+import "./utils/incidentReporter";
 
 console.log('[AUREM] Autonomous AI Workforce Platform Starting...');
 

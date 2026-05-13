@@ -96,6 +96,7 @@ import GitCommitGate from './platform/admin/GitCommitGate';
 import OraChat from './platform/admin/OraChat';
 import OraSettings from './platform/admin/OraSettings';
 import FounderSaves from './platform/admin/FounderSaves';
+import IncidentLedger from './platform/admin/IncidentLedger';
 import DesignExtractPublic from './platform/DesignExtractPublic';
 import MonitorFreeLanding from './platform/MonitorFreeLanding';
 import AdminSiteMonitor from './platform/AdminSiteMonitor';
@@ -338,6 +339,7 @@ function AppRouter() {
         <Route path="/admin/ora-cto" element={<OraCtoCockpit />} />
         <Route path="/admin/git-gate" element={<GitCommitGate />} />
         <Route path="/admin/ora-chat" element={<OraChat />} />
+        <Route path="/admin/incident-ledger" element={<IncidentLedger />} />
         <Route path="/admin/ora-settings" element={<OraSettings />} />
         <Route path="/admin/founder-saves" element={<FounderSaves />} />
         <Route path="/design-extract" element={<DesignExtractPublic />} />

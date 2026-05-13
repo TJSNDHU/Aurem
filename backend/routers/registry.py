@@ -675,6 +675,7 @@ def register_all_routers(app, db):
         ("routers.scrapling_router", "Scrapling Health (iter 282al-22)"),
         ("routers.sovereign_truth_router", "Sovereign Truth (iter 282al-26)"),
         ("routers.sms_admin_router", "SMS Admin + CA Allowlist (iter 282al-33)"),
+        ("routers.incident_router", "Incident Pipeline (iter 322ff)"),
     ]
 
     for module_path, label in _aurem_with_db:

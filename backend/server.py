@@ -870,6 +870,16 @@ try:
 except Exception as e:
     print(f"[STARTUP] BIN Context Middleware not loaded: {e}", flush=True)
 
+# iter 322ff — Auto-capture every 5xx + unhandled exception into the
+# incident pipeline. Observes, never blocks. Must come BEFORE the global
+# exception handler so we see the exception before it's swallowed.
+try:
+    from middleware.exception_to_incident import ExceptionToIncidentMiddleware
+    app.add_middleware(ExceptionToIncidentMiddleware)
+    print("[STARTUP] Exception→Incident Middleware loaded (iter 322ff)", flush=True)
+except Exception as e:
+    print(f"[STARTUP] Exception→Incident Middleware not loaded: {e}", flush=True)
+
 
 # Register global exception handler (extracted from middleware/crash_protection.py)
 app.add_exception_handler(Exception, global_exception_handler)
