@@ -201,40 +201,132 @@ async def _llm_turn(
     *,
     model: str | None = None,
 ) -> dict[str, Any] | None:
-    """One turn against Groq with the FULL agent tool schema set.
+    """One turn against the LLM provider chain with full agent tool schema.
 
-    Returns the raw OpenAI-format message dict (may have tool_calls).
-    If Groq fails (rate-limit / network), falls back to Claude in plain
-    text mode (no tool-use) so ORA can at least reply honestly.
+    Provider order (overridable via ORA_AGENT_PROVIDER_ORDER env):
+        1. legion_ollama   — sovereign, local qwen2.5 via Legion daemon
+        2. groq            — cloud, fast, daily TPD limit
+        3. claude          — plain-text fallback (no tools this turn)
+
+    Returns the raw OpenAI-format message dict (may have tool_calls), or
+    None if every provider failed.
     """
-    api_key = os.environ.get("GROQ_API_KEY", "").strip()
-    model_name = model or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+    order_env = os.environ.get(
+        "ORA_AGENT_PROVIDER_ORDER", "legion_ollama,groq,claude"
+    )
+    order = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
-    if api_key:
+    for provider in order:
         try:
-            async with httpx.AsyncClient(timeout=30.0) as c:
-                r = await c.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}",
-                              "Content-Type":  "application/json"},
-                    json={
-                        "model":       model_name,
-                        "messages":    messages,
-                        "tools":       all_agent_tool_schemas(),
-                        "tool_choice": "auto",
-                        "temperature": 0.25,
-                        "max_tokens":  1000,
-                    },
-                )
-                if r.status_code == 200:
-                    data = r.json()
-                    return (data.get("choices") or [{}])[0].get("message") or {}
-                logger.warning(f"[ora-agent] groq {r.status_code}: {r.text[:240]}")
+            if provider in ("legion_ollama", "ollama", "legion"):
+                msg = await _ollama_with_tools(messages)
+            elif provider == "groq":
+                msg = await _groq_with_tools(messages, model=model)
+            elif provider == "claude":
+                msg = await _claude_text_fallback(messages)
+            else:
+                continue
+            if msg is not None:
+                return msg
         except Exception as e:
-            logger.warning(f"[ora-agent] groq error: {type(e).__name__}: {e}")
+            logger.warning(
+                f"[ora-agent] provider={provider} crashed: {type(e).__name__}: {e}"
+            )
+            continue
+    return None
 
-    # ── Claude fallback (no tools — just give the founder an answer) ──
-    return await _claude_text_fallback(messages)
+
+async def _groq_with_tools(
+    messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+) -> dict[str, Any] | None:
+    """Groq function-calling. Returns None on rate-limit / network / no key."""
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return None
+    model_name = model or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as c:
+            r = await c.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}",
+                          "Content-Type":  "application/json"},
+                json={
+                    "model":       model_name,
+                    "messages":    messages,
+                    "tools":       all_agent_tool_schemas(),
+                    "tool_choice": "auto",
+                    "temperature": 0.25,
+                    "max_tokens":  1000,
+                },
+            )
+            if r.status_code == 200:
+                data = r.json()
+                return (data.get("choices") or [{}])[0].get("message") or {}
+            logger.warning(f"[ora-agent] groq {r.status_code}: {r.text[:240]}")
+    except Exception as e:
+        logger.warning(f"[ora-agent] groq error: {type(e).__name__}: {e}")
+    return None
+
+
+async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Local Ollama (qwen2.5:7b by default) via Legion daemon.
+
+    Uses Ollama's OpenAI-compatible /v1/chat/completions which supports
+    function-calling for qwen2.5 / llama3.1+ / mistral-nemo models. The
+    call is made FROM the Legion laptop (curl localhost:11434) — pod
+    just enqueues + waits.
+
+    Returns the OpenAI-format `message` dict (may have tool_calls).
+    """
+    try:
+        from services.legion_tool import legion_exec
+    except Exception:
+        return None
+    import json as _json
+    import shlex
+
+    model = os.environ.get("LEGION_OLLAMA_MODEL", "qwen2.5:7b")
+    url   = os.environ.get("LEGION_OLLAMA_URL", "http://localhost:11434")
+    timeout_s = int(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "180"))
+
+    payload: dict[str, Any] = {
+        "model":       model,
+        "messages":    messages,
+        "tools":       all_agent_tool_schemas(),
+        "tool_choice": "auto",
+        "temperature": 0.25,
+        "max_tokens":  1000,
+        "stream":      False,
+    }
+    body = _json.dumps(payload, ensure_ascii=False)
+    cmd = (
+        f"curl -sS --max-time {timeout_s} "
+        f"-H 'Content-Type: application/json' "
+        f"-d {shlex.quote(body)} "
+        f"{url.rstrip('/')}/v1/chat/completions"
+    )
+    result = await legion_exec(
+        cmd=cmd, cwd="/opt/aurem-cto",
+        timeout_s=timeout_s + 10, risk_hint="low",
+        wait_max_s=int(os.environ.get("ORA_AGENT_OLLAMA_WAIT_S", "120")),
+    )
+    if not result.get("ok") or int(result.get("exit_code", -1)) != 0:
+        logger.info(
+            f"[ora-agent] ollama miss: ok={result.get('ok')} "
+            f"exit={result.get('exit_code')} stderr={(result.get('stderr','') or '')[:160]}"
+        )
+        return None
+    stdout = (result.get("stdout") or "").strip()
+    if not stdout:
+        return None
+    try:
+        data = _json.loads(stdout)
+    except _json.JSONDecodeError as e:
+        logger.info(f"[ora-agent] ollama non-JSON: {e} body={stdout[:200]}")
+        return None
+    return (data.get("choices") or [{}])[0].get("message") or {}
 
 
 async def _claude_text_fallback(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
