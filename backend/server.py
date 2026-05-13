@@ -2204,6 +2204,30 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] csv_leads wire failed: {_e}")
 
+# iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
+try:
+    from routers.ghost_scout_router import (
+        router as _ghost_scout_router,
+        set_db as _set_ghost_scout_db,
+    )
+    app.include_router(_ghost_scout_router)
+
+    @app.on_event("startup")
+    async def _wire_ghost_scout():
+        from server import db as _bound_db  # type: ignore
+        _set_ghost_scout_db(_bound_db)
+        # Start the autonomous harvest loop (gracefully exits if IPROYAL not set)
+        try:
+            import asyncio as _aio
+            from services.ghost_scout_iproyal import ghost_scout_loop
+            _aio.create_task(ghost_scout_loop())
+        except Exception as __e:
+            import logging as __lg
+            __lg.getLogger(__name__).warning(f"[ghost-scout] loop start failed: {__e}")
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] ghost_scout wire failed: {_e}")
+
 # /.well-known/ucp moved to bootstrap.wellknown_routes (iter 263 final surgery).
 
 # Serve standalone tracking pixel
