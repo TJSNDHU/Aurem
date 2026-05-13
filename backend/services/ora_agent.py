@@ -199,33 +199,83 @@ async def _llm_turn(
     """One turn against Groq with the FULL agent tool schema set.
 
     Returns the raw OpenAI-format message dict (may have tool_calls).
+    If Groq fails (rate-limit / network), falls back to Claude in plain
+    text mode (no tool-use) so ORA can at least reply honestly.
     """
     api_key = os.environ.get("GROQ_API_KEY", "").strip()
-    if not api_key:
-        return None
     model_name = model or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as c:
-            r = await c.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}",
-                          "Content-Type":  "application/json"},
-                json={
-                    "model":       model_name,
-                    "messages":    messages,
-                    "tools":       all_agent_tool_schemas(),
-                    "tool_choice": "auto",
-                    "temperature": 0.25,
-                    "max_tokens":  1000,
-                },
-            )
-            if r.status_code != 200:
+
+    if api_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as c:
+                r = await c.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}",
+                              "Content-Type":  "application/json"},
+                    json={
+                        "model":       model_name,
+                        "messages":    messages,
+                        "tools":       all_agent_tool_schemas(),
+                        "tool_choice": "auto",
+                        "temperature": 0.25,
+                        "max_tokens":  1000,
+                    },
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    return (data.get("choices") or [{}])[0].get("message") or {}
                 logger.warning(f"[ora-agent] groq {r.status_code}: {r.text[:240]}")
-                return None
-            data = r.json()
-            return (data.get("choices") or [{}])[0].get("message") or {}
+        except Exception as e:
+            logger.warning(f"[ora-agent] groq error: {type(e).__name__}: {e}")
+
+    # ── Claude fallback (no tools — just give the founder an answer) ──
+    return await _claude_text_fallback(messages)
+
+
+async def _claude_text_fallback(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Plain-text Claude call. Used when Groq is unavailable so ORA can
+    still respond, just without tool execution this turn. The founder
+    can ask again once Groq recovers (or we can wire claude function-
+    calling separately in a future iter)."""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+    except Exception:
+        return None
+    # Flatten messages → one user prompt + a synthetic system
+    sys_lines: list[str] = []
+    convo_lines: list[str] = []
+    for m in messages:
+        role = m.get("role", "")
+        content = m.get("content") or ""
+        if role == "system":
+            sys_lines.append(content)
+        elif role == "user":
+            convo_lines.append(f"User: {content}")
+        elif role == "assistant":
+            if content:
+                convo_lines.append(f"ORA: {content}")
+        elif role == "tool":
+            convo_lines.append(
+                f"(tool {m.get('name','?')} result: {(content or '')[:600]})"
+            )
+    sys_msg = "\n\n".join(sys_lines)[:5000] + (
+        "\n\n[Note: Tool calls are temporarily unavailable in this reply. "
+        "Answer the founder honestly using what you already know — "
+        "if you need to verify something, say so explicitly.]"
+    )
+    user_msg = "\n".join(convo_lines[-12:]) + "\nORA:"
+    try:
+        chat = LlmChat(
+            api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
+            session_id=f"ora-agent-fb-{os.urandom(4).hex()}",
+            system_message=sys_msg,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        text = (await chat.send_message(UserMessage(text=user_msg[:6000]))).strip()
+        if not text:
+            return None
+        return {"role": "assistant", "content": text}
     except Exception as e:
-        logger.warning(f"[ora-agent] llm_turn error: {type(e).__name__}: {e}")
+        logger.warning(f"[ora-agent] claude fallback failed: {type(e).__name__}: {e}")
         return None
 
 
