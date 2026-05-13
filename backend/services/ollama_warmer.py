@@ -82,6 +82,15 @@ async def _warm_once() -> None:
 
 async def warmer_loop() -> None:
     """Pillar-1 worker entrypoint. Pings Ollama every 3min if daemon alive."""
+    # iter 322g+ prod-guard: skip in production (no daemon tunnel).
+    try:
+        from services.prod_guard import is_production_pod
+        if is_production_pod():
+            print("[warmer] skipped — production pod (no daemon)", flush=True)
+            return
+    except Exception:
+        pass
+
     print("[warmer] Ollama warmer alive — 30s grace, then 3min cycles", flush=True)
     await asyncio.sleep(30)
     while True:

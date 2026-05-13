@@ -27,6 +27,15 @@ async def sovereign_warmer_loop() -> None:
         logger.info("[SovereignWarmer] disabled via SOVEREIGN_WARMER_ENABLED")
         return
 
+    # iter 322g+ prod-guard: skip in production (no daemon tunnel reachable).
+    try:
+        from services.prod_guard import is_production_pod
+        if is_production_pod():
+            logger.info("[SovereignWarmer] skipped — production pod (no daemon tunnel)")
+            return
+    except Exception:
+        pass
+
     # Resolve URL lazily so .env reloads / runtime overrides are honoured.
     try:
         from services.local_llm_service import _config as _llm_config

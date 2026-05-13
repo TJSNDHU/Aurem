@@ -323,8 +323,14 @@ async def platform_health():
     MUST stay dependency-free (no DB, no auth, no third-party) so it returns
     instantly during cold-start. Hit by Emergent's ingress at /api/platform/health.
     iter 322au — added to fix deployment health-check timeouts.
+    iter 322g+ — env label included so prod-guard activation is verifiable.
     """
-    return {"status": "ok", "service": "aurem-platform"}
+    try:
+        from services.prod_guard import env_label
+        env = env_label()
+    except Exception:
+        env = "unknown"
+    return {"status": "ok", "service": "aurem-platform", "env": env}
 
 
 @router.get("/tiers")

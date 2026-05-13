@@ -246,8 +246,31 @@ async def _llm_turn(
     Returns the raw OpenAI-format message dict (may have tool_calls), or
     None if every provider failed.
     """
+    # iter 322g+ prod-guard — in production, Legion daemon is unreachable
+    # (no laptop tunnel), and Groq/Claude are disabled per founder mandate.
+    # Returning None here lets the caller surface a clean "preview-only"
+    # message instead of hanging for 270s on a hard-timeout. Saves the pod
+    # from worker exhaustion → /health 520s.
+    try:
+        from services.prod_guard import is_production_pod
+        if is_production_pod():
+            logger.info("[ora-agent] production pod — skipping LLM chain (preview-only)")
+            return {
+                "role": "assistant",
+                "content": (
+                    "ORA CTO runs from the preview dashboard, not production.\n\n"
+                    "Production has no Legion daemon and cloud LLMs are disabled "
+                    "(founder mandate: 100% sovereign).\n\n"
+                    "Open the preview environment to chat with ORA — your "
+                    "laptop's local Ollama (qwen2.5:7b-instruct) will answer."
+                ),
+                "tool_calls": [],
+            }
+    except Exception:
+        pass
+
     order_env = os.environ.get(
-        "ORA_AGENT_PROVIDER_ORDER", "legion_ollama,groq,claude"
+        "ORA_AGENT_PROVIDER_ORDER", "legion_ollama,claude"
     )
     order = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
@@ -258,7 +281,7 @@ async def _llm_turn(
             # automatic cloud fallback. If Ollama fails, user gets a clear
             # diagnostic and they bring the daemon back up.
             if provider in ("legion_ollama", "ollama", "legion"):
-                msg = await asyncio.wait_for(_ollama_with_tools(messages), timeout=270)
+                msg = await asyncio.wait_for(_ollama_with_tools(messages), timeout=120)
             elif provider == "groq":
                 msg = await asyncio.wait_for(_groq_with_tools(messages, model=model), timeout=20)
             elif provider == "claude":

@@ -120,6 +120,15 @@ async def _warm_ollama_once() -> dict:
 
 
 async def ollama_warmer_autonomous_loop() -> None:
+    # iter 322g+ prod-guard: skip in production (no laptop reach via daemon).
+    try:
+        from services.prod_guard import is_production_pod
+        if is_production_pod():
+            print("[autonomous-warmer] skipped — production pod (no daemon)", flush=True)
+            return
+    except Exception:
+        pass
+
     print(f"[autonomous-warmer] alive — first warm in {WARM_FIRST_DELAY_S}s, "
           f"then every {WARM_INTERVAL_S/3600:.1f}h", flush=True)
     await asyncio.sleep(WARM_FIRST_DELAY_S)
@@ -225,6 +234,18 @@ async def _autofix_restart_blast() -> dict:
 
 
 async def watchdog_autofix_loop() -> None:
+    # iter 322g+ prod-guard: watchdog autofix calls auto_blast which uses
+    # Legion verify under the hood — skip in production to avoid timeouts.
+    # The watchdog itself (anomaly detection) can still run for telemetry,
+    # but the auto-fire playbooks are preview-only.
+    try:
+        from services.prod_guard import is_production_pod
+        if is_production_pod():
+            print("[autonomous-autofix] skipped — production pod (preview-only)", flush=True)
+            return
+    except Exception:
+        pass
+
     print(f"[autonomous-autofix] alive — polling every {AUTOFIX_INTERVAL_S}s", flush=True)
     await asyncio.sleep(40)
     while True:
