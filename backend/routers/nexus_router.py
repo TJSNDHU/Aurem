@@ -58,7 +58,7 @@ def _get_user(request: Request):
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Auth required")
     try:
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         return jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
     except Exception:
         raise HTTPException(401, "Invalid token")

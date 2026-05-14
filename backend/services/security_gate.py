@@ -275,7 +275,9 @@ def _check_v2_auth() -> dict:
         findings.append("Could not verify password hashing")
 
     # Check JWT secret
-    jwt_secret = os.environ.get("JWT_SECRET", "")
+    jwt_secret = os.environ.get("JWT_SECRET")
+    if not jwt_secret:
+        return False, "JWT_SECRET not configured"
     if len(jwt_secret) >= 32:
         findings.append(f"JWT secret length: {len(jwt_secret)} chars (sufficient)")
     else:
@@ -299,7 +301,9 @@ def _check_v3_session() -> dict:
         findings.append("Could not verify token storage")
 
     # Check JWT expiry
-    jwt_secret = os.environ.get("JWT_SECRET", "")
+    jwt_secret = os.environ.get("JWT_SECRET")
+    if not jwt_secret:
+        return False, "JWT_SECRET not configured"
     if jwt_secret:
         findings.append("JWT secret configured")
 

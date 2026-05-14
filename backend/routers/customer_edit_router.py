@@ -215,7 +215,7 @@ async def admin_send_edit_link(body: AdminSendBody,
     import jwt
     try:
         p = jwt.decode(authorization.split(" ", 1)[1],
-                        os.environ.get("JWT_SECRET", ""),
+                        (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
                         algorithms=["HS256"])
         if not (p.get("is_admin") or p.get("role") in ("admin", "super_admin")
                 or p.get("is_super_admin") or p.get("email")):

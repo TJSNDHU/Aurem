@@ -2,12 +2,36 @@
 ReRoots Seed Data Routes
 Extracted from server.py to reduce main file size
 """
-from fastapi import APIRouter
+import os
+from fastapi import APIRouter, HTTPException, Request
 import logging
 
 logger = logging.getLogger(__name__)
 
 seed_router = APIRouter(tags=["Seed Data"])
+
+
+def _require_admin(request: Request):
+    """Bug-fix #64 — seed endpoint was unauthenticated. If products got
+    deleted (intentionally or via a wipe), anyone could re-seed with
+    hardcoded data and trash any customer customisations."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except Exception:
+        raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    if not (payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))):
+        raise HTTPException(403, "Admin access required")
+
 
 # Lazy import - only load when endpoint is called
 def get_seed_data():
@@ -17,8 +41,9 @@ def get_seed_data():
 
 
 @seed_router.post("/seed")
-async def seed_database():
+async def seed_database(request: Request):
     """Seed the database with initial data - only runs once"""
+    _require_admin(request)  # Bug-fix #64
     db, Category, Product = get_seed_data()
     
     # Check if already seeded

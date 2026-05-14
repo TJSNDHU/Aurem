@@ -27,7 +27,7 @@ async def _get_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Authentication required")
     import jwt
     try:
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(authorization[7:], secret, algorithms=["HS256"])
         user_id = payload.get("user_id")
         if _db is not None and user_id:
@@ -57,9 +57,35 @@ async def get_pending(user=Depends(_get_user)):
 # APPROVE / REJECT
 # ═══════════════════════════════════════
 
+async def _ensure_can_decide(approval_id: str, user: dict):
+    """Bug-fix #59 — approvals were globally decidable by any authenticated
+    customer. Now: admins can decide any approval; everyone else may
+    only decide approvals that belong to their own tenant. (Customers
+    rubber-stamping their own queued-for-review actions defeats the
+    entire approval gate, including blast/sequence limits, VIP outreach,
+    and high-value invoices.)"""
+    is_admin = bool(
+        user.get("is_admin") or user.get("is_super_admin")
+        or user.get("role") in ("admin", "super_admin")
+    )
+    if is_admin:
+        return
+    if _db is None:
+        raise HTTPException(503, "DB unavailable")
+    appr = await _db.approvals.find_one({"id": approval_id}, {"_id": 0, "tenant_id": 1})
+    if appr is None:
+        # Defer to process_approval's 404 — but block customer access if
+        # the approval doesn't exist *or* belongs to another tenant.
+        raise HTTPException(404, "Approval not found")
+    caller_tenant = user.get("tenant_id") or user.get("id")
+    if appr.get("tenant_id") and appr["tenant_id"] != caller_tenant:
+        raise HTTPException(403, "Approval belongs to a different tenant")
+
+
 @router.post("/{approval_id}/approve")
 async def approve_action(approval_id: str, user=Depends(_get_user)):
     """Approve a pending action."""
+    await _ensure_can_decide(approval_id, user)  # Bug-fix #59
     from services.smart_approval import process_approval
     result = await process_approval(approval_id, "approve", decided_by=user.get("email", "admin"))
     if result.get("error"):
@@ -70,6 +96,7 @@ async def approve_action(approval_id: str, user=Depends(_get_user)):
 @router.post("/{approval_id}/reject")
 async def reject_action(approval_id: str, body: dict = Body(default={}), user=Depends(_get_user)):
     """Reject a pending action with reason."""
+    await _ensure_can_decide(approval_id, user)  # Bug-fix #59
     reason = body.get("reason", "")
     from services.smart_approval import process_approval
     result = await process_approval(approval_id, "reject", reason=reason, decided_by=user.get("email", "admin"))

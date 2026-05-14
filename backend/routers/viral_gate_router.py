@@ -28,7 +28,7 @@ async def _get_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     try:
         import jwt as pyjwt
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         token = authorization.replace("Bearer ", "")
         payload = pyjwt.decode(token, secret, algorithms=["HS256"])
         user_id = payload.get("user_id")

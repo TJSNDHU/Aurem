@@ -34,7 +34,7 @@ async def get_current_user(authorization: str = Header(None)):
         import jwt
         payload = jwt.decode(
             authorization.split(" ", 1)[1],
-            os.environ.get("JWT_SECRET", ""),
+            (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
             algorithms=["HS256"],
         )
     except Exception:

@@ -14,7 +14,7 @@ import secrets
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse
@@ -37,6 +37,41 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
 # Redirect URI will be set dynamically based on request
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "")
+
+
+# Bug-fix #41 — restrict OAuth redirect targets to a known allowlist so
+# the `redirect_url` query param can't be used to bounce a user (and
+# their Gmail address) to an attacker-controlled host.
+_REDIRECT_ALLOWLIST_ENV = os.environ.get("OAUTH_REDIRECT_ALLOWLIST", "")
+_DEFAULT_REDIRECT_ALLOWLIST = {
+    "https://aurem.live",
+    "https://www.aurem.live",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+if _REDIRECT_ALLOWLIST_ENV:
+    REDIRECT_ALLOWLIST = {o.strip().rstrip("/") for o in _REDIRECT_ALLOWLIST_ENV.split(",") if o.strip()}
+else:
+    REDIRECT_ALLOWLIST = set(_DEFAULT_REDIRECT_ALLOWLIST)
+
+
+def _safe_redirect(target: Optional[str], fallback: str = "/aurem-ai") -> str:
+    """Return a safe redirect URL or the fallback. Accepts relative
+    paths (start with `/`) and absolute URLs whose origin appears in
+    REDIRECT_ALLOWLIST."""
+    if not target:
+        return fallback
+    if target.startswith("/") and not target.startswith("//"):
+        return target  # same-origin relative path
+    try:
+        parsed = urlparse(target)
+        origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+        if origin in REDIRECT_ALLOWLIST:
+            return target
+    except Exception:
+        pass
+    logger.warning(f"[OAuth] blocked redirect outside allowlist: {target!r}")
+    return fallback
 
 # Gmail scopes
 GMAIL_SCOPES = [
@@ -204,7 +239,9 @@ async def oauth_callback(
     
     state_data = _oauth_states.pop(state)
     business_id = state_data["business_id"]
-    redirect_url = state_data["redirect_url"]
+    # Bug-fix #41 — clamp redirect target to the allowlist so we can't
+    # be used to bounce the victim's email to an attacker host.
+    redirect_url = _safe_redirect(state_data.get("redirect_url"))
     callback_uri = state_data["callback_uri"]
     
     db = get_db()

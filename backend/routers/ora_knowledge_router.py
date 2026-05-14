@@ -40,7 +40,7 @@ def _require_admin(request: Request) -> None:
     try:
         payload = jwt.decode(
             token,
-            os.environ.get("JWT_SECRET", "aurem_default_secret"),
+            (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
             algorithms=["HS256"],
         )
     except Exception:

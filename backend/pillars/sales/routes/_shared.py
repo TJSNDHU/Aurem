@@ -48,7 +48,15 @@ def _verify_admin(request: Request):
         import jwt
         secret = os.environ.get("JWT_SECRET")
         payload = jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+        # Bug-fix #51 — require an admin claim, not just a valid JWT.
+        from utils.admin_guard import is_admin_email
+        if not (payload.get("is_admin") or payload.get("is_super_admin")
+                or payload.get("role") in ("admin", "super_admin")
+                or is_admin_email(payload.get("email"))):
+            raise HTTPException(403, "Admin access required")
         return payload
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(401, "Invalid token")
 # ══════════════════════════════════════════════

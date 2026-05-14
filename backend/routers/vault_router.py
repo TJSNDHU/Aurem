@@ -29,10 +29,20 @@ def get_db():
     return _db
 
 
-ENCRYPTION_KEY = os.environ.get("AUREM_ENCRYPTION_KEY", "aurem32characterencryptionkey!")
+# Bug-fix #49 — refuse to fall back to a hardcoded encryption key.
+# Previously: `ENCRYPTION_KEY = os.environ.get("AUREM_ENCRYPTION_KEY",
+# "aurem32characterencryptionkey!")`. That literal was committed to
+# the repo, meaning anyone with read access to the secret_vault
+# collection could decrypt every stored credential. Now we require the
+# env var; vault operations 500 if it's missing, which fails loud.
+ENCRYPTION_KEY = os.environ.get("AUREM_ENCRYPTION_KEY")
 
 def _get_aes_key():
     """Derive a 32-byte key from the encryption key."""
+    if not ENCRYPTION_KEY:
+        # Bug-fix #49 — fail loud when the key is missing instead of
+        # silently encrypting with a publicly-known fallback.
+        raise HTTPException(500, "AUREM_ENCRYPTION_KEY not configured")
     key_bytes = ENCRYPTION_KEY.encode("utf-8")
     if len(key_bytes) < 32:
         key_bytes = key_bytes.ljust(32, b'\0')
@@ -72,7 +82,7 @@ def _get_user_from_token(request: Request):
     token = auth_header.split(" ", 1)[1]
     try:
         import jwt
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload
     except Exception:

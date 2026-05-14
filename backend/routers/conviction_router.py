@@ -51,7 +51,7 @@ def _require_admin(request: Request):
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Auth required")
     token = auth.replace("Bearer ", "", 1)
-    secret = os.environ.get("JWT_SECRET", "")
+    secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
     except JWTError:

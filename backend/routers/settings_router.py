@@ -35,7 +35,7 @@ def _get_user_from_token(request: Request):
     token = auth_header.split(" ", 1)[1]
     try:
         import jwt
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload
     except Exception:
@@ -71,7 +71,11 @@ def clean_phone(raw: str) -> str:
 class ProfileUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    email: Optional[str] = None
+    # Bug-fix #46 — email is NO LONGER updatable here. Allowing it
+    # enabled instant privilege escalation: any customer could rename
+    # their `email` to an entry in ADMIN_EMAIL_WHITELIST and pass
+    # admin_guard.is_admin_email() on next login. Email changes must
+    # go through a separate verified flow with OTP confirmation.
     phone: Optional[str] = None
     company: Optional[str] = None
     timezone: Optional[str] = None
@@ -99,6 +103,13 @@ async def update_profile(profile: ProfileUpdate, request: Request):
     db = get_db()
 
     update_fields = {k: v for k, v in profile.dict().items() if v is not None}
+
+    # Bug-fix #46 — even with email removed from the model, defence-in-
+    # depth: never accept email/role/is_admin via this endpoint, in case
+    # the model is widened later.
+    for _forbidden in ("email", "role", "is_admin", "is_super_admin",
+                        "is_team_member", "permissions", "tenant_id"):
+        update_fields.pop(_forbidden, None)
 
     # Self-cleaning phone
     if "phone" in update_fields and update_fields["phone"]:

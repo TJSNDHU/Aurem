@@ -553,7 +553,7 @@ async def get_call_history(authorization: str = Header(None)):
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_JWT_SECRET = os.environ.get("JWT_SECRET", "")
+_JWT_SECRET = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
 
 def _get_current_user(authorization: str):
     """Extract user from JWT — proper implementation"""

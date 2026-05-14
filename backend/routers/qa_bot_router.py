@@ -49,7 +49,7 @@ def _require_admin(request: Request):
     if not token:
         raise HTTPException(401, "Auth required")
     try:
-        payload = jwt.decode(token, os.environ.get("JWT_SECRET", ""), algorithms=["HS256"])
+        payload = jwt.decode(token, (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))), algorithms=["HS256"])
     except Exception:
         raise HTTPException(401, "Invalid token")
     role = (payload.get("role") or "").lower()

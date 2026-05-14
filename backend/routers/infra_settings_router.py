@@ -32,7 +32,7 @@ def _get_user_from_token(request: Request):
     token = auth_header.split(" ", 1)[1]
     try:
         import jwt
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         if not (payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email")):
             raise HTTPException(403, "Admin access required")

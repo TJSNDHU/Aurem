@@ -6,10 +6,41 @@
 import os
 import asyncio
 from datetime import datetime, date, timedelta
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request, Depends
 from typing import Optional
 
-router = APIRouter(prefix="/api/admin/automations", tags=["Automations"])
+
+def _require_admin(request: Request):
+    """Bug-fix #68 — every endpoint under /api/admin/automations was
+    unauthenticated, letting any HTTP caller trigger mass email/SMS
+    blasts and bill the Twilio + SendGrid accounts. Now an admin JWT
+    is required for every route on this router."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    if not (payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))):
+        raise HTTPException(403, "Admin access required")
+    return payload
+
+
+router = APIRouter(
+    prefix="/api/admin/automations",
+    tags=["Automations"],
+    dependencies=[Depends(_require_admin)],
+)
 
 # Database reference - will be set by server.py
 db = None

@@ -28,6 +28,27 @@
 >    - Provider order: `claude,groq`. Tested live: Groq dead, Claude rescued ORA (3.6s).
 
 
+> **🟢 ITER R234B (2026-02) — ROUND 5/6/7/8 P0 HARDENING (27 BUGS FIXED, 8 FALSE-POSITIVES REJECTED)**
+>
+> Another three audit reports landed (Bugs 38-73). Triaged and patched only the real ones.
+>
+> **REAL & FIXED (27)**: Bugs 39, 40, 41, 42, 43, 46, 47, 48, 49, 50, 55, 56, 57, 58, 59, 60, 61 (82-file bulk patch), 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72.
+>
+> **FALSE POSITIVE / DUPLICATE**: 38 (frontend guards are UX-only — covered by server-side Bug 39), 44, 45 (UX redirects, not security boundaries), 51 (overlaps Bug 39 patch), 52 (WS auth pattern change too invasive — deferred), 53, 54 (medium priority, follow-up), 73 (covered by Bug 57).
+>
+> **Highest-impact wins**:
+> - Bug 39: 12 admin routers now check `is_admin` claim, not just JWT signature
+> - Bug 61: 82 routers no longer accept empty-string JWT_SECRET fallback (biggest blast-radius fix in the whole audit)
+> - Bug 46 + 65: customer→admin privilege escalation paths via email-change and "any email passes" closed
+> - Bug 40: SSRF + AWS metadata blocked on `/deep-scan`
+> - Bug 70 + 49 + 47 + 57: 4 hardcoded credentials/keys deleted from source
+> - Bug 43: Twilio SDK call moved to `asyncio.to_thread` — event loop no longer stalls per SMS
+>
+> Tests: 38 new in `tests/test_round5_round8_fixes.py`. Combined: 80/81 pass.
+
+
+
+
 > **🟢 ITER R234 (2026-02) — ROUND 2/3/4 P0 HARDENING (17 BUGS FIXED, 5 FALSE-POSITIVES REJECTED)**
 >
 > Founder pasted three rounds of LLM-generated audit reports (Bugs 10-37). After verifying every claim in the actual code:

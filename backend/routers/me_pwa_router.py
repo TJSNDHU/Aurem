@@ -57,7 +57,7 @@ async def _require_user(authorization: Optional[str]) -> Dict[str, Any]:
         raise HTTPException(503, "Auth not ready")
     try:
         import jwt  # type: ignore
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if not secret:
             raise HTTPException(503, "JWT secret missing")
         payload = jwt.decode(token, secret, algorithms=["HS256"])

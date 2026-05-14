@@ -65,6 +65,29 @@ async def execute_action(request: Request, body: ActionRequest):
     - "Flag order ORD-12345 for review - suspicious address"
     - "Send WhatsApp to +14165551234: Your order has shipped!"
     """
+    # Bug-fix #56 — endpoint was unauthenticated. An anonymous caller
+    # could send WhatsApp messages from our Twilio account, mutate
+    # inventory, and mint discount codes via natural language. Require
+    # an admin JWT before invoking the action AI.
+    import os as _os, jwt as _jwt
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization required")
+    secret = _os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(status_code=500, detail="JWT not configured")
+    try:
+        _payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    from utils.admin_guard import is_admin_email
+    if not (_payload.get("is_admin") or _payload.get("is_super_admin")
+            or _payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(_payload.get("email"))):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
     if _db is None:
         raise HTTPException(status_code=503, detail="Database not ready")
     

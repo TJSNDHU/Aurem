@@ -143,7 +143,7 @@ async def _require_admin(request: Request) -> str:
     try:
         import jwt as _jwt
         import os as _os
-        secret = _os.environ.get("JWT_SECRET", "")
+        secret = _(os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if not secret:
             raise HTTPException(500, "JWT_SECRET unset")
         claims = _jwt.decode(token, secret, algorithms=["HS256"])

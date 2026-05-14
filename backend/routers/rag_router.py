@@ -4,8 +4,9 @@ ReRoots AI RAG Knowledge Base Router
 API endpoints for managing the RAG Knowledge Base and AI Consultant.
 """
 
+import os
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime, timezone
@@ -16,6 +17,32 @@ from services.hybrid_search import get_retrieval_metrics
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rag", tags=["RAG Knowledge Base"])
+
+
+def _require_auth(request: Request, *, admin_only: bool = False) -> dict:
+    """Bug-fix #63 — RAG endpoints (ingest, refresh, chat, etc.) were
+    fully unauthenticated. /admin/refresh kicked off an expensive
+    background re-index without a single permission check."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    if admin_only:
+        from utils.admin_guard import is_admin_email
+        if not (payload.get("is_admin") or payload.get("is_super_admin")
+                or payload.get("role") in ("admin", "super_admin")
+                or is_admin_email(payload.get("email"))):
+            raise HTTPException(403, "Admin access required")
+    return payload
 
 
 # =============================================================================
@@ -66,13 +93,14 @@ class ChatResponse(BaseModel):
 # =============================================================================
 
 @router.post("/ingest")
-async def ingest_products(request: IngestRequest, background_tasks: BackgroundTasks):
+async def ingest_products(request: IngestRequest, background_tasks: BackgroundTasks, http_request: Request):
     """
     Ingest products from MongoDB into the RAG Knowledge Base.
     This creates embeddings and stores them in ChromaDB for semantic search.
     
     Use force_refresh=True to clear existing data and re-ingest all.
     """
+    _require_auth(http_request, admin_only=True)  # Bug-fix #63
     try:
         rag_kb = get_rag_knowledge_base()
         
@@ -220,7 +248,7 @@ async def get_rag_context(
 # =============================================================================
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_with_consultant(request: ChatRequest):
+async def chat_with_consultant(request: ChatRequest, http_request: Request):
     """
     Chat with the Hybrid Sales Scientist AI Consultant.
     
@@ -230,6 +258,7 @@ async def chat_with_consultant(request: ChatRequest):
     - Only discuss price/stock when explicitly asked
     - Maintain the luxury brand voice
     """
+    _require_auth(http_request)  # Bug-fix #63 — any auth, not admin-only
     try:
         sales_scientist = get_sales_scientist()
         
@@ -291,11 +320,12 @@ async def get_chat_session_stats(session_id: str):
 # =============================================================================
 
 @router.post("/admin/refresh")
-async def admin_refresh_knowledge_base(background_tasks: BackgroundTasks):
+async def admin_refresh_knowledge_base(background_tasks: BackgroundTasks, http_request: Request):
     """
     Admin endpoint to force refresh the entire knowledge base.
     This clears all existing data and re-ingests from MongoDB.
     """
+    _require_auth(http_request, admin_only=True)  # Bug-fix #63
     try:
         rag_kb = get_rag_knowledge_base()
         background_tasks.add_task(rag_kb.ingest_products, True)

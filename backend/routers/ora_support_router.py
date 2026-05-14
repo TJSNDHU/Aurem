@@ -55,7 +55,7 @@ def _decode_email_from_token(request: Request) -> Optional[str]:
         if not auth.startswith("Bearer "):
             return None
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if not secret:
             return None
         payload = jwt.decode(token, secret, algorithms=["HS256"])

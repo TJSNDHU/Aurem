@@ -398,10 +398,17 @@ async def retell_webhook(request: Request):
     # Read raw body first for signature verification
     raw = await request.body()
     sig = request.headers.get("x-retell-signature", "")
-    # Verify signature only when we have a key — skip silently for local smoke tests
-    if os.environ.get("RETELL_API_KEY") and sig and not _verify_retell_signature(raw, sig):
-        logger.warning("[retell-webhook] invalid signature — rejecting")
-        raise HTTPException(401, "invalid signature")
+    # Bug-fix #58 — used to short-circuit when `sig` was missing, letting
+    # attackers POST fake call events without any signature. Now: if the
+    # webhook is configured (RETELL_API_KEY set), the signature header
+    # MUST be present and valid.
+    if os.environ.get("RETELL_API_KEY"):
+        if not sig:
+            logger.warning("[retell-webhook] missing signature header — rejecting")
+            raise HTTPException(401, "missing signature")
+        if not _verify_retell_signature(raw, sig):
+            logger.warning("[retell-webhook] invalid signature — rejecting")
+            raise HTTPException(401, "invalid signature")
 
     import json as _json
     try:

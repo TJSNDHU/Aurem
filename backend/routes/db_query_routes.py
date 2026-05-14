@@ -15,7 +15,7 @@ import logging
 import json
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
@@ -44,11 +44,31 @@ async def get_db():
 
 
 async def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify admin authentication."""
+    """Verify admin authentication.
+
+    Bug-fix #55 — the previous implementation accepted ANY credentials
+    and trusted a literal "TODO: verify JWT" comment. Now we actually
+    validate the JWT signature, require it to be unexpired, and demand
+    an admin claim before letting the caller hit Mongo aggregate / find."""
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
-    # In production, verify JWT token here
-    return {"authenticated": True}
+    import jwt as _jwt
+    import os as _os
+    secret = _os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(status_code=500, detail="JWT not configured")
+    try:
+        payload = _jwt.decode(credentials.credentials, secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except _jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+    from utils.admin_guard import is_admin_email
+    if not (payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return {"authenticated": True, "payload": payload}
 
 
 class QueryRequest(BaseModel):

@@ -130,7 +130,7 @@ def set_jwt(secret: str, algorithm: str = "HS256") -> None:
 def _verify_admin(authorization: Optional[str]) -> dict:
     return _unified_verify_admin(
         authorization,
-        secret=_jwt_secret or os.environ.get("JWT_SECRET", ""),
+        secret=_jwt_secret or (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
         algorithm=_jwt_alg,
     )
 

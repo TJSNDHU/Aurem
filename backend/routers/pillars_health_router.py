@@ -58,7 +58,7 @@ def _verify_admin(authorization: Optional[str]) -> dict:
         raise HTTPException(status_code=401, detail="Admin authentication required")
     import jwt
     try:
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(authorization.split(" ", 1)[1], secret, algorithms=["HS256"])
         if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
             return payload

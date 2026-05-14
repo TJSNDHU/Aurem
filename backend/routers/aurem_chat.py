@@ -396,10 +396,29 @@ async def _build_crm_snapshot(db, message: str) -> str:
 @router.post("/api/aurem/chat", response_model=ChatResponse)
 async def aurem_chat(request: ChatRequest, http_request: Request = None):
     try:
+        # Bug-fix #48 — endpoint was wide-open to the public internet,
+        # letting any anonymous caller burn through our LLM budget for
+        # 45s per request × the 12-phase pipeline. Require a valid JWT.
+        if http_request is not None:
+            auth = http_request.headers.get("Authorization", "")
+            if not auth.startswith("Bearer "):
+                raise HTTPException(401, "Authorization required")
+            import jwt as _jwt
+            secret = os.environ.get("JWT_SECRET")
+            if not secret:
+                raise HTTPException(500, "JWT not configured")
+            try:
+                _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+            except _jwt.ExpiredSignatureError:
+                raise HTTPException(401, "Token expired")
+            except _jwt.InvalidTokenError:
+                raise HTTPException(401, "Invalid token")
         # 45s — LLM + full 12-phase pipeline headroom. Pipeline is async so this
         # is a wall-clock ceiling, not a per-phase one. Kept under uvicorn's
         # default request timeout.
         return await asyncio.wait_for(_aurem_chat_inner(request, http_request), timeout=45.0)
+    except HTTPException:
+        raise
     except asyncio.TimeoutError:
         logger.error("[ORA] Chat endpoint timed out (45s)")
         return ChatResponse(

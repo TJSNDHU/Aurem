@@ -46,7 +46,7 @@ def _get_llm_key():
 async def _verify_token(token: str) -> dict:
     """Verify JWT token for WebSocket auth."""
     import jwt
-    secret = os.getenv("JWT_SECRET", "")
+    secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
     return jwt.decode(token, secret, algorithms=["HS256"])
 
 

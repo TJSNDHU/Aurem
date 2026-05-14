@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException
+import os
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -33,6 +34,25 @@ def _db():
         return None
 
 
+def _require_auth(request: Request) -> dict:
+    """Bug-fix #42 — shortlink creation was unauthenticated, letting any
+    visitor mint phishing URLs under aurem.live. Now require a valid
+    JWT (any logged-in caller; the lead-id field still scopes use)."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        return _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+
+
 class _ShortlinkCreateBody(BaseModel):
     lead_id: str
     target_url: str
@@ -40,7 +60,8 @@ class _ShortlinkCreateBody(BaseModel):
 
 
 @router.post("/api/shortlinks/create")
-async def shortlinks_create(body: _ShortlinkCreateBody):
+async def shortlinks_create(body: _ShortlinkCreateBody, request: Request):
+    _require_auth(request)  # Bug-fix #42
     db = _db()
     if db is None:
         raise HTTPException(503, "db unavailable")

@@ -44,7 +44,7 @@ def _require_admin(request: Request):
     try:
         import os
         from jose import jwt  # lazy import — already a dep elsewhere
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if secret:
             payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_exp": False})
             if isinstance(payload, dict):

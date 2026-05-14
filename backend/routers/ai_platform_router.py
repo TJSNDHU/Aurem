@@ -28,7 +28,7 @@ def set_db(database: AsyncIOMotorDatabase):
 # could forge admin tokens whenever the env var was accidentally missing
 # (e.g. fresh deploy, mistyped key name). The platform refuses to boot
 # without a configured secret — protects every protected endpoint.
-JWT_SECRET = os.environ.get("JWT_SECRET", "").strip()
+JWT_SECRET = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))).strip()
 if not JWT_SECRET:
     raise RuntimeError(
         "JWT_SECRET env var is REQUIRED — refusing to start ai_platform_router "

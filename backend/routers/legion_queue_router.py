@@ -35,7 +35,12 @@ router = APIRouter(prefix='/api/legion/queue', tags=['legion'])
 async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     if not creds:
         raise HTTPException(status_code=401, detail='Missing token')
-    secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY') or ''
+    # Bug-fix #72 — no empty-string fallback for the JWT secret. The
+    # previous `or ''` could not actually mint forged tokens (the
+    # `if not secret` guard below caught it), but we leave nothing to
+    # chance — legion enqueue runs arbitrary shell commands on the
+    # founder's laptop, so the auth path here must be airtight.
+    secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY')
     if not secret:
         raise HTTPException(status_code=500, detail='Server config error')
     try:

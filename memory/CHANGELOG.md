@@ -1,3 +1,66 @@
+## 2026-02 — iter R234b — Round 5/6/7/8 P0 Security Hardening (27 bugs)
+
+**Mandate**: continue token-conscious triage. Verify before fix. Reject hallucinations.
+
+**Triage**
+- REAL & FIXED (27): Bugs 39, 40, 41, 42, 43, 46, 47, 48, 49, 50, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72.
+- FALSE POSITIVE / OUT OF SCOPE: Bug 38 (frontend guards are UX-only, never a security boundary — the real fix is server-side, which is Bug 39); Bug 44 (covered by 45 / fixed via subsequent migration); Bug 45 (UX redirect using JWT decode — same class as 38, not a true escalation); Bug 51 (covered by Bug 39 patch on `pillars/sales/routes/_shared.py`); Bug 52 (changing WS auth pattern is risky; documented for follow-up); Bug 53 (covered by retiring `send_email_sync` in favour of `await send_email`); Bug 54 (dev test endpoint — documented for cleanup but lower priority); Bug 73 (already covered by Bug 57 — setup-owner now disabled without env key).
+
+**Real fixes shipped (Rounds 5/6/7/8)**
+
+*Auth & authorization (12 routers)*
+- **Bug 39 + 51**: Added `is_admin` role check to `admin_customers`, `db_optimizer`, `news_monitor`, `shopify_pulse`, `churn_prediction`, `website_builder`, `fraud_prevention`, `agent_observatory`, `camofox`, `dark_scout` routers + `pillars/sales/routes/_shared.py`. All delegate to `utils.admin_guard.is_admin_email`.
+- **Bug 55**: `routes/db_query_routes.verify_admin` now actually validates the JWT (was a TODO comment that accepted any Bearer header). Requires admin claim.
+- **Bug 56**: `/admin/ai/action/execute` now requires admin JWT before invoking action-AI (was wide-open; could send WhatsApp / mutate inventory / mint discount codes via natural language).
+- **Bug 59**: `approval_router.approve_action/reject_action` enforces admin-or-tenant-match before deciding. Closed the bypass where any user could rubber-stamp queued high-value actions.
+- **Bug 60**: Replaced `"aurem_default_secret"` fallback in `blast_chain_router`, `sovereign_memory_router`, `ora_knowledge_router`, `council_backlog_router` with strict env requirement.
+- **Bug 61**: Bulk-patched 82 router files + `security_gate.py` to remove `JWT_SECRET", ""` empty-string fallback. Replaced with a generator-throw expression that 500s if `JWT_SECRET` is unset.
+- **Bug 62**: `agent_harness_router.execute_agent` now requires admin (was wide-open; subprocess-running endpoint).
+- **Bug 63**: `rag_router` `/admin/refresh` + `/ingest` require admin; `/chat` requires any auth.
+- **Bug 64**: `/api/auth/seed` now admin-gated.
+- **Bug 65**: `founders_console_router._verify_admin` no longer accepts `payload.get("email")` as proof of admin (used to grant every authenticated user access to the production file editor + supervisor restart).
+- **Bug 66**: `routes/whatsapp_ai_routes` router-level `dependencies=[Depends(_require_admin)]` covers all 11 endpoints.
+- **Bug 67**: `gmail_channel_router` — 12 endpoints now require an admin JWT or a caller whose claim `business_id`/`bin`/`tenant_id` matches the URL parameter.
+- **Bug 68**: `routes/automations` router-level admin dep covers all routes.
+- **Bug 69**: `routes/phone_routes` admin dep on `/provision`, `/numbers`, `/release` (TeXML webhook + /countries + /health stay public).
+- **Bug 72**: `legion_queue_router` removed the cosmetic `or ''` fallback in the JWT secret resolution.
+
+*Hardcoded secrets & defaults*
+- **Bug 47**: `bootstrap/background_init.py` admin seed refuses to run unless `ADMIN_SEED_PASSWORD` is set AND ≥16 chars. The committed default `"vyoOeNWyZCGMbmf5u8dc"` is gone.
+- **Bug 49**: `vault_router.AUREM_ENCRYPTION_KEY` no longer falls back to `"aurem32characterencryptionkey!"`; `_get_aes_key` raises HTTPException if unset.
+- **Bug 57**: `routes/rbac.SETUP_KEY` no longer defaults to `"reroots-setup-2026"`. `/setup-owner` is fully disabled when env var is unset (covers Bug 73).
+- **Bug 70**: `crypto_engine/router.LOGIN_PASSWORD` no longer defaults to `"signal123"`. Login returns 503 when unset.
+
+*SSRF / open-redirect / phishing*
+- **Bug 40**: `/api/scanner/deep-scan` now requires JWT AND rejects URLs that resolve to RFC-1918, loopback, link-local (blocks `169.254.169.254` AWS metadata), multicast, reserved, or unspecified addresses. DNS resolved server-side then validated.
+- **Bug 41**: Google OAuth `redirect_url` query param now validated against `OAUTH_REDIRECT_ALLOWLIST` (env-overridable). Off-allowlist targets fall back to `/aurem-ai`. Closes open-redirect that was leaking victims' Gmail addresses.
+- **Bug 42**: `/api/shortlinks/create` requires a JWT — prevents minting phishing URLs under `aurem.live`.
+- **Bug 48**: `/api/aurem/chat` now requires a JWT (was wide-open, burning LLM budget with no rate limit).
+
+*Crypto / API key handling*
+- **Bug 33**: (R2-R3 carryover) reset-token JTIs are blacklisted in a TTL-indexed collection — no replay.
+- **Bug 58**: Retell webhook now rejects requests with missing OR invalid signature (was short-circuiting on missing `sig` header).
+
+*Code quality / event loop*
+- **Bug 43**: `services/sms_engine.send_message` Twilio call moved to `asyncio.to_thread` — no more 300-2000ms event-loop stalls per SMS.
+- **Bug 46**: `routers/settings_router.ProfileUpdate` no longer accepts `email`; handler also pops `role`, `is_admin`, `is_super_admin`, `tenant_id` defensively. Closes the customer-to-admin privilege escalation chain.
+- **Bug 71**: `routers/biometric_auth.face/verify` rate-limited at 5 fails per user/15min via the existing `biometric_auth_log` collection; rejects all-zero descriptors (degenerate enrollment trap).
+
+*XSS / output sanitization*
+- **Bug 50**: `AdminConsole.jsx` `exportPdf` `<title>` interpolation now escapes `<>&"'` so a crafted `topic` like `</title><script>...</script>` no longer breaks out of the tag.
+
+**Tests**
+- New: `backend/tests/test_round5_round8_fixes.py` — 38 regression tests, all pass.
+- Combined suites: 80/81 pass (the 1 failure is a pre-existing live-Mongo integration test in `test_background_loop_bug_fixes.py::test_expire_stale_approvals_against_live_mongo`, unrelated to these patches).
+
+**Live smoke**:
+- `/api/scanner/deep-scan` unauth → 401 ✓
+- `/api/shortlinks/create` unauth → 401 ✓
+- `/api/aurem/chat` unauth → 401 ✓
+- `/api/admin/phone/provision` unauth → 401 ✓
+- backend boots clean, `/api/health` green
+
+
 ## 2026-02 — iter R234 — Round 2/3/4 P0 Security & Logic Hardening
 
 **User mandate**: "P0 + Round 4. Token-conscious. Verify before fix; reject hallucinations."

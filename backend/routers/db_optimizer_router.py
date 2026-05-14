@@ -24,9 +24,20 @@ async def _verify_admin(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Authorization required")
     try:
         import jwt, os
+        secret = os.getenv("JWT_SECRET")
+        if not secret:
+            raise HTTPException(status_code=500, detail="JWT not configured")
         token = authorization.replace("Bearer ", "")
-        payload = jwt.decode(token, os.getenv("JWT_SECRET"), algorithms=["HS256"])
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        # Bug-fix #39 — require an admin claim, not just a valid JWT.
+        from utils.admin_guard import is_admin_email
+        if not (payload.get("is_admin") or payload.get("is_super_admin")
+                or payload.get("role") in ("admin", "super_admin")
+                or is_admin_email(payload.get("email"))):
+            raise HTTPException(status_code=403, detail="Admin access required")
         return payload
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 

@@ -124,7 +124,7 @@ def _get_user_from_request(request: Request) -> dict:
     if not auth.startswith("Bearer "):
         return {}
     try:
-        payload = jwt.decode(auth.split(" ", 1)[1], os.environ.get("JWT_SECRET", ""), algorithms=["HS256"])
+        payload = jwt.decode(auth.split(" ", 1)[1], (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))), algorithms=["HS256"])
         return payload
     except Exception:
         return {}

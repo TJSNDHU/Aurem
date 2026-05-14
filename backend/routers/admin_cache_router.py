@@ -27,7 +27,7 @@ def _verify_token(authorization: Optional[str] = None):
     if not token:
         raise HTTPException(401, "Authorization required")
     try:
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload.get("user_id", payload.get("id", "unknown"))
     except Exception:

@@ -103,7 +103,7 @@ async def google_auth_callback(body: GoogleSessionRequest, response: Response):
 
     # Generate JWT token
     import jwt
-    jwt_secret = os.environ.get("JWT_SECRET", "")
+    jwt_secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
     token_payload = {
         "user_id": user_id,
         "email": email,

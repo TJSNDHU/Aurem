@@ -34,7 +34,7 @@ def _get_user_id(request: Request):
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Missing token")
     token = auth.split(" ", 1)[1]
-    secret = os.environ.get("JWT_SECRET", "")
+    secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload.get("user_id") or payload.get("sub") or payload.get("id")

@@ -56,23 +56,33 @@ async def run_background_init(
             admin_email = "teji.ss1986@gmail.com"
             existing = await db.users.find_one({"email": admin_email}, {"_id": 0})
             if not existing:
-                from utils.auth import hash_password
-                admin_doc = {
-                    "id": f"admin-{uuid.uuid4().hex[:12]}",
-                    "email": admin_email,
-                    "first_name": "Teji",
-                    "last_name": "Admin",
-                    "password": hash_password(
-                        os.environ.get("ADMIN_SEED_PASSWORD", "vyoOeNWyZCGMbmf5u8dc")
-                    ),
-                    "is_admin": True,
-                    "is_super_admin": True,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "auth_provider": "password",
-                    "tenant_id": f"admin-{uuid.uuid4().hex[:12]}",
-                }
-                await db.users.insert_one(admin_doc)
-                logger.info(f"✓ Admin user seeded: {admin_email}")
+                # Bug-fix #47 — refuse to seed an admin with a hardcoded
+                # default password. If the env var is unset we skip the
+                # seed entirely so a pod restart can never recreate the
+                # admin with a publicly-known string.
+                _seed_pw = os.environ.get("ADMIN_SEED_PASSWORD") or ""
+                if not _seed_pw or len(_seed_pw) < 16:
+                    logger.warning(
+                        "Admin seed skipped — ADMIN_SEED_PASSWORD env var "
+                        "is missing or <16 chars. Set a strong value and "
+                        "restart to seed the founder admin."
+                    )
+                else:
+                    from utils.auth import hash_password
+                    admin_doc = {
+                        "id": f"admin-{uuid.uuid4().hex[:12]}",
+                        "email": admin_email,
+                        "first_name": "Teji",
+                        "last_name": "Admin",
+                        "password": hash_password(_seed_pw),
+                        "is_admin": True,
+                        "is_super_admin": True,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "auth_provider": "password",
+                        "tenant_id": f"admin-{uuid.uuid4().hex[:12]}",
+                    }
+                    await db.users.insert_one(admin_doc)
+                    logger.info(f"✓ Admin user seeded: {admin_email}")
             else:
                 logger.info(f"✓ Admin user already exists: {admin_email}")
         except Exception as e:

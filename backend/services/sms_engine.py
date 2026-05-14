@@ -108,9 +108,14 @@ class SMSEngine:
 
         try:
             from twilio.rest import Client
+            import asyncio as _asyncio
             client = Client(creds["sid"], creds["token"])
 
-            msg = client.messages.create(
+            # Bug-fix #43 — Twilio's SDK is synchronous (uses `requests`).
+            # Calling it directly inside `async def` blocks the asyncio
+            # loop for 300-2000ms per send. Run in a thread instead.
+            msg = await _asyncio.to_thread(
+                client.messages.create,
                 body=message,
                 from_=creds["phone"],
                 to=to_formatted,

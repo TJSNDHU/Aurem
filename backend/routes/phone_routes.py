@@ -18,10 +18,37 @@ import os
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException, Header, Response
+from fastapi import APIRouter, Request, HTTPException, Header, Response, Depends
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+def _require_admin(request: Request):
+    """Bug-fix #69 — phone provisioning/release/listing was open to the
+    internet. An attacker could rack up Telnyx provisioning fees, list
+    every number we own, or release production numbers (service
+    outage). Inbound TeXML webhook + /countries + /health stay public."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    if not (payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))):
+        raise HTTPException(403, "Admin access required")
+    return payload
+
 
 router = APIRouter(prefix="/api/admin/phone", tags=["Phone Management"])
 
@@ -80,7 +107,7 @@ async def get_supported_countries():
     }
 
 
-@router.post("/provision")
+@router.post("/provision", dependencies=[Depends(_require_admin)])  # Bug-fix #69
 async def provision_phone_number(
     request: Request,
     body: ProvisionRequest
@@ -109,7 +136,7 @@ async def provision_phone_number(
     return result
 
 
-@router.get("/numbers")
+@router.get("/numbers", dependencies=[Depends(_require_admin)])  # Bug-fix #69
 async def list_phone_numbers(
     request: Request,
     tenant_id: str = "reroots"
@@ -132,7 +159,7 @@ async def list_phone_numbers(
     return result
 
 
-@router.delete("/release")
+@router.delete("/release", dependencies=[Depends(_require_admin)])  # Bug-fix #69
 async def release_phone_number(
     request: Request,
     body: ReleaseRequest

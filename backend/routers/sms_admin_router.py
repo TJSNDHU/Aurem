@@ -39,7 +39,7 @@ async def _require_founder(authorization: Optional[str]) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "missing token")
     token = authorization.split(" ", 1)[1].strip()
-    secret = os.environ.get("JWT_SECRET", "")
+    secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
     if not secret:
         raise HTTPException(500, "jwt secret unset")
     try:

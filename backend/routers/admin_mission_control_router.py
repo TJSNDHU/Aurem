@@ -190,7 +190,7 @@ async def verify_admin(authorization: Optional[str] = Header(None), x_admin_key:
         import jwt, os
         token = authorization.split(" ", 1)[1]
         try:
-            secret = os.environ.get("JWT_SECRET", "")
+            secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
             payload = jwt.decode(token, secret, algorithms=["HS256"])
             # Support both is_admin flag and role field
             if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):

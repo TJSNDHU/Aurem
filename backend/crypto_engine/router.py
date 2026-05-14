@@ -30,7 +30,11 @@ JWT_SECRET = os.environ.get("CRYPTO_JWT_SECRET") or os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
     raise RuntimeError("CRITICAL: JWT_SECRET environment variable not set. Server cannot start without it.")
 JWT_ALGORITHM = "HS256"
-LOGIN_PASSWORD = os.environ.get("CRYPTO_LOGIN_PASSWORD", "signal123")
+# Bug-fix #70 — the previous fallback `"signal123"` was committed to
+# source, so any caller could POST {"password": "signal123"} to
+# /api/crypto/auth/login and receive a valid JWT. We now require the
+# env var; if it's missing, the login endpoint rejects everything.
+LOGIN_PASSWORD = os.environ.get("CRYPTO_LOGIN_PASSWORD")
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -63,6 +67,10 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
 @router.post("/auth/login")
 async def login(password: str):
     """Login with password"""
+    # Bug-fix #70 — when CRYPTO_LOGIN_PASSWORD is unset, refuse all logins
+    # rather than letting a missing env var degrade to "anyone signs in".
+    if not LOGIN_PASSWORD:
+        raise HTTPException(status_code=503, detail="Crypto auth not configured")
     if password != LOGIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid password")
     

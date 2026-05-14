@@ -27,7 +27,11 @@ if not JWT_SECRET:
     raise RuntimeError("CRITICAL: JWT_SECRET not set.")
 JWT_EXPIRY_HOURS = 24
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@reroots.ca")
-SETUP_KEY = os.environ.get("SETUP_KEY", "reroots-setup-2026")
+# Bug-fix #57 — refuse the committed default. If SETUP_KEY is unset
+# the /setup-owner endpoint is disabled entirely. (The endpoint is
+# meant to be a one-shot bootstrap; leaving "reroots-setup-2026" as
+# a fallback in source meant anyone could re-create an owner.)
+SETUP_KEY = os.environ.get("SETUP_KEY")
 
 security = HTTPBearer(auto_error=False)
 
@@ -393,6 +397,11 @@ async def change_user_password(data: dict = Body(...), current_user: dict = Depe
 @router.post("/setup-owner")
 async def setup_owner_account(data: dict = Body(...)):
     """ONE-TIME SETUP: Create the owner account. DELETE after use."""
+    # Bug-fix #57 — disable entirely when SETUP_KEY is unset (used to
+    # accept the committed default "reroots-setup-2026" so anyone could
+    # create owner accounts).
+    if not SETUP_KEY:
+        raise HTTPException(status_code=403, detail="Owner setup is disabled.")
     if data.get("setupKey") != SETUP_KEY:
         raise HTTPException(status_code=403, detail="Invalid setup key.")
     

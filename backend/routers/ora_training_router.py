@@ -149,7 +149,7 @@ def _get_user_id(authorization: Optional[str], ora_email: Optional[str] = None) 
         token = authorization.replace("Bearer ", "").strip()
         if token:
             try:
-                secret = os.environ.get("JWT_SECRET", "")
+                secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
                 payload = jwt.decode(token, secret, algorithms=["HS256"])
                 return payload.get("user_id", payload.get("sub", payload.get("id", "unknown")))
             except jwt.ExpiredSignatureError:

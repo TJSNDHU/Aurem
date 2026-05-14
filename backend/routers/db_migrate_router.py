@@ -91,7 +91,7 @@ async def _require_founder(request: Request) -> None:
     token = auth.split(" ", 1)[1]
     try:
         import jwt
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if not secret:
             raise HTTPException(500, "JWT_SECRET not configured")
         payload = jwt.decode(token, secret, algorithms=["HS256"])

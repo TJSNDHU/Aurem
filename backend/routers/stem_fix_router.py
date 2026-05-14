@@ -86,7 +86,7 @@ def _verify_admin(authorization: Optional[str]) -> dict:
     try:
         payload = jwt.decode(
             authorization.split(" ", 1)[1],
-            _jwt_secret or os.environ.get("JWT_SECRET", ""),
+            _jwt_secret or (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
             algorithms=[_jwt_alg],
         )
     except Exception as e:

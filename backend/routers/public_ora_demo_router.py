@@ -104,7 +104,7 @@ async def _resolve_user_context(authorization: Optional[str]) -> Optional[Dict[s
         return None
     try:
         import jwt  # type: ignore
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if not secret:
             return None
         payload = jwt.decode(token, secret, algorithms=["HS256"])

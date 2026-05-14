@@ -3,7 +3,8 @@ WhatsApp AI Assistant API Routes
 Admin panel endpoints for managing the WhatsApp AI auto-reply bot.
 """
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
+import os
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form, Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -11,7 +12,45 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin/whatsapp-ai", tags=["WhatsApp AI"])
+
+def _require_admin(request: Request):
+    """Bug-fix #66 — all /api/admin/whatsapp-ai/* routes were
+    unauthenticated, exposing customer conversation history, contact
+    lists, and giving an attacker the ability to toggle the AI
+    responder + burn LLM budget via /test-reply."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    if not (payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))):
+        raise HTTPException(403, "Admin access required")
+    return payload
+
+
+# Apply the admin gate to EVERY route under this router via dependencies.
+# Bug-fix #66 — including /webhook: the WHAPI webhook handler currently
+# does no signature verification at all (just `await request.json()`),
+# so leaving it public would let any caller stuff fake messages into
+# the conversation store. If WHAPI integration is wired in production,
+# either configure the webhook to send a Bearer JWT or split this route
+# off into a separate signature-verifying public router.
+router = APIRouter(
+    prefix="/api/admin/whatsapp-ai",
+    tags=["WhatsApp AI"],
+    dependencies=[Depends(_require_admin)],
+)
 
 # Database reference (set by main server)
 db = None

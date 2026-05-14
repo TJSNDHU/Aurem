@@ -43,7 +43,7 @@ def _verify_admin(authorization: Optional[str]) -> None:
     try:
         import jwt
         token = authorization.replace("Bearer ", "").strip()
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         if not secret:
             raise HTTPException(status_code=500, detail="JWT_SECRET unset")
         decoded = jwt.decode(token, secret, algorithms=["HS256"])

@@ -3,7 +3,8 @@ Agent Harness Router
 API endpoints for AUREM agent system
 """
 
-from fastapi import APIRouter, HTTPException
+import os
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import logging
@@ -13,6 +14,30 @@ from services.aurem_agents import AUREMAgentHarness, get_agent_harness
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/dev/agents", tags=["AUREM Agent Harness"])
+
+
+def _require_admin(request: Request):
+    """Bug-fix #62 — the harness can run server-side subprocesses via
+    AUREMBuildFixer. Endpoint was unauthenticated."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    if not (payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))):
+        raise HTTPException(403, "Admin access required")
+    return payload
 
 
 class AgentTaskRequest(BaseModel):
@@ -69,7 +94,8 @@ async def get_agent_stats(agent_name: str):
 
 
 @router.post("/execute")
-async def execute_agent(request: AgentTaskRequest):
+async def execute_agent(request: AgentTaskRequest, http_request: Request):
+    _require_admin(http_request)  # Bug-fix #62
     """
     Execute a specific agent or auto-detect
     

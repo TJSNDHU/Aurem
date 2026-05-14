@@ -39,7 +39,7 @@ def set_db(db):
 async def verify_admin_key(x_admin_key: str = Header(None, alias="X-Admin-Key")):
     """Verify admin key for security endpoints."""
     import os
-    expected_key = os.environ.get("ADMIN_API_KEY") or os.environ.get("JWT_SECRET", "")[:32]
+    expected_key = os.environ.get("ADMIN_API_KEY") or (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))[:32]
     
     if not x_admin_key or x_admin_key != expected_key:
         raise HTTPException(
@@ -207,7 +207,7 @@ async def run_code_audit(request: Request, body: CodeAuditRequest):
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         try:
             jwt.decode(token, secret, algorithms=["HS256"])
         except Exception:
@@ -280,7 +280,7 @@ async def run_precompact(request: Request):
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         try:
             jwt.decode(token, secret, algorithms=["HS256"])
         except Exception:
@@ -323,7 +323,7 @@ async def precompact_status(request: Request):
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         try:
             jwt.decode(token, secret, algorithms=["HS256"])
         except Exception:
@@ -370,7 +370,7 @@ async def parseltongue_test(request: Request, body: ParseltongueTestRequest):
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         try:
             jwt.decode(token, secret, algorithms=["HS256"])
         except Exception:
@@ -390,7 +390,7 @@ async def parseltongue_suite(request: Request, body: ParseltongueTestRequest):
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         try:
             jwt.decode(token, secret, algorithms=["HS256"])
         except Exception:
@@ -410,7 +410,7 @@ async def parseltongue_triggers(request: Request):
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1]
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         try:
             jwt.decode(token, secret, algorithms=["HS256"])
         except Exception:

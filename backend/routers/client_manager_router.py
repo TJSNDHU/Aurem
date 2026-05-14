@@ -33,7 +33,7 @@ def _get_user_from_token(request: Request):
         raise HTTPException(401, "Missing token")
     try:
         import jwt
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(auth_header.split(" ", 1)[1], secret, algorithms=["HS256"])
         return payload
     except Exception:

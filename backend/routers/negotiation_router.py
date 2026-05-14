@@ -27,7 +27,7 @@ async def _get_auth(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Authentication required")
     import jwt
     try:
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(authorization[7:], secret, algorithms=["HS256"])
         return payload
     except Exception:

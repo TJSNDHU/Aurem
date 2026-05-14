@@ -28,7 +28,7 @@ async def _get_admin(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Authentication required")
     try:
-        secret = os.environ.get("JWT_SECRET", "")
+        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(authorization[7:], secret, algorithms=["HS256"])
         user_id = payload.get("user_id", "")
         email = payload.get("email", "")

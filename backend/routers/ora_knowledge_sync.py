@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ora/knowledge", tags=["ORA Knowledge Sync"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "")
+JWT_SECRET = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 db = None

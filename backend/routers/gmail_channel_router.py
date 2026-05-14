@@ -16,12 +16,47 @@ Endpoints:
 - GET /api/gmail/{business_id}/threads/{thread_id} - Get email thread
 """
 
+import os
 import logging
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Request, Query, Depends
 from pydantic import BaseModel, EmailStr, Field
+
+
+def _require_owner_or_admin(business_id: str, request: Request):
+    """Bug-fix #67 — Gmail endpoints were fully unauthenticated. Any
+    HTTP caller could read every connected tenant's inbox and send mail
+    from their account given just the business_id (which leaks via the
+    URL). Now we require a valid JWT AND we require the caller's claim
+    set to either include the same business_id OR be admin."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "JWT not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    is_admin = bool(
+        payload.get("is_admin") or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+        or is_admin_email(payload.get("email"))
+    )
+    caller_biz = (payload.get("business_id")
+                    or payload.get("bin")
+                    or payload.get("tenant_id"))
+    if not is_admin and caller_biz != business_id:
+        raise HTTPException(403, "Business ID does not match the caller")
+    return payload
+
 
 router = APIRouter(prefix="/api/gmail", tags=["AUREM Gmail Channel"])
 
@@ -113,6 +148,7 @@ async def list_messages(
     Returns:
         List of messages with pagination info
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -160,6 +196,7 @@ async def get_message(
     Returns:
         Full message object with headers, body, etc.
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -195,6 +232,7 @@ async def send_email(
     Returns:
         Sent message info or error
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     from services.aurem_commercial import get_workspace_service
     
@@ -244,6 +282,7 @@ async def get_labels(business_id: str, request: Request):
     Returns:
         List of labels with their IDs and types
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -274,6 +313,7 @@ async def create_label(
     Returns:
         Created label info
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -301,6 +341,7 @@ async def mark_as_read(
     request: Request
 ):
     """Mark a message as read"""
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -326,6 +367,7 @@ async def mark_as_unread(
     request: Request
 ):
     """Mark a message as unread"""
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -351,6 +393,7 @@ async def archive_message(
     request: Request
 ):
     """Archive a message (remove from inbox)"""
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -376,6 +419,7 @@ async def trash_message(
     request: Request
 ):
     """Move a message to trash"""
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -402,6 +446,7 @@ async def get_profile(business_id: str, request: Request):
     Returns:
         Email address, message count, thread count
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -436,6 +481,7 @@ async def get_thread(
     Returns:
         Thread with all messages
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()
@@ -460,6 +506,7 @@ async def health_check(business_id: str, request: Request):
     Health check for Gmail connection.
     Tests if the connection is working by fetching the profile.
     """
+    _require_owner_or_admin(business_id, request)  # Bug-fix #67
     from services.aurem_commercial.gmail_service import get_gmail_service
     
     db = get_db()

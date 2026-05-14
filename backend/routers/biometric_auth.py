@@ -485,7 +485,36 @@ async def face_verify(request: FaceVerifyRequest):
     """
     if _db is None:
         raise HTTPException(status_code=503, detail="Database not available")
-    
+
+    # Bug-fix #71 — face/verify previously had no rate limit and no
+    # lockout. A 128-float-space brute force against the 0.6 distance
+    # threshold is feasible (and trivially crackable when an enrollment
+    # ended up with all-zero descriptors). Cap attempts at 5 per
+    # user_id per 15 minutes; record every failure to biometric_auth_log
+    # before any expensive maths.
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(minutes=15)
+    fail_count = await _db.biometric_auth_log.count_documents({
+        "user_id": request.user_id,
+        "type": "face",
+        "success": False,
+        "timestamp": {"$gte": window_start.isoformat()},
+    })
+    if fail_count >= 5:
+        # Log the lockout hit so detection / SOC can pick it up.
+        await _db.biometric_auth_log.insert_one({
+            "user_id": request.user_id,
+            "type": "face",
+            "success": False,
+            "lockout_hit": True,
+            "fail_count": fail_count,
+            "timestamp": now.isoformat(),
+        })
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed face verifications. Try again in 15 minutes.",
+        )
+
     try:
         # Get enrolled face data
         enrolled = await _db.face_biometrics.find_one({"user_id": request.user_id})
@@ -496,9 +525,18 @@ async def face_verify(request: FaceVerifyRequest):
         # Validate descriptor
         if len(request.face_descriptor) != 128:
             raise HTTPException(status_code=400, detail="Invalid face descriptor dimensions")
-        
+
+        # Bug-fix #71 — reject obviously degenerate inputs that would
+        # match any all-zero enrolled descriptor with distance=0.
+        if all(abs(float(v)) < 1e-9 for v in request.face_descriptor):
+            raise HTTPException(status_code=400, detail="Invalid face descriptor")
+
         # Calculate distance to average descriptor
         avg_descriptor = enrolled.get("average_descriptor", [])
+        if not avg_descriptor or all(abs(float(v)) < 1e-9 for v in avg_descriptor):
+            # Bug-fix #71 — refuse to authenticate against a corrupt
+            # enrollment (all-zero average); force re-enrollment.
+            raise HTTPException(status_code=409, detail="Enrolled face data invalid — please re-enroll")
         distance = calculate_face_distance(request.face_descriptor, avg_descriptor)
         
         # Also check against all enrolled descriptors and take minimum distance

@@ -34,10 +34,18 @@ def _verify_admin(authorization: Optional[str]) -> dict:
     try:
         payload = jwt.decode(
             authorization.split(" ", 1)[1],
-            os.environ.get("JWT_SECRET", ""),
+            (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
             algorithms=["HS256"],
         )
-        if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
+        # Bug-fix #65 — the previous condition included `or payload.get("email")`,
+        # which is truthy for EVERY authenticated user. The Founders Console
+        # exposes `self_edit_apply` (production file editor + supervisor
+        # restart), so any customer could mutate auth code and restart the
+        # backend. Now we require an actual admin claim.
+        from utils.admin_guard import is_admin_email
+        if (payload.get("is_admin") or payload.get("is_super_admin")
+                or payload.get("role") in ("admin", "super_admin")
+                or is_admin_email(payload.get("email"))):
             return payload
         raise HTTPException(403, "Admin only")
     except HTTPException:

@@ -1032,7 +1032,14 @@ const IntelligenceReport = ({ m, index, onCopy }) => {
 
   const exportPdf = () => {
     const md = buildMarkdown();
-    const html = `<html><head><title>Intelligence Report — ${m.inputs?.topic || ''}</title>
+    // Bug-fix #50 — XSS: m.inputs?.topic was interpolated directly
+    // into the <title> tag, letting "</title><script>...</script>"
+    // break out of the tag and run arbitrary JS in the print window.
+    const _esc = (s) => String(s || '').replace(/[<>&"']/g, (c) =>
+      ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#x27;'}[c])
+    );
+    const safeTitle = _esc(m.inputs?.topic || '');
+    const html = `<html><head><title>Intelligence Report — ${safeTitle}</title>
 <style>
 body{font-family:Georgia,serif;max-width:780px;margin:30px auto;padding:0 20px;color:#222;line-height:1.55}
 h1{color:#8a6d1c;border-bottom:2px solid #C9A227;padding-bottom:8px}
