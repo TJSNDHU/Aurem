@@ -28,7 +28,14 @@ logger = logging.getLogger(__name__)
 
 # Environment variables
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-prod")
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    # Fail fast at import. The previous default "dev-secret-change-in-prod"
+    # is public in the repo, so any token signed with it would be valid
+    # against this service forever.
+    raise RuntimeError(
+        "JWT_SECRET must be set in the environment for aurem-cto/api"
+    )
 OUTBOX_DB_PATH = os.getenv("OUTBOX_DB_PATH", "/app/data/outbox.sqlite3")
 
 # Application state

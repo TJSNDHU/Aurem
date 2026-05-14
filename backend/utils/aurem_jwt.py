@@ -119,6 +119,15 @@ async def verify_token(token: str) -> Optional[Dict[str, Any]]:
             logger.warning("[AUREM JWT] Invalid token type")
             return None
         
+        # Bug-fix: enforce the blocklist on read. The previous version
+        # built the entire invalidate/blocklist machinery (lines 186-203)
+        # but never queried it here, so `invalidate_token` on logout was
+        # a no-op for the lifetime of the token (up to 24 h).
+        jti = payload.get("jti")
+        if jti and await is_token_blacklisted(jti):
+            logger.warning(f"[AUREM JWT] Token {jti[:8]}... is blacklisted")
+            return None
+        
         # Validate user exists in database
         user_id = payload.get("sub")
         if _db is not None:

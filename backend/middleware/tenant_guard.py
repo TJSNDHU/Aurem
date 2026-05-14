@@ -105,11 +105,15 @@ class TenantGuardMiddleware(BaseHTTPMiddleware):
         if auth_header.startswith("Bearer "):
             token = auth_header.split(" ", 1)[1]
             try:
+                # Bug-fix: previous code passed options={"verify_exp": False}
+                # which made TenantGuard happily honour months-old expired
+                # tokens. Any route trusting request.state.tenant_id was
+                # therefore reachable with a dead token. Enforce expiry
+                # like the rest of the auth layer does.
                 payload = jwt.decode(
                     token,
                     JWT_SECRET,
                     algorithms=[JWT_ALGORITHM],
-                    options={"verify_exp": False},
                 )
                 user_id = payload.get("user_id")
                 is_admin = payload.get("is_admin", False)
@@ -126,6 +130,10 @@ class TenantGuardMiddleware(BaseHTTPMiddleware):
                     request.state.tenant_id = tenant_id
                     request.state.is_admin = is_admin
 
+            except jwt.ExpiredSignatureError:
+                # Expired token: leave TenantGuard cleared and let the
+                # downstream auth dependency surface the proper 401.
+                logger.debug("[TenantGuard] Expired token rejected")
             except jwt.InvalidTokenError:
                 pass
             except Exception as e:

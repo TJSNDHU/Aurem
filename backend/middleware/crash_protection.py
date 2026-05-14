@@ -74,10 +74,22 @@ class RequestTimeoutMiddleware:
 
 # ============= CRASH PROTECTION - GLOBAL EXCEPTION HANDLER =============
 # Catches all unhandled exceptions and returns friendly error messages
+# Bug-fix: the previous `try/import; except ImportError: pass` left
+# `log_crash` undefined when the import failed. The bare `except:`
+# inside the handler then silently swallowed the NameError, so every
+# unhandled exception in production failed to log itself to the crash
+# database without any signal. Track availability explicitly.
+log_crash = None
+set_crash_log_db = None
 try:
-    from services.crash_protection import log_crash, set_crash_log_db
-except ImportError:
-    pass
+    from services.crash_protection import (
+        log_crash as _log_crash,
+        set_crash_log_db as _set_crash_log_db,
+    )
+    log_crash = _log_crash
+    set_crash_log_db = _set_crash_log_db
+except ImportError as _ie:
+    logging.warning(f"[CRASH_PROTECTION] services.crash_protection unavailable: {_ie}")
 
 
 async def global_exception_handler(request: Request, exc: Exception):
@@ -91,8 +103,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     logging.error(f"[CRASH_PROTECTION] Unhandled exception: {exc}", exc_info=True)
     
     try:
-        asyncio.create_task(log_crash(str(request.url), exc, type(exc).__name__))
-    except:
+        if log_crash is not None:
+            asyncio.create_task(log_crash(str(request.url), exc, type(exc).__name__))
+    except Exception:
         pass
 
     # Sentinel Guard — fingerprint + pattern recognition (non-blocking)

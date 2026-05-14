@@ -117,15 +117,28 @@ class RedisRateLimiter:
                     )
                 self._connected = False  # Stop trying Redis until reconnect
         
-        # Fallback to in-memory
+        # Fallback to in-memory. Bug-fix: we used to clean only the
+        # per-key bucket, so one-shot IPs (scanners, scrapers, one-time
+        # visitors) accumulated forever. Cap the dict and prune in bulk
+        # whenever it crosses the watermark.
         self._memory_storage[key] = [
             t for t in self._memory_storage[key] if current_time - t < window
         ]
-        
-        if len(self._memory_storage[key]) >= limit:
+        if not self._memory_storage[key]:
+            self._memory_storage.pop(key, None)
+        elif len(self._memory_storage[key]) >= limit:
             return True
-        
-        self._memory_storage[key].append(current_time)
+        else:
+            self._memory_storage[key].append(current_time)
+
+        if len(self._memory_storage) > 10000:
+            cutoff = current_time - window
+            self._memory_storage = defaultdict(list, {
+                k: [t for t in v if t > cutoff]
+                for k, v in self._memory_storage.items()
+                if any(t > cutoff for t in v)
+            })
+
         return False
     
     async def get_stats(self) -> dict:

@@ -36,7 +36,20 @@ logger = logging.getLogger(__name__)
 
 _async_pool = None
 _async_client = None
-_async_lock = asyncio.Lock()
+# Bug-fix: previously `_async_lock = asyncio.Lock()` at module import.
+# Python 3.10+ keeps loop-binding deferred for asyncio.Lock now, but the
+# safer pattern (and the one that survives Windows + test event-loop
+# swaps) is lazy: create on first use inside the running loop.
+_async_lock: "asyncio.Lock | None" = None
+
+
+def _get_async_lock() -> asyncio.Lock:
+    global _async_lock
+    if _async_lock is None:
+        _async_lock = asyncio.Lock()
+    return _async_lock
+
+
 _async_init_failed = False
 _async_init_failed_at = 0.0
 _ASYNC_RETRY_AFTER_SEC = 60.0  # circuit-breaker window
@@ -116,7 +129,7 @@ async def get_async_redis():
         # Breaker window expired — reset and try again
         _async_init_failed = False
 
-    async with _async_lock:
+    async with _get_async_lock():
         if _async_client is not None:
             return _async_client
         if _async_init_failed:

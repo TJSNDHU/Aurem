@@ -7759,3 +7759,67 @@ Architecture:
 - db_not_ready handling
 
 **Validation: 96/96 tests pass across 9 test files.**
+
+---
+
+## 2026-05-14 — Security Review Round 4 (9 LLM-reported, 5 real fixed)
+
+User pasted a 9-bug security review. Slow live-verification triaged
+each one against actual source:
+
+**🟢 FALSE POSITIVES (4) — verified, no action:**
+- Bug 1: `backend/.env.txt` doesn't exist; real `.env` IS gitignored.
+- Bug 4: `STRIPE_PRICE_GROWTH=price_1TNDxa0Exg9gU93trPCSXQBy` is clean,
+  no duplication.
+- Bug 6: `backend/app.py` doesn't exist — there's no double-middleware
+  registration to fix.
+- (Plus the leaked-token claim itself — leaked tokens in screenshots
+  is a user-side operational issue, not a code bug.)
+
+**🔴 REAL FIXES (5) shipped:**
+
+**Bug 2 — verify_token enforces blocklist on every read.**
+File: `backend/utils/aurem_jwt.py`. Previously the entire invalidate/
+blocklist machinery existed (lines 186-203) but `verify_token` never
+called `is_token_blacklisted`. Logout was a 24-hour no-op. Now every
+token read checks its jti against the blocklist before honouring it.
+
+**Bug 3 — TenantGuard rejects expired tokens.**
+File: `backend/middleware/tenant_guard.py`. Removed
+`options={"verify_exp": False}` from the `jwt.decode` call. Added
+explicit `jwt.ExpiredSignatureError` handler that leaves TenantGuard
+cleared so the downstream 401 surfaces correctly. Verified live: an
+hour-old expired token now returns `HTTP 401 "Token expired"`.
+
+**Bug 5 — aurem-cto/api/main.py: no hardcoded JWT_SECRET fallback.**
+The `os.getenv("JWT_SECRET", "dev-secret-change-in-prod")` default was
+public in the repo, so a known fallback signing key worked forever.
+Replaced with `raise RuntimeError("JWT_SECRET must be set ...")` at
+import time so the service refuses to boot without a real secret.
+
+**Bug 7 — crash_protection.global_exception_handler defensive guard.**
+File: `backend/middleware/crash_protection.py`. Previously a failed
+import left `log_crash` undefined, then a bare `except: pass` inside
+the handler silently swallowed the NameError. Now log_crash is None-
+guarded explicitly, with a `if log_crash is not None:` check before
+invocation. Failures emit a startup warning instead of vanishing.
+
+**Bug 8 — Rate limiter in-memory storage bounded.**
+File: `backend/middleware/security.py::RedisRateLimiter`. The
+fallback `defaultdict(list)` cleaned only per-key on visit, so one-shot
+IPs accumulated forever. Added a 10 000-key watermark + bulk prune
+that drops every bucket whose newest timestamp is past the window.
+Test seeds 10 500 stale keys and verifies the dict collapses on next
+request.
+
+**Bug 9 — redis_pool _async_lock lazy-init.**
+File: `backend/utils/redis_pool.py`. Module-level `asyncio.Lock()` now
+None-defaulted; first `_get_async_lock()` call materialises it on the
+running event loop. Safer for Windows + test fixtures that swap loops.
+
+**Validation:**
+- 7 new tests in `tests/test_security_review_fixes_may2026.py` →
+  7/7 pass.
+- Live curl test: expired JWT → `401 "Token expired"` (was bypassing
+  TenantGuard previously).
+- Full regression: **103/103 across 10 test files**.
