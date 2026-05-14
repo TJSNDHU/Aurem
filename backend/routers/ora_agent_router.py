@@ -34,6 +34,13 @@ def set_db(database):
     global _db
     _db = database
     ora_agent.set_db(database)
+    # Wire the async-job queue (CF 524 fix) to the same DB. Worker is
+    # started by server.py once the asyncio loop is alive.
+    try:
+        from services import ora_agent_jobs
+        ora_agent_jobs.set_db(database)
+    except Exception as e:
+        logger.warning("[ora-agent-router] could not wire ora_agent_jobs: %s", e)
 
 
 async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)):
@@ -134,6 +141,38 @@ async def agent_run(body: RunBody, user: dict = Depends(get_admin_user)):
     return await ora_agent.run_turn(
         body.session_id, body.text, founder_email=user["email"]
     )
+
+
+# ─── Async job pattern (CF 524 fix, sovereign + free) ─────────────────
+# Cloudflare Free plan kills any HTTP request lingering >100 s. Tool-call
+# loops against the user's local Ollama daemon routinely exceed that on
+# multi-step queries ("System Overview", "diagnose backend"). Instead of
+# paying for a CF plan upgrade we split the slow path into two short
+# requests:
+#
+#   POST /run-async      → returns job_id in <100 ms (never times out)
+#   GET  /status/<jobid> → returns {status, result?} in <50 ms; client
+#                          polls every 2-3 s
+#
+# The actual ora_agent.run_turn() executes inside a background worker
+# spawned by server.py. Jobs persist in Mongo so an unfortunate pod
+# restart never loses an in-flight conversation (the "never offline"
+# mandate). See services/ora_agent_jobs.py for details.
+
+@router.post("/run-async")
+async def agent_run_async(body: RunBody, user: dict = Depends(get_admin_user)):
+    from services import ora_agent_jobs
+    return await ora_agent_jobs.enqueue(
+        session_id=body.session_id,
+        text=body.text,
+        founder_email=user["email"],
+    )
+
+
+@router.get("/status/{job_id}")
+async def agent_status(job_id: str, user: dict = Depends(get_admin_user)):
+    from services import ora_agent_jobs
+    return await ora_agent_jobs.get_status(job_id, founder_email=user["email"])
 
 
 @router.post("/approve")

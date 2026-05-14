@@ -1523,6 +1523,20 @@ async def startup_event():
         _safe_task(ensure_indexes(db), "ensure_indexes")
         logging.info("✓ Service init scheduled (background)")
 
+        # ── ORA Async Job Worker (CF 524 fix) ────────────────────────
+        # Spawns a long-running coroutine that drains the ora_agent_jobs
+        # Mongo queue. Without this, /run-async would enqueue jobs that
+        # never get processed. The worker is the entire reason the
+        # async pattern works — keep it BEFORE any other startup that
+        # might raise and abort the startup callback.
+        try:
+            from services import ora_agent_jobs
+            ora_agent_jobs.set_db(db)
+            _safe_task(ora_agent_jobs.worker_loop(), "ora_agent_jobs_worker")
+            logging.info("✓ ORA async job worker started")
+        except Exception as _e:
+            logging.warning(f"[startup] ora_agent_jobs worker failed: {_e}")
+
         # Iter 289.5 — record this boot's commit for Founder Timeline + commit links
         try:
             from services.deploy_logger import log_deploy_event

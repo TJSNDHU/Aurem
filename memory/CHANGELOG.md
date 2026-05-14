@@ -7709,3 +7709,53 @@ sessions), triage:
 - 10 new tests in `tests/test_background_loop_bug_fixes.py` → 10/10 pass.
 - Includes a live-Mongo integration test for `expire_stale_approvals`.
 - Full regression: **88/88** pass across 8 test files.
+
+---
+
+## 2026-05-14 — ORA Chat Async-Job Pattern (CF 524 Permanent Fix)
+
+User screenshot showed production ORA chat returning `HTTP 524` on
+"System Overview" queries. Diagnosis: Cloudflare Free plan kills any
+single HTTP request taking >100s. Multi-step ORA tool-loops against
+the laptop Ollama daemon routinely exceed that.
+
+**Solution: split the slow path into 2 short requests + Mongo-backed worker.**
+
+Architecture:
+```
+1. Browser → POST /api/ora/agent/run-async  → 200 OK, {job_id} in <100ms
+2. Browser → GET  /api/ora/agent/status/<id> → polls every 2.5s, each <50ms
+3. Backend worker (services/ora_agent_jobs.py) drains the queue, calls
+   ora_agent.run_turn() with a 5-min hard timeout, writes result to Mongo.
+4. Jobs persist in `ora_agent_jobs` Mongo collection with 24h TTL — they
+   survive pod restarts, fulfilling the "never offline" mandate.
+```
+
+**Token-efficiency wins (baked into the new path):**
+- Jobs forward to existing `ora_agent.run_turn` which already enforces tool-grounding caps. No extra LLM calls.
+- Poll responses ship the heavy turn-result ONLY on terminal status — every intermediate poll is ~80 bytes of JSON, not the full session history.
+- `llm_response_cache` (existing) short-circuits identical prompts so token spend drops on repeat queries.
+
+**Files:**
+- NEW `services/ora_agent_jobs.py` (Mongo job queue + worker)
+- `routers/ora_agent_router.py` — added `/run-async` + `/status/{id}`
+- `server.py` — startup spawns `worker_loop()` as long-running task
+- `frontend/.../OraChat.jsx` — `send()` now uses `runAsyncPolling()` with
+  graceful fallback to legacy `/run` if backend is stale (no breakage).
+
+**Live proof (preview):**
+- POST `/run-async` → `{"ok":true,"job_id":"32617e...","status":"pending"}` in 90ms
+- GET  `/status/<id>` (4s later) → `{"status":"running",...}`
+- GET  `/status/<id>` (13s later) → `{"status":"done","result":{...}}`
+- Each HTTP call stayed <100ms. CF would never see a request to kill.
+
+**Tests:** 8 new in `test_ora_agent_jobs_async.py`:
+- enqueue speed
+- pending-poll payload size
+- 404 for wrong owner (multi-tenant safety)
+- atomic single claim across concurrent workers (race-test)
+- timeout enforcement (5-min hard cap)
+- exception capture
+- db_not_ready handling
+
+**Validation: 96/96 tests pass across 9 test files.**

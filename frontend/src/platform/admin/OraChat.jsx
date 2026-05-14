@@ -166,6 +166,74 @@ export default function OraChat() {
     } catch { /* clipboard blocked */ }
   };
 
+  // ── Async polling helper — bypasses Cloudflare's 100s timeout ─────
+  // Production aurem.live sits behind Cloudflare Free which kills any
+  // single HTTP request taking >100 s with a 524. ORA's tool-calling
+  // loop against the local Ollama daemon routinely exceeds that on
+  // complex queries. Instead we:
+  //   1. POST /run-async         → returns job_id in <100 ms
+  //   2. GET  /status/{job_id}   → poll every 2.5 s; CF sees only
+  //                                short, healthy requests
+  // The backend worker (services/ora_agent_jobs.py) executes the real
+  // ora_agent.run_turn() in the background — survives pod restarts
+  // because the job is persisted in Mongo.
+  //
+  // If /run-async doesn't exist on the deployed backend (e.g. running
+  // a stale build), we transparently fall back to the legacy /run.
+  const POLL_INTERVAL_MS = 2500;
+  const POLL_MAX_TRIES   = 130;   // 130 × 2.5 s = ~5.4 min, matches worker timeout
+
+  const runAsyncPolling = async (q) => {
+    // 1) Enqueue
+    let startRes;
+    try {
+      startRes = await fetch(`${API}/api/ora/agent/run-async`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ session_id: sessionId, text: q }),
+      });
+    } catch (e) {
+      throw new Error(`network: ${e}`);
+    }
+    if (startRes.status === 404) {
+      // Backend is older — fall back to legacy single-shot path.
+      const r = await fetch(`${API}/api/ora/agent/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ session_id: sessionId, text: q }),
+      });
+      return await safeJson(r);
+    }
+    const startJson = await safeJson(startRes);
+    if (!startJson.ok || !startJson.job_id) {
+      throw new Error(startJson.error || startJson.detail || "enqueue failed");
+    }
+    const jobId = startJson.job_id;
+
+    // 2) Poll
+    for (let i = 0; i < POLL_MAX_TRIES; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      let pollRes;
+      try {
+        pollRes = await fetch(
+          `${API}/api/ora/agent/status/${encodeURIComponent(jobId)}`,
+          { headers: { ...authHeaders() } }
+        );
+      } catch {
+        // transient network blip — keep polling
+        continue;
+      }
+      const j = await safeJson(pollRes);
+      if (!j.ok) throw new Error(j.error || j.detail || "status_lost");
+      if (j.status === "done")   return j.result || { ok: true, reply: "(empty)" };
+      if (j.status === "failed") {
+        return { ok: false, error: j.error || "ORA job failed" };
+      }
+      // else still pending/running — loop
+    }
+    return { ok: false, error: "ORA job timed out client-side after 5+ min" };
+  };
+
   const send = async () => {
     const q = input.trim();
     if (!q || busy) return;
@@ -174,12 +242,7 @@ export default function OraChat() {
     setInput("");
     setBusy(true);
     try {
-      const r = await fetch(`${API}/api/ora/agent/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ session_id: sessionId, text: q }),
-      });
-      const j = await safeJson(r);
+      const j = await runAsyncPolling(q);
       applyTurnResult(j);
     } catch (e) {
       setError(String(e));
