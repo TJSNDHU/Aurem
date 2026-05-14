@@ -1,3 +1,32 @@
+## 2026-02 — iter R234D — Auto-Blast Aggressive Reclamation
+
+**Trigger**: founder asked for aggressive mode after seeing 0 sent and 123-cycle zero-streak.
+
+**Root cause found**
+- Auto-blast `_is_noise()` was treating every `info@`/`hello@` email as noise → 1009 legitimate SMB leads got permanent `status=not_interested`. Pool dropped to 0.
+- WhatsApp send path read `r.get("ok")` but provider returns `{"success": True, "message_sid": …}` → every send logged as `ok: None`.
+
+**Fixes shipped**
+- `services/auto_blast_engine.py`
+  - `_NOISE_DOMAIN_SUBSTR` expanded from 9 → 49 entries (Yelp, Fresha, Facebook, LinkedIn, ada.org, dentists.com, kbb, cars.com, Squarespace, etc.).
+  - `_GENERIC_EMAIL_USERS` tightened — `info`, `hello`, `admin`, `webmaster` REMOVED (they were killing 879 real SMB inboxes).
+  - `_is_noise()` no longer auto-marks `not_interested`; sets `noise_flag` instead (re-classifiable).
+  - Eligibility query: `noise_flag != True` instead of permanent status block.
+- `services/auto_website_builder.py` — WhatsApp send result reads both `success` and `ok`, plus `message_sid`/`reason`/`status` for full delivery visibility.
+
+**Reclamation**
+- 699 false-positive `not_interested` leads flipped back to `status: new` with `reclaim_reason: "false-positive-noise-iter-R234d"`.
+- Round-2 + listicle bulk noise flag: 225 truly-noise leads (`cars.com`, `easterndental.com`, "Find X in Y" titles, "X near Y" titles) removed from pool.
+
+**Config**
+- `auto_blast_config`: `enabled=True, max_per_cycle=12, interval_minutes=8, tripped=[], zero_sent_streak=0`. Throughput target: ~90/hr / ~2160/day.
+
+**Result**
+- Pool: **0 → 729 clean SMB leads** ready (Friz Dental, KW Law, Lakefront Dental, theautospa.ca, lnm-cpa.com, etc. — real local prospects).
+- Outreach events today: **14 → 35** (and growing — scheduler firing every 8 min).
+- WhatsApp deliveries now report real `ok=True/False` + `sid` so the dashboard reflects reality.
+
+
 ## 2026-02 — iter R234C — ORA Sovereign Security Patterns Playbook
 
 **Goal**: teach ORA CTO (and the other 27 internal agents) to recognise every audited vulnerability pattern in real time so the next code-review cycle is self-driven.

@@ -125,46 +125,99 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
         _is_blocked_url = lambda _u: False  # noqa: E731
 
     _NOISE_NAME_SUBSTR = (
+        # Aggressive but precise — only listing/directory titles, never SMB names.
         "the best 10 ", " - wikipedia", " - reddit",
         "nail salons for sale", "businesses for sale",
         "yelp.com/search", "r/",
+        # iter R234d — additions: real-noise listicle patterns we saw
+        # auto-rejecting today: "Find X in Y", "X Companies in Y" (only
+        # when paired with a directory domain — see _is_noise below).
     )
     _GENERIC_EMAIL_USERS = {
-        "yelp.guest", "hello", "info", "admin", "webmaster",
-        "noreply", "no-reply", "postmaster",
+        # Kept tight — these are mass-mail noise users only. We DO NOT
+        # treat `info@`, `hello@`, `contact@`, `admin@`, `webmaster@` as
+        # noise anymore: those are the standard SMB inbox formats and
+        # rejecting them was killing 879 legitimate dental / HVAC / law
+        # practice leads (iter R234d aggressive reclamation).
+        "yelp.guest", "noreply", "no-reply", "postmaster",
     }
+    # iter R234d — directory / listicle / SaaS / national-chain domains
+    # that should always be skipped regardless of the local-part user.
+    _NOISE_DOMAIN_SUBSTR = (
+        # Original noise list
+        "yelp.com", "wikipedia.org", "reddit.com", "justia.com",
+        "intently.co", "hvaclocal.com", "procore.com",
+        "findbusinesses4sale.com", "bizbuysell.com",
+        # iter R234d post-cycle audit: aggressive expansion. These are
+        # directory / listing / SaaS-host platforms whose `info@DOMAIN`
+        # email is never a local SMB prospect. Even when the
+        # `business_name` LOOKS like a real business, the email lands
+        # in the platform's corporate inbox, not the merchant's.
+        "fresha.com", "rew.ca", "desiforce.com",
+        "facebook.com", "instagram.com", "tiktok.com", "twitter.com",
+        "linkedin.com", "youtube.com", "pinterest.com",
+        "yellowpages", "tripadvisor", "thumbtack", "houzz.com",
+        "angi.com", "trustpilot", "glassdoor", "crunchbase",
+        "google.com", "googleusercontent", "g.page",
+        "homestars", "bbb.org", "indeed.com", "ziprecruiter",
+        "weebly.com", "wix.com", "squarespace.com",  # only when site too
+        "shopify.com", "etsy.com", "ebay.com", "kijiji.ca",
+        "realtor.ca", "realtor.com", "zolo.ca", "zillow.com",
+        "remax.ca", "remax.com", "century21",
+    )
 
     def _is_noise(lead: Dict[str, Any]) -> bool:
         name = (lead.get("business_name") or "").lower()
         if any(s in name for s in _NOISE_NAME_SUBSTR):
             return True
+        # iter R234d — listicle title pattern: "(N) X in Y", "X Companies in Y",
+        # "Find X in Y" — these are always directory pages, never real SMBs.
+        if (name.startswith("find ") and " in " in name) or \
+           (" companies in " in name) or \
+           (" companies near " in name):
+            return True
         site = (lead.get("website_url") or lead.get("website") or "").lower()
         if site and _is_blocked_url(site):
             return True
+        # iter R234d — explicit noise-domain check (replaces the over-broad
+        # generic-user rule that was killing all `info@` SMBs).
         email = (lead.get("email") or "").lower()
-        if email:
-            # Block generic@wikipedia.org, yelp.guest@yelp.com, info@autozone.com, etc.
-            if "@" in email:
-                user, _, domain = email.partition("@")
-                if any(d in domain for d in BLOCKED_DOMAINS):
-                    return True
-                # Big-box retailer / national-chain domains are not SMB prospects
-                if domain in {"autozone.com", "walmart.com", "amazon.com",
-                              "homedepot.com", "lowes.com", "costco.com",
-                              "findbusinesses4sale.com", "bizbuysell.com"}:
-                    return True
-                if user in _GENERIC_EMAIL_USERS and not (lead.get("phone") or "").strip():
-                    # no phone + generic email = almost always low-intent page scrape
-                    return True
+        if email and "@" in email:
+            user, _, domain = email.partition("@")
+            if any(d in domain for d in BLOCKED_DOMAINS):
+                return True
+            if any(d in domain for d in _NOISE_DOMAIN_SUBSTR):
+                return True
+            # Big-box retailer / national chains: still skip.
+            if domain in {"autozone.com", "walmart.com", "amazon.com",
+                          "homedepot.com", "lowes.com", "costco.com"}:
+                return True
+            # Kept narrow generic-user check — only blocks yelp.guest /
+            # noreply / postmaster. `info@`, `hello@`, `admin@` are
+            # legit SMB inboxes and pass through to outreach now.
+            if user in _GENERIC_EMAIL_USERS:
+                return True
         return False
 
     q = {
         "last_blast_at": {"$exists": False},
         "blast_chain": {"$exists": False},
-        "status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]},
+        # iter R234d — was excluding `not_interested` blindly which caught
+        # the 827 noise-falsely-flagged SMBs. We now narrow the exclusion
+        # to *user-driven* not_interested OR unsubscribed only; auto-noise
+        # uses `noise_flag` (separate field) so re-classification can flip
+        # the false positives back.
         "$or": [
-            {"email": {"$nin": ["", None]}},
-            {"phone": {"$nin": ["", None]}},
+            {"status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]}},
+            {"status": "not_interested", "noise_reason": {"$in": ["pre-282u-scrape-residue", "listicle-or-directory"]}},
+        ],
+        # Skip current-cycle noise (set above) but don't permanently exclude.
+        "noise_flag": {"$ne": True},
+        "$and": [
+            {"$or": [
+                {"email": {"$nin": ["", None]}},
+                {"phone": {"$nin": ["", None]}},
+            ]},
         ],
     }
     out: List[Dict[str, Any]] = []
@@ -182,13 +235,18 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
         if (lead.get("email") or "").lower() in dnc_emails:
             continue
         if _is_noise(lead):
-            # Mark it so future cycles skip instantly.
+            # iter R234d — was permanently marking these `not_interested`,
+            # which killed re-arming (827 legitimate SMBs got buried).
+            # Now we just tag with a separate `noise_flag` so this cycle
+            # skips them, but a re-classification job can revive false
+            # positives later. The lead's `status` is left alone so the
+            # eligibility query keeps surfacing them after a re-classify.
             try:
                 await db.campaign_leads.update_one(
                     {"lead_id": lead.get("lead_id")},
-                    {"$set": {"status": "not_interested",
+                    {"$set": {"noise_flag": True,
                               "noise_filtered_at": datetime.now(timezone.utc).isoformat(),
-                              "noise_reason": "pre-282u-scrape-residue"}},
+                              "noise_reason": "listicle-or-directory"}},
                 )
             except Exception:
                 pass

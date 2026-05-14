@@ -1101,8 +1101,25 @@ async def _trigger_lead_outreach(db, site_id: str, slug: str,
                 try:
                     from shared.providers.twilio import send_whatsapp_message
                     r = await send_whatsapp_message(phone_val, msg_short)
-                    out["sent"].append({"channel": "whatsapp", "to": phone_val,
-                                        "ok": r.get("ok") if isinstance(r, dict) else True})
+                    # iter R234d — provider returns {"success": True,
+                    # "message_sid": …} for both WHAPI and Twilio paths.
+                    # Old code only checked `ok`, which was never set →
+                    # every send logged `ok: None`, hiding both real
+                    # sends AND real failures from the dashboard.
+                    if isinstance(r, dict):
+                        ok_flag = bool(r.get("success") or r.get("ok"))
+                        out["sent"].append({
+                            "channel": "whatsapp",
+                            "to": phone_val,
+                            "ok": ok_flag,
+                            "sid": r.get("message_sid") or r.get("sid"),
+                            "skipped": bool(r.get("skipped")),
+                            "reason": r.get("reason") or r.get("error"),
+                            "status": r.get("status"),
+                        })
+                    else:
+                        out["sent"].append({"channel": "whatsapp", "to": phone_val,
+                                            "ok": bool(r)})
                 except Exception as e:
                     out["skipped"].append({"channel": "whatsapp", "reason": str(e)[:120]})
 
