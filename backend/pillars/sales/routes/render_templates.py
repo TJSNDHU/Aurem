@@ -65,7 +65,7 @@ async def seed_aurem_client(request: Request):
             "country": "Canada",
         },
         "website_url": "https://aurem.live",
-        "email": "teji.ss1986@gmail.com",
+        "email": os.environ.get("FOUNDER_EMAIL", "teji.ss1986@gmail.com"),
         "phone": "+12265017777",
         "whatsapp": "+12265017777",
         "industry": "AI Technology",

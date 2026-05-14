@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -59,17 +59,45 @@ def _days_remaining(target_iso: str) -> int:
 
 
 @router.get("/by-session/{session_id}")
-async def onboarding_by_session(session_id: str):
-    """Resolve an onboarding record from a Stripe Checkout session_id."""
+async def onboarding_by_session(session_id: str, request: Request):
+    """Resolve an onboarding record from a Stripe Checkout session_id.
+
+    Bug-fix #34 — this endpoint used to be fully unauthenticated. Anyone
+    knowing a `cs_live_xxx` session id (visible in browser history,
+    referrer headers, server logs) could read the buyer's email,
+    tenant_id, and full onboarding state. We now require an Authorization
+    Bearer JWT and only return data when the caller's email matches the
+    transaction's user_email (or the caller is admin).
+    """
     db = _get_db()
     if db is None:
         raise HTTPException(503, "Database unavailable")
+
+    # ── Auth gate ──
+    import jwt as _jwt
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    _jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not _jwt_secret:
+        raise HTTPException(503, "Auth not configured")
+    try:
+        _payload = _jwt.decode(auth.split(" ", 1)[1], _jwt_secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    _caller_email = (_payload.get("email") or _payload.get("sub") or "").lower().strip()
+    _is_admin = bool(_payload.get("is_admin") or _payload.get("is_super_admin"))
 
     tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not tx:
         raise HTTPException(404, "Payment session not found")
 
     email = tx.get("user_email", "")
+    # Caller must own this session (or be admin).
+    if not _is_admin and _caller_email and _caller_email != (email or "").lower().strip():
+        raise HTTPException(403, "Forbidden — session does not belong to caller")
     # Find the matching tenant
     customer = await db.tenant_customers.find_one({"email": email}, {"_id": 0})
     if not customer:

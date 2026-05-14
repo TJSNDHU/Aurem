@@ -954,6 +954,17 @@ async def create_indexes():
         await db.analytics_events.create_index("timestamp")
         await db.analytics_events.create_index("event_type")
 
+        # Bug-fix #33 — TTL index for the BIN-auth reset-token JTI
+        # replay-protection collection. `expires_at` lets Mongo auto-prune
+        # used jtis after 20 min so the collection never balloons.
+        try:
+            await db.bin_reset_token_jtis.create_index(
+                "expires_at", expireAfterSeconds=0
+            )
+            await db.bin_reset_token_jtis.create_index("jti", unique=True)
+        except Exception as _e:
+            logging.debug(f"[INDEX] bin_reset_token_jtis idx: {_e}")
+
         logging.info("✓ Database indexes created/verified")
     except Exception as e:
         logging.warning(f"Index creation warning (may already exist): {e}")

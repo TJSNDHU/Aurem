@@ -18,8 +18,17 @@ from pydantic import BaseModel, EmailStr
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/founder/customers", tags=["Founder Customers"])
 
-# Founder allow-list — these accounts are NEVER deleted
-FOUNDER_EMAILS = {"teji.ss1986@gmail.com", "admin@aurem.live"}
+# Founder allow-list — these accounts are NEVER deleted.
+# Bug-fix #27 — pull from FOUNDER_EMAILS env (comma-separated) so we
+# stop hard-coding personal emails in source. Falls back to the historic
+# list so existing deploys don't lose protection.
+import os as _os
+_env_founders = (_os.environ.get("FOUNDER_EMAILS") or "").strip()
+if _env_founders:
+    FOUNDER_EMAILS = {e.strip().lower() for e in _env_founders.split(",") if e.strip()}
+else:
+    _f = (_os.environ.get("FOUNDER_EMAIL") or "teji.ss1986@gmail.com").strip().lower()
+    FOUNDER_EMAILS = {_f, "admin@aurem.live"}
 
 # Collections that hold customer/tenant data (cleanup scope)
 CUSTOMER_COLLECTIONS = [

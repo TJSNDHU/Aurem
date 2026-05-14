@@ -1,3 +1,38 @@
+## 2026-02 — iter R234 — Round 2/3/4 P0 Security & Logic Hardening
+
+**User mandate**: "P0 + Round 4. Token-conscious. Verify before fix; reject hallucinations."
+
+**Triage (verify before patch)**
+- ALREADY FIXED (no-op): Bug 10 (admin 401 enumeration), Bug 19 (Stripe sig bypass), Bug 21 (DB_NAME RuntimeError), Bug 25 (Fernet key-rotation), Bug 22 (lazy server.db import).
+- FALSE POSITIVE: Bug 15, 16 (`usePersistentState.js` does not exist in the codebase), Bug 28 (`DB_NAME=aurem_db` already set in `.env`), Bug 29 (JWT_SECRET is in gitignored `.env`, not committed).
+- REAL & FIXED: Bugs 11, 12, 13, 14, 17, 18, 23, 24, 26, 27, 30, 31, 32, 33, 34, 35, 36 (17 patches landed).
+
+**Real fixes shipped**
+- **Bug 11** — `routes/auth.py` password reset token now stored as sha256 hash (`token_hash`), looked up via hash, with backward-compat OR clause for any in-flight tokens.
+- **Bug 12** — `shared/commercial/billing_service.py` every Stripe SDK call wrapped in `_stripe_call()` (run_in_executor) so the event loop never blocks on Stripe round-trips. Customer.create, Customer.retrieve, checkout.Session.create, Price.list/create, Product.create, billing_portal.Session.create all converted.
+- **Bug 13** — `pillars/billing/worker.py::_safe_task` now accepts a *factory* and auto-restarts crashed schedulers with exponential delay + max_restarts cap. Honors the docstring promise.
+- **Bug 14** — All `httpx.AsyncClient()` calls in `routes/auth.py` now pass `httpx.Timeout(8.0, connect=4.0)` so Google OAuth can never hang the request.
+- **Bug 17** — `routes/auth.py::register` now catches `DuplicateKeyError` from the existing `users.email` unique index → same 400 as the pre-check; closes the TOCTOU race.
+- **Bug 18** — `failed_logins` and `admin_failed_logins` migrated from unbounded `defaultdict(list)` to `cachetools.TTLCache` (maxsize 50k/10k, ttl 2× lockout). Helper functions `_admin_fail_append/_clear` for safe access.
+- **Bug 23** — `middleware/tier_metering.py` now resolves tier from `X-Tier` header / scope state, falls back to **free** (not professional) so untagged requests get the safest cap.
+- **Bug 24** — Same file caps tracked tenants at 50k; oldest entry evicted on overflow.
+- **Bug 26** — `services/llm_gateway.py` swapped `import server as _srv` for `sys.modules.get("server")` to dodge the circular-import None-trap that was silently disabling the response cache + skill broadcast.
+- **Bug 27** — `routers/admin_founder_customers_router.py` + `pillars/sales/routes/render_templates.py` now read founder email(s) from `FOUNDER_EMAILS` / `FOUNDER_EMAIL` env vars.
+- **Bug 30** — `services/ora_tools.py::invoke_tool` now hard-denies public dispatch of `safe_edit` and `shell_exec` (returns "gated — use *_with_council instead"). `list_tools()` hides them from the catalog the LLM sees. Council-gated wrappers still work because they call the bare functions directly via Python import.
+- **Bug 31** — `_redact_env` SENSITIVE list expanded with `URL, WEBHOOK, HASH, PASS, CREDENTIAL, AUTH, PRIVATE, SIGNATURE, API` — `REDIS_URL`/`DATABASE_URL`/`DISCORD_WEBHOOK`/`ADMIN_PASSWORD_HASH` no longer leak through the `env` tool.
+- **Bug 32** — `routers/bin_auth_router.py` 4 broken `from utils.redis_pool import get_redis` imports aliased to the real `get_async_redis`. OTP rate limiting + storage now actually use Redis instead of silently falling back to in-process memory.
+- **Bug 33** — Reset-token JTI is now persisted to `bin_reset_token_jtis` (TTL-indexed) on first use; replays return 400. TTL + unique indexes added in `server.py::setup_database_indexes`.
+- **Bug 34** — `routers/aurem_onboarding_router.py::onboarding_by_session` now requires `Authorization: Bearer <JWT>`, decodes it, and rejects requests where the caller's email doesn't match the session's `user_email` (admins exempt). Closed an unauthenticated PII leak via guessable Stripe session ids.
+- **Bug 35** — `routers/bin_auth_router.py::verify_otp` attempt counter is now atomic — Redis `INCR` when available, `asyncio.Lock`-guarded in-memory fallback. Eliminates the concurrent-request TOCTOU window that effectively halved brute-force protection.
+- **Bug 36** — `services/ora_tools.py::_WRITE_FORBIDDEN_FILES` extended to include `.env.txt`, `.env.staging`, `.env.development`.
+
+**Tests**
+- New: `backend/tests/test_round2_round3_round4_fixes.py` — 18 regression tests, one per fixed bug. All 18 pass.
+- Combined run: 43/43 pass across `test_round2_round3_round4_fixes`, `test_security_review_fixes_may2026`, `test_ora_agent_jobs_async`, `test_background_loop_bug_fixes`.
+
+**Deps**: added `cachetools==5.5.0` to `requirements.txt`.
+
+
 ## 2026-02 — iter 322g.6 — `git_bisect` autonomous bug-hunting LIVE
 
 **User mandate**: "git bisect use kr k ORA bug dhund skta hai isa bus wire kro."

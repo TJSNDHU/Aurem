@@ -41,9 +41,33 @@ def get_auth_db():
 from utils.admin_guard import ADMIN_EMAIL_WHITELIST  # noqa: E402,F401
 
 # Failed login tracking
-failed_logins = defaultdict(list)
+# Bug-fix #18 — was an unbounded `defaultdict(list)` that grew forever
+# (one key per attacker IP / email). Replaced with a TTLCache so old
+# entries are auto-evicted; we still keep the per-identifier list for
+# the sliding-window check but each TTLCache key expires after
+# LOCKOUT_DURATION * 2.
+try:
+    from cachetools import TTLCache as _TTLCache
+    _has_ttl_cache = True
+except Exception:
+    _has_ttl_cache = False
+
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_DURATION = 900  # 15 minutes
+
+if _has_ttl_cache:
+    failed_logins = _TTLCache(maxsize=50000, ttl=LOCKOUT_DURATION * 2)
+else:
+    failed_logins = defaultdict(list)
+
+
+def _get_failed_list(identifier: str):
+    """Return the per-identifier list, creating it if missing.
+    TTLCache lookups raise KeyError on miss/expiry — handle that."""
+    try:
+        return failed_logins[identifier]
+    except KeyError:
+        return []
 
 
 def validate_email(email: str) -> bool:
@@ -74,18 +98,22 @@ def sanitize_input(text: str) -> str:
 def check_account_lockout(identifier: str) -> bool:
     """Check if account is locked"""
     current_time = time.time()
-    failed_logins[identifier] = [
-        t for t in failed_logins[identifier] if current_time - t < LOCKOUT_DURATION
-    ]
-    return len(failed_logins[identifier]) >= LOCKOUT_THRESHOLD
+    pruned = [t for t in _get_failed_list(identifier) if current_time - t < LOCKOUT_DURATION]
+    failed_logins[identifier] = pruned
+    return len(pruned) >= LOCKOUT_THRESHOLD
 
 
 def record_failed_login(identifier: str):
-    failed_logins[identifier].append(time.time())
+    lst = _get_failed_list(identifier)
+    lst.append(time.time())
+    failed_logins[identifier] = lst
 
 
 def clear_failed_logins(identifier: str):
-    failed_logins[identifier] = []
+    try:
+        del failed_logins[identifier]
+    except KeyError:
+        pass
 
 
 @router.post("/register", response_model=TokenResponse)
@@ -124,7 +152,16 @@ async def register(user_data: UserCreate):
     user_dict["password"] = hash_password(user_data.password)
     user_dict["created_at"] = user_dict["created_at"].isoformat()
 
-    await get_auth_db().users.insert_one(user_dict)
+    # Bug-fix #17 — race condition: two concurrent /register calls with
+    # the same email both saw `existing is None` and inserted duplicate
+    # user rows. We rely on a unique index on `users.email` (created in
+    # setup_database_indexes) and translate the resulting DuplicateKey
+    # error into the same 400 the pre-check returns.
+    from pymongo.errors import DuplicateKeyError as _DupKey
+    try:
+        await get_auth_db().users.insert_one(user_dict)
+    except _DupKey:
+        raise HTTPException(status_code=400, detail="Email already registered")
     token = create_token(user.id, user.is_admin, email=email)
 
     logging.info(f"New user registered: {email}")
@@ -397,9 +434,31 @@ async def login(credentials: UserLogin):
 # ============= ADMIN LOGIN (Separated) =============
 
 # Admin login lockout: stricter (5 attempts, 15 min)
-admin_failed_logins = defaultdict(list)
 ADMIN_LOCKOUT_THRESHOLD = 5
 ADMIN_LOCKOUT_DURATION = 900  # 15 minutes
+
+# Bug-fix #18 — bound the admin lockout dict.
+if _has_ttl_cache:
+    admin_failed_logins = _TTLCache(maxsize=10000, ttl=ADMIN_LOCKOUT_DURATION * 2)
+else:
+    admin_failed_logins = defaultdict(list)
+
+
+def _admin_fail_append(email: str):
+    """Safely append a failed-login timestamp under TTLCache or defaultdict."""
+    try:
+        lst = admin_failed_logins[email]
+    except KeyError:
+        lst = []
+    lst.append(time.time())
+    admin_failed_logins[email] = lst
+
+
+def _admin_fail_clear(email: str):
+    try:
+        del admin_failed_logins[email]
+    except KeyError:
+        pass
 
 
 @router.post("/admin/login")
@@ -418,10 +477,13 @@ async def admin_login(credentials: UserLogin, request: Request):
 
     # Check admin lockout (stricter: 5 attempts, 15 min)
     current_time = time.time()
-    admin_failed_logins[email] = [
-        t for t in admin_failed_logins[email] if current_time - t < ADMIN_LOCKOUT_DURATION
-    ]
-    if len(admin_failed_logins[email]) >= ADMIN_LOCKOUT_THRESHOLD:
+    try:
+        _af = admin_failed_logins[email]
+    except KeyError:
+        _af = []
+    _af = [t for t in _af if current_time - t < ADMIN_LOCKOUT_DURATION]
+    admin_failed_logins[email] = _af
+    if len(_af) >= ADMIN_LOCKOUT_THRESHOLD:
         # Log suspicious activity
         try:
             await get_auth_db().suspicious_ips.insert_one({
@@ -441,7 +503,7 @@ async def admin_login(credentials: UserLogin, request: Request):
     user = await get_auth_db().users.find_one({"email": email}, {"_id": 0})
 
     if not user:
-        admin_failed_logins[email].append(time.time())
+        _admin_fail_append(email)
         # Log unknown admin attempt
         try:
             await get_auth_db().suspicious_ips.insert_one({
@@ -456,7 +518,7 @@ async def admin_login(credentials: UserLogin, request: Request):
 
     # ROLE CHECK: must be super_admin
     if not user.get("is_super_admin"):
-        admin_failed_logins[email].append(time.time())
+        _admin_fail_append(email)
         # Log role violation attempt
         try:
             await get_auth_db().suspicious_ips.insert_one({
@@ -475,7 +537,7 @@ async def admin_login(credentials: UserLogin, request: Request):
 
     # Password check
     if not verify_password(credentials.password, user.get("password", "")):
-        admin_failed_logins[email].append(time.time())
+        _admin_fail_append(email)
         try:
             await get_auth_db().suspicious_ips.insert_one({
                 "ip": client_ip,
@@ -496,7 +558,7 @@ async def admin_login(credentials: UserLogin, request: Request):
             # Signal frontend to prompt for code without burning a failed attempt
             raise HTTPException(status_code=401, detail="2fa_required")
         if not verify_totp(totp_secret, credentials.totp_code):
-            admin_failed_logins[email].append(time.time())
+            _admin_fail_append(email)
             try:
                 await get_auth_db().suspicious_ips.insert_one({
                     "ip": client_ip,
@@ -509,7 +571,7 @@ async def admin_login(credentials: UserLogin, request: Request):
             raise HTTPException(status_code=401, detail="Invalid 2FA code")
 
     # Success — clear lockout
-    admin_failed_logins[email] = []
+    _admin_fail_clear(email)
 
     # Short-lived admin JWT (8h) + rotating refresh token (7d)
     from services.totp_service import (
@@ -723,7 +785,7 @@ async def process_admin_google_session(data: dict, response: Response):
 
     try:
         auth_service_url = os.environ.get("AUTH_SERVICE_URL", "https://demobackend.emergentagent.com")
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(8.0, connect=4.0)) as client:
             auth_response = await client.get(
                 f"{auth_service_url}/auth/v1/env/oauth/session-data",
                 headers={"X-Session-ID": session_id},
@@ -855,7 +917,7 @@ async def process_google_session(data: dict, response: Response):
 
     try:
         auth_service_url = os.environ.get("AUTH_SERVICE_URL", "https://demobackend.emergentagent.com")
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(8.0, connect=4.0)) as client:
             auth_response = await client.get(
                 f"{auth_service_url}/auth/v1/env/oauth/session-data",
                 headers={"X-Session-ID": session_id},
@@ -951,7 +1013,7 @@ async def process_google_callback(data: dict, response: Response):
         auth_service_url = os.environ.get(
             "AUTH_SERVICE_URL", "https://demobackend.emergentagent.com"
         )
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(8.0, connect=4.0)) as client:
             auth_response = await client.get(
                 f"{auth_service_url}/auth/v1/env/oauth/session-data",
                 headers={"X-Session-ID": session_id},
@@ -995,11 +1057,18 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
         return {"message": "If this email exists, you will receive reset instructions."}
 
     reset_token = secrets.token_urlsafe(32)
+    # Bug-fix #11 — store ONLY the hash so a DB leak / read-only Mongo
+    # access doesn't hand attackers usable reset tokens. The plaintext
+    # token still travels in the email link; verification re-hashes the
+    # token from the URL and matches it against the stored hash.
+    import hashlib as _hl
+    token_hash = _hl.sha256(reset_token.encode("utf-8")).hexdigest()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
     await get_auth_db().password_resets.update_one(
         {"email": email},
-        {"$set": {"token": reset_token, "expires_at": expires_at.isoformat(), "used": False}},
+        {"$set": {"token_hash": token_hash, "expires_at": expires_at.isoformat(), "used": False},
+         "$unset": {"token": ""}},
         upsert=True
     )
 
@@ -1061,8 +1130,12 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
 @router.post("/reset-password")
 async def reset_password(request_data: PasswordResetConfirm):
     """Reset password with token"""
+    # Bug-fix #11 — look the token up by its sha256 hash, not plaintext.
+    import hashlib as _hl
+    token_hash = _hl.sha256(request_data.token.encode("utf-8")).hexdigest()
     reset_record = await get_auth_db().password_resets.find_one(
-        {"token": request_data.token, "used": False}, {"_id": 0}
+        {"$or": [{"token_hash": token_hash}, {"token": request_data.token}], "used": False},
+        {"_id": 0}
     )
 
     if not reset_record:
@@ -1098,7 +1171,7 @@ async def reset_password(request_data: PasswordResetConfirm):
         logging.warning(f"[RESET] secondary mirror failed: {_e}")
 
     await get_auth_db().password_resets.update_one(
-        {"token": request_data.token},
+        {"email": reset_record["email"]},
         {"$set": {"used": True}}
     )
 
@@ -1110,8 +1183,11 @@ async def reset_password(request_data: PasswordResetConfirm):
 @router.get("/verify-reset-token")
 async def verify_reset_token(token: str):
     """Verify if reset token is valid"""
+    import hashlib as _hl
+    token_hash = _hl.sha256(token.encode("utf-8")).hexdigest()
     reset_record = await get_auth_db().password_resets.find_one(
-        {"token": token, "used": False}, {"_id": 0}
+        {"$or": [{"token_hash": token_hash}, {"token": token}], "used": False},
+        {"_id": 0}
     )
 
     if not reset_record:

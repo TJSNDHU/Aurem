@@ -470,7 +470,11 @@ def _redact_env(stdout: str) -> str:
         return stdout
     SENSITIVE = ("KEY", "SECRET", "TOKEN", "PASSWORD", "MONGO_URL",
                   "STRIPE", "RESEND", "TWILIO", "JWT_SECRET",
-                  "GROQ", "OPENAI", "ANTHROPIC", "EMERGENT")
+                  "GROQ", "OPENAI", "ANTHROPIC", "EMERGENT",
+                  # Bug-fix #31 — connection strings, webhooks, and hashes
+                  # were leaking through `env` tool output.
+                  "URL", "WEBHOOK", "HASH", "PASS", "CREDENTIAL",
+                  "AUTH", "PRIVATE", "SIGNATURE", "API")
     kept = []
     for line in stdout.split("\n"):
         if "=" in line:
@@ -619,7 +623,8 @@ _WRITE_FORBIDDEN_PATTERNS = (
     "/migrations/", "/.next/", "/build/", "/dist/",
 )
 _WRITE_FORBIDDEN_FILES = (
-    ".env", ".env.local", ".env.production",
+    ".env", ".env.local", ".env.production", ".env.txt",
+    ".env.development", ".env.staging",
     "requirements.txt", "package.json", "package-lock.json", "yarn.lock",
 )
 _BACKUP_DIR = Path("/tmp/ora_backups")
@@ -2804,8 +2809,30 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
     is enforced by the council gate (safe_edit_with_council / shell_exec
     _with_council) and the git commit gate (propose_commit + founder
     approval).
+
+    Bug-fix #30 — the bare `safe_edit` and `shell_exec` tools are NOT
+    callable through this public dispatcher anymore. They remain importable
+    so the council-gated wrappers (safe_edit_with_council, shell_exec_with
+    _council) can still call them server-side after peer review, but
+    anyone hitting /api/ora-tools/execute with tool="safe_edit" gets a
+    403 — direct file writes / arbitrary subprocess from the admin panel
+    were effectively RCE.
     """
     start = time.time()
+    # Bug-fix #30 — block direct dispatch of write/exec tools.
+    _PUBLIC_DENYLIST = {"safe_edit", "shell_exec"}
+    if name in _PUBLIC_DENYLIST:
+        result = {
+            "ok": False,
+            "error": (f"tool {name!r} is gated — call "
+                       f"{name}_with_council instead (peer-review required)."),
+        }
+        elapsed_ms = int((time.time() - start) * 1000)
+        result["tool"] = name
+        result["elapsed_ms"] = elapsed_ms
+        result["ts"] = _now_iso()
+        asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+        return result
     if name not in TOOL_REGISTRY:
         result = {"ok": False, "error": f"unknown tool: {name}",
                    "available_tools": sorted(TOOL_REGISTRY.keys())}
@@ -2833,9 +2860,14 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
 
 def list_tools() -> list[dict]:
     """Public descriptor list — what ORA can call."""
+    # Bug-fix #30 — hide the denylisted bare tools from the catalog the
+    # LLM sees so it stops suggesting them. The council-gated wrappers
+    # are the only public surface for write/exec actions.
+    _HIDDEN = {"safe_edit", "shell_exec"}
     return [
         {"name": n,
          "description": meta["description"],
          "args_spec": meta["args_spec"]}
         for n, meta in TOOL_REGISTRY.items()
+        if n not in _HIDDEN
     ]

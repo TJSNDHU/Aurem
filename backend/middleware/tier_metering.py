@@ -7,7 +7,7 @@ import os
 import time
 import json
 import logging
-from collections import defaultdict
+from collections import defaultdict, deque
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,33 @@ TIER_LIMITS = {
 }
 
 DEFAULT_TIER = "professional"
+
+# Bug-fix #23 — pull the real tier from the X-Tier header (set by tenant
+# guard / auth middleware) or fall back to looking it up in the tenant
+# context. The middleware previously hard-coded "professional" so a
+# tenant on the $0 free plan got the $97 starter quota — silently.
+# Bug-fix #24 — bound the per-tenant counter dict so a flood of distinct
+# tenant_id values (or attackers spoofing headers) can't grow RAM
+# without limit. We also bound the per-tenant deque so a single chatty
+# tenant never holds more than `limit` timestamps.
+_MAX_TRACKED_TENANTS = 50_000
+
+
+def _resolve_tier_from_scope(scope: Scope, headers: dict) -> str:
+    """Resolve tier from headers / scope state. Falls back to free, not
+    professional, so an un-tiered request gets the safest cap."""
+    # Header set by tenant_guard / auth layer.
+    raw_tier = headers.get(b"x-tier")
+    if raw_tier:
+        t = raw_tier.decode("utf-8", errors="replace").strip().lower()
+        if t in TIER_LIMITS:
+            return t
+    # Fallback: scope state populated by auth middleware
+    state = scope.get("state") or {}
+    t = (state.get("tier") or "").strip().lower() if isinstance(state, dict) else ""
+    if t in TIER_LIMITS:
+        return t
+    return "free"
 
 
 class TierMeteringMiddleware:
@@ -62,10 +89,21 @@ class TierMeteringMiddleware:
             return
 
         # Check rate limit
-        tier = DEFAULT_TIER
-        limit = TIER_LIMITS.get(tier, TIER_LIMITS[DEFAULT_TIER])
+        # Bug-fix #23 — use the actual tier instead of always 'professional'.
+        tier = _resolve_tier_from_scope(scope, headers)
+        limit = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
         now = time.time()
         window = 60  # 1 minute
+
+        # Bug-fix #24 — cap the tracked-tenant dict size. Drop the oldest
+        # entry when we exceed the cap so memory stays bounded under
+        # tenant-id churn / header spoofing attempts.
+        if (tenant_id not in self._counters
+                and len(self._counters) >= _MAX_TRACKED_TENANTS):
+            try:
+                self._counters.pop(next(iter(self._counters)))
+            except StopIteration:
+                pass
 
         # Clean old entries
         self._counters[tenant_id] = [

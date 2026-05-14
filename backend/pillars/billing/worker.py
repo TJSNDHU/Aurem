@@ -27,15 +27,52 @@ _worker_tasks: list[asyncio.Task] = []
 _worker_started = False
 
 
-def _safe_task(coro, name: str) -> Optional[asyncio.Task]:
+def _safe_task(coro_or_factory, name: str, *, restart: bool = True,
+                max_restarts: int = 8, restart_delay: float = 5.0) -> Optional[asyncio.Task]:
+    """Wrap a scheduler coroutine in an exception-isolating supervisor.
+
+    Bug-fix #13 — the docstring used to claim auto-restart but the
+    implementation only logged the crash and let the task die quietly.
+    Now we honour the claim: if `coro_or_factory` is a *callable* that
+    returns a fresh coroutine each call, we re-invoke it after the
+    crash (up to max_restarts, with restart_delay between attempts).
+    If a raw coroutine is passed, we still wrap+log but cannot restart
+    (a coroutine object can only be awaited once).
+    """
+    is_factory = callable(coro_or_factory) and not asyncio.iscoroutine(coro_or_factory)
+
     async def _wrapper():
-        try:
-            await coro
-        except asyncio.CancelledError:
-            logger.info(f"[p2-worker] task '{name}' cancelled")
-            raise
-        except BaseException as exc:
-            logger.error(f"[p2-worker] task '{name}' crashed: {exc}", exc_info=True)
+        attempts = 0
+        while True:
+            try:
+                if is_factory:
+                    await coro_or_factory()
+                else:
+                    await coro_or_factory
+                # Normal completion — no restart unless factory + restart flag.
+                if not (is_factory and restart):
+                    return
+            except asyncio.CancelledError:
+                logger.info(f"[p2-worker] task '{name}' cancelled")
+                raise
+            except BaseException as exc:
+                logger.error(f"[p2-worker] task '{name}' crashed: {exc}", exc_info=True)
+                if not (is_factory and restart):
+                    return
+                attempts += 1
+                if attempts > max_restarts:
+                    logger.error(
+                        f"[p2-worker] task '{name}' exceeded {max_restarts} restarts "
+                        f"— giving up to avoid restart-loop spam"
+                    )
+                    return
+                logger.warning(
+                    f"[p2-worker] task '{name}' restarting "
+                    f"({attempts}/{max_restarts}) after {restart_delay}s"
+                )
+                await asyncio.sleep(restart_delay)
+                continue
+            # Factory completed normally — re-run on next loop iteration.
 
     task = asyncio.create_task(_wrapper(), name=f"p2:{name}")
     _worker_tasks.append(task)

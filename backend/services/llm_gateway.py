@@ -157,10 +157,20 @@ async def call_llm_with_meta(
     # Live skill broadcast — admin can push Antigravity SKILL.md playbooks
     # to ALL agents via /api/admin/antigravity-skills/broadcast. Every LLM
     # call routed through this gateway picks them up at runtime.
+    #
+    # Bug-fix #26 — `import server` here triggers a circular import the
+    # FIRST time the module loads (server imports llm_gateway, llm_gateway
+    # imports server). Python returns the half-built `server` module, so
+    # `getattr(_srv, "db", None)` is None → addendum + cache silently miss.
+    # Resolve via `sys.modules.get("server")` so we only see the module
+    # AFTER it has finished initialising, and fall back gracefully on the
+    # cold-start race.
     _db = None
     try:
-        import server as _srv  # noqa: WPS433
-        _db = getattr(_srv, "db", None)
+        import sys as _sys
+        _srv = _sys.modules.get("server")
+        if _srv is not None:
+            _db = getattr(_srv, "db", None)
     except Exception:
         _db = None
     try:

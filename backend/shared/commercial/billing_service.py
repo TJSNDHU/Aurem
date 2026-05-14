@@ -10,6 +10,8 @@ Features:
 """
 
 import os
+import asyncio
+import functools
 import stripe
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
@@ -27,6 +29,20 @@ from .workspace_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Bug-fix #12 — Stripe's official Python SDK is synchronous (urllib).
+# Every `stripe.X.Y(...)` call blocks the asyncio event loop while
+# Stripe round-trips (250-800 ms in the happy path; 30 s on timeouts).
+# In a single-worker FastAPI pod, 4 concurrent customers means the
+# health probe times out and Cloudflare returns 524. We wrap every
+# Stripe call in a run_in_executor so the loop stays responsive.
+async def _stripe_call(fn, *args, **kwargs):
+    """Run a synchronous Stripe SDK call in a thread without blocking
+    the event loop. Returns the original Stripe object so callers see
+    the exact same shape as a bare `stripe.X.Y(...)` call."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
 
 # Initialize Stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
@@ -129,11 +145,12 @@ class BillingService:
             existing = await self.collection.find_one({"business_id": business_id})
             if existing and existing.get("stripe_customer_id"):
                 # Return existing customer
-                customer = stripe.Customer.retrieve(existing["stripe_customer_id"])
+                customer = await _stripe_call(stripe.Customer.retrieve, existing["stripe_customer_id"])
                 return {"customer": customer, "existing": True}
             
             # Create Stripe customer
-            customer = stripe.Customer.create(
+            customer = await _stripe_call(
+                stripe.Customer.create,
                 email=email,
                 name=business_name,
                 metadata={
@@ -234,7 +251,8 @@ class BillingService:
                 price_id = await self._get_or_create_price(plan_key, price_config)
             
             # Create checkout session
-            session = stripe.checkout.Session.create(
+            session = await _stripe_call(
+                stripe.checkout.Session.create,
                 customer=customer_id,
                 payment_method_types=["card"],
                 line_items=[{
@@ -292,7 +310,8 @@ class BillingService:
         """Get existing price or create new one"""
         
         # Search for existing price
-        prices = stripe.Price.list(
+        prices = await _stripe_call(
+            stripe.Price.list,
             lookup_keys=[f"aurem_{plan_key}"],
             limit=1
         )
@@ -301,13 +320,15 @@ class BillingService:
             return prices.data[0].id
         
         # Create product first
-        product = stripe.Product.create(
+        product = await _stripe_call(
+            stripe.Product.create,
             name=price_config["product_name"],
             metadata={"platform": "aurem", "plan": plan_key}
         )
         
         # Create price
-        price = stripe.Price.create(
+        price = await _stripe_call(
+            stripe.Price.create,
             product=product.id,
             unit_amount=price_config["amount"],
             currency="cad",
@@ -583,7 +604,8 @@ class BillingService:
         if not billing or not billing.get("stripe_customer_id"):
             raise ValueError("No Stripe customer found")
         
-        session = stripe.billing_portal.Session.create(
+        session = await _stripe_call(
+            stripe.billing_portal.Session.create,
             customer=billing["stripe_customer_id"],
             return_url=return_url
         )

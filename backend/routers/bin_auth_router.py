@@ -231,10 +231,15 @@ class ResetPasswordRequest(BaseModel):
 # Redis-backed OTP store (falls back to in-memory for dev)
 _OTP_MEMORY = {}
 
+# Bug-fix #35 — single process-wide lock for the in-memory fallback so
+# concurrent verify-otp calls can't race the attempt counter.
+import asyncio as _asyncio_for_lock
+_OTP_ATTEMPT_LOCK = _asyncio_for_lock.Lock()
+
 
 async def _otp_store_set(key: str, value: dict, ttl_seconds: int = 600):
     try:
-        from utils.redis_pool import get_redis
+        from utils.redis_pool import get_async_redis as get_redis
         r = await get_redis()
         if r:
             import json as _json
@@ -247,7 +252,7 @@ async def _otp_store_set(key: str, value: dict, ttl_seconds: int = 600):
 
 async def _otp_store_get(key: str) -> Optional[dict]:
     try:
-        from utils.redis_pool import get_redis
+        from utils.redis_pool import get_async_redis as get_redis
         r = await get_redis()
         if r:
             import json as _json
@@ -266,7 +271,7 @@ async def _otp_store_get(key: str) -> Optional[dict]:
 
 async def _otp_store_del(key: str):
     try:
-        from utils.redis_pool import get_redis
+        from utils.redis_pool import get_async_redis as get_redis
         r = await get_redis()
         if r:
             await r.delete(key)
@@ -325,7 +330,7 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
     ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
     rl_key = f"bin_otp_rl:{user['email']}"
     try:
-        from utils.redis_pool import get_redis
+        from utils.redis_pool import get_async_redis as get_redis
         r = await get_redis()
         if r:
             cnt = await r.incr(rl_key)
@@ -383,13 +388,44 @@ async def verify_otp(body: VerifyOtpRequest):
     if not rec:
         raise HTTPException(400, "Code expired or not found. Request a new one.")
 
-    # Attempt limiting
-    attempts = int(rec.get("attempts", 0)) + 1
-    if attempts > 5:
+    # Bug-fix #35 — atomic attempt counter to close the TOCTOU window.
+    # Previously: read attempts → check → write back was non-atomic, so
+    # N concurrent verify-OTP requests could each see attempts=0 and burn
+    # N guesses before the counter advanced. Use Redis INCR (atomic) when
+    # available, fall back to a process-local lock for in-memory mode.
+    new_attempts = None
+    try:
+        from utils.redis_pool import get_async_redis as _gr
+        _r = await _gr()
+        if _r:
+            _attempts_key = f"{otp_key}:attempts"
+            new_attempts = int(await _r.incr(_attempts_key))
+            if new_attempts == 1:
+                # Pin the attempt counter TTL to match the OTP record.
+                await _r.expire(_attempts_key, 600)
+    except Exception:
+        new_attempts = None
+    if new_attempts is None:
+        # In-memory fallback — serialise via a module-level lock so the
+        # read-modify-write is at least atomic within this process.
+        async with _OTP_ATTEMPT_LOCK:
+            rec_now = await _otp_store_get(otp_key) or rec
+            new_attempts = int(rec_now.get("attempts", 0)) + 1
+            rec["attempts"] = new_attempts
+            await _otp_store_set(otp_key, rec, ttl_seconds=600)
+    else:
+        rec["attempts"] = new_attempts
+
+    if new_attempts > 5:
         await _otp_store_del(otp_key)
+        try:
+            from utils.redis_pool import get_async_redis as _gr2
+            _r2 = await _gr2()
+            if _r2:
+                await _r2.delete(f"{otp_key}:attempts")
+        except Exception:
+            pass
         raise HTTPException(429, "Too many attempts. Request a new code.")
-    rec["attempts"] = attempts
-    await _otp_store_set(otp_key, rec, ttl_seconds=600)
 
     if hashlib.sha256(body.otp.strip().encode()).hexdigest() != rec.get("otp_hash"):
         raise HTTPException(400, "Invalid code")
@@ -424,6 +460,20 @@ async def reset_password(body: ResetPasswordRequest):
     if payload.get("purpose") != "password_reset":
         raise HTTPException(400, "Invalid reset token")
 
+    # Bug-fix #33 — JTI single-use enforcement. Without this the same
+    # reset_token could be replayed within its 15-min TTL to clobber a
+    # password the legitimate user just rotated. Persist `jti` to a
+    # short-TTL collection and reject on second sighting.
+    jti = payload.get("jti")
+    if not jti:
+        raise HTTPException(400, "Invalid reset token")
+    try:
+        used = await db.bin_reset_token_jtis.find_one({"jti": jti}, {"_id": 0})
+    except Exception:
+        used = None
+    if used:
+        raise HTTPException(400, "Reset token already used")
+
     email = (payload.get("email") or "").lower()
     user = await _find_user_by_identifier(db, email)
     if not user:
@@ -435,6 +485,18 @@ async def reset_password(body: ResetPasswordRequest):
         "must_set_password": False,
         "password_reset_at": datetime.now(timezone.utc).isoformat(),
     }})
+    # Burn the jti so the same token can never be reused.
+    try:
+        await db.bin_reset_token_jtis.insert_one({
+            "jti": jti,
+            "email": email,
+            "used_at": datetime.now(timezone.utc),
+            # 15 min TTL — matches the token's own exp; index is created
+            # at startup via setup_database_indexes().
+            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=20),
+        })
+    except Exception as _e:
+        logger.warning(f"[BIN-AUTH] jti persist failed (replay protection): {_e}")
     logger.info(f"[BIN-AUTH] Password reset for {email}")
     return {"success": True}
 

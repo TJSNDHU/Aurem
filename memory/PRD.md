@@ -28,6 +28,21 @@
 >    - Provider order: `claude,groq`. Tested live: Groq dead, Claude rescued ORA (3.6s).
 
 
+> **🟢 ITER R234 (2026-02) — ROUND 2/3/4 P0 HARDENING (17 BUGS FIXED, 5 FALSE-POSITIVES REJECTED)**
+>
+> Founder pasted three rounds of LLM-generated audit reports (Bugs 10-37). After verifying every claim in the actual code:
+>
+> **REAL & FIXED (17)**: Bug 11 (reset-token hashing), 12 (Stripe run_in_executor), 13 (`_safe_task` real auto-restart), 14 (Google OAuth httpx timeouts), 17 (register DuplicateKey), 18 (`failed_logins` TTLCache), 23 (real tier resolution), 24 (counter bounded), 26 (llm_gateway circular import), 27 (founder email from env), 30 (`safe_edit`/`shell_exec` gated), 31 (env redaction expanded), 32 (`get_redis` typo), 33 (reset-token JTI single-use), 34 (`/by-session` auth), 35 (OTP TOCTOU race), 36 (`.env.txt` write-forbidden).
+>
+> **ALREADY FIXED**: 10, 19, 21, 22, 25.
+>
+> **FALSE POSITIVES**: 15, 16 (`usePersistentState.js` does not exist), 28 (`DB_NAME=aurem_db` already set), 29 (`.env` is gitignored, secret never committed).
+>
+> Tests: 18 new in `tests/test_round2_round3_round4_fixes.py`, all pass. 43/43 combined security regression pass. Dep added: `cachetools==5.5.0`.
+
+
+
+
 
 > **🟢 ITER 322fa (2026-05-12) — LEGION BRIDGE · ORA AUTONOMOUS CONTROL OF LEGION · 29 TOOLS · ZERO MOCKS**
 >
