@@ -1681,7 +1681,19 @@ async def pytest_run(path: str, *, verbose: bool = False, timeout: int = 60) -> 
         cmd = ["python3", "-m", "pytest", path]
         if verbose:
             cmd.append("-v")
-        env = {**os.environ}
+        # FIX #4 (audit iter 322fi) — never inherit parent process env.
+        # Old code: env = {**os.environ}  → STRIPE_SECRET_KEY, MONGO_URL,
+        # GROQ_API_KEY, JWT_SECRET were all visible to pytest, and one
+        # accidental print(os.environ) in a test would surface them in
+        # stdout_tail → fed back to ORA → potentially logged.
+        # New code: build a minimal env identical to what shell_exec uses.
+        env = {
+            "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/plugins-venv/bin",
+            "HOME": os.environ.get("HOME", "/root"),
+            "LANG": "C.UTF-8",
+            # pytest sometimes needs PYTHONPATH for project-local imports
+            "PYTHONPATH": os.environ.get("PYTHONPATH", "/app/backend"),
+        }
         proc = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             cwd="/app/backend", env=env,
@@ -1756,16 +1768,30 @@ async def cloudflare_dns_write(
     root = os.environ.get("CLOUDFLARE_ROOT_DOMAIN", "").strip()
     if not tok or not zone:
         return {"ok": False, "error": "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ZONE_ID missing"}
+    # FIX #5 (audit iter 322fi) — REQUIRE CLOUDFLARE_ROOT_DOMAIN.
+    # Old code: if CLOUDFLARE_ROOT_DOMAIN was unset (empty), the `if root and
+    # not fqdn.endswith(root)` check silently skipped, letting ORA write
+    # arbitrary records across the entire Cloudflare zone (e.g. hijack
+    # mail records of unrelated domains in the same zone). Now we hard-fail
+    # if the env var is missing.
+    if not root:
+        return {
+            "ok": False,
+            "error": (
+                "CLOUDFLARE_ROOT_DOMAIN env var is REQUIRED to scope writes. "
+                "Set it to e.g. 'aurem.live' so ORA cannot touch other domains."
+            ),
+        }
     if record_type.upper() not in {"A", "AAAA", "CNAME", "TXT"}:
         return {"ok": False, "error": f"unsupported record type: {record_type}"}
     if not isinstance(name, str) or not name:
         return {"ok": False, "error": "name required"}
     if not isinstance(content, str) or not content:
         return {"ok": False, "error": "content required"}
-    # Sanitise — force `name` into the configured root domain to prevent
-    # ORA from touching unrelated zones.
-    fqdn = name if "." in name else (f"{name}.{root}" if root else name)
-    if root and not fqdn.endswith(root):
+    # Force `name` into the configured root domain. With FIX #5 above, `root`
+    # is guaranteed non-empty here, so the endswith check is always enforced.
+    fqdn = name if "." in name else f"{name}.{root}"
+    if not fqdn.endswith(root):
         return {"ok": False, "error": f"name must be under CLOUDFLARE_ROOT_DOMAIN ({root})"}
     body = {
         "type": record_type.upper(), "name": fqdn, "content": content,
@@ -2150,10 +2176,24 @@ async def _ora_git_bisect(
       bad_sha: commit where the bug is present (default HEAD).
       good_sha: commit where the test passed (required).
       test_cmd: shell command that returns exit 0 if "good", non-zero if "bad".
-                E.g. `python3 -c "import services.ora_agent"` or
-                `curl -fsS http://localhost:8001/api/health`.
+                LLM-supplied — STRICTLY tokenised and validated against the
+                same whitelist that `shell_exec` uses. shell=False enforced.
+                E.g. `python3 -c "import services.ora_agent"`,
+                     `pytest /app/backend/tests/test_x.py`,
+                     `curl -fsS http://localhost:8001/api/health`.
       max_steps: safety cap on bisect iterations (default 12 → covers ~4k commits).
+
+    PATCHES (audit iter 322fi):
+      #1  Shell-injection RCE — `subprocess.run(test_cmd, shell=True)` allowed
+          ORA-generated strings to run arbitrary code (rm -rf /, exfiltrate creds,
+          bypass every other gate in this file). Now tokenised via shlex.split()
+          and validated against _SHELL_WHITELIST. shell=False enforced.
+      #3  Event-loop blocking — all subprocess.run() / check_output() calls
+          wrapped in asyncio.to_thread() so the FastAPI worker can keep
+          serving health probes, MongoDB writes, and campaign blasts during
+          a multi-minute bisect run.
     """
+    import shlex
     import subprocess
 
     if not good_sha:
@@ -2161,11 +2201,58 @@ async def _ora_git_bisect(
     if not test_cmd:
         return {"ok": False, "error": "test_cmd required — shell command, exit 0 = good"}
 
+    # ── FIX #1: tokenise + validate test_cmd against shell_exec whitelist ──
+    try:
+        argv_tokens = shlex.split(test_cmd)
+    except ValueError as e:
+        return {"ok": False, "error": f"test_cmd unparseable: {e}"}
+    if not argv_tokens:
+        return {"ok": False, "error": "test_cmd is empty after parsing"}
+
+    cmd0 = argv_tokens[0]
+    cmd_args = argv_tokens[1:]
+    if cmd0 not in _SHELL_WHITELIST:
+        return {
+            "ok": False,
+            "error": f"test_cmd binary not in whitelist: {cmd0!r}",
+            "whitelist": sorted(_SHELL_WHITELIST.keys()),
+        }
+    err = _validate_shell_args(cmd0, cmd_args)
+    if err:
+        return {"ok": False, "error": f"test_cmd validation: {err}"}
+
+    # Resolve the binary path the same way shell_exec does
+    import shutil as _sh
+    test_binary = _sh.which(cmd0) or f"/usr/bin/{cmd0}"
+    if not (Path(test_binary).is_file() and os.access(test_binary, os.X_OK)):
+        return {"ok": False, "error": f"test_cmd binary not found on host: {cmd0}"}
+    test_argv = [test_binary] + cmd_args
+
+    # Stripped env (same approach as shell_exec — no secret leakage to subprocess)
+    test_env = {
+        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/plugins-venv/bin",
+        "HOME": os.environ.get("HOME", "/root"),
+        "LANG": "C.UTF-8",
+    }
+
+    # ── FIX #3: wrap every subprocess call in asyncio.to_thread ─────────
+    async def _run(argv: list[str], *, timeout: int = 15, check: bool = False,
+                   capture: bool = True, want_text: bool = True):
+        return await asyncio.to_thread(
+            subprocess.run, argv,
+            cwd="/app", timeout=timeout, check=check,
+            capture_output=capture, text=want_text, shell=False,
+        )
+
+    async def _check_output(argv: list[str], *, timeout: int = 10) -> str:
+        return await asyncio.to_thread(
+            subprocess.check_output, argv,
+            cwd="/app", timeout=timeout, text=True,
+        )
+
     # Sanity: do NOT bisect a dirty tree.
     try:
-        dirty = subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd="/app", text=True, timeout=10,
-        ).strip()
+        dirty = (await _check_output(["git", "status", "--porcelain"], timeout=10)).strip()
         if dirty:
             return {
                 "ok": False,
@@ -2176,31 +2263,33 @@ async def _ora_git_bisect(
         return {"ok": False, "error": f"pre-check failed: {e}"}
 
     log: list[dict] = []
-    original_head = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd="/app", text=True, timeout=5,
-    ).strip()
+    try:
+        original_head = (await _check_output(
+            ["git", "rev-parse", "HEAD"], timeout=5,
+        )).strip()
+    except Exception as e:
+        return {"ok": False, "error": f"rev-parse failed: {e}"}
     log.append({"step": "start", "head": original_head[:10]})
 
     first_bad = None
     bisect_log = ""
     try:
-        # Start bisect
-        subprocess.run(["git", "bisect", "start"], cwd="/app", check=True,
-                       capture_output=True, timeout=15)
-        subprocess.run(["git", "bisect", "bad", bad_sha], cwd="/app", check=True,
-                       capture_output=True, timeout=15)
-        subprocess.run(["git", "bisect", "good", good_sha], cwd="/app", check=True,
-                       capture_output=True, timeout=15)
+        # Start bisect (all sync subprocess offloaded to thread pool)
+        await _run(["git", "bisect", "start"], timeout=15, check=True)
+        await _run(["git", "bisect", "bad", bad_sha], timeout=15, check=True)
+        await _run(["git", "bisect", "good", good_sha], timeout=15, check=True)
 
         for step in range(max_steps):
-            cur = subprocess.check_output(
-                ["git", "rev-parse", "--short=10", "HEAD"], cwd="/app", text=True, timeout=5,
-            ).strip()
+            cur = (await _check_output(
+                ["git", "rev-parse", "--short=10", "HEAD"], timeout=5,
+            )).strip()
 
-            # Run the test (best-effort — wrap in subprocess shell)
-            r = subprocess.run(
-                test_cmd, shell=True, cwd="/app",
-                capture_output=True, text=True, timeout=90,
+            # ── FIX #1+#3: run the validated test in a thread, no shell ──
+            r = await asyncio.to_thread(
+                subprocess.run, test_argv,
+                cwd="/app", timeout=90,
+                capture_output=True, text=True, shell=False,
+                env=test_env,
             )
             verdict = "good" if r.returncode == 0 else "bad"
             log.append({
@@ -2210,27 +2299,19 @@ async def _ora_git_bisect(
             })
 
             # Tell bisect
-            out = subprocess.run(
-                ["git", "bisect", verdict], cwd="/app",
-                capture_output=True, text=True, timeout=15,
-            )
+            out = await _run(["git", "bisect", verdict], timeout=15, capture=True)
             combined = (out.stdout or "") + (out.stderr or "")
             if "is the first bad commit" in combined:
-                # Parse the SHA from output.
-                import re as _re
-                m = _re.search(r"([0-9a-f]{7,40}) is the first bad commit", combined)
+                m = re.search(r"([0-9a-f]{7,40}) is the first bad commit", combined)
                 first_bad = m.group(1) if m else None
                 bisect_log = combined
                 break
             if "bisect" not in combined.lower() and not combined.strip():
-                # nothing to do
                 break
 
         # Capture full bisect log before reset.
         try:
-            bisect_log = subprocess.check_output(
-                ["git", "bisect", "log"], cwd="/app", text=True, timeout=5,
-            )
+            bisect_log = await _check_output(["git", "bisect", "log"], timeout=5)
         except Exception:
             pass
     except subprocess.CalledProcessError as e:
@@ -2238,8 +2319,7 @@ async def _ora_git_bisect(
     finally:
         # Always reset, even on error/cancel.
         try:
-            subprocess.run(["git", "bisect", "reset"], cwd="/app",
-                           capture_output=True, timeout=15)
+            await _run(["git", "bisect", "reset"], timeout=15, capture=True)
         except Exception:
             pass
 
@@ -2247,9 +2327,9 @@ async def _ora_git_bisect(
     culprit_details: dict | None = None
     if first_bad:
         try:
-            sho = subprocess.check_output(
+            sho = await _check_output(
                 ["git", "show", "--stat", "--format=%H%n%an <%ae>%n%ad%n%s%n%b",
-                 first_bad], cwd="/app", text=True, timeout=10,
+                 first_bad], timeout=10,
             )
             parts = sho.splitlines()
             culprit_details = {
@@ -2701,118 +2781,19 @@ TOOL_REGISTRY: dict[str, dict] = {
 
 
 
-# ── iter 322g ORA autonomous-ops shortcut tools ─────────────────────────
-async def _ora_campaign_status() -> dict:
-    """Live snapshot for ORA's autonomous decisions."""
-    from services.ora_tools import _db as db
-    if db is None:
-        return {"ok": False, "error": "db not wired"}
-    try:
-        cfg = await db.auto_blast_config.find_one({"tenant_id": "global"}, {"_id": 0}) or {}
-        health = await db.ora_campaign_health.find_one({"_id": "global"}, {"_id": 0}) or {}
-        autonomous_log = []
-        async for d in db.ora_autonomous_log.find({}, {"_id": 0}).sort("ts", -1).limit(5):
-            autonomous_log.append({
-                "ts": d.get("ts"), "playbook": d.get("playbook"),
-                "summary": d.get("summary"),
-            })
-        from datetime import datetime, timezone
-        today = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0).isoformat()
-        outreach_today = await db.outreach_history.count_documents(
-            {"created_at": {"$gte": today}}
-        )
-        return {
-            "ok": True,
-            "engine": {
-                "enabled": cfg.get("enabled"),
-                "last_run_at": cfg.get("last_run_at"),
-                "last_run_sent": cfg.get("last_run_sent"),
-                "last_run_processed": cfg.get("last_run_processed"),
-                "max_per_cycle": cfg.get("max_per_cycle"),
-            },
-            "watchdog": {
-                "zero_sent_streak": health.get("zero_sent_streak"),
-                "veto_rate_1h": health.get("veto_rate_1h"),
-                "tripped": health.get("tripped"),
-                "checked_at": health.get("checked_at"),
-            },
-            "outreach_events_today": outreach_today,
-            "recent_autonomous_actions": autonomous_log,
-        }
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
-
-
-async def _ora_force_blast_cycle(max_leads: int = 5) -> dict:
-    from services.ora_tools import _db as db
-    if db is None:
-        return {"ok": False, "error": "db not wired"}
-    try:
-        max_leads = max(1, min(int(max_leads), 25))
-        await db.auto_blast_config.update_one(
-            {"tenant_id": "global"},
-            {"$set": {"max_per_cycle": max_leads}},
-        )
-        from services import auto_blast_engine
-        auto_blast_engine.set_db(db)
-        r = await asyncio.wait_for(
-            auto_blast_engine.run_auto_blast_cycle(force=True), timeout=90,
-        )
-        return {
-            "ok": True,
-            "processed": r.get("total_processed"),
-            "sent": r.get("total_sent"),
-            "max_leads_used": max_leads,
-        }
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
-
-
-async def _ora_channel_gating_reseed() -> dict:
-    from services.ora_tools import _db as db
-    if db is None:
-        return {"ok": False, "error": "db not wired"}
-    try:
-        from services.ora_autonomous_ops import _autofix_channel_gating, set_db as setdb
-        setdb(db)
-        return await _autofix_channel_gating()
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
-
-
-async def _ora_git_commit_local(message: str) -> dict:
-    import subprocess
-    msg = f"ora-autofix: {message[:140]}"
-    try:
-        # stage everything
-        subprocess.run(["git", "add", "-A"], cwd="/app", check=True, timeout=20)
-        # commit (allow empty)
-        proc = subprocess.run(
-            ["git", "commit", "-m", msg, "--allow-empty"],
-            cwd="/app", check=True, capture_output=True, text=True, timeout=20,
-        )
-        # head sha
-        sha = subprocess.check_output(
-            ["git", "rev-parse", "--short=10", "HEAD"], cwd="/app", text=True, timeout=10,
-        ).strip()
-        # changed file list
-        files = subprocess.check_output(
-            ["git", "show", "--stat", "--name-only", "HEAD"],
-            cwd="/app", text=True, timeout=10,
-        )
-        changed = [ln for ln in files.splitlines() if ln and not ln.startswith("commit ")][1:6]
-        return {
-            "ok": True,
-            "sha": sha,
-            "message": msg,
-            "files_changed_preview": changed,
-            "next_step": "Founder must click 'Save to GitHub' in Emergent UI to push to remote.",
-        }
-    except subprocess.CalledProcessError as e:
-        return {"ok": False, "error": f"git: {e.stderr or e.stdout or 'unknown'}"}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+# FIX #2 (audit iter 322fi) — removed duplicate shadow definitions of
+# _ora_campaign_status / _ora_force_blast_cycle / _ora_channel_gating_reseed /
+# _ora_git_commit_local that used to live below this point. They re-imported
+# _db via `from services.ora_tools import _db as db`, which silently grabbed
+# a STALE module-level reference (whatever _db pointed to when the duplicate
+# was first imported — not when set_db() was later called). That meant:
+#   - invoke_tool("campaign_status") used the FORWARD-DECLARED upper copy
+#     (live _db reference)
+#   - direct call _ora_campaign_status() from anywhere else hit the SHADOW
+#     copy (potentially stale/None _db)
+# Result: debugging was a nightmare. Same name, two code paths, behaviour
+# differed by entry-point. Now only the forward-declared definitions above
+# (which use module-level _db directly) survive.
 
 
 async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:

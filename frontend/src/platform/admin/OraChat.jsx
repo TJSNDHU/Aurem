@@ -11,12 +11,12 @@
  * Persistence: server-side per session_id; we also cache the session_id
  * locally so refresh keeps the thread.
  */
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Crown, MessageSquare, Send, Loader2, Trash2, Copy, Check,
-  Wrench, AlertTriangle, ShieldAlert, X, Wand2, FileText, Eye,
-  RefreshCw, ChevronRight, Sparkles,
+  Crown, Send, Loader2, Trash2, Copy, Check,
+  Wrench, AlertTriangle, ShieldAlert, X, Wand2, Eye,
+  ChevronRight, Sparkles,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -96,6 +96,21 @@ export default function OraChat() {
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [error, setError] = useState(null);
   const scrollRef = useRef(null);
+  // FIX #6 (audit) — track the active copy-feedback timer so unmount or a
+  // rapid second copy cancels the pending setCopiedIdx(null) call.
+  // Without this, an unmount within 1.5s of a copy fired setState on a
+  // dead component (React dev warning, no real leak but ugly).
+  const copyTimerRef = useRef(null);
+
+  // Cleanup pending copy timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Load server-side history once at mount
   useEffect(() => {
@@ -142,7 +157,12 @@ export default function OraChat() {
         ta.select(); document.execCommand("copy"); ta.remove();
       }
       setCopiedIdx(idx);
-      setTimeout(() => setCopiedIdx((v) => (v === idx ? null : v)), 1500);
+      // Cancel any prior pending reset so rapid second copies don't race
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedIdx((v) => (v === idx ? null : v));
+        copyTimerRef.current = null;
+      }, 1500);
     } catch { /* clipboard blocked */ }
   };
 
