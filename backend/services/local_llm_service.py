@@ -19,10 +19,37 @@ db = None
 SOVEREIGN_URL = os.environ.get("OLLAMA_URL", os.environ.get("SOVEREIGN_NODE_URL", "https://sovereign.aurem.live"))
 SOVEREIGN_MODEL = os.environ.get("LOCAL_LLM_MODEL", os.environ.get("SOVEREIGN_MODEL", "llama3.1"))
 
+
+# iter 322g+ prod-guard — in production deployment (aurem.live), the
+# sovereign tunnel (sovereign.aurem.live → founder's laptop) is unreachable
+# from the pod's network, so every call returns 5xx. Without this gate the
+# circuit breaker hammers 80+ retries during startup, floods logs, and
+# starves the asyncio loop → K8s health-probe times out → deployment fails.
+# Auto-disable Sovereign entirely when running in production.
+def _is_prod() -> bool:
+    try:
+        from services.prod_guard import is_production_pod
+        return is_production_pod()
+    except Exception:
+        # Fallback signal detection if prod_guard import fails for any reason
+        if os.environ.get("AUREM_ENV", "").strip().lower() == "production":
+            return True
+        app_url = (os.environ.get("APP_URL", "") or "").lower()
+        if "aurem.live" in app_url or "reroots.ca" in app_url:
+            return True
+        return False
+
+
+_PROD_DETECTED = _is_prod()
+
 _config = {
     "ollama_url": SOVEREIGN_URL,
     "model": SOVEREIGN_MODEL,
-    "enabled": os.environ.get("LOCAL_LLM_ENABLED", "true").lower() == "true",
+    # In production, force-disable: tunnel is unreachable, and the breaker
+    # logs would otherwise spam every startup. Founder-local laptops always
+    # use preview/local env where this evaluates False.
+    "enabled": (not _PROD_DETECTED)
+               and (os.environ.get("LOCAL_LLM_ENABLED", "true").lower() == "true"),
     # iter 322ai — timeout split:
     #   "connect_timeout": fast (5s) — TCP+TLS handshake to ngrok edge.
     #       If this exceeds 5s the tunnel is effectively dead — fail fast
@@ -110,12 +137,17 @@ def get_config():
 
 
 def _is_backed_off() -> bool:
-    """Check if we're in backoff period after too many failures.
+    """Internal hot-path circuit-breaker check.
 
     iter 322p — also returns True when the service is fully disabled, so
     callers using `is_backed_off()` as a fast pre-check skip Sovereign
     entirely without paying the connect-timeout cost.
+
+    iter 322g+ prod-guard — in prod, sovereign is permanently "backed off"
+    since the tunnel doesn't reach production network. Skip ALL probes.
     """
+    if _PROD_DETECTED:
+        return True
     if not _config.get("enabled", True):
         return True
     if _config["backoff_until"] is None:
@@ -323,7 +355,12 @@ async def is_available() -> bool:
     never retries, never waits longer than 2s total. Callers that need
     cold-start tolerance should use chat_local() directly (which retries).
     If the circuit breaker is open we short-circuit to False immediately.
+
+    iter 322g+ prod-guard — in production deployment the tunnel is unreachable,
+    so probe is skipped entirely. Saves 2s × every caller × every startup.
     """
+    if _PROD_DETECTED:
+        return False
     if _is_backed_off():
         return False
     try:
@@ -341,5 +378,11 @@ async def is_available() -> bool:
     if _config["consecutive_failures"] >= BACKOFF_AFTER_FAILURES:
         from datetime import timedelta
         _config["backoff_until"] = (datetime.now(timezone.utc) + timedelta(seconds=BACKOFF_DURATION_S)).isoformat()
-        logger.warning(f"[Sovereign] Circuit breaker opened after {_config['consecutive_failures']} fails — skipping for {BACKOFF_DURATION_S}s")
+        # iter 322g+ — silence the breaker-opened spam in prod (it's expected
+        # and harmless when tunnel is intentionally unreachable). Keep it at
+        # INFO so preview/local devs still see a one-line heads-up.
+        if _PROD_DETECTED:
+            logger.debug(f"[Sovereign] breaker open (prod, expected) — {_config['consecutive_failures']} fails")
+        else:
+            logger.info(f"[Sovereign] Circuit breaker opened after {_config['consecutive_failures']} fails — skipping for {BACKOFF_DURATION_S}s")
     return False
