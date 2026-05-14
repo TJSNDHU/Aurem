@@ -717,6 +717,12 @@ async def _liveness_health():
 async def _liveness_ready():
     return {"status": "ready"}
 
+# NOTE: /api/platform/health, /api/health, /ready, /live are ALL served
+# in <1ms by `middleware/health_probe.py::HealthProbeMiddleware` at the
+# outermost ASGI layer, before any router or DB touch. Do not duplicate
+# them here — the middleware catches them first anyway, but a duplicate
+# would just be dead code.
+
 # ============= CORS - HARDENED FOR PRODUCTION =============
 _cors_raw = os.environ.get("CORS_ORIGINS", "")
 _cors_raw_stripped = _cors_raw.strip()
