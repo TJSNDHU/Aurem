@@ -14,6 +14,14 @@ if not MONGO_URL:
     logging.warning("MONGO_URL not set - database operations will fail until configured")
     
 DB_NAME = os.environ.get("DB_NAME")
+if not DB_NAME:
+    # Bug-fix: previously `os.environ.get("DB_NAME")` returned None when
+    # unset, and `client[None]` made Motor silently write to a database
+    # literally named "None" (str(None)). Fail loudly instead.
+    raise RuntimeError(
+        "DB_NAME environment variable is required — refusing to start "
+        "with a database named 'None'."
+    )
 
 # JWT Configuration — Must not CRASH the server just because the env
 # var is missing. If uvicorn's module import raises at load time, the pod

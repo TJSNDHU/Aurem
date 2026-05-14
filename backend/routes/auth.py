@@ -468,7 +468,10 @@ async def admin_login(credentials: UserLogin, request: Request):
             })
         except Exception:
             pass
-        raise HTTPException(status_code=403, detail="Access denied. Admin privileges required.")
+        # Bug-fix #10: return 401 with the same message as unknown-email
+        # so an attacker can't enumerate which emails are real accounts
+        # by diffing 401 vs 403.
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Password check
     if not verify_password(credentials.password, user.get("password", "")):

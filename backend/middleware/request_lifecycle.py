@@ -31,14 +31,24 @@ class DatabaseReadinessMiddleware:
             await self.app(scope, receive, send)
             return
         
-        # Check if db is initialized for API requests
-        if path.startswith("/api") and db is None:
-            response = JSONResponse(
-                status_code=503,
-                content={"detail": "Service is starting up, please retry in a few seconds"}
-            )
-            await response(scope, receive, send)
-            return
+        # Bug-fix #22: `db` was referenced here without ever being
+        # imported, so this ENTIRE guard raised NameError on the first
+        # non-health API request — which the ASGI stack catches as a
+        # 500 OR (depending on uvicorn config) lets through. Either way
+        # the readiness gate was dead code. Pull `db` from `server`
+        # lazily so we don't introduce an import cycle.
+        if path.startswith("/api"):
+            try:
+                from server import db as _db
+            except Exception:
+                _db = None
+            if _db is None:
+                response = JSONResponse(
+                    status_code=503,
+                    content={"detail": "Service is starting up, please retry in a few seconds"}
+                )
+                await response(scope, receive, send)
+                return
         
         await self.app(scope, receive, send)
 

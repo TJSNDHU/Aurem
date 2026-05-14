@@ -48,23 +48,37 @@ NEVER_ENCRYPT = [
 
 
 @lru_cache(maxsize=1)
-def get_fernet() -> Optional[Fernet]:
-    """Get Fernet cipher instance (cached)"""
+def _get_fernet_cached(key: str) -> Optional["Fernet"]:
+    """Internal cache keyed on the actual key value so a rotation
+    produces a different Fernet instance instead of returning the stale
+    one. Bug-fix: previously a bare `@lru_cache(maxsize=1)` on a
+    no-arg function meant every rotation silently kept the old key
+    forever — old data became unreadable and new data started using
+    the new key with no migration path."""
     if Fernet is None:
         return None
-    
+    try:
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception as e:
+        logger.error(f"[AUREM ENCRYPTION] Invalid key: {e}")
+        return None
+
+
+def get_fernet() -> Optional[Fernet]:
+    """Get Fernet cipher instance. Reads the key from the env on every
+    call so a rotation takes effect immediately; the underlying Fernet
+    object is still memoised per-key via _get_fernet_cached()."""
+    if Fernet is None:
+        return None
+
     key = os.environ.get("AUREM_ENCRYPTION_KEY")
     if not key:
         # Generate dev key
         key = Fernet.generate_key().decode()
         os.environ["AUREM_ENCRYPTION_KEY"] = key
         logger.warning("[AUREM ENCRYPTION] Generated development key")
-    
-    try:
-        return Fernet(key.encode() if isinstance(key, str) else key)
-    except Exception as e:
-        logger.error(f"[AUREM ENCRYPTION] Invalid key: {e}")
-        return None
+
+    return _get_fernet_cached(key)
 
 
 def encrypt_value(value: str) -> str:

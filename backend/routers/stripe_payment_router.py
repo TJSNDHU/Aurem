@@ -565,7 +565,19 @@ async def stripe_webhook(request: Request):
                     f"{len(secrets_list)} secret(s): {last_err} | body_len={len(body)} "
                     f"sig_t={sig_preview}"
                 )
-                # Parse anyway for visibility, but mark unverified
+                # Bug-fix #19: previously, when sig_verified was False
+                # the code logged a warning and FELL THROUGH into the
+                # normal event processing (including _activate_plan()).
+                # An attacker could POST a forged checkout.session.completed
+                # payload and activate a paid subscription for free.
+                # Refuse the request hard.
+                if not is_health_ping:
+                    return {
+                        "received": False,
+                        "error": "signature_invalid",
+                        "verified": False,
+                    }
+                # health-ping case: parse for visibility but never act on it
                 import json
                 try:
                     event = json.loads(body)
