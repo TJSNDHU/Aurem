@@ -22,6 +22,7 @@ NO writes. NO LLM calls. Just reads + counts.
 """
 from __future__ import annotations
 
+import re as _re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
@@ -60,11 +61,14 @@ async def get_overview(db) -> Dict[str, Any]:
         ("agent_actions", "ts"),
     ]:
         totals[name] = await _safe_count(db, name)
-        # 24h rollup — try datetime first, then ISO string
+        # 24h rollup — datetime query first; only fall back to ISO-string
+        # query if the datetime query actually FAILED (-1). Previous logic
+        # also fell back on a legitimate 0, wasted a query, and `max(-1,-1,0)`
+        # silently turned a double-failure into a clean zero.
         n_dt = await _safe_count(db, name, {time_field: {"$gte": cutoff_24h}})
-        if n_dt <= 0:
+        if n_dt == -1:
             n_iso = await _safe_count(db, name, {time_field: {"$gte": cutoff_iso}})
-            last24h[name] = max(n_dt, n_iso, 0)
+            last24h[name] = n_iso if n_iso >= 0 else -1
         else:
             last24h[name] = n_dt
 
@@ -126,13 +130,30 @@ async def get_pipeline_flow(db, limit: int = 10) -> Dict[str, Any]:
              "root_cause": 1, "error_snapshot": 1},
     ).sort("created_at", -1).limit(limit)
     async for r in cur:
-        # Joins (best-effort, no _id leak)
+        # Joins (best-effort, no _id leak). Bind the council decision to
+        # THIS suggestion via its error_id / source_signature instead of
+        # the previous loose regex which just grabbed the most recent
+        # council row regardless of which error it belonged to.
         sig = r.get("source_signature")
+        err_id = r.get("error_id")
+        created_at = r.get("created_at")
         council_row = None
         dev_row = None
+        _council_query: Dict[str, Any] = {"action": "sentinel_ai_diagnose"}
+        _ored = []
+        if err_id:
+            _ored.append({"error_id": err_id})
+            _ored.append({"payload.error_id": err_id})
         if sig:
+            _ored.append({"source_signature": sig})
+            _ored.append({"payload.source_signature": sig})
+        if _ored:
+            _council_query["$or"] = _ored
+            # Only consider decisions made AT or AFTER the suggestion existed.
+            if created_at is not None:
+                _council_query["ts"] = {"$gte": created_at}
             council_row = await db.council_decisions_detailed.find_one(
-                {"action": {"$regex": "sentinel_ai_diagnose"}, "ts": {"$lte": _now()}},
+                _council_query,
                 {"_id": 0, "verdict": 1, "votes": 1, "confidence": 1, "ts": 1},
                 sort=[("ts", -1)],
             )
@@ -160,7 +181,10 @@ async def get_recent_decisions(
 
     q: Dict[str, Any] = {}
     if action_filter:
-        q["action"] = {"$regex": action_filter, "$options": "i"}
+        # Escape regex metacharacters so callers can only do literal-substring
+        # (case-insensitive) matches. Without escape an admin-passed `.*`
+        # silently widened the filter to ALL rows.
+        q["action"] = {"$regex": _re.escape(action_filter), "$options": "i"}
     if verdict_filter:
         q["verdict"] = verdict_filter.upper()
 

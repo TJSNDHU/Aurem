@@ -16,12 +16,15 @@ Runs every 10 minutes via APScheduler.
 import os
 import re
 import json
+import hashlib
+import shutil
+import ast
 import subprocess
 import logging
 import asyncio
 import httpx
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,41 @@ def set_db(db):
     global _db
     _db = db
 
-# Admin phone for alerts
-ADMIN_WHATSAPP = os.environ.get("ADMIN_WHATSAPP", "+16134000000")
+# Admin phone for alerts. NO default fallback — if not configured, alerts
+# silently disable instead of leaking a stale hardcoded number into the
+# repo or sending to a wrong recipient.
+ADMIN_WHATSAPP = os.environ.get("ADMIN_WHATSAPP", "").strip()
+
+# ── Repair-storm protection ───────────────────────────────────────────
+# If more than this many repair cycles ran in the cooloff window, skip
+# this cycle. Prevents flapping (restart → break → restart → break ...).
+_REPAIR_COOLOFF_MIN = 5
+_REPAIR_COOLOFF_MAX = 3
+
+# ── pip-install allowlist ─────────────────────────────────────────────
+# Only these packages may be auto-installed by the repair loop. New names
+# must be added explicitly here. Without this an error log containing
+# `No module named 'rquests'` would have typosquat-installed malware.
+_PIP_INSTALL_ALLOWLIST = frozenset({
+    "requests", "httpx", "pymongo", "motor", "fastapi", "pydantic",
+    "aiohttp", "redis", "sqlalchemy", "pillow", "numpy", "pandas",
+    "twilio", "resend", "sendgrid", "stripe", "anthropic", "openai",
+    "google-cloud-storage", "boto3", "python-dotenv", "uvicorn",
+    "starlette", "pyjwt", "passlib", "bcrypt", "apscheduler",
+    "beautifulsoup4", "lxml", "python-multipart", "email-validator",
+})
+
+# ── WhatsApp-approval safe-command allowlist ──────────────────────────
+# When the admin approves an AI-suggested fix via WhatsApp, we still
+# refuse to pipe arbitrary AI-generated strings into /bin/sh. Only the
+# specific shapes below are accepted, exec'd as argv lists (shell=False).
+_APPROVAL_CMD_RE = re.compile(
+    r"^("
+    r"sudo supervisorctl (restart|start|stop) [A-Za-z0-9_-]{1,40}"
+    r"|pip install [A-Za-z0-9_.\-]{1,60}"
+    r"|yarn (install|build)"
+    r")$"
+)
 
 # ═══════════════════════════════════════════════════════════════════
 # KNOWN FIX PATTERNS - Applied automatically without asking admin
@@ -152,7 +188,24 @@ async def run_autonomous_repair() -> Dict[str, Any]:
     if _db is None:
         logger.warning("[AUTO_REPAIR] Database not initialized")
         return {'status': 'error', 'message': 'Database not ready'}
-    
+
+    # Repair-storm guard. If we've already burned 3+ cycles inside the
+    # last 5 min, cool off; otherwise an unstable subsystem can trigger
+    # an infinite restart→crash→restart spiral.
+    try:
+        cooloff_since = datetime.now(timezone.utc) - timedelta(minutes=_REPAIR_COOLOFF_MIN)
+        recent = await _db.auto_repair_log.count_documents(
+            {'timestamp': {'$gte': cooloff_since}}
+        )
+        if recent >= _REPAIR_COOLOFF_MAX:
+            logger.warning(
+                f"[AUTO_REPAIR] cooloff active — {recent} cycles in last "
+                f"{_REPAIR_COOLOFF_MIN}min (max {_REPAIR_COOLOFF_MAX})"
+            )
+            return {'status': 'cooloff', 'recent_cycles': recent}
+    except Exception as _cool_e:
+        logger.debug(f"[AUTO_REPAIR] cooloff check failed: {_cool_e}")
+
     logger.info("[AUTO_REPAIR] Starting autonomous repair cycle...")
     
     since = datetime.now(timezone.utc) - timedelta(minutes=15)
@@ -189,12 +242,19 @@ async def run_autonomous_repair() -> Dict[str, Any]:
         logger.info("[AUTO_REPAIR] System healthy, no repairs needed")
         return {'status': 'healthy', 'actions': []}
     
-    # Step 2 — Check for known fixes first (fast path)
+    # Step 2 — Check for known fixes first (fast path). Dedup by a hash
+    # of the message so that 5 identical "Connection refused" lines don't
+    # trigger 5 redis restarts in a single cycle.
     auto_fixed = []
     remaining_errors = []
-    
+    _seen_error_hashes: set = set()
+
     for error in errors:
         error_text = str(error.get('message', '') or error.get('error', ''))
+        _h = hashlib.md5(error_text.encode('utf-8', 'ignore')).hexdigest()
+        if _h in _seen_error_hashes:
+            continue
+        _seen_error_hashes.add(_h)
         fixed = False
         
         for fix_name, fix_data in KNOWN_FIXES.items():
@@ -308,17 +368,52 @@ async def apply_known_fix(fix_name: str, fix_data: dict, error_text: str) -> dic
             patched = []
             
             for filepath in files:
+                # Safety: make a .bak copy before any write, validate the
+                # post-patch source parses cleanly, and restore on failure.
+                # Without this, a regex-broad fix can corrupt a comment or
+                # docstring and crash the whole backend on next restart.
+                backup_path = filepath + ".bak"
                 try:
                     with open(filepath, 'r') as f:
                         content = f.read()
                     
-                    if search in content and replace not in content:
-                        new_content = content.replace(search, replace)
-                        with open(filepath, 'w') as f:
-                            f.write(new_content)
+                    if search not in content or replace in content:
+                        continue
+                    
+                    new_content = content.replace(search, replace)
+                    try:
+                        ast.parse(new_content, filename=filepath)
+                    except SyntaxError as se:
+                        logger.error(
+                            f"[AUTO_REPAIR] code_patch on {filepath} would "
+                            f"break syntax ({se}) — skipping"
+                        )
+                        continue
+
+                    shutil.copy2(filepath, backup_path)
+                    with open(filepath, 'w') as f:
+                        f.write(new_content)
+
+                    # Final guard: re-parse the on-disk file. If anything
+                    # raced between validation and write, restore.
+                    try:
+                        with open(filepath, 'r') as f:
+                            ast.parse(f.read(), filename=filepath)
                         patched.append(filepath)
+                    except SyntaxError as se2:
+                        logger.error(
+                            f"[AUTO_REPAIR] post-write syntax error on "
+                            f"{filepath} ({se2}) — restoring"
+                        )
+                        shutil.move(backup_path, filepath)
                 except Exception as e:
                     logger.warning(f"[AUTO_REPAIR] Could not patch {filepath}: {e}")
+                    # Best-effort restore if backup was made.
+                    try:
+                        if os.path.exists(backup_path):
+                            shutil.move(backup_path, filepath)
+                    except Exception:
+                        pass
             
             if patched:
                 # Restart backend to apply patch
@@ -340,6 +435,17 @@ async def apply_known_fix(fix_name: str, fix_data: dict, error_text: str) -> dic
             match = re.search(r"No module named '([^']+)'", error_text)
             if match:
                 module = match.group(1).split('.')[0]
+                # Allowlist gate — without this, a "No module named 'rquests'"
+                # in any log would let an attacker typosquat-install malware.
+                if module.lower() not in _PIP_INSTALL_ALLOWLIST:
+                    logger.warning(
+                        f"[AUTO_REPAIR] pip_install BLOCKED — '{module}' not "
+                        f"in allowlist"
+                    )
+                    return {
+                        'success': False,
+                        'reason': f"module '{module}' not in pip-install allowlist",
+                    }
                 result = subprocess.run(
                     ['pip', 'install', module],
                     capture_output=True, text=True, timeout=60
@@ -418,7 +524,15 @@ Return ONLY valid JSON, no other text."""
             system_message="You are an autonomous DevOps AI. Return ONLY valid JSON."
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
         user_msg = UserMessage(text=prompt)
-        response_text = await llm.send_message(user_msg)
+        # Hard timeout — without this, a slow/hung Claude call blocks the
+        # entire 10-min repair scheduler tick.
+        try:
+            response_text = await asyncio.wait_for(
+                llm.send_message(user_msg), timeout=30.0
+            )
+        except asyncio.TimeoutError:
+            logger.warning("[AUTO_REPAIR] AI diagnosis timed out (30s)")
+            return [{'auto_applied': False, 'description': 'AI diagnosis timeout'}]
         
         # Extract JSON from response
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
@@ -502,6 +616,9 @@ Return ONLY valid JSON, no other text."""
 
 async def request_human_approval(approval_id: str, fix: dict):
     """Sends fix to admin via WhatsApp for approval."""
+    if not ADMIN_WHATSAPP:
+        logger.debug("[AUTO_REPAIR] ADMIN_WHATSAPP not configured — skipping approval ping")
+        return
     try:
         # Import WhatsApp service (Twilio-backed)
         from services.twilio_service import send_whatsapp_message
@@ -657,6 +774,8 @@ async def test_system_health() -> dict:
 async def send_repair_report(auto_fixed: list, ai_actions: list, test_result: dict):
     """Sends summary to admin only if something happened."""
     if not auto_fixed and not ai_actions:
+        return
+    if not ADMIN_WHATSAPP:
         return
     
     try:
