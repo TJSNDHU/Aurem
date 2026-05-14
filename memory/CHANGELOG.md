@@ -7604,3 +7604,44 @@ call      400      :  1      ← Twilio rejected bad number format
 - `/api/system/uptime` returns `last_run_processed=5, last_run_sent=7, zero_sent_streak=0, leads_added=24` — campaign actively sending real leads.
 - 19 new tests in `tests/test_autonomous_stack_and_auto_repair_fixes.py`: 19/19 pass.
 - Full regression: 71/71 pass across 6 test files.
+
+---
+
+## 2026-05-14 — autonomous_repair_engine.py (5 fixes, live-proven)
+
+User LLM-flagged 6 bugs. Slow-scan + live-MongoDB verification triaged to:
+  REAL: #1, #2, #3, #5 · PREEMPTIVE: #4 · FALSE: #6.
+
+**Bug #5 (CRITICAL — the headline win):**
+- `_top_signatures` pipeline matched only BSON-datetime `ts`. Live data showed
+  `client_errors` has **mixed types: 25 datetime + 187 string out of 212** —
+  the engine was blind to 88% of real errors.
+- Fix: `$or` match on both shapes. Live proof: 20 → 206 rows covered,
+  **10.3× improvement**. The biggest real signature (187-count `backend_5xx`
+  cluster) was completely invisible to the old code.
+
+**Bug #1**: `is_enabled()` was fail-OPEN on DB exception (`return True`)
+but fail-CLOSED on `_db is None`. Inconsistent → engine could activate
+during transient DB outages. Now fail-closed in both paths.
+
+**Bug #2**: `_read_overlay()` returned `{"verdict": "green"}` on exception,
+silently masking overlay-reader failures forever. Now returns `"unknown"`,
+caller logs + emails admin and skips this cycle explicitly.
+
+**Bug #3**: `status_snapshot()` reported `actions_last_hour = len(_recent_actions)`
+without pruning, so >1h-old entries inflated the metric. Extracted
+`_prune_recent_actions()` helper, called from both `_rate_ok()` and
+`status_snapshot()`.
+
+**Bug #4 (preemptive)**: `cycle_doc.get("ts_iso")` could return None if
+`_log_event` short-circuited on `_db is None`. Currently un-triggerable
+because is_enabled returns False when db is None, but defensive fix:
+stamp `ts`/`ts_iso` on cycle_doc BEFORE calling `_log_event`.
+
+**Bug #6 (rejected)**: `_pause_flag = not flag` style note — logic correct,
+no change.
+
+**Validation:**
+- 7 new tests in `tests/test_autonomous_repair_engine_fixes.py`: 7/7 pass.
+- Full regression: 78/78 pass across 7 test files.
+- Live aggregation re-run on production `client_errors`: 10.3× coverage.

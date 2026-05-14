@@ -68,7 +68,13 @@ def _now() -> datetime:
 
 
 async def is_enabled() -> bool:
-    """Read config from DB. Default ON unless explicitly paused."""
+    """Read config from DB. Default ON unless explicitly paused.
+
+    Fail-closed: if the config read raises (transient DB error, schema
+    drift, network blip), we treat the engine as disabled. Mixing
+    fail-open on exception with fail-closed on `_db is None` was the
+    previous behaviour and could activate the loop in unsafe conditions.
+    """
     if _pause_flag:
         return False
     if _db is None:
@@ -78,10 +84,11 @@ async def is_enabled() -> bool:
             {"config_key": CONFIG_KEY}, {"_id": 0}
         )
         if not doc:
-            return True  # default ON
+            return True  # default ON when no config row exists
         return bool(doc.get("enabled", True))
-    except Exception:
-        return True
+    except Exception as e:
+        logger.warning("[auto-repair] is_enabled DB read failed — fail-closed: %s", e)
+        return False
 
 
 async def set_enabled(flag: bool, actor: str = "system") -> Dict[str, Any]:
@@ -109,9 +116,17 @@ async def set_enabled(flag: bool, actor: str = "system") -> Dict[str, Any]:
 
 def _rate_ok() -> bool:
     """Discard timestamps older than 1h; return True if under cap."""
+    _prune_recent_actions()
+    return len(_recent_actions) < MAX_ACTIONS_PER_HOUR
+
+
+def _prune_recent_actions() -> None:
+    """Drop monotonic action timestamps older than 1h. Shared by
+    _rate_ok() and status_snapshot() so the reported `actions_last_hour`
+    is never inflated by stale entries (the prior version only pruned
+    inside _rate_ok, leaving status_snapshot reading raw list length)."""
     cutoff = time.monotonic() - 3600
     _recent_actions[:] = [t for t in _recent_actions if t >= cutoff]
-    return len(_recent_actions) < MAX_ACTIONS_PER_HOUR
 
 
 def _mark_action() -> None:
@@ -132,20 +147,32 @@ async def _log_event(doc: Dict[str, Any]) -> None:
 # ── Sentinel state reader (in-process, no HTTP) ───────────────────────
 
 async def _read_overlay() -> Dict[str, Any]:
+    """Fetch sentinel overlay. On read failure, return an explicit
+    `"unknown"` verdict (not `"green"`) so the caller can react —
+    pretending green on exception was silently suppressing every repair
+    cycle whenever the overlay reader itself had a bug."""
     try:
         from routers.pillars_map_router import _fetch_sentinel_overlay
         return await _fetch_sentinel_overlay()
     except Exception as e:
         logger.warning("[auto-repair] overlay read failed: %s", e)
-        return {"verdict": "green", "errors_1h": 0}
+        return {"verdict": "unknown", "errors_1h": None, "error": str(e)[:200]}
 
 
 async def _top_signatures(limit: int = 3) -> List[Dict[str, Any]]:
     if _db is None:
         return []
     cutoff = _now() - timedelta(hours=1)
+    cutoff_iso = cutoff.isoformat()
+    # iter 281+ — `client_errors.ts` is mixed-type in prod (verified live:
+    # 25 BSON datetime rows + 187 ISO-string rows out of 212). Matching
+    # only datetime ignored ~88% of real errors → engine appeared
+    # always-clean. Match BOTH shapes so 100% of recent errors are seen.
     pipeline = [
-        {"$match": {"ts": {"$gte": cutoff}}},
+        {"$match": {"$or": [
+            {"ts": {"$gte": cutoff}},
+            {"ts": {"$gte": cutoff_iso}},
+        ]}},
         {"$group": {
             "_id": "$signature_hash",
             "count": {"$sum": 1},
@@ -425,6 +452,13 @@ async def _run_cycle_once_inner() -> Dict[str, Any]:
         "signatures_handled": len(actions),
         "actions": actions,
     }
+    # Bug #4 preemptive fix: stamp ts/ts_iso on the dict ourselves
+    # so the returned `cycle_ts` is always a stable ISO string, even
+    # if _log_event short-circuits (e.g., db disconnected between
+    # is_enabled() check and now).
+    _ts = _now()
+    cycle_doc["ts"] = _ts
+    cycle_doc["ts_iso"] = _ts.isoformat()
     await _log_event(cycle_doc)
 
     # Self-report
@@ -483,6 +517,11 @@ async def status_snapshot() -> Dict[str, Any]:
             )
         except Exception:
             pass
+    # Bug #3 fix: prune stale entries BEFORE counting so the reported
+    # value reflects the true last-hour window. Previously this read
+    # raw list length which could be inflated by entries >1h old until
+    # _rate_ok() happened to run.
+    _prune_recent_actions()
     actions_last_hr = len(_recent_actions)
     return {
         "enabled": enabled,
