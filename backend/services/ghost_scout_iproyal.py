@@ -40,7 +40,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-from bs4 import BeautifulSoup
 
 logger = logging.getLogger("ghost_scout_iproyal")
 
@@ -100,13 +99,15 @@ def _normalize_phone(p: str) -> str:
     if not p:
         return ""
     digits = re.sub(r"[^\d]", "", p)
+    # Reject obvious garbage (too short, or too long to be a real phone number).
+    # ITU E.164 caps national numbers at 15 digits.
+    if not (10 <= len(digits) <= 15):
+        return ""
     if len(digits) == 10:
         return f"+1{digits}"
     if len(digits) == 11 and digits.startswith("1"):
         return f"+{digits}"
-    if len(digits) >= 10:
-        return f"+{digits}"
-    return ""
+    return f"+{digits}"
 
 
 # ── Email/phone harvest from business website ────────────────────────

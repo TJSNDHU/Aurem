@@ -44,12 +44,11 @@ ALL data is DB-only — runs the same in preview AND production.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger("system_uptime")
@@ -77,12 +76,16 @@ def _get_db() -> AsyncIOMotorDatabase | None:
     return _db
 
 
-async def _safe_count(coll, query: dict) -> int:
+async def _safe_count(coll, query: dict) -> int | None:
+    """Count documents safely. Returns None on failure (NOT -1) so callers
+    can distinguish 'query failed' from 'genuinely zero' — masking DB
+    errors as zero was previously flipping health to 'healthy' on outages.
+    """
     try:
         return await coll.count_documents(query)
     except Exception as e:
         logger.warning(f"[uptime] count failed: {e}")
-        return -1
+        return None
 
 
 @router.get("/uptime")
@@ -99,10 +102,12 @@ async def system_uptime() -> dict[str, Any]:
         env = "unknown"
 
     if db is None:
-        return {
-            "ts": now_iso, "env": env,
-            "error": "db_not_ready",
-        }
+        # Surface DB outage to monitoring (returning 200 here was hiding
+        # real production downtime from the phone monitor's SLA graph).
+        raise HTTPException(
+            status_code=503,
+            detail={"ts": now_iso, "env": env, "error": "db_not_ready"},
+        )
 
     since_24h = (now_dt - timedelta(hours=24)).isoformat()
     since_today = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
@@ -134,6 +139,9 @@ async def system_uptime() -> dict[str, Any]:
     enabled = bool(cfg.get("enabled"))
     if not enabled:
         campaign_health = "stopped"
+    elif sent_24h is None:
+        # DB query failed — surface as error, not 'healthy'
+        campaign_health = "error"
     elif tripped or sent_24h == 0:
         campaign_health = "degraded"
     else:
@@ -144,7 +152,13 @@ async def system_uptime() -> dict[str, Any]:
         {"_id": "global"}, {"_id": 0, "last_poll_ts": 1}
     )
     last_ts = float((daemon_doc or {}).get("last_poll_ts") or 0)
-    age_s: int | None = int(time.time() - last_ts) if last_ts else None
+    # Clamp age_s to >=0 to defend against clock skew / future-dated
+    # heartbeats that would otherwise flip status to 'stale' incorrectly.
+    if last_ts:
+        _delta = time.time() - last_ts
+        age_s: int | None = max(0, int(_delta))
+    else:
+        age_s = None
     if age_s is None:
         ora_status = "never"
         daemon_alive = False

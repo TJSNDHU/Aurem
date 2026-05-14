@@ -63,7 +63,19 @@ async def _auto_verify_lead(db, lead: Dict[str, Any]) -> Dict[str, Any]:
         name = lead.get("business_name") or ""
         city = lead.get("city") or ""
         addr = lead.get("address") or ""
-        country = "ca" if ("ON" in addr or city.lower() in (
+        # Country inference. Earlier version used `"ON" in addr` which false-
+        # matched BOSTON / BRANDON / JOHNSTON. Now we check for a proper
+        # Canadian province token (comma- or space-delimited) plus the
+        # explicit Canadian city allowlist.
+        _addr_upper = addr.upper()
+        _ca_provinces = ("ON", "QC", "BC", "AB", "SK", "MB", "NB", "NS",
+                         "PE", "NL", "NT", "NU", "YT")
+        _ca_province_hit = any(
+            f", {p}" in _addr_upper or f" {p} " in _addr_upper
+            or _addr_upper.endswith(f" {p}") or _addr_upper.endswith(f",{p}")
+            for p in _ca_provinces
+        )
+        country = "ca" if (_ca_province_hit or city.lower() in (
             "toronto", "brampton", "mississauga", "ottawa", "vancouver",
             "calgary", "edmonton", "montreal", "quebec"
         )) else "us"

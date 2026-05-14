@@ -7547,3 +7547,31 @@ call      400      :  1      ← Twilio rejected bad number format
    "scrapling_installed":true, "stealth_available":true}
   ```
   → Scrapling lib + Stealth available; current preview env using httpx fallback as it lacks Playwright browsers (handled cleanly). Production deploy will run `scrapling install` to enable AsyncFetcher + AsyncStealthySession directly.
+
+---
+
+## 2026-05-14 — Tonight Campaign Rescue (P0)
+
+**Symptom**: `zero_sent_streak=274`, watchdog tripped, founder asked "tonight campaign success rate? r you sure?"
+
+**Real root cause** (vs LLM-list assumptions):
+1. Lead pool poisoned — 958/1033 unblasted leads were `awb_e2e_test` fixtures or pre-iter-282u Wikipedia/AutoZone scrape residue → noise-filtered correctly.
+2. The 25 remaining "contactable" test fixtures all shared `tjautoclinic@gmail.com` which is in the DNC list → 100% filtered.
+3. Ghost Scout autonomous loop WAS started via `server.py:2222` (LLM review's "Bug #13: loop never started" was a false positive — agent verified by grep before touching).
+
+**Fixes shipped**:
+- `services/ghost_scout_iproyal.py` — removed unused `bs4` import; `_normalize_phone` now bounds digit length to E.164 range (10–15) instead of accepting any 10+ string.
+- `services/auto_blast_engine.py` — country inference no longer false-positives on "ON" substring (BOSTON / BRANDON / JOHNSTON). Now checks all 13 Canadian province codes with proper delimiter context.
+- `routers/system_uptime_router.py` — `_safe_count` returns `None` (not `-1`) on DB failure; health flips to `"error"` instead of masking as healthy; `/api/system/uptime` raises HTTP 503 on db_not_ready (was silently returning 200); `age_s` clamped to ≥0 against clock skew; removed unused `os` import.
+- DB cleanup — 28 `awb_e2e_test` poison fixtures suppressed; `ora_campaign_health` streak reset to 0.
+
+**Verification**:
+- Ghost Scout manual harvest produced 15 fresh real Canadian/US leads in 90s (dentists in Hamilton, hvac in Pittsburgh).
+- `_eligible_leads(db, 5)` now returns 5 real businesses (Walk-In Notary, Canada Legal Services, Chan Law, etc).
+- `run_auto_blast_cycle(force=True)` → `processed=5, sent=10` (email+SMS each).
+- 33 prior + 19 new regression tests all pass (`tests/test_tonight_campaign_fixes.py`).
+
+**LLM bug-review triage** (saved for context):
+- ghost_scout_iproyal.py: 2 of 15 reported real (`bs4`, phone bounds); rest false-positive or over-engineering.
+- auto_blast_engine.py: 1 of 20 reported real (country "ON" false-positive); others either fictional or rejected per "minimum needed complexity" coding guideline.
+- system_uptime_router.py: 4 of 23 reported real (`_safe_count` masking, age_s negative, HTTP 200 on outage, unused `os`); rest over-engineering.
