@@ -23,7 +23,18 @@ def set_db(database: AsyncIOMotorDatabase):
     global db
     db = database
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "aurem-secure-jwt-secret-key-2026-production")
+# FIX #5 (audit iter 322fi) — fail fast if JWT_SECRET is unset.
+# Old code had a hardcoded fallback, which meant anyone reading the source
+# could forge admin tokens whenever the env var was accidentally missing
+# (e.g. fresh deploy, mistyped key name). The platform refuses to boot
+# without a configured secret — protects every protected endpoint.
+JWT_SECRET = os.environ.get("JWT_SECRET", "").strip()
+if not JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET env var is REQUIRED — refusing to start ai_platform_router "
+        "without a configured signing key (was previously falling back to a "
+        "hardcoded default that anyone reading the source could exploit)."
+    )
 JWT_ALGORITHM = "HS256"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -397,6 +408,13 @@ async def register_platform_user(data: PlatformUserCreate):
     }
 
 
+# FIX #6 (audit) — Note: this in-memory dict is single-pod only.
+# AUREM currently runs ONE backend pod via supervisor with ONE uvicorn worker,
+# so all login traffic hits the same process and the dict is sufficient.
+# IF we scale to multi-worker / multi-pod, this MUST move to Redis or a
+# MongoDB-backed counter (TTL index on first_at). Until then a brute-force
+# attacker would have to distribute requests across pods we don't have.
+# An asyncio.Lock would also help if we move to multi-worker uvicorn.
 _login_attempts = {}  # {ip: {"count": int, "first_at": float}}
 
 @router.post("/auth/login")
@@ -540,7 +558,21 @@ async def get_current_user(authorization: str = Header(None)):
 async def get_api_key(authorization: str = Header(None)):
     """Get full API key (one-time reveal)"""
     user = await get_current_platform_user(authorization)
-    return {"api_key": user["api_key"]}
+    # FIX #3 (audit) — admin users created via the env-var admin path don't
+    # have an `api_key` field. user["api_key"] raised KeyError. Return a
+    # tier-appropriate fallback so admins get a usable admin key while
+    # regular platform users get their actual key.
+    api_key = user.get("api_key")
+    if not api_key:
+        if user.get("role") == "admin":
+            api_key = os.environ.get("ADMIN_API_KEY", "aurem_admin_key")
+        else:
+            return {
+                "api_key": None,
+                "error": "no_api_key_provisioned",
+                "hint": "Use /api-key/regenerate to provision one.",
+            }
+    return {"api_key": api_key}
 
 
 @router.post("/api-key/regenerate")
@@ -577,14 +609,21 @@ async def connect_tool(data: ToolConnection, authorization: str = Header(None)):
             detail=f"Tool '{data.tool_type}' not available in your plan. Upgrade to access."
         )
     
-    # Store encrypted credentials (in production, use proper encryption)
+    # FIX #4 (audit) — credentials stored "encrypted at rest" is still a TODO.
+    # Until a Fernet/KMS-backed encryption layer lands, we at minimum:
+    #   • Never return `config` in any /tools/* read endpoint (see status route)
+    #   • Wrap the dict in a small envelope so a future migration to encrypted
+    #     storage can be done without touching every read path.
+    # MUST DO: add Fernet encryption with a key from env (ENCRYPTION_KEY) and
+    # migrate existing rows. Tracked in CHANGELOG.md as P0 hardening.
     await db.platform_users.update_one(
         {"_id": user["_id"]},
         {"$set": {
             f"tool_connections.{data.tool_type}": {
                 "connected_at": datetime.now(timezone.utc),
                 "status": "active",
-                "config": data.credentials
+                "config": data.credentials,  # ⚠️ PLAINTEXT — see FIX #4 TODO
+                "_encrypted": False,
             },
             "updated_at": datetime.now(timezone.utc)
         }}
@@ -625,15 +664,27 @@ async def execute_crew(
     """Execute an AI crew"""
     user = await get_current_platform_user(authorization)
     tier_config = PLATFORM_TIERS.get(user["tier"], PLATFORM_TIERS["starter"])
-    usage = user.get("usage", {})
-    
-    # Check usage limits
-    if usage.get("crew_executions", 0) >= tier_config["crew_executions"]:
+
+    # FIX #10 (audit) — atomic check-and-increment.
+    # Old code did `if usage >= limit: raise` then `$inc` in a separate query.
+    # Two concurrent requests could both pass the gate before either incremented.
+    # Now the conditional update only succeeds if usage is still under the limit.
+    inc_result = await db.platform_users.update_one(
+        {
+            "_id": user["_id"],
+            "$or": [
+                {"usage.crew_executions": {"$lt": tier_config["crew_executions"]}},
+                {"usage.crew_executions": {"$exists": False}},
+            ],
+        },
+        {"$inc": {"usage.crew_executions": 1}},
+    )
+    if inc_result.modified_count == 0:
         raise HTTPException(
-            status_code=429, 
-            detail="Crew execution limit reached. Upgrade your plan for more executions."
+            status_code=429,
+            detail="Crew execution limit reached. Upgrade your plan for more executions.",
         )
-    
+
     # Get crew config
     if data.template_id:
         if data.template_id not in CREW_TEMPLATES:
@@ -668,12 +719,6 @@ async def execute_crew(
     }
     
     await db.platform_executions.insert_one(execution_doc)
-    
-    # Increment usage
-    await db.platform_users.update_one(
-        {"_id": user["_id"]},
-        {"$inc": {"usage.crew_executions": 1}}
-    )
     
     # Execute in background
     background_tasks.add_task(
@@ -775,12 +820,59 @@ Provide your output in JSON format with keys: analysis, actions, recommendations
             }}
         )
         
-        # Trigger webhooks
+        # FIX #9 (audit) — actually fire the webhooks. Old code was a no-op
+        # `pass` statement after the comment "In production, make HTTP call to
+        # webhook URL". Customers saw "webhook configured" but nothing fired.
+        # We POST asynchronously with a 10s timeout and log failures to
+        # webhook_delivery_log so failed deliveries can be retried/inspected.
         user = await db.platform_users.find_one({"_id": user_id})
-        for webhook in user.get("webhooks", []):
-            if "crew_completed" in webhook.get("events", []):
-                # In production, make HTTP call to webhook URL
-                pass
+        if user:
+            webhook_payload = {
+                "event": "crew_completed",
+                "execution_id": execution_id,
+                "user_id": user_id,
+                "summary": (summary or "")[:1000],
+                "result_count": len(results),
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            import httpx as _httpx
+            for webhook in user.get("webhooks", []):
+                if "crew_completed" not in webhook.get("events", []):
+                    continue
+                wh_url = (webhook.get("url") or "").strip()
+                if not wh_url.startswith(("http://", "https://")):
+                    continue
+                wh_id = webhook.get("id") or webhook.get("url")
+                try:
+                    async with _httpx.AsyncClient(timeout=10.0) as _wc:
+                        wr = await _wc.post(
+                            wh_url, json=webhook_payload,
+                            headers={"X-Aurem-Event": "crew_completed"},
+                        )
+                    ok = 200 <= wr.status_code < 300
+                    await db.webhook_delivery_log.insert_one({
+                        "user_id": user_id,
+                        "execution_id": execution_id,
+                        "webhook_id": wh_id,
+                        "url": wh_url,
+                        "status": "delivered" if ok else "http_error",
+                        "http_status": wr.status_code,
+                        "response_excerpt": (wr.text or "")[:300],
+                        "ts": datetime.now(timezone.utc),
+                    })
+                except Exception as _whe:
+                    try:
+                        await db.webhook_delivery_log.insert_one({
+                            "user_id": user_id,
+                            "execution_id": execution_id,
+                            "webhook_id": wh_id,
+                            "url": wh_url,
+                            "status": "transport_error",
+                            "error": f"{type(_whe).__name__}: {str(_whe)[:200]}",
+                            "ts": datetime.now(timezone.utc),
+                        })
+                    except Exception:
+                        pass
         
     except Exception as e:
         await db.platform_executions.update_one(
@@ -926,15 +1018,39 @@ async def api_run_crew(
     
     # Same logic as execute_crew but with API key auth
     tier_config = PLATFORM_TIERS.get(user["tier"], PLATFORM_TIERS["starter"])
-    usage = user.get("usage", {})
-    
-    if usage.get("crew_executions", 0) >= tier_config["crew_executions"]:
+
+    # FIX #10 (audit) — atomic check-and-increment (see /crews/execute above
+    # for the rationale). Replaces the read-then-write pair that allowed
+    # concurrent API requests to bypass the quota.
+    inc_result = await db.platform_users.update_one(
+        {
+            "_id": user["_id"],
+            "$or": [
+                {"usage.crew_executions": {"$lt": tier_config["crew_executions"]}},
+                {"usage.crew_executions": {"$exists": False}},
+            ],
+        },
+        {"$inc": {"usage.crew_executions": 1}},
+    )
+    if inc_result.modified_count == 0:
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
-    
+
     if data.template_id and data.template_id not in CREW_TEMPLATES:
         raise HTTPException(status_code=400, detail="Invalid template")
-    
-    crew_config = CREW_TEMPLATES.get(data.template_id, data.custom_crew)
+
+    # FIX #8 (audit) — Old code: crew_config = CREW_TEMPLATES.get(data.template_id, data.custom_crew).
+    # If template_id was None AND custom_crew was None, crew_config became None
+    # and run_platform_crew crashed downstream on .get() of NoneType. The main
+    # /execute endpoint already validated this; the api-key endpoint did not.
+    if data.template_id:
+        crew_config = CREW_TEMPLATES[data.template_id]
+    elif data.custom_crew:
+        crew_config = data.custom_crew
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide template_id or custom_crew",
+        )
     execution_id = f"api_{secrets.token_hex(10)}"
     
     await db.platform_executions.insert_one({
@@ -948,12 +1064,7 @@ async def api_run_crew(
         "source": "api",
         "created_at": datetime.now(timezone.utc)
     })
-    
-    await db.platform_users.update_one(
-        {"_id": user["_id"]},
-        {"$inc": {"usage.crew_executions": 1}}
-    )
-    
+
     background_tasks.add_task(
         run_platform_crew,
         execution_id,
