@@ -88,6 +88,19 @@ def start_pillar1_worker(db, news_monitor_coro_factory=None) -> dict:
         failed.append({"task": "ora_campaign_watchdog", "error": str(e)})
         print(f"[p1-worker] ✗ ORA Campaign Watchdog failed: {e}", flush=True)
 
+    # ---- Legion Queue Stale-Approval Sweeper — auto-reject HIGH-risk
+    # jobs that the operator never approved within HIGH_TIMEOUT_S so the
+    # queue can't accumulate dead `awaiting_approval` rows forever.
+    try:
+        from services.legion_queue import expire_stale_approvals_loop, set_db as set_lq_db
+        set_lq_db(db)
+        _safe_task(expire_stale_approvals_loop(), "legion_queue_expirer")
+        started.append("legion_queue_expirer (60s poll)")
+        print("[p1-worker] ✓ Legion queue expirer attached", flush=True)
+    except Exception as e:
+        failed.append({"task": "legion_queue_expirer", "error": str(e)})
+        print(f"[p1-worker] ✗ Legion queue expirer failed: {e}", flush=True)
+
     # ---- Ollama Model Warmer (DISABLED iter 322g — daemon is single-threaded;
     # warmer pings were jamming the queue. qwen2.5:7b-instruct stays in
     # RAM for ~5min after last use by Ollama's default keepalive, which

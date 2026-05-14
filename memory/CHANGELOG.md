@@ -7645,3 +7645,67 @@ no change.
 - 7 new tests in `tests/test_autonomous_repair_engine_fixes.py`: 7/7 pass.
 - Full regression: 78/78 pass across 7 test files.
 - Live aggregation re-run on production `client_errors`: 10.3× coverage.
+
+---
+
+## 2026-05-14 — 13 Background-Loop Bugs Triaged & Fixed
+
+User asked to fix the 13 background-loop bugs from earlier handoff. After
+slow re-scan of current source (some had already been fixed in prior
+sessions), triage:
+
+**REAL & FIXED (5):**
+
+1. **`ora_autonomous_ops.py` watchdog_autofix_loop — no `_db is None` guard.**
+   Previously the very first tick after a cold start did
+   `_db.ora_campaign_health.find_one(...)` directly; if set_db hadn't
+   been called yet, AttributeError killed the loop until
+   pillar_orchestrator restarted it. Now guards + falls through to a
+   normal-interval sleep.
+
+2. **`ora_autonomous_ops.py` _warm_ollama_once — DB find_one had no timeout.**
+   Wrapped in `asyncio.wait_for(timeout=5.0)` so a flaky Mongo primary
+   can't jam this 6h-interval loop for hours.
+
+3. **`ora_autonomous_ops.py` watchdog_autofix_loop — no error backoff.**
+   Sustained downstream outages re-ran every 90s. Added exponential
+   backoff doubling up to 30 min, resets on healthy tick.
+
+4. **`sovereign_watchdog.py` boot_race regex — greedy `.*\/health`.**
+   With `re.S` it could swallow newlines and consume past the intended
+   match. Changed to non-greedy `.*?/health`. Test pins the behaviour
+   with both a normal line and a double-`/health` adversarial line.
+
+5. **`ora_autonomous_ops.py` autofix_restart failures were silent.**
+   `_autofix_restart_blast()` returning `ok=False` only went into the
+   audit doc. Now also emits `logger.error("restart_blast FAILED ...")`.
+
+**WIRED ORPHANED CODE (1):**
+
+6. **`legion_queue.py` expire_stale_approvals was never called.**
+   Function existed but no caller. Added `expire_stale_approvals_loop`
+   60s poll, wired into Pillar 1 worker (`start_pillar1_worker`).
+   Verified live: `[p1-worker] ✓ Legion queue expirer attached`
+   in supervisor log after restart; live Mongo test seeded a 1h-old
+   stale row and confirmed it flipped to `rejected/approval_timeout`.
+
+**ALREADY FIXED in prior sessions (verified, not touched):**
+- `system_uptime_router._safe_count` returns None on failure (done in
+  tonight-campaign-rescue commit).
+- `system_uptime_router.signups_today` ISO-string vs datetime fix
+  (FIX #12 comment in source).
+- `_auto_verify_lead` already has wait_for + exception handling.
+- `auto_blast_engine._get_db` import-server pattern: cheap after Python
+  caches module — not a real perf issue.
+
+**REJECTED with reason:**
+- "Telegram approval should be awaited, not fire-and-forget" — would
+  block job enqueue on a flaky external API. Correct as-is.
+- "ora_campaign_watchdog init document at startup" — already uses
+  `or {}` fallback; zero_streak correctly starts at 0.
+- "ValueError in tz parsing" — already in outer try/except Exception.
+
+**Validation:**
+- 10 new tests in `tests/test_background_loop_bug_fixes.py` → 10/10 pass.
+- Includes a live-Mongo integration test for `expire_stale_approvals`.
+- Full regression: **88/88** pass across 8 test files.

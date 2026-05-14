@@ -159,3 +159,26 @@ async def expire_stale_approvals() -> int:
         {'$set': {'status': 'rejected', 'reject_reason': 'approval_timeout'}}
     )
     return result.modified_count
+
+
+# Background loop — runs forever inside Pillar 1 worker so HIGH-risk jobs
+# that the operator never approved (Telegram missed, asleep, etc.) auto-
+# reject after `HIGH_TIMEOUT_S` instead of jamming the queue forever.
+async def expire_stale_approvals_loop(poll_s: int = 60) -> None:
+    while True:
+        try:
+            if _db is not None:
+                n = await expire_stale_approvals()
+                if n:
+                    import logging
+                    logging.getLogger("legion_queue").info(
+                        "[legion-queue] expired %d stale approvals", n
+                    )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            import logging
+            logging.getLogger("legion_queue").warning(
+                "[legion-queue] expire loop err: %s", e
+            )
+        await asyncio.sleep(poll_s)

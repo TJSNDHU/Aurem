@@ -135,7 +135,7 @@ _PATTERNS: List[Tuple[re.Pattern, str, str, str]] = [
         "pillar_restart",    "high",  "pillar_failed"),
     (re.compile(r"\[STARTUP\]\s*✗\s*Pillar", re.I),
         "pillar_restart",    "high",  "pillar_failed"),
-    (re.compile(r"connect\(\)\s+failed\s+\(111[^)]*\)\s+while connecting to upstream.*\/health", re.I | re.S),
+    (re.compile(r"connect\(\)\s+failed\s+\(111[^)]*\)\s+while connecting to upstream.*?/health", re.I | re.S),
         "noop_log_only",     "info",  "boot_race"),
     (re.compile(r"PymongoServerSelectionTimeout|ServerSelectionTimeoutError", re.I),
         "db_ping",           "high",  "mongo_timeout"),

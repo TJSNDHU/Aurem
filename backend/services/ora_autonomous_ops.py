@@ -87,7 +87,20 @@ async def _warm_ollama_once() -> dict:
 
     # Skip if daemon is dead.
     if _db is not None:
-        s = await _db.legion_daemon_status.find_one({"_id": "global"}, {"_id": 0, "last_poll_ts": 1})
+        # Bug-fix: bound the DB poll. find_one without an explicit timeout
+        # can hang indefinitely if the Mongo driver loses its primary
+        # mid-tick, which would jam this loop for the full 6h interval.
+        try:
+            s = await asyncio.wait_for(
+                _db.legion_daemon_status.find_one(
+                    {"_id": "global"}, {"_id": 0, "last_poll_ts": 1}
+                ),
+                timeout=5.0,
+            )
+        except asyncio.TimeoutError:
+            return {"ok": False, "error": "db query timeout"}
+        except Exception as e:
+            return {"ok": False, "error": f"db query: {e}"}
         last = float((s or {}).get("last_poll_ts") or 0)
         if not last or (time.time() - last) > 120:
             return {"ok": False, "error": "daemon offline"}
@@ -241,8 +254,17 @@ async def watchdog_autofix_loop() -> None:
     print(f"[autonomous-autofix] alive — polling every {AUTOFIX_INTERVAL_S}s "
           f"(pure DB, runs in both preview + prod)", flush=True)
     await asyncio.sleep(40)
+    _err_backoff = AUTOFIX_INTERVAL_S
     while True:
         try:
+            # Bug-fix: guard against `_db` not being wired yet during a
+            # cold pod start. Previously this raised AttributeError on
+            # the very first tick and killed the whole loop until
+            # pillar_orchestrator restarted it.
+            if _db is None:
+                await asyncio.sleep(AUTOFIX_INTERVAL_S)
+                continue
+
             h = await _db.ora_campaign_health.find_one({"_id": "global"}, {"_id": 0}) or {}
             tripped = h.get("tripped") or []
             streak = int(h.get("zero_sent_streak") or 0)
@@ -257,10 +279,18 @@ async def watchdog_autofix_loop() -> None:
                     )
                     a = await _autofix_channel_gating()
                     b = await _autofix_restart_blast()
+                    # Bug-fix: surface autofix-restart failures explicitly
+                    # — previously they were silently buried inside the
+                    # _log_action audit doc with no operator alert.
+                    if not b.get("ok"):
+                        logger.error(
+                            f"[autonomous-autofix] restart_blast FAILED — "
+                            f"{b.get('error')}"
+                        )
                     await _log_action(
                         "zero_sent_autofix",
                         f"streak={streak} → seeded={a.get('fixed')} purged={a.get('purged')} "
-                        f"restart_sent={b.get('sent')}",
+                        f"restart_ok={b.get('ok')} restart_sent={b.get('sent')}",
                         streak=streak, autofix_seed=a, autofix_restart=b,
                     )
 
@@ -278,8 +308,15 @@ async def watchdog_autofix_loop() -> None:
                         veto_rate=veto_rate, autofix_seed=a,
                     )
 
+            # Healthy tick — reset error backoff window.
+            _err_backoff = AUTOFIX_INTERVAL_S
         except asyncio.CancelledError:
             raise
         except Exception as e:
             logger.error(f"[autonomous-autofix] loop err: {e}", exc_info=True)
+            # Bug-fix: exponential backoff (capped at 30 min) so a sustained
+            # downstream outage doesn't hammer Mongo every 90 s.
+            _err_backoff = min(_err_backoff * 2, 1800)
+            await asyncio.sleep(_err_backoff)
+            continue
         await asyncio.sleep(AUTOFIX_INTERVAL_S)
