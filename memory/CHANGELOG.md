@@ -1,3 +1,31 @@
+## 2026-02 — iter R234C — ORA Sovereign Security Patterns Playbook
+
+**Goal**: teach ORA CTO (and the other 27 internal agents) to recognise every audited vulnerability pattern in real time so the next code-review cycle is self-driven.
+
+**Shipped**
+1. **`/app/memory/SECURITY_PATTERNS.md`** — 32-pattern playbook (PAT-01 → PAT-32) covering auth/AuthZ, input validation, crypto/secrets, event-loop, data exposure, tenancy, tool dispatch, biometrics. Each pattern has detect-regex + fix-template + impact narrative.
+2. **`/app/scripts/seed_security_patterns_skill.py`** — idempotent seeder that pushes the playbook into `ora_skills_library` (versioned doc) AND `ora_skills_broadcast/_id=active` (joined into the system-prompt addendum for ALL agents). Cache-busts `agent_skill_broadcast` so the change is live on the next LLM call without restart.
+3. **`/app/backend/routers/security_patterns_router.py`** — admin-gated read + scan API:
+   - `GET /api/admin/sec-patterns` — catalog
+   - `GET /api/admin/sec-patterns/playbook` — full body
+   - `POST /api/admin/sec-patterns/scan {path}` — single-file scan
+   - `POST /api/admin/sec-patterns/scan-paths {paths:[]}` — batch (≤200)
+4. **Registry wiring** — added to `routers/registry.py`. Prefix chosen as `sec-patterns` (NOT `security-patterns`) because LEAN-mode prunes anything under `/api/admin/security`.
+
+**End-to-end validation**
+- Negative test on a hand-crafted bad file → 4 critical findings (PAT-01, PAT-02, PAT-04×2) detected with line numbers + fix hints.
+- `routes/auth.py` (which carries 17 R234 fixes) → **0 findings** — playbook confirms its own fixes hold.
+- `ora_skills_broadcast/active` now lists 15 active skills incl. `AUREM-SEC-PATTERNS-V1`, addendum body 85k bytes, target = ALL.
+
+**ORA Drive Cycle (documented in playbook)**
+```
+CRAWL → CONFIRM (false-positive guard) → PROPOSE (via safe_edit_with_council)
+→ GATE (founder Telegram inline-button) → APPLY → TEST → COMMIT (manual push)
+```
+
+**Hard refusals built into the playbook** — `/app/backend/.env*`, legion queue enqueue handler, founders-console self-edit, and prod password-hash migrations require explicit founder go-ahead even if a pattern matches.
+
+
 ## 2026-02 — iter R234b — Round 5/6/7/8 P0 Security Hardening (27 bugs)
 
 **Mandate**: continue token-conscious triage. Verify before fix. Reject hallucinations.

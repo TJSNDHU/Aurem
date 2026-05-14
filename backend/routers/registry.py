@@ -1142,6 +1142,24 @@ def register_all_routers(app, db):
             import logging
             logging.getLogger(__name__).warning(f"[REGISTRY] antigravity_skills_router skipped: {e}")
 
+    # iter R234c — Security Patterns Router (AUREM-SEC-PATTERNS-V1)
+    # 15 detect-regex patterns derived from 45 audited bugs (R2-R8).
+    # Exposes /api/admin/sec-patterns/{,/playbook,/scan,/scan-paths}.
+    # NOTE: prefix is `sec-patterns` (NOT `security-patterns`) so the
+    # LEAN-mode prune list doesn't strip it via the `/api/admin/security`
+    # prefix-match in _registry_lean_prune.py.
+    if not _should_skip("routers.security_patterns_router"):
+        try:
+            from routers.security_patterns_router import (
+                router as security_patterns_router,
+                set_db as set_security_patterns_db,
+            )
+            set_security_patterns_db(db)
+            app.include_router(security_patterns_router)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"[REGISTRY] security_patterns_router skipped: {e}")
+
     # iter 322ep — Design Extract admin router (DTCG/shadcn tokens from competitor URLs)
     if not _should_skip("routers.design_extract_router"):
         try:

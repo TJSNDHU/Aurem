@@ -28,6 +28,27 @@
 >    - Provider order: `claude,groq`. Tested live: Groq dead, Claude rescued ORA (3.6s).
 
 
+> **🟢 ITER R234C (2026-02) — ORA SOVEREIGN SECURITY PATTERNS**
+>
+> Distilled all 45 fixed bugs into a 32-pattern playbook (`AUREM-SEC-PATTERNS-V1`) and seeded it into the live skill broadcast that powers every LLM call across the 28 internal agents.
+>
+> - **Catalog**: `GET /api/admin/sec-patterns` (admin JWT)
+> - **Full body**: `GET /api/admin/sec-patterns/playbook`
+> - **Scanner**: `POST /api/admin/sec-patterns/scan {path}` — runs every detect-regex against a file, returns line-level findings with fix hints
+> - **Batch**: `POST /api/admin/sec-patterns/scan-paths {paths:[]}` (≤200)
+>
+> Negative test: hand-crafted bad file → 4 critical findings (PAT-01, PAT-02, PAT-04 ×2) with hints + line numbers. Re-scan of `auth.py` (17 R234 fixes) → 0 findings.
+>
+> Files:
+> - `/app/memory/SECURITY_PATTERNS.md` — the playbook
+> - `/app/scripts/seed_security_patterns_skill.py` — idempotent broadcast seeder
+> - `/app/backend/routers/security_patterns_router.py` — admin API
+>
+> ORA now drives its own audits: CRAWL → CONFIRM → PROPOSE (council-gated) → GATE → APPLY → TEST → COMMIT.
+
+
+
+
 > **🟢 ITER R234B (2026-02) — ROUND 5/6/7/8 P0 HARDENING (27 BUGS FIXED, 8 FALSE-POSITIVES REJECTED)**
 >
 > Another three audit reports landed (Bugs 38-73). Triaged and patched only the real ones.
