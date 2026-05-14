@@ -159,10 +159,14 @@ async def system_uptime() -> dict[str, Any]:
         daemon_alive = False
 
     # ── Revenue heartbeat ────────────────────────────────────────────
+    # FIX #12 (audit) — `created_at` is stored as an ISO-8601 string in
+    # Mongo, but the previous code compared it against a tz-aware datetime
+    # object via `$gte`. Mongo's BSON comparator treats those as different
+    # types → match-rate was always 0, signups_today was permanently zero.
+    # Now we compare ISO-string to ISO-string, matching how every other
+    # collection in this file already does it (since_today, etc).
     signups_today = await _safe_count(
-        db.platform_users, {"created_at": {"$gte": now_dt.replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )}}
+        db.platform_users, {"created_at": {"$gte": since_today}}
     )
     leads_added_today = await _safe_count(
         db.campaign_leads, {"created_at": {"$gte": since_today}}
