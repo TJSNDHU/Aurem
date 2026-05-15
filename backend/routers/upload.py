@@ -27,40 +27,52 @@ cloudinary.config(
 
 
 async def get_current_user_from_request(request: Request):
-    """Get current user from request - compatible with server.py auth system"""
+    """Get current user from request - compatible with server.py auth system.
+
+    Bug-fix #98 — previously instantiated a fresh AsyncIOMotorClient on
+    every upload, exhausting MongoDB's connection pool under moderate
+    upload load. Now reuses the shared server.db handle.
+    """
     import jwt
-    from motor.motor_asyncio import AsyncIOMotorClient
     from bson import ObjectId
-    
+
     JWT_SECRET = os.environ.get("JWT_SECRET")
     if not JWT_SECRET:
         raise RuntimeError("CRITICAL: JWT_SECRET environment variable not set.")
-    
+
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return None
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
             return None
-        
-        # Get user from database
-        mongo_url = os.environ.get("MONGO_URL")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = AsyncIOMotorClient(mongo_url)
-        db = client[db_name]
-        
+
+        # Reuse the shared database instance from server.py
+        try:
+            import server
+            db = getattr(server, "db", None)
+        except Exception:
+            db = None
+        if db is None:
+            # Fall back to the config helper if server.db isn't yet bound
+            try:
+                from config import get_database
+                db = get_database()
+            except Exception:
+                return None
+
         user = await db.users.find_one({"id": user_id})
         if not user:
             # Try ObjectId
             try:
                 user = await db.users.find_one({"_id": ObjectId(user_id)})
-            except:
+            except Exception:
                 pass
-        
+
         return user
     except Exception:
         return None

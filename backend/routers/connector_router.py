@@ -3,7 +3,7 @@ Connector Ecosystem Router
 API endpoints for all external integrations
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import logging
@@ -14,6 +14,15 @@ from services.vector_search import get_vector_search
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/connectors", tags=["Connector Ecosystem"])
+
+
+# Bug-fix #90 — previously /connect, /fetch, /post had ZERO auth. Any
+# unauthenticated caller could store API tokens, scrape via stored
+# credentials, or POST to the platform's connected Twitter/GitHub/Slack
+# accounts. All three actions now require admin.
+def _require_admin_connector(request: Request):
+    from utils.admin_guard import verify_admin
+    return verify_admin(request.headers.get("Authorization"))
 
 
 class ConnectRequest(BaseModel):
@@ -60,7 +69,7 @@ async def list_platforms():
 
 
 @router.post("/connect")
-async def connect_platform(request: ConnectRequest):
+async def connect_platform(request: ConnectRequest, req: Request):
     """
     Connect to a platform
     
@@ -72,6 +81,7 @@ async def connect_platform(request: ConnectRequest):
         }
     }
     """
+    _require_admin_connector(req)
     ecosystem = get_connector_ecosystem()
     
     try:
@@ -92,7 +102,7 @@ async def connect_platform(request: ConnectRequest):
 
 
 @router.post("/fetch")
-async def fetch_data(request: FetchRequest):
+async def fetch_data(request: FetchRequest, req: Request):
     """
     Fetch data from a platform
     
@@ -133,6 +143,7 @@ async def fetch_data(request: FetchRequest):
         }
     }
     """
+    _require_admin_connector(req)
     ecosystem = get_connector_ecosystem()
     vector_search = get_vector_search()
     
@@ -173,7 +184,7 @@ async def fetch_data(request: FetchRequest):
 
 
 @router.post("/post")
-async def post_data(request: PostRequest):
+async def post_data(request: PostRequest, req: Request):
     """
     Post data to a platform
     
@@ -208,6 +219,7 @@ async def post_data(request: PostRequest):
         }
     }
     """
+    _require_admin_connector(req)
     ecosystem = get_connector_ecosystem()
     
     try:

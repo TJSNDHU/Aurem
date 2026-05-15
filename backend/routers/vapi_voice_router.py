@@ -110,18 +110,42 @@ async def voice_event_handler(request: Request):
     """
     General voice event handler for the AUREM DIY engine.
     Receives events: call.started, call.ended, transcript.updated
+
+    Bug-fix #97 — previously accepted `tenant_id` from the attacker-
+    controlled request payload, allowing fake calls to be injected under
+    any tenant's account. Now `tenant_id` is derived strictly from a
+    verified JWT in the Authorization header; we never trust the body.
     """
     if db is None:
         raise HTTPException(500, "Database not initialized")
+
+    # Authenticate the caller — JWT required
+    import os, jwt as _jwt
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not secret:
+        raise HTTPException(503, "Auth not configured")
+    try:
+        token_payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    tenant_id = (
+        token_payload.get("tenant_id") or token_payload.get("business_id")
+        or token_payload.get("sub") or token_payload.get("email")
+    )
+    if not tenant_id:
+        raise HTTPException(403, "No tenant in token")
 
     try:
         payload = await request.json()
 
         event_type = payload.get("type")
         conversation_id = payload.get("call", {}).get("id", payload.get("conversation_id", "unknown"))
-        # Tenant from payload (first-party Web Speech client sends it).
-        # Falls back to platform default for legacy clients.
-        tenant_id = payload.get("tenant_id") or payload.get("call", {}).get("tenant_id") or "aurem_platform"
+        # tenant_id comes from the verified JWT above — NEVER from payload.
 
         logger.info(f"[AuremVoice] Event received: {event_type} for {conversation_id}")
 

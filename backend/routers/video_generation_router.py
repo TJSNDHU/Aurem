@@ -3,14 +3,15 @@ ReRoots AI Video Generation Router
 Sora 2 powered video generation for product demos and marketing
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import os
 import secrets
 import asyncio
+import jwt as _jwt
 
 router = APIRouter(prefix="/api/video-gen", tags=["video-generation"])
 
@@ -20,6 +21,45 @@ db: AsyncIOMotorDatabase = None
 def set_db(database: AsyncIOMotorDatabase):
     global db
     db = database
+
+
+# Bug-fix #91 — Sora 2 video generation previously had ZERO auth and no
+# rate-limit. An attacker spamming /generate with duration=12 model=sora-2-pro
+# could drain the EMERGENT_LLM_KEY budget in minutes. /status leaked
+# in-memory video_jobs dict including other users' prompts.
+# Now: require JWT, enforce per-user daily quota (env-driven default 5),
+# enforce duration<=12s ceiling, scope /status to caller.
+DAILY_QUOTA_PER_USER = int(os.environ.get("VIDEO_GEN_DAILY_QUOTA", "5"))
+
+
+def _verify_caller(request: Request) -> dict:
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not secret:
+        raise HTTPException(503, "Auth not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    return payload
+
+
+async def _check_quota(user_id: str) -> None:
+    if db is None or not user_id:
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    n = await db.video_generations.count_documents(
+        {"created_by": user_id, "created_at": {"$gte": cutoff}}
+    )
+    if n >= DAILY_QUOTA_PER_USER:
+        raise HTTPException(
+            429,
+            f"Daily video generation quota exceeded ({n}/{DAILY_QUOTA_PER_USER}). Try again in 24h.",
+        )
 
 
 class VideoGenerationRequest(BaseModel):
@@ -40,8 +80,11 @@ video_jobs = {}
 
 
 @router.post("/generate")
-async def generate_video(data: VideoGenerationRequest, background_tasks: BackgroundTasks):
+async def generate_video(data: VideoGenerationRequest, background_tasks: BackgroundTasks, request: Request):
     """Start video generation job"""
+    caller = _verify_caller(request)
+    user_id = caller.get("user_id") or caller.get("sub") or caller.get("email") or "anon"
+    await _check_quota(user_id)
     try:
         from dotenv import load_dotenv
         load_dotenv(override=False)
@@ -78,6 +121,7 @@ async def generate_video(data: VideoGenerationRequest, background_tasks: Backgro
             "model": data.model,
             "status": "processing",
             "output_path": output_path,
+            "created_by": user_id,
             "created_at": datetime.now(timezone.utc)
         }
         
@@ -162,34 +206,34 @@ async def generate_video_background(video_id: str, prompt: str, output_path: str
 
 
 @router.get("/status/{video_id}")
-async def get_video_status(video_id: str):
-    """Check video generation status"""
-    # Check in-memory first
+async def get_video_status(video_id: str, request: Request):
+    """Check video generation status (scoped to creator)."""
+    caller = _verify_caller(request)
+    user_id = caller.get("user_id") or caller.get("sub") or caller.get("email") or "anon"
+    is_admin = bool(caller.get("is_admin") or caller.get("is_super_admin")
+                    or caller.get("role") in ("admin", "super_admin"))
+
+    # Verify ownership before returning anything
+    job = await db.video_generations.find_one({"video_id": video_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Video job not found")
+    if not is_admin and job.get("created_by") and job.get("created_by") != user_id:
+        raise HTTPException(status_code=403, detail="Not your video")
+
+    # In-memory status first
     if video_id in video_jobs:
-        job = video_jobs[video_id]
-        if job["status"] == "completed":
+        j = video_jobs[video_id]
+        if j["status"] == "completed":
             return {
                 "video_id": video_id,
                 "status": "completed",
                 "video_url": f"/api/video-gen/download/{video_id}"
             }
-        elif job["status"] == "failed":
-            return {
-                "video_id": video_id,
-                "status": "failed",
-                "error": job.get("error")
-            }
+        elif j["status"] == "failed":
+            return {"video_id": video_id, "status": "failed", "error": j.get("error")}
         else:
-            return {
-                "video_id": video_id,
-                "status": "processing"
-            }
-    
-    # Check database
-    job = await db.video_generations.find_one({"video_id": video_id}, {"_id": 0})
-    if not job:
-        raise HTTPException(status_code=404, detail="Video job not found")
-    
+            return {"video_id": video_id, "status": "processing"}
+
     return {
         "video_id": video_id,
         "status": job.get("status"),
@@ -232,19 +276,20 @@ async def get_video_history(limit: int = 20):
 
 
 @router.post("/generate/product/{product_id}")
-async def generate_product_video(product_id: str, background_tasks: BackgroundTasks):
+async def generate_product_video(product_id: str, background_tasks: BackgroundTasks, request: Request):
     """Generate video for a specific product"""
+    _verify_caller(request)  # auth gate; generate_video will re-verify + quota
     product = await db.products.find_one({"id": product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
+
     # Build prompt from product data
     prompt = f"Showcase video for {product.get('name', 'skincare product')}: {product.get('short_description', '')}. Highlight key benefits and luxurious packaging."
-    
+
     return await generate_video(VideoGenerationRequest(
         prompt=prompt,
         product_id=product_id,
         video_type="product_demo",
         size="1280x720",
         duration=4
-    ), background_tasks)
+    ), background_tasks, request)

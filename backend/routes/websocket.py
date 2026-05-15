@@ -118,40 +118,73 @@ async def broadcast_inventory_update(product_id: str, new_stock: int, product_na
 
 # WebSocket endpoint (will be mounted on app, not router)
 async def websocket_endpoint(websocket: WebSocket):
-    """Main WebSocket endpoint for real-time updates"""
+    """Main WebSocket endpoint for real-time updates.
+
+    Bug-fix #52 — JWT used to be transmitted strictly via ?token= URL
+    query param, which got logged to Nginx access logs. We now accept
+    the token via either:
+      1) The first WebSocket message: {"type": "auth", "token": "..."}
+         (preferred — keeps the JWT out of access logs); OR
+      2) The legacy `?token=` query param (kept for backwards compat
+         until all PWA clients migrate; will be removed in a future
+         release once PWA coordination completes).
+    """
     db = get_database()
     client_id = str(uuid.uuid4())
     user_id = None
     is_admin = False
-    
+
+    async def _decode_and_apply(tok: str) -> None:
+        nonlocal user_id, is_admin
+        try:
+            payload = jwt.decode(tok, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("user_id") or payload.get("sub")
+            user = await db.users.find_one({"id": user_id}, {"_id": 0})
+            if user:
+                is_admin = user.get("is_admin", False) or user.get("is_super_admin", False)
+            else:
+                is_admin = bool(payload.get("is_admin") or payload.get("is_super_admin")
+                                or payload.get("role") in ("admin", "super_admin"))
+        except jwt.InvalidTokenError:
+            pass
+
     try:
-        token = websocket.query_params.get("token")
-        if token:
-            try:
-                payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-                user_id = payload.get("user_id")
-                user = await db.users.find_one({"id": user_id}, {"_id": 0})
-                if user:
-                    is_admin = user.get("is_admin", False) or user.get("is_super_admin", False)
-            except jwt.InvalidTokenError:
-                pass
-        
+        # Legacy query-string fallback (deprecated — see Bug-fix #52)
+        legacy_token = websocket.query_params.get("token")
+        if legacy_token:
+            await _decode_and_apply(legacy_token)
+
         await ws_manager.connect(websocket, client_id, user_id, is_admin)
-        
+
         await websocket.send_json({
             "type": "connection_established",
             "client_id": client_id,
             "is_admin": is_admin,
+            "auth_required": user_id is None,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
         while True:
             try:
                 data = await websocket.receive_json()
-                
+
+                # Bug-fix #52 — preferred auth path: first-message JWT
+                if data.get("type") == "auth" and data.get("token"):
+                    await _decode_and_apply(data["token"])
+                    async with ws_manager._lock:
+                        if client_id in ws_manager.active_connections:
+                            ws_manager.active_connections[client_id]["user_id"] = user_id
+                            ws_manager.active_connections[client_id]["is_admin"] = is_admin
+                    await websocket.send_json({
+                        "type": "auth_result",
+                        "authenticated": user_id is not None,
+                        "is_admin": is_admin,
+                    })
+                    continue
+
                 if data.get("type") == "ping":
                     await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
-                
+
                 elif data.get("type") == "subscribe":
                     channel = data.get("channel")
                     await websocket.send_json({
@@ -159,11 +192,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         "channel": channel,
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     })
-                
+
             except Exception as e:
                 logging.debug(f"WebSocket receive error: {e}")
                 break
-                
+
     except WebSocketDisconnect:
         await ws_manager.disconnect(client_id)
     except Exception as e:

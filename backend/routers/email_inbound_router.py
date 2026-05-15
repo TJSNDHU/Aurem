@@ -285,8 +285,20 @@ async def _reply_rate_exceeded(db, sender: str) -> bool:
 
 
 def _auth_ok(request: Request) -> bool:
+    """Bug-fix #96 — previously returned True when INBOUND_TOKEN was
+    unset, making the inbound email endpoint fully public. Anyone could
+    POST a fake email and trigger ORA to compose+send an auto-reply
+    (prompt injection vector). Now we fail closed when the token is
+    not configured, unless explicitly opted out for local dev."""
     if not INBOUND_TOKEN:
-        return True
+        # Explicit dev opt-in only
+        if os.environ.get("EMAIL_INBOUND_ALLOW_PUBLIC", "").strip() == "1":
+            return True
+        logger.error(
+            "[email_inbound] rejected — EMAIL_INBOUND_TOKEN not set. "
+            "Set it in .env or set EMAIL_INBOUND_ALLOW_PUBLIC=1 to opt-in for dev."
+        )
+        return False
     ah = request.headers.get("Authorization", "")
     if ah.startswith("Bearer ") and ah[7:].strip() == INBOUND_TOKEN:
         return True

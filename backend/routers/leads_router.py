@@ -222,21 +222,20 @@ async def update_lead_status(
 
 
 @router.post("/test-capture")
-async def test_lead_capture(request: TestLeadCaptureRequest):
+async def test_lead_capture(request: TestLeadCaptureRequest, req: Request):
     """
     Test lead capture functionality (development only)
-    
-    Body:
-        {
-            "tenant_id": "test_tenant",
-            "conversation_id": "test_conv_123",
-            "user_message": "I want to book an appointment tomorrow",
-            "conversation_history": [...]  # optional
-        }
-    
-    Returns:
-        Lead capture result
+
+    Bug-fix #54 — previously had NO auth, allowing unauthenticated
+    injection of fake leads into any tenant. Now requires admin auth
+    AND a non-prod environment (set AUREM_TEST_ENDPOINTS_ENABLED=1).
     """
+    import os
+    if os.environ.get("AUREM_TEST_ENDPOINTS_ENABLED", "").strip() != "1":
+        raise HTTPException(404, "Endpoint disabled in this environment")
+    from utils.admin_guard import verify_admin
+    verify_admin(req.headers.get("Authorization"))
+
     if db is None:
         raise HTTPException(500, "Database not initialized")
     

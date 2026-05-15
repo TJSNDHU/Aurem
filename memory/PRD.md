@@ -1,5 +1,38 @@
 # AUREM Platform — PRD
 
+> **🟢 ROUND 11 + P2 FIXES (2026-02 / iter 322fj) — 9 NEW CRITICAL BUGS PATCHED + WS JWT MIGRATION**
+>
+> Total bugs fixed across all rounds now: **98**. Round 11 audit closed at source. P2 bugs 52 + 54 also resolved.
+>
+> ## Round 11 (Bugs 90-98)
+> 1. **Bug 90** — `connector_router` /connect, /fetch, /post — all 3 now require admin (`_require_admin_connector`). No more anonymous Twitter/GitHub/Slack posts as the platform.
+> 2. **Bug 91** — `video_generation_router` /generate + /status — require JWT, per-user daily quota (`VIDEO_GEN_DAILY_QUOTA`, default 5), /status scopes to creator/admin. Sora budget protected.
+> 3. **Bug 92** — `shopify_oauth_router.oauth_callback` — `if hmac_param and not _verify_hmac` → `if not hmac_param or not _verify_hmac`; nonce mismatch now raises 403 instead of "Continue anyway"; nonce deleted after use (single-use).
+> 4. **Bug 93** — `shopify_oauth_router.app_uninstalled` — new `_verify_shopify_webhook_hmac()` checks `X-Shopify-Hmac-Sha256` against raw body with API secret. Webhook rejected with 401 if invalid.
+> 5. **Bug 94** — `aurem_keys_router` list/revoke/usage — all 3 now call `_verify_business_caller(authorization, business_id)`. Cross-tenant key wipe attack closed.
+> 6. **Bug 95** — `omnichannel_hub` — SMS webhook validates `X-Twilio-Signature` via `twilio.request_validator.RequestValidator`; WhatsApp webhook requires `WHAPI_WEBHOOK_TOKEN` via `Authorization: Bearer` or `?t=` query. Both fail closed when secrets unset. Dev opt-in via `TWILIO_WEBHOOK_SKIP_VERIFY=1` / `WHAPI_WEBHOOK_SKIP_VERIFY=1`.
+> 7. **Bug 96** — `email_inbound_router._auth_ok` — no longer returns `True` when `EMAIL_INBOUND_TOKEN` unset. Requires explicit `EMAIL_INBOUND_ALLOW_PUBLIC=1` opt-in for dev.
+> 8. **Bug 97** — `vapi_voice_router.voice_event_handler` — `tenant_id` now derived from a verified JWT (`token_payload`), never from request body. Fake-call injection across tenants impossible.
+> 9. **Bug 98** — `upload.get_current_user_from_request` — reuses `server.db` / `config.get_database()` instead of creating a fresh `AsyncIOMotorClient` per upload. Connection pool exhaustion eliminated.
+>
+> ## P2 (Bugs 52 + 54)
+> 10. **Bug 54** — `routers/leads_router.py /test-capture` — now gated by `AUREM_TEST_ENDPOINTS_ENABLED=1` env flag AND requires `verify_admin`. Returns 404 in prod by default.
+> 11. **Bug 52** — `routes/websocket.py websocket_endpoint` — preferred auth path is now the first-message `{"type": "auth", "token": "..."}` payload, keeping JWTs out of Nginx access logs. Legacy `?token=` query param still accepted for PWA backwards compat (will be removed after PWA migration). Server replies with `{"type": "auth_result", "authenticated": ..., "is_admin": ...}` to confirm.
+>
+> ## Tests
+> - New: `backend/tests/test_round11_fixes.py` (12 tests).
+> - Combined with Rounds 5-10: **72 regression tests passing**.
+> - Live curl smoke-tested: all reachable endpoints rejected with correct status codes (401/403/503/404).
+>
+> ## Ops checklist for production
+> - Set `STRIPE_WEBHOOK_SECRET` (from Bug 76)
+> - Set `OWNER_PANEL_TOKEN` ≥16 chars (from Bug 83)
+> - Set `TWILIO_AUTH_TOKEN` (from Bug 95 SMS)
+> - Set `WHAPI_WEBHOOK_TOKEN` and update WHAPI dashboard webhook URL to `…?t=<token>` (from Bug 95 WhatsApp)
+> - Set `EMAIL_INBOUND_TOKEN` (from Bug 96)
+> - Optional: `VIDEO_GEN_DAILY_QUOTA` (Bug 91, default 5)
+
+
 > **🟢 ROUND 9 + 10 SECURITY HARDENING + GHOST SCOUT ROTATION (2026-02 / iter 322fi) — 16 CRITICAL BUGS PATCHED + P0 HARVESTER FIX**
 >
 > Total bugs fixed across all rounds now: **89**. All Round 9 + Round 10 audit findings closed at source. Ghost Scout dedup-spin (55 runs/day, 0 inserts) eliminated via dedup-park + 30-entry rotation queue.

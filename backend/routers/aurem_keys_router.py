@@ -30,6 +30,39 @@ def get_db():
     return _db
 
 
+# Bug-fix #94 — list/revoke/usage previously had ZERO auth. An attacker
+# who knew any business_id (visible in many API responses) could revoke
+# all API keys for that business, breaking every integration. Now all
+# three endpoints require JWT + business_id ownership (admins exempted).
+def _verify_business_caller(authorization: str, business_id: str) -> dict:
+    import os, jwt as _jwt
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Authentication required")
+    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not secret:
+        raise HTTPException(503, "Auth not configured")
+    try:
+        payload = _jwt.decode(authorization.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    is_admin = bool(
+        payload.get("is_admin") or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+    )
+    if not is_admin:
+        from utils.admin_guard import is_admin_email
+        if is_admin_email(payload.get("email")):
+            is_admin = True
+    if is_admin:
+        return payload
+    caller_biz = payload.get("business_id") or payload.get("tenant_id") or payload.get("sub")
+    if not caller_biz or caller_biz != business_id:
+        raise HTTPException(403, "business_id does not belong to caller")
+    return payload
+
+
 class CreateKeyRequest(BaseModel):
     business_id: str
     name: str = "Default API Key"
@@ -128,8 +161,9 @@ async def create_api_key(
 
 
 @router.get("/list/{business_id}")
-async def list_api_keys(business_id: str):
+async def list_api_keys(business_id: str, authorization: str = Header(None)):
     """List all API keys for a business (without revealing full keys)"""
+    _verify_business_caller(authorization, business_id)
     from services.aurem_commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
@@ -139,8 +173,9 @@ async def list_api_keys(business_id: str):
 
 
 @router.post("/revoke")
-async def revoke_api_key(request: RevokeKeyRequest):
+async def revoke_api_key(request: RevokeKeyRequest, authorization: str = Header(None)):
     """Revoke an API key"""
+    _verify_business_caller(authorization, request.business_id)
     from services.aurem_commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
@@ -153,8 +188,9 @@ async def revoke_api_key(request: RevokeKeyRequest):
 
 
 @router.get("/usage/{business_id}")
-async def get_usage_stats(business_id: str, billing_period: Optional[str] = None):
+async def get_usage_stats(business_id: str, billing_period: Optional[str] = None, authorization: str = Header(None)):
     """Get usage statistics for billing"""
+    _verify_business_caller(authorization, business_id)
     from services.aurem_commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())

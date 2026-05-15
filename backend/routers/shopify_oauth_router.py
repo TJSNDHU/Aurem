@@ -125,17 +125,30 @@ async def oauth_callback(request: Request):
 
     config = _get_config()
 
-    # Verify HMAC
-    if hmac_param and not _verify_hmac(params, config["api_secret"]):
-        raise HTTPException(403, "HMAC verification failed")
+    # Bug-fix #92 — previously `if hmac_param and not _verify_hmac(...)`
+    # silently skipped HMAC verification when `hmac_param` was absent
+    # (empty string short-circuits the `and`). An attacker could craft a
+    # callback URL with no hmac parameter and complete OAuth for any
+    # store. Now we REQUIRE hmac_param AND a valid signature.
+    if not hmac_param or not _verify_hmac(params, config["api_secret"]):
+        raise HTTPException(403, "HMAC verification failed — possible CSRF attack")
 
-    # Verify nonce
+    # Verify nonce — must match the one we issued. Bug-fix #92 part 2:
+    # previously "continued anyway" on mismatch, defeating CSRF protection.
     db = _get_db()
     if db and state:
         nonce_doc = await db.shopify_oauth_nonces.find_one({"shop": shop, "nonce": state})
         if not nonce_doc:
             logger.warning(f"[SHOPIFY-AUTH] Nonce mismatch for {shop}")
-            # Continue anyway — some flows don't preserve nonce
+            raise HTTPException(403, "Invalid OAuth state — possible CSRF attack")
+        # Single-use: delete the nonce so it can't be replayed
+        try:
+            await db.shopify_oauth_nonces.delete_one({"_id": nonce_doc["_id"]})
+        except Exception:
+            pass
+    elif state:
+        # No DB available but state was provided — refuse rather than skip
+        raise HTTPException(503, "OAuth nonce store unavailable")
 
     # Exchange code for access token
     import httpx
@@ -229,16 +242,41 @@ async def _register_webhooks(shop: str, access_token: str):
     logger.info(f"[SHOPIFY-AUTH] Registered {registered}/{len(webhooks)} webhooks for {shop}")
 
 
+def _verify_shopify_webhook_hmac(body: bytes, header_hmac: str, secret: str) -> bool:
+    """Bug-fix #93 — Shopify-signed webhook verification. The uninstall
+    webhook previously processed any POST, so anyone could disable any
+    connected store's integration by spoofing `myshopify_domain`."""
+    if not header_hmac or not secret:
+        return False
+    import base64
+    computed = base64.b64encode(
+        hmac.new(secret.encode(), body, hashlib.sha256).digest()
+    ).decode()
+    return hmac.compare_digest(computed, header_hmac)
+
+
 # ═══════════════════════════════════════════════════
 # App Uninstall Webhook
 # ═══════════════════════════════════════════════════
 
 @router.post("/webhook/uninstalled")
 async def app_uninstalled(request: Request):
-    """Handle app uninstall — mark shop as inactive."""
+    """Handle app uninstall — mark shop as inactive.
+
+    Bug-fix #93 — verify X-Shopify-Hmac-Sha256 against the raw body
+    using the shared API secret before mutating any state.
+    """
+    config = _get_config()
+    body_bytes = await request.body()
+    sig = request.headers.get("X-Shopify-Hmac-Sha256", "")
+    if not _verify_shopify_webhook_hmac(body_bytes, sig, config.get("api_secret", "")):
+        logger.warning("[SHOPIFY-AUTH] Uninstall webhook rejected — invalid HMAC")
+        raise HTTPException(401, "Invalid webhook signature")
+
     db = _get_db()
     try:
-        body = await request.json()
+        import json as _json
+        body = _json.loads(body_bytes or b"{}")
         shop = body.get("myshopify_domain", body.get("domain", ""))
         if db and shop:
             await db.shopify_app_installs.update_one(

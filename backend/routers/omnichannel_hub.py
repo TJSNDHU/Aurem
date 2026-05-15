@@ -245,10 +245,33 @@ class WhatsAppSend(BaseModel):
 async def twilio_sms_webhook(request: Request):
     """Twilio SMS inbound webhook — form-urlencoded.
 
-    Twilio sends: From, To, Body, MessageSid, SmsStatus.
-    Mirrors into db.unified_inbox so the customer-facing OmnichannelHub
-    displays inbound SMS alongside email + WhatsApp.
+    Bug-fix #95 — verify Twilio's X-Twilio-Signature against the
+    request URL + form params before accepting. Without this, anyone
+    could POST fake inbound SMS into `unified_inbox`, potentially
+    triggering automated outbound replies billed to our Twilio account.
     """
+    twilio_auth_token = os.environ.get("TWILIO_AUTH_TOKEN", "").strip()
+    twilio_skip_check = os.environ.get("TWILIO_WEBHOOK_SKIP_VERIFY", "").strip() == "1"
+    if not twilio_skip_check:
+        if not twilio_auth_token:
+            logger.error("[SMS] webhook rejected — TWILIO_AUTH_TOKEN not configured")
+            raise HTTPException(503, "Twilio webhook verification not configured")
+        try:
+            from twilio.request_validator import RequestValidator
+            validator = RequestValidator(twilio_auth_token)
+            url = str(request.url)
+            form_for_validation = await request.form()
+            params = {k: v for k, v in form_for_validation.items()}
+            sig = request.headers.get("X-Twilio-Signature", "")
+            if not validator.validate(url, params, sig):
+                logger.warning("[SMS] webhook rejected — bad Twilio signature")
+                raise HTTPException(401, "Invalid Twilio signature")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"[SMS] webhook validation error: {e}")
+            raise HTTPException(401, "Twilio signature validation failed")
+
     _db = _get_db()
     sender = ""
     body = ""
@@ -290,7 +313,27 @@ async def whatsapp_webhook(request: Request):
     """
     WHAPI webhook — receives incoming WhatsApp messages.
     Routes them through the Sovereign Brain and auto-replies.
+
+    Bug-fix #95 — verify a shared WHAPI_WEBHOOK_TOKEN (sent by us when
+    configuring the WHAPI webhook URL as a query param `?t=<token>` or
+    `Authorization: Bearer <token>`). Without this, anyone could POST
+    fake inbound WhatsApp messages and trigger real outbound replies
+    billed to our WHAPI account.
     """
+    whapi_webhook_token = os.environ.get("WHAPI_WEBHOOK_TOKEN", "").strip()
+    skip_check = os.environ.get("WHAPI_WEBHOOK_SKIP_VERIFY", "").strip() == "1"
+    if not skip_check:
+        if not whapi_webhook_token:
+            logger.error("[WhatsApp] webhook rejected — WHAPI_WEBHOOK_TOKEN not configured")
+            raise HTTPException(503, "WhatsApp webhook verification not configured")
+        # Accept either Authorization: Bearer <token> or ?t=<token>
+        auth = request.headers.get("Authorization", "")
+        bearer = auth.split(" ", 1)[1].strip() if auth.startswith("Bearer ") else ""
+        q_tok = request.query_params.get("t", "")
+        if bearer != whapi_webhook_token and q_tok != whapi_webhook_token:
+            logger.warning("[WhatsApp] webhook rejected — bad WHAPI webhook token")
+            raise HTTPException(401, "Invalid WhatsApp webhook token")
+
     _db = _get_db()
     try:
         body = await request.json()
