@@ -114,8 +114,16 @@ async def get_availability(date: str, specialist_id: Optional[str] = None):
 
 
 @router.post("/book")
-async def book_appointment(data: AppointmentRequest):
-    """Book a new appointment"""
+async def book_appointment(data: AppointmentRequest, request: Request):
+    """Book a new appointment.
+
+    Bug-fix #176 (R21): authenticated callers only. Previously zero-auth
+    let competitors flood the booking system with fake appointments to
+    block legitimate ones.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     # Validate appointment type
     if data.appointment_type not in APPOINTMENT_TYPES:
         raise HTTPException(status_code=400, detail=f"Invalid appointment type. Use: {list(APPOINTMENT_TYPES.keys())}")
@@ -240,8 +248,15 @@ async def update_appointment(appointment_id: str, data: AppointmentUpdate):
 
 
 @router.delete("/{appointment_id}")
-async def cancel_appointment(appointment_id: str):
-    """Cancel an appointment"""
+async def cancel_appointment(appointment_id: str, request: Request):
+    """Cancel an appointment.
+
+    Bug-fix #176 (R21): admin auth required. Previously zero-auth +
+    short guessable appointment_id let attackers cancel any booking.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     result = await db.appointments.update_one(
         {"appointment_id": appointment_id},
         {"$set": {
@@ -257,8 +272,15 @@ async def cancel_appointment(appointment_id: str):
 
 
 @router.get("/customer/{email}")
-async def get_customer_appointments(email: str):
-    """Get all appointments for a customer"""
+async def get_customer_appointments(email: str, request: Request):
+    """Get all appointments for a customer.
+
+    Bug-fix #176 (R21): admin auth required. Previously zero-auth let
+    anyone enumerate every customer's appointment history by email.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     appointments = await db.appointments.find(
         {"customer_email": email},
         {"_id": 0}

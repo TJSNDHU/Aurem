@@ -13,7 +13,7 @@ Provides:
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 logger = logging.getLogger(__name__)
 
@@ -83,15 +83,17 @@ def _check_circuit_breaker(channel: str, engine) -> Dict:
 
 
 @router.post("/sync")
-async def global_sync():
+async def global_sync(request: Request):
     """
-    Global sync button functionality:
-    1. Clear deduplication cache
-    2. Re-index MongoDB collections
-    3. Reset cooled-down circuit breakers
-    4. Run immediate bug scan
-    5. Return sync status
+    Global sync button functionality.
+    Bug-fix #180 (R22): admin auth required. Without it any caller
+    could reset every rate-limit counter, amplifying every other
+    rate-limit bypass in the codebase. Also triggers LLM bug-scan
+    which burns EMERGENT_LLM_KEY budget.
     """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     global _last_sync
     import time
     start = time.time()

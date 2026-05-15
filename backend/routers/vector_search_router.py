@@ -3,7 +3,7 @@ Vector Search API Router
 Semantic search endpoints for AUREM
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import logging
@@ -94,20 +94,18 @@ async def semantic_search(request: SemanticSearchRequest):
 
 
 @router.post("/index")
-async def index_data(request: IndexDataRequest):
+async def index_data(request: IndexDataRequest, http_request: Request):
     """
-    Index data for semantic search
-    
-    Example:
-    {
-        "platform": "reddit",
-        "data": [
-            {"title": "AI SaaS trends", "text": "..."},
-            {"title": "Automation tools", "text": "..."}
-        ],
-        "query_context": "AI automation"
-    }
+    Index data for semantic search.
+
+    Bug-fix #174 (R21): admin auth required. Previously zero-auth — an
+    attacker could POST any content under platform=reddit/twitter and
+    poison the vector store used by ORA RAG / semantic search for
+    every customer.
     """
+    from utils.admin_guard import verify_admin
+    verify_admin(http_request.headers.get("Authorization", ""))
+
     vector_search = get_vector_search()
     
     try:

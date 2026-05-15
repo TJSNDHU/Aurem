@@ -20,7 +20,22 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
-ADMIN_PHONE = os.environ.get("ADMIN_WHATSAPP", "12265017777")
+def _resolve_admin_phone() -> str:
+    """Bug-fix #178 (R21): never fall back to the hardcoded founder
+    number `12265017777` in production. Either ADMIN_WHATSAPP is set
+    explicitly, or alerts are silently dropped (logged) rather than
+    routed to a public number.
+    """
+    import os as _os
+    phone = _os.environ.get("ADMIN_WHATSAPP", "").strip()
+    if phone:
+        return phone
+    if _os.environ.get("AUREM_ENV") == "production":
+        return ""  # caller-side: skip send + log warning
+    return ""
+
+
+ADMIN_PHONE = _resolve_admin_phone()
 
 _db = None
 
@@ -374,7 +389,9 @@ async def _send_whatsapp_alert(tenant_id: str, event_type: str, details: dict):
         from routers.whatsapp_alerts import send_whatsapp
         score = details.get("score", "N/A")
         msg = f"AUREM SECURITY: {event_type} blocked. Tenant: {tenant_id}. Score: {score}"
-        await send_whatsapp(ADMIN_PHONE, msg)
+        await send_whatsapp(ADMIN_PHONE, msg) if ADMIN_PHONE else logger.warning(
+            "[Guardrail] ADMIN_WHATSAPP not configured — alert dropped (Bug-fix #178 R21)"
+        )
     except Exception as e:
         logger.warning(f"[Guardrail] WhatsApp alert failed: {e}")
 

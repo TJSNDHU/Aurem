@@ -24,20 +24,13 @@ def set_db(db):
 
 
 async def _require_admin(request: Request):
-    """Verify JWT and admin status."""
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = auth.replace("Bearer ", "")
-    try:
-        from jose import jwt
-        secret = os.environ.get("JWT_SECRET", os.environ.get("SECRET_KEY", "aurem-secret-key"))
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
-        if not (payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email")):
-            raise HTTPException(status_code=403, detail="Admin required")
-        return payload
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    """Bug-fix #172 (R21): use canonical admin guard.
+    Eliminates: (a) email-bypass, (b) third hardcoded JWT default
+    `"aurem-secret-key"` which let forged tokens pass even without the
+    real JWT_SECRET.
+    """
+    from utils.admin_guard import verify_admin
+    return verify_admin(request.headers.get("Authorization", ""))
 
 
 async def _get_database_info() -> Dict[str, Any]:

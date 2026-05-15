@@ -74,11 +74,16 @@ async def get_live_stats():
 
 
 @router.post("/broadcast")
-async def admin_broadcast(request: BroadcastRequest):
+async def admin_broadcast(request: BroadcastRequest, http_request: Request):
+    """Admin endpoint to broadcast UI refresh.
+
+    Bug-fix #184 (R22): admin auth required. Previously zero-auth let
+    anyone push UI-refresh events to every connected WebSocket client,
+    triggering mass UI reloads.
     """
-    Admin endpoint to broadcast UI refresh
-    Called when Admin updates products, inventory, promotions
-    """
+    from utils.admin_guard import verify_admin
+    verify_admin(http_request.headers.get("Authorization", ""))
+
     await live_broadcast.broadcast_ui_refresh(
         resource_type=request.resource,
         resource_id=request.resource_id,
@@ -93,11 +98,16 @@ async def admin_broadcast(request: BroadcastRequest):
 
 
 @router.post("/sync")
-async def sync_state(request: StateSyncRequest):
+async def sync_state(request: StateSyncRequest, http_request: Request):
+    """REST fallback for state sync when WebSocket unavailable.
+
+    Bug-fix #184 (R22): admin auth required. Previously zero-auth let
+    any caller overwrite any user_id's state with attacker-controlled
+    data.
     """
-    REST fallback for state sync when WebSocket unavailable
-    Circuit Breaker fallback - short polling every 30 seconds
-    """
+    from utils.admin_guard import verify_admin
+    verify_admin(http_request.headers.get("Authorization", ""))
+
     result = await live_broadcast.sync_customer_state(
         request.user_id,
         request.state

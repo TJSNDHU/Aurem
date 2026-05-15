@@ -45,15 +45,15 @@ async def _require_founder(authorization: Optional[str]) -> dict:
     try:
         payload = jwt.decode(
             token, secret, algorithms=["HS256"],
-            options={"verify_exp": False},
         )
     except Exception:
         raise HTTPException(401, "invalid token")
-    # Founder = super_admin OR email on allowlist
-    FOUNDERS = {
-        (os.environ.get("FOUNDER_EMAIL") or "teji.ss1986@gmail.com").lower(),
-        "admin@aurem.live",
-    }
+    # Bug-fix #173/#171 (R21): expiry now enforced; hardcoded fallback
+    # founder email removed so a leaked JWT_SECRET alone can't grant
+    # founder-tier SMS kill-switch access. FOUNDER_EMAIL must be set
+    # explicitly via env in production.
+    _founder_env = os.environ.get("FOUNDER_EMAIL", "").strip().lower()
+    FOUNDERS = {e for e in (_founder_env, "admin@aurem.live") if e}
     email = (payload.get("email") or "").lower()
     if payload.get("is_super_admin") or email in FOUNDERS:
         return payload

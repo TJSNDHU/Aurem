@@ -9,7 +9,7 @@ Model: Alibaba Tongyi-MAI Z-Image-Turbo
 - 8-22 inference steps for photorealistic quality
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -152,10 +152,25 @@ def _sync_generate_image(space_name: str, prompt: str, negative: str,
 
 
 @router.post("/generate", response_model=ImageGenerationResponse)
-async def generate_image(request: ImageGenerationRequest):
+async def generate_image(request: ImageGenerationRequest, http_request: Request):
+    """Generate a high-quality image using Z-Image-Turbo.
+
+    Bug-fix #183 (R22): admin auth required + per-IP rate limit.
+    Hugging Face inference is paid; unauth open was a free LLM/image
+    credit drain.
     """
-    Generate a high-quality image using Z-Image-Turbo
-    """
+    from utils.admin_guard import verify_admin
+    verify_admin(http_request.headers.get("Authorization", ""))
+    try:
+        from utils.aurem_rate_limiter import is_rate_limited
+        ip = http_request.headers.get("cf-connecting-ip") or (http_request.client.host if http_request.client else "unknown")
+        if await is_rate_limited(f"zimg_gen:{ip}", limit=10, window=60):
+            raise HTTPException(429, "rate limit — wait a minute")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     start_time = time.time()
     
     # Apply quality preset
@@ -249,8 +264,14 @@ async def health_check():
 
 
 @router.post("/enhance-prompt")
-async def enhance_prompt(prompt: str):
-    """Enhance a basic prompt for DSLR-quality output"""
+async def enhance_prompt(prompt: str, request: Request):
+    """Enhance a basic prompt for DSLR-quality output.
+
+    Bug-fix #183 (R22): admin auth required.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     enhanced = prompt.rstrip('.') + DSLR_ENHANCEMENT
     
     return {

@@ -1,5 +1,38 @@
 # AUREM Platform — PRD
 
+> **🟢 ROUND 21 + 22 SECURITY SPRINT (2026-02 / iter 322fn) — 14 BUGS PATCHED IN ONE SHOT**
+>
+> Total bugs fixed across all rounds now: **184**. R21 and R22 closed at source. 22 audit rounds complete.
+>
+> ## Round 21 (Bugs 172-178)
+> 1. **Bug 172** — `diagnostic_router._require_admin` → canonical `verify_admin`. Removed email-bypass + 3rd hardcoded JWT default `"aurem-secret-key"`.
+> 2. **Bug 173** — `sms_admin_router._require_founder` — removed `verify_exp: False` (expiry now enforced) + dropped hardcoded fallback founder email `teji.ss1986@gmail.com`. Requires `FOUNDER_EMAIL` env var explicitly.
+> 3. **Bug 174** — `vector_search_router /index` admin-gated. RAG poisoning closed.
+> 4. **Bug 175** — `nexus_router`, `vault_credentials`, `ai_repair_router` all wrap encryption-key load in `_load_aurem_encryption_key()` which raises in production if `AUREM_ENCRYPTION_KEY` is unset / default. Dev auto-mints random per-process key.
+> 5. **Bug 176** — `appointment_scheduler_router` `/book`, `DELETE /{id}`, `GET /customer/{email}` admin-gated.
+> 6. **Bug 177** — `extension_leads_router` `/leads/bulk` (with 500-row cap) + `DELETE /leads/{id}` admin-gated.
+> 7. **Bug 178** — `guardrail_proxy.ADMIN_PHONE` no longer falls back to hardcoded `12265017777`. Alerts dropped + logged if `ADMIN_WHATSAPP` unset.
+>
+> ## Round 22 (Bugs 179-185)
+> 8. **Bug 179** — `data_security_routes` GDPR delete now requires a signed `gdpr_delete` JWT (1h TTL + `jti` one-shot via `gdpr_deletion_used` TTL collection). New `POST /api/customer/request-deletion` mints the token and emails it. Response is generic ("If the email exists…") to prevent enumeration.
+> 9. **Bug 180** — `aurem_admin_router /sync` admin-gated. Rate-limit reset + LLM bug-scan no longer triggerable anonymously.
+> 10. **Bug 181** — `universal_connector_router /webhooks/{platform}` now HMAC-verifies Shopify (`X-Shopify-Hmac-Sha256`) and WooCommerce (`x-wc-webhook-signature`) in addition to Stripe. Fails-closed in production.
+> 11. **Bug 182** — `seo_router /unlinked/scan` + `/unlinked/outreach` admin-gated. Quota drain + spam-engine abuse closed.
+> 12. **Bug 183** — `z_image_router /generate` + `/enhance-prompt` admin-gated + per-IP rate limit (10/min).
+> 13. **Bug 184** — `live_sync_router /broadcast` + `/sync` admin-gated.
+> 14. **Bug 185** — `smart_search_router /switch` admin-gated.
+>
+> ## Tests
+> - New: `backend/tests/test_round21_round22_fixes.py` — **29 tests passing**.
+> - Full R12-R22 regression: **125 passed, 0 failed** in ~20s.
+>
+> ## Operator action items (new in this sprint)
+> - **MUST set in production env:** `AUREM_ENCRYPTION_KEY` (random 32-byte urlsafe), `FOUNDER_EMAIL`, `ADMIN_WHATSAPP`, `SHOPIFY_WEBHOOK_SECRET`, `WOOCOMMERCE_WEBHOOK_SECRET`.
+> - Customer-initiated GDPR deletion is now a two-step flow: customer hits `/api/customer/request-deletion`, receives email link, clicks → `/api/customer/delete-my-data?email=...&token=...`. Frontend may need a small update if you expose this UI.
+
+
+
+
 > **🟢 ROUND 20 SECURITY SPRINT — FINAL AUDIT (2026-02 / iter 322fm) — 7 BUGS PATCHED**
 >
 > Total bugs fixed across all rounds now: **170**. Round 20 is the final audit round.

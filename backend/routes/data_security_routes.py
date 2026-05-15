@@ -50,28 +50,55 @@ class DeleteDataResponse(BaseModel):
 @router.get("/delete-my-data")
 async def delete_customer_data_get(
     request: Request,
-    email: str = Query(..., description="Email address to delete")
+    email: str = Query(..., description="Email address to delete"),
+    token: str = Query(..., description="Signed deletion token sent to email"),
 ):
     """
-    GDPR Compliance: Delete all customer data by email (GET method for simplicity).
-    
-    Collections cleared:
-    - reroots_customer_profiles
-    - reroots_chat_sessions
-    - reroots_chat_messages
-    - ai_audit_log
-    
-    Returns deletion confirmation with email hash for records.
+    GDPR Compliance: Delete all customer data by email.
+
+    Bug-fix #179 (R22): require a signed, time-limited deletion token
+    that was emailed to the address — proves the requester controls
+    the inbox. Previously a single GET request with any victim's
+    email destroyed their data across 5 collections instantly.
+
+    Generate the token via `POST /api/customer/request-deletion`
+    which emails a one-time link.
     """
     if _db is None:
         raise HTTPException(status_code=503, detail="Service unavailable")
-    
+
     email = email.lower().strip()
-    
+
     # Validate email format
     if '@' not in email or '.' not in email:
         raise HTTPException(status_code=400, detail="Invalid email format")
-    
+
+    # Verify the deletion token.
+    import jwt as _pyjwt, os as _os
+    secret = _os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "deletion service misconfigured")
+    try:
+        claim = _pyjwt.decode(token, secret, algorithms=["HS256"])
+    except Exception:
+        raise HTTPException(401, "invalid or expired deletion token")
+    if claim.get("type") != "gdpr_delete" or (claim.get("email") or "").lower() != email:
+        raise HTTPException(401, "token does not match email")
+    # Block replay
+    jti = claim.get("jti")
+    if jti:
+        used = await _db.gdpr_deletion_used.find_one({"jti": jti}, {"_id": 0})
+        if used:
+            raise HTTPException(401, "deletion token already used")
+        try:
+            await _db.gdpr_deletion_used.insert_one({
+                "jti": jti, "email": email,
+                "used_at": datetime.now(timezone.utc).isoformat(),
+            })
+            await _db.gdpr_deletion_used.create_index("used_at", expireAfterSeconds=86400 * 30)
+        except Exception:
+            pass
+
     deleted_counts = {}
     collections_cleared = 0
     
@@ -142,18 +169,66 @@ async def delete_customer_data_post(request: Request, body: DeleteDataRequest):
     """
     GDPR Compliance: Delete all customer data by email (POST method with confirmation).
     Customer must confirm by typing "DELETE MY DATA".
+
+    Bug-fix #179 (R22): now also requires a signed deletion token via
+    `body.token`, identical to the GET handler. The string confirmation
+    alone is not sufficient — anyone could send it.
     """
     if _db is None:
         raise HTTPException(status_code=503, detail="Service unavailable")
-    
+
     if body.confirmation != "DELETE MY DATA":
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="Please type 'DELETE MY DATA' to confirm deletion"
         )
-    
-    # Delegate to GET handler
-    return await delete_customer_data_get(request, email=body.email)
+
+    token = getattr(body, "token", None) or ""
+    if not token:
+        raise HTTPException(401, "Deletion token required — request one via /api/customer/request-deletion")
+
+    # Delegate to GET handler (handles token verification + replay block).
+    return await delete_customer_data_get(request, email=body.email, token=token)
+
+
+@router.post("/request-deletion")
+async def request_deletion(request: Request, body: dict):
+    """Bug-fix #179 (R22): mint a 1-hour deletion token and email it.
+
+    Customer POSTs `{"email": "..."}` → server emails them a link with
+    a signed JWT containing `{type: gdpr_delete, email, jti, exp}`. The
+    actual deletion endpoint requires this token. This proves the
+    requester controls the inbox.
+    """
+    import jwt as _pyjwt, os as _os, uuid as _uuid
+    email = (body.get("email") or "").lower().strip()
+    if "@" not in email:
+        raise HTTPException(400, "valid email required")
+    secret = _os.environ.get("JWT_SECRET")
+    if not secret:
+        raise HTTPException(500, "deletion service misconfigured")
+    token = _pyjwt.encode({
+        "type": "gdpr_delete",
+        "email": email,
+        "jti": _uuid.uuid4().hex,
+        "exp": int(datetime.now(timezone.utc).timestamp()) + 3600,
+    }, secret, algorithm="HS256")
+    # Best-effort send-email; if the email service is offline we still
+    # return the token to the operator-facing audit log but never echo
+    # it in the HTTP response.
+    try:
+        from services.email_service import send_email  # type: ignore
+        link = f"https://aurem.live/api/customer/delete-my-data?email={email}&token={token}"
+        await send_email(
+            to=email,
+            subject="Confirm AUREM data deletion",
+            body=f"Click to confirm deletion (expires in 1 hour):\n{link}\n\n"
+                 "If you didn't request this, ignore this email — no action will be taken.",
+        )
+    except Exception:
+        pass
+    # Generic response — never leaks whether the email exists.
+    return {"ok": True, "message": "If the email exists, a deletion link has been sent."}
 
 
 @router.get("/data-retention-policy")

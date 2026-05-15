@@ -1083,7 +1083,21 @@ except ImportError:
     logger.error("Stripe checkout import failed")
 
 # Nexus vault decryption (for GitHub token retrieval)
-ENCRYPTION_KEY = os.environ.get("AUREM_ENCRYPTION_KEY", "aurem32characterencryptionkey!")
+def _load_aurem_encryption_key() -> str:
+    """Bug-fix #175 (R21): refuse the public default key in production."""
+    import os as _os, secrets as _secrets
+    k = _os.environ.get("AUREM_ENCRYPTION_KEY")
+    if not k or k == "aurem32characterencryptionkey!":
+        if _os.environ.get("AUREM_ENV") == "production":
+            raise RuntimeError(
+                "AUREM_ENCRYPTION_KEY not configured — refusing to use default key in production"
+            )
+        k = _secrets.token_urlsafe(32)
+        _os.environ["AUREM_ENCRYPTION_KEY"] = k
+    return k
+
+
+ENCRYPTION_KEY = _load_aurem_encryption_key()
 
 def _nexus_aes_key():
     k = ENCRYPTION_KEY.encode("utf-8")

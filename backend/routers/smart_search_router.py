@@ -151,20 +151,17 @@ async def get_quota_status():
 
 
 @router.post("/switch")
-async def switch_engine(engine: str = Query(..., description="google or duckduckgo")):
+async def switch_engine(
+    request: Request,
+    engine: str = Query(..., description="google or duckduckgo"),
+):
+    """Manually switch search engine.
+
+    Bug-fix #185 (R22): admin auth required.
     """
-    Manually switch search engine
-    
-    **Use cases:**
-    - Force DuckDuckGo for privacy
-    - Force Google for better results
-    - Override automatic selection
-    
-    **Example:**
-    ```bash
-    POST /api/search/switch?engine=duckduckgo
-    ```
-    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     search_service = get_smart_search()
     
     try:

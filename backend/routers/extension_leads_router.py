@@ -51,8 +51,17 @@ class BulkLeadsRequest(BaseModel):
 
 
 @router.post("/leads/bulk")
-async def bulk_import_leads(request: BulkLeadsRequest):
-    """Receive bulk leads from Chrome extension"""
+async def bulk_import_leads(request: BulkLeadsRequest, http_request: Request):
+    """Receive bulk leads from Chrome extension.
+
+    Bug-fix #177 (R21): admin auth required. Also enforce a hard cap
+    of 500 leads/call to bound storage usage on import.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(http_request.headers.get("Authorization", ""))
+    if len(request.leads) > 500:
+        raise HTTPException(413, "max 500 leads per bulk import")
+
     if db is None:
         raise HTTPException(500, "Database not initialized")
 
@@ -219,8 +228,14 @@ async def export_leads_csv():
 
 
 @router.delete("/leads/{lead_id}")
-async def delete_lead(lead_id: str):
-    """Delete a single lead"""
+async def delete_lead(lead_id: str, http_request: Request):
+    """Delete a single lead.
+
+    Bug-fix #177 (R21): admin auth required.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(http_request.headers.get("Authorization", ""))
+
     if db is None:
         raise HTTPException(500, "Database not initialized")
 

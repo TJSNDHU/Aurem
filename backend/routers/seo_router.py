@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from services.unlinked_mentions_service import (
@@ -61,7 +61,11 @@ class _StatusBody(BaseModel):
 
 # ── Endpoints ───────────────────────────────────────────────────────
 @router.post("/api/seo/unlinked/scan")
-async def scan_endpoint(body: _ScanBody):
+async def scan_endpoint(body: _ScanBody, request: Request):
+    """Bug-fix #182 (R22): admin auth required. Burns Google/Tavily
+    quota per call — unauthenticated callers could drain budget."""
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
     db = _db()
     if db is None:
         raise HTTPException(503, "db unavailable")
@@ -101,7 +105,12 @@ async def results_endpoint(client_bin: str | None = Query(default=None)):
 
 
 @router.post("/api/seo/unlinked/outreach")
-async def outreach_endpoint(body: _OutreachBody):
+async def outreach_endpoint(body: _OutreachBody, request: Request):
+    """Bug-fix #182 (R22): admin auth required. Sends real outreach
+    email via RESEND — unauthenticated abuse turns the platform into
+    a spam engine impersonating AUREM's domain."""
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
     db = _db()
     if db is None:
         raise HTTPException(503, "db unavailable")

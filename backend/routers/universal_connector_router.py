@@ -418,6 +418,40 @@ async def receive_webhook(platform: str, request: Request):
         else:
             logger.warning("[Webhook] STRIPE_WEBHOOK_SECRET not set — skipping signature verification")
             body = await request.json()
+    elif platform == "shopify":
+        # Bug-fix #181 (R22): Shopify webhook HMAC verification.
+        import hmac as _hmac, hashlib as _hashlib, base64 as _base64
+        secret = os.environ.get("SHOPIFY_WEBHOOK_SECRET") or os.environ.get("SHOPIFY_API_SECRET")
+        raw_body = await request.body()
+        sig = request.headers.get("X-Shopify-Hmac-Sha256", "") or request.headers.get("x-shopify-hmac-sha256", "")
+        if secret:
+            digest = _hmac.new(secret.encode("utf-8"), raw_body, _hashlib.sha256).digest()
+            computed = _base64.b64encode(digest).decode("utf-8")
+            if not (sig and _hmac.compare_digest(computed, sig)):
+                raise HTTPException(401, "invalid Shopify webhook signature")
+        elif os.environ.get("AUREM_ENV") == "production":
+            raise HTTPException(500, "SHOPIFY_WEBHOOK_SECRET not configured")
+        try:
+            body = json.loads(raw_body) if raw_body else {}
+        except Exception:
+            body = {}
+    elif platform == "woocommerce":
+        # Bug-fix #181 (R22): WooCommerce webhook HMAC (base64 sha256).
+        import hmac as _hmac, hashlib as _hashlib, base64 as _base64
+        secret = os.environ.get("WOOCOMMERCE_WEBHOOK_SECRET", "")
+        raw_body = await request.body()
+        sig = request.headers.get("x-wc-webhook-signature", "")
+        if secret:
+            digest = _hmac.new(secret.encode("utf-8"), raw_body, _hashlib.sha256).digest()
+            computed = _base64.b64encode(digest).decode("utf-8")
+            if not (sig and _hmac.compare_digest(computed, sig)):
+                raise HTTPException(401, "invalid WooCommerce webhook signature")
+        elif os.environ.get("AUREM_ENV") == "production":
+            raise HTTPException(500, "WOOCOMMERCE_WEBHOOK_SECRET not configured")
+        try:
+            body = json.loads(raw_body) if raw_body else {}
+        except Exception:
+            body = {}
     else:
         body = await request.json()
 
