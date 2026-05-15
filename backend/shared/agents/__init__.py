@@ -105,11 +105,16 @@ def register_agents(db):
     missing module doesn't break the whole startup path. Each agent is
     imported individually; failures are logged and skipped.
     """
+    # iter 322ev — agent classes live in `shared.agents.*`. The
+    # `services.agents.*` paths are shim modules and do NOT re-export the
+    # class symbols, so `getattr(mod, cls_name)` returned None for every
+    # agent, spamming a warning per agent on every startup. Import from
+    # the canonical location.
     agent_specs = [
-        ("services.agents.hunter_ora",   "HunterORA"),
-        ("services.agents.followup_ora", "FollowupORA"),
-        ("services.agents.closer_ora",   "CloserORA"),
-        ("services.agents.referral_ora", "ReferralORA"),
+        ("shared.agents.hunter_ora",   "HunterORA"),
+        ("shared.agents.followup_ora", "FollowupORA"),
+        ("shared.agents.closer_ora",   "CloserORA"),
+        ("shared.agents.referral_ora", "ReferralORA"),
     ]
     for mod_path, cls_name in agent_specs:
         try:

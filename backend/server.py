@@ -717,6 +717,26 @@ async def _liveness_health():
 async def _liveness_ready():
     return {"status": "ready"}
 
+
+# Belt-and-braces: even though HealthProbeMiddleware short-circuits these
+# paths at the outermost ASGI layer, register direct routes too so any
+# request that bypasses the middleware (route prefix order, exception in
+# middleware code, etc.) still gets a fast OK response. Critical for K8s
+# readiness/liveness probes during production cold-start.
+@app.get("/api/platform/health", include_in_schema=False)
+async def _liveness_platform_health():
+    return {"status": "healthy", "platform": "aurem"}
+
+
+@app.get("/api/health", include_in_schema=False)
+async def _liveness_api_health():
+    return {"status": "healthy"}
+
+
+@app.get("/live", include_in_schema=False)
+async def _liveness_live():
+    return {"status": "alive"}
+
 # NOTE: /api/platform/health, /api/health, /ready, /live are ALL served
 # in <1ms by `middleware/health_probe.py::HealthProbeMiddleware` at the
 # outermost ASGI layer, before any router or DB touch. Do not duplicate

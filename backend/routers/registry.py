@@ -1302,7 +1302,11 @@ def register_all_routers(app, db):
 
 
     # Memoir Router (Git-versioned semantic memory for 28 agents + ORA)
-    if not _should_skip("routers.memoir_router"):
+    # Production-safety: skip if MEMOIR_SKIP=1 or /app/data is read-only.
+    # The CLI `memoir new` exits 5 on K8s overlay FS and the registry call
+    # is synchronous → can stall startup if it retries. Make it best-effort
+    # and respect the operator's MEMOIR_SKIP=1 override.
+    if not _should_skip("routers.memoir_router") and os.environ.get("MEMOIR_SKIP", "").strip() not in ("1", "true", "yes", "on"):
         try:
             from routers.memoir_router import router as memoir_router
             from services import memoir_service

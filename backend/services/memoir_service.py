@@ -58,21 +58,43 @@ def _normalize_path(path: str | tuple | list) -> tuple:
 def _ensure_store_dir() -> None:
     """Create the store on disk if missing. Uses the `memoir new` CLI to
     initialise the .git directory + data folder so ProllyTreeStore can
-    open it."""
+    open it.
+
+    Production-safety (May 2026): in deployed K8s pods `memoir new` exits 5
+    because `/app/data/` is not writable on the read-only overlay. We now
+    detect this fast (writability probe) and raise a clean error so init()
+    can skip Memoir without blocking startup. Set MEMOIR_SKIP=1 to disable
+    the subprocess entirely (recommended for production)."""
     if os.path.isdir(os.path.join(_STORE_PATH, ".git")) and os.path.isdir(
         os.path.join(_STORE_PATH, "data")
     ):
         return
-    os.makedirs(os.path.dirname(_STORE_PATH) or "/", exist_ok=True)
+    if os.environ.get("MEMOIR_SKIP", "").strip() in ("1", "true", "yes", "on"):
+        raise RuntimeError("MEMOIR_SKIP=1 (operator disabled)")
+    parent = os.path.dirname(_STORE_PATH) or "/"
+    try:
+        os.makedirs(parent, exist_ok=True)
+    except Exception as e:
+        raise RuntimeError(f"cannot create parent {parent}: {e}")
+    # Fast writability probe — avoids spawning subprocess that takes ~10s
+    # to time out in read-only production containers.
+    if not os.access(parent, os.W_OK):
+        raise RuntimeError(f"parent {parent} is not writable")
     try:
         r = subprocess.run(
             ["memoir", "new", _STORE_PATH],
             check=True, capture_output=True, text=True, timeout=10,
         )
         logger.info(f"[memoir] store created at {_STORE_PATH}: {r.stdout.strip()}")
+    except FileNotFoundError:
+        # memoir CLI binary not present in container — silent skip.
+        raise RuntimeError("memoir CLI not installed")
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("memoir new timed out (10s)")
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"memoir new exit={e.returncode}: {(e.stderr or '').strip()[:120]}")
     except Exception as e:
-        logger.error(f"[memoir] could not create store at {_STORE_PATH}: {e}")
-        raise
+        raise RuntimeError(f"memoir new failed: {e}")
 
 
 def init() -> bool:

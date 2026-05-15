@@ -50,15 +50,33 @@ SHIPPED_RE = re.compile(r"(?:shipped|added|built|launched|ship)[:\s]+([^\.\n]+)"
 # ────────────────────────────────────────────────────────────────────
 # Git helpers
 # ────────────────────────────────────────────────────────────────────
+_GIT_AVAILABLE: Optional[bool] = None
+
+
 def _git(*args: str) -> str:
+    """Run `git -C /app <args>`. Caches binary availability after first
+    call so production containers without `git` installed don't spam
+    warning logs on every scheduler tick (was: ~3 warnings/minute)."""
+    global _GIT_AVAILABLE
+    if _GIT_AVAILABLE is False:
+        return ""
     try:
         out = subprocess.check_output(
             ["git", "-C", REPO_ROOT, *args],
             stderr=subprocess.DEVNULL, timeout=30,
         )
+        _GIT_AVAILABLE = True
         return out.decode("utf-8", errors="replace")
+    except FileNotFoundError:
+        if _GIT_AVAILABLE is None:
+            logger.info("[build-journal] git binary not present — disabling for this pod")
+        _GIT_AVAILABLE = False
+        return ""
     except Exception as e:
-        logger.warning(f"[build-journal] git {args}: {e}")
+        # Real git error — keep logging but rate-limit by only emitting once.
+        if _GIT_AVAILABLE is None:
+            logger.warning(f"[build-journal] git {args}: {e}")
+            _GIT_AVAILABLE = False  # disable retries this pod-lifetime
         return ""
 
 
