@@ -36,6 +36,9 @@ router = APIRouter(prefix="/api/admin/git-gate", tags=["git-commit-gate"])
 
 
 def _verify_token(authorization: Optional[str] = None) -> str:
+    """Bug-fix 141 — was validating JWT signature only; any authenticated
+    user could approve git proposals → run real `git commit` on production.
+    Now requires admin/super-admin claim, role, or whitelisted email."""
     if not authorization:
         raise HTTPException(401, "Authorization required")
     import jwt
@@ -45,9 +48,18 @@ def _verify_token(authorization: Optional[str] = None) -> str:
     try:
         secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
         payload = jwt.decode(token, secret, algorithms=["HS256"])
-        return payload.get("email") or payload.get("user_id") or payload.get("sub") or "unknown"
     except Exception:
         raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    is_admin = (
+        payload.get("is_admin")
+        or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+        or is_admin_email(payload.get("email"))
+    )
+    if not is_admin:
+        raise HTTPException(403, "Admin access required (git operations)")
+    return payload.get("email") or payload.get("user_id") or payload.get("sub") or "unknown"
 
 
 def _get_db():

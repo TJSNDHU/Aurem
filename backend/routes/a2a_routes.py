@@ -100,29 +100,54 @@ async def handle_a2a_task(
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    """
-    A2A Task Handler.
-    
-    Receives tasks from other AI agents and routes them to appropriate
-    Reroots AI skills.
-    
-    Supported skills:
-    - skincare_advice: Personalized skincare recommendations
-    - skin_analysis: Analyze skin photos (requires image in input)
-    - order_management: Check order status
-    - inventory_check: Check product availability
-    - product_info: Get product details
+    """A2A Task Handler.
+
+    Bug-fix 139 — was unauthenticated for all skills except `supplier_order`,
+    allowing anyone to call paid LLM endpoints via skincare_advice /
+    skin_analysis. Now requires either:
+      • A valid X-API-Key registered in api_key_manager, OR
+      • A verified JWT (Authorization: Bearer ...)
+    Per-skill rate-limiting (60 req / 10 min / IP) enforced on top.
     """
     if _db is None:
         raise HTTPException(status_code=503, detail="Service unavailable")
-    
-    # Validate API key for B2B operations
-    b2b_skills = ["supplier_order"]
-    if task.skill_id in b2b_skills:
-        if not x_api_key:
-            raise HTTPException(status_code=401, detail="API key required for this skill")
-        # Validate API key here (integrate with api_key_manager)
-    
+
+    # Authentication: require either api key OR JWT
+    authed = False
+    if x_api_key:
+        try:
+            from services.api_key_manager import validate_api_key
+            res = await validate_api_key(x_api_key)
+            if res.get("valid"):
+                authed = True
+        except Exception:
+            pass
+    if not authed and authorization:
+        try:
+            from utils.require_auth import require_auth as _ra
+            await _ra(authorization=authorization)
+            authed = True
+        except Exception:
+            authed = False
+    if not authed:
+        raise HTTPException(status_code=401, detail="A2A task requires X-API-Key or Bearer JWT")
+
+    # Rate limit: 60 calls per 10 minutes per IP
+    try:
+        from datetime import timedelta as _td
+        ten_min_ago = datetime.now(timezone.utc) - _td(minutes=10)
+        ip = request.client.host if request.client else "unknown"
+        recent = await _db.a2a_tasks.count_documents({
+            "source_ip": ip,
+            "created_at": {"$gte": ten_min_ago.isoformat()},
+        })
+        if recent >= 60:
+            raise HTTPException(429, "A2A rate limit exceeded (60 / 10 min)")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # rate-limit is best-effort; don't break the flow on count error
+
     # Log A2A task
     await _db.a2a_tasks.insert_one({
         "task_id": task.task_id,

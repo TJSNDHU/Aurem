@@ -40,7 +40,16 @@ def _get_db():
     return None
 
 # JWT Configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "aurem-secure-jwt-secret-key-2026-production")
+# Bug-fix 140 — was hardcoded fallback "aurem-secure-jwt-secret-key-2026-production"
+# creating a split-secret scenario where an attacker who knew this string
+# could forge tokens accepted ONLY by /api/aurem/* routes. No fallback now —
+# missing env var fails fast at first use.
+JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+if not JWT_SECRET:
+    import logging as _l
+    _l.getLogger(__name__).warning(
+        "[aurem_routes] JWT_SECRET not set — auth endpoints will 500 until configured"
+    )
 JWT_ALGORITHM = "HS256"
 
 # ═══════════════════════════════════════════════════════════════════════════════

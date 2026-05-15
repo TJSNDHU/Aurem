@@ -8054,3 +8054,57 @@ tests pass** (Round 2-15 + compliance + may2026 suites).
 - New: `/app/backend/tests/test_round12_round15_fixes.py` — 24 tests, all
   pass. Runs hot smoke against live preview backend.
 - Total security regression: **124 tests across 7 suites, all green**.
+
+## 2026-02-15 — Round 16-17 Security Sprint (Bugs 133-148)
+
+**ORA CTO watchdog mode** continued. 15 more critical bugs patched, **145
+total security regression tests passing** (8 suites).
+
+### Critical fixes
+- **Bug 133/147** `self_repair_router._require_admin` — was returning payload
+  for any valid JWT; now requires admin claim/role/whitelisted email.
+  Closes the full chain `JWT → bridge_issue_to_builder → LLM → file write
+  → supervisorctl restart`.
+- **Bug 134** `orchestrator_brain_router` — router-level `require_admin`.
+  `/command`, `/workflow/execute`, `/workflow/create`, `/task` admin-gated.
+- **Bug 135** `ai_email_router` — router-level `require_admin`. Closes
+  free email-spam + phishing relay under `ora@aurem.live`.
+- **Bug 136** `seo_audit_router` — `urlparse(netloc)` check was bypassed by
+  private IPs. Added `_block_ssrf()` to `/scan` and `/v2/scan`. The
+  endpoint stays public (lead-magnet), only the SSRF vector is closed.
+- **Bug 137** `design_extract_router._verify_token` — added admin claim
+  enforcement + `_block_ssrf()` on extract URL (Playwright SSRF).
+- **Bug 138** `backup_service.write_file_backup` — chmod 700/600 on
+  directory/file, optional `BACKUP_ENCRYPTION_KEY` (Fernet) for
+  at-rest encryption of MongoDB snapshots; cleanup handles `.enc` files.
+- **Bug 139** `a2a_routes` `/api/a2a/task` — now requires either valid
+  X-API-Key (api_key_manager) OR Bearer JWT; per-IP rate-limit of 60
+  calls / 10 min based on `a2a_tasks` collection.
+- **Bug 140** `aurem_routes.py` — removed hardcoded `JWT_SECRET` fallback
+  `"aurem-secure-jwt-secret-key-2026-production"` (split-secret eliminated).
+- **Bug 141** `git_gate_router._verify_token` — added admin enforcement so
+  `git commit` / `git reset --hard HEAD~N` can no longer be triggered by
+  any paying customer.
+- **Bug 142** `hermes_router._auth` — added admin check so `PUT /identity`
+  (SOUL.md / USER.md overwrite) is no longer customer-callable.
+- **Bug 143** `ai_repair_router.free_tier_deploy` — added server-side
+  HMAC-signed PIN token (`<deploy_id>.<unix_ts>.<sha256_hmac>` keyed off
+  `AUREM_ADMIN_KEY`, 15-min window) + admin JWT bypass for support.
+  Closes the bypass of $49/$99 Stripe tiers.
+- **Bug 144** `customer_scanner` — removed `or payload.get("email")`
+  bypass on the push-fixes review endpoint; now uses the shared
+  `is_admin_email` whitelist + explicit claim/role check.
+- **Bug 145** `ora_optimize_router._verify_token` — added admin
+  enforcement on `/clear-cache` (and 4 other endpoints sharing the
+  helper) to stop LLM-budget drain via cache wipe.
+- **Bug 146** `session_memory_router` — full rewrite. Router-level
+  `Depends(require_admin)` + input sanitisation (control-char strip,
+  2000-char cap) to prevent Markdown / link injection into
+  `/app/docs/session_memory.md`.
+- **Bug 148** — not exploitable in current source (registration only
+  stores `password_hash`, never plaintext). Test added to guard future
+  regressions.
+
+### Test suite
+- New: `/app/backend/tests/test_round16_round17_fixes.py` — 21 tests, all
+  pass. Full security regression: **145 tests across 8 suites, all green**.

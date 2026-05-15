@@ -2486,3 +2486,28 @@ Previously backend-complete + frontend-orphan. Now wired:
 - LinkedIn token encryption no longer derives from `JWT_SECRET`. Tokens
   encrypted under the old key (pre-2026-02-15) require user reconnect.
 
+
+---
+
+## 2026-02-15 Update #2 — Round 16-17 Security Sprint Complete
+
+### Status snapshot
+- **Total bugs patched across 17 audit rounds: 148**
+- **Security regression suite: 145 tests across 8 files, all green**
+- Backend healthy on preview URL; all admin/SSRF gates verified via live curl.
+
+### What's now closed (Round 16+17)
+- Bugs 133-148 — self_repair_router builder bypass, orchestrator/ai-email/
+  seo-audit/design-extract/a2a/git-gate/hermes/ai-repair/customer-scanner/
+  ora-optimize/session-memory all auth-tightened; hardcoded JWT default
+  removed from aurem_routes; backup files now chmod'd + optionally
+  Fernet-encrypted via BACKUP_ENCRYPTION_KEY.
+
+### Pending / next priorities
+Same as previous update:
+- **P1** Ghost Scout parked-vertical → Telegram alert (24h stall).
+- **P2** Bug 52 WebSocket JWT migration to first init message.
+- **P2** Bug 54 `/test-capture` lock-down or removal.
+- **P2** Phase 2 integrations (HubSpot/Salesforce, Telegram inline buttons,
+  Day-7 upsell).
+

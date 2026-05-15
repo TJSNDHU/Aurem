@@ -34,7 +34,9 @@ router = APIRouter(prefix="/api/admin/design-extract", tags=["design-extract"])
 
 
 def _verify_token(authorization: Optional[str] = None) -> str:
-    """JWT auth — matches admin_cache_router pattern."""
+    """Bug-fix 137 — was validating JWT signature only; any authenticated
+    user could run Playwright against arbitrary URLs (SSRF). Now requires
+    admin role explicitly."""
     if not authorization:
         raise HTTPException(401, "Authorization required")
     import jwt
@@ -44,9 +46,18 @@ def _verify_token(authorization: Optional[str] = None) -> str:
     try:
         secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
         payload = jwt.decode(token, secret, algorithms=["HS256"])
-        return payload.get("user_id", payload.get("id", payload.get("sub", "unknown")))
     except Exception:
         raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    is_admin = (
+        payload.get("is_admin")
+        or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+        or is_admin_email(payload.get("email"))
+    )
+    if not is_admin:
+        raise HTTPException(403, "Admin access required")
+    return payload.get("user_id", payload.get("id", payload.get("sub", "unknown")))
 
 
 class ExtractRequest(BaseModel):
@@ -74,6 +85,10 @@ async def run_extract(req: ExtractRequest, authorization: Optional[str] = Header
     """
     user_id = _verify_token(authorization)
     db = _get_db()
+
+    # Bug-fix 137 — block SSRF to private hosts.
+    from routers.intelligence_router import _block_ssrf
+    _block_ssrf(req.url)
 
     from services.design_extractor import extract_design
     started = datetime.now(timezone.utc)

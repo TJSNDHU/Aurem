@@ -3,7 +3,7 @@ ReRoots AI Orchestrator - The Master Brain
 Central intelligence that coordinates all AI agents, routes tasks, and executes workflows
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Set
 from datetime import datetime, timezone, timedelta
@@ -14,7 +14,18 @@ import asyncio
 import secrets
 from enum import Enum
 
-router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator-brain"])
+from utils.require_auth import require_admin
+
+# Bug-fix 134 — was completely unauthenticated; /command, /workflow/execute,
+# /workflow/create, /task could trigger WhatsApp/SMS blasts via LLM-routed
+# execution plans. Admin-gated at the router level. WebSocket route is
+# excluded from this dependency (FastAPI applies router deps to WS handlers
+# differently — we add a per-message check there).
+router = APIRouter(
+    prefix="/api/orchestrator",
+    tags=["orchestrator-brain"],
+    dependencies=[Depends(require_admin)],
+)
 
 # Database reference
 db: AsyncIOMotorDatabase = None

@@ -331,6 +331,12 @@ async def run_scan(body: ScanRequest, request: Request):
     except Exception:
         raise HTTPException(400, "Invalid URL")
 
+    # Bug-fix 136 — netloc check alone passed `169.254.169.254` etc. Block
+    # private / loopback / link-local / metadata hosts before issuing the
+    # three concurrent fetches (PSI, Firecrawl, direct httpx).
+    from routers.intelligence_router import _block_ssrf
+    _block_ssrf(url)
+
     scan_id = f"seo_{uuid.uuid4().hex[:12]}"
 
     # Run external probes CONCURRENTLY — these are I/O bound and independent.
@@ -546,6 +552,9 @@ async def deep_scan_v2(body: ScanRequest):
     """
     from services.seo_audit_v2 import run_seo_audit_v2
     url = _normalize_url(body.url)
+    # Bug-fix 136 — /v2/scan also fetched user-supplied URL with no IP guard.
+    from routers.intelligence_router import _block_ssrf
+    _block_ssrf(url)
     report = await run_seo_audit_v2(url)
     if _db is not None:
         await _db.seo_audits_v2.insert_one({

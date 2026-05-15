@@ -18,14 +18,26 @@ logger = logging.getLogger(__name__)
 
 
 async def _auth(authorization: str = Header(None)):
+    """Bug-fix 142 — was validating JWT only; any authenticated user could
+    overwrite SOUL.md / USER.md (ORA core identity files) via PUT /identity.
+    Now requires admin/super-admin claim, role, or whitelisted email."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Auth required")
     try:
         import jwt
         payload = jwt.decode(authorization.replace("Bearer ", ""), os.getenv("JWT_SECRET"), algorithms=["HS256"])
-        return payload
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+    from utils.admin_guard import is_admin_email
+    is_admin = (
+        payload.get("is_admin")
+        or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+        or is_admin_email(payload.get("email"))
+    )
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required (Hermes identity)")
+    return payload
 
 
 @router.get("/identity")

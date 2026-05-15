@@ -39,9 +39,21 @@ async def _require_admin(request: Request):
     token = auth.split(" ", 1)[1]
     try:
         payload = jwt.decode(token, _jwt_secret, algorithms=[_jwt_algorithm])
-        return payload
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+    # Bug-fix 133/147 — was returning payload unconditionally; any valid JWT
+    # could trigger production file writes via /unfixable/.../fix-with-builder.
+    # Now require explicit admin/super-admin claim, role, or whitelisted email.
+    from utils.admin_guard import is_admin_email
+    is_admin = (
+        payload.get("is_admin")
+        or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+        or is_admin_email(payload.get("email"))
+    )
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return payload
 
 
 @router.get("/status")

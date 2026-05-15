@@ -76,18 +76,58 @@ async def run_backup():
 
 
 async def write_file_backup(backup_ts, results, collections_data):
-    """Write backup JSON file to /app/backups/ with date stamp."""
+    """Write backup JSON file to /app/backups/ with date stamp.
+
+    Bug-fix 138 — was writing world-readable plaintext JSON containing
+    `users`, `api_keys`, `aurem_billing`, `tenant_customers`, `invoices` to
+    a predictable filename. Now:
+      • Directory chmod'd to 0o700 (owner-only).
+      • File chmod'd to 0o600.
+      • If BACKUP_ENCRYPTION_KEY is set in env, payload is encrypted with
+        Fernet before write (the key is independent of JWT_SECRET).
+    """
     try:
         FILE_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(FILE_BACKUP_DIR, 0o700)
+        except Exception:
+            pass
         payload = {
             "timestamp": backup_ts,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "meta": {col: {"count": r["count"], "status": r["status"]} for col, r in results.items()},
             "collections": {col: docs for col, docs in collections_data.items() if docs},
         }
-        filepath = FILE_BACKUP_DIR / f"backup_{backup_ts}.json"
-        filepath.write_text(json.dumps(payload, default=str), encoding="utf-8")
-        logger.info(f"[Backup] File backup written: {filepath} ({filepath.stat().st_size} bytes)")
+        raw = json.dumps(payload, default=str).encode("utf-8")
+
+        # Optional encryption — strongly recommended for production.
+        enc_key = (os.environ.get("BACKUP_ENCRYPTION_KEY")
+                   or os.environ.get("WALLET_ENCRYPTION_KEY")
+                   or "").strip()
+        if enc_key:
+            try:
+                import base64 as _b64, hashlib as _hl
+                from cryptography.fernet import Fernet as _Fernet
+                # Accept either a urlsafe-b64 32-byte key or any string (derive).
+                try:
+                    f = _Fernet(enc_key.encode())
+                except Exception:
+                    derived = _b64.urlsafe_b64encode(_hl.sha256(enc_key.encode()).digest())
+                    f = _Fernet(derived)
+                raw = f.encrypt(raw)
+                filepath = FILE_BACKUP_DIR / f"backup_{backup_ts}.json.enc"
+            except Exception as enc_err:
+                logger.warning(f"[Backup] Encryption failed, falling back to plaintext: {enc_err}")
+                filepath = FILE_BACKUP_DIR / f"backup_{backup_ts}.json"
+        else:
+            filepath = FILE_BACKUP_DIR / f"backup_{backup_ts}.json"
+
+        filepath.write_bytes(raw)
+        try:
+            os.chmod(filepath, 0o600)
+        except Exception:
+            pass
+        logger.info(f"[Backup] File backup written: {filepath} ({filepath.stat().st_size} bytes, {'encrypted' if str(filepath).endswith('.enc') else 'plaintext'})")
     except Exception as e:
         logger.error(f"[Backup] File backup write failed: {e}")
 
@@ -99,8 +139,8 @@ def cleanup_old_file_backups():
             return
         cutoff = (datetime.now(timezone.utc) - timedelta(days=BACKUP_RETENTION_DAYS)).strftime("%Y%m%d")
         removed = 0
-        for f in FILE_BACKUP_DIR.glob("backup_*.json"):
-            date_part = f.stem.replace("backup_", "")[:8]
+        for f in list(FILE_BACKUP_DIR.glob("backup_*.json")) + list(FILE_BACKUP_DIR.glob("backup_*.json.enc")):
+            date_part = f.name.replace("backup_", "").split(".")[0][:8]
             if date_part < cutoff:
                 f.unlink()
                 removed += 1

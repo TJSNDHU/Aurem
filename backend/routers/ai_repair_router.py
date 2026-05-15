@@ -1446,13 +1446,56 @@ async def repair_stripe_webhook(request: Request):
 # ══════ 5b. FREE TIER DEPLOY ═════════════════════════════════════
 
 @router.post("/api/repair/deploy/free/{deploy_id}")
-async def free_tier_deploy(deploy_id: str, authorization: str = Header(None)):
-    """
-    Deploy fixes for free tier — marks deployment as paid and fixes as deployed
-    without requiring Stripe payment. Requires prior PIN unlock on frontend.
+async def free_tier_deploy(deploy_id: str, authorization: str = Header(None), x_repair_pin: str = Header(None, alias="X-Repair-PIN")):
+    """Deploy fixes for free tier.
+
+    Bug-fix 143 — previously trusted that the frontend had verified a PIN
+    before calling this endpoint, which meant any authenticated user could
+    POST directly and bypass the Basic ($49) / Pro ($99) Stripe tiers. Now
+    requires a server-issued PIN token (HMAC-signed against AUREM_ADMIN_KEY).
+    The frontend obtains the PIN via /pin-token after legitimate unlock.
+    Admin JWTs may also bypass the PIN check for support / testing.
     """
     from server import db
     user_id = _get_user_id(authorization)
+
+    # Admin bypass
+    is_admin_bypass = False
+    try:
+        import jwt as _jwt
+        secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+        payload = _jwt.decode((authorization or "").replace("Bearer ", "").strip(), secret, algorithms=["HS256"])
+        from utils.admin_guard import is_admin_email
+        is_admin_bypass = bool(
+            payload.get("is_admin") or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or is_admin_email(payload.get("email"))
+        )
+    except Exception:
+        pass
+
+    if not is_admin_bypass:
+        # Require valid server-signed PIN token for non-admin callers.
+        import hmac as _hmac
+        import hashlib as _hl
+        admin_key = (os.environ.get("AUREM_ADMIN_KEY") or "").strip()
+        if not admin_key:
+            raise HTTPException(503, "Free-tier deploy PIN gate not configured")
+        if not x_repair_pin:
+            raise HTTPException(402, "X-Repair-PIN required. Unlock at /repair/pin-token first.")
+        # PIN format: <deploy_id>.<unix_ts>.<hmac-sha256>
+        try:
+            d_id, ts, sig = x_repair_pin.split(".", 2)
+        except ValueError:
+            raise HTTPException(401, "Malformed PIN token")
+        if d_id != deploy_id:
+            raise HTTPException(401, "PIN does not match deploy_id")
+        import time as _t
+        if abs(_t.time() - int(ts)) > 900:  # 15-minute window
+            raise HTTPException(401, "PIN expired")
+        expected = _hmac.new(admin_key.encode(), f"{d_id}.{ts}".encode(), _hl.sha256).hexdigest()
+        if not _hmac.compare_digest(sig, expected):
+            raise HTTPException(401, "PIN signature invalid")
 
     deploy = await db.repair_deployments.find_one(
         {"deploy_id": deploy_id, "user_id": user_id},

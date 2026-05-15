@@ -1499,7 +1499,15 @@ async def review_self_client_fixes(push_id: str, action: str = Query(..., patter
             raise HTTPException(status_code=401, detail="Authorization required")
         token = authorization.replace("Bearer ", "")
         payload = _jwt.decode(token, os.getenv("JWT_SECRET"), algorithms=["HS256"])
-        if not (payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email")):
+        # Bug-fix 144 — `or payload.get("email")` accepted ANY user with an
+        # email claim. Now requires explicit admin claim/role or whitelist.
+        from utils.admin_guard import is_admin_email as _is_admin_email
+        if not (
+            payload.get("is_admin")
+            or payload.get("is_super_admin")
+            or payload.get("role") in ("admin", "super_admin")
+            or _is_admin_email(payload.get("email"))
+        ):
             raise HTTPException(status_code=403, detail="Admin access required to review self-client fixes")
 
         push = await db.push_deployments.find_one({"push_id": push_id})

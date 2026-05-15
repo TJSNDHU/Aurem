@@ -34,6 +34,9 @@ router = APIRouter(prefix="/api/admin/ora-optimize", tags=["ora-optimize"])
 
 
 def _verify_token(authorization: Optional[str] = None) -> str:
+    """Bug-fix 145 — was validating JWT signature only; any user could wipe
+    the entire LLM cache via /clear-cache (forces expensive API calls).
+    Now requires admin claim/role/email."""
     if not authorization:
         raise HTTPException(401, "Authorization required")
     import jwt
@@ -43,9 +46,18 @@ def _verify_token(authorization: Optional[str] = None) -> str:
     try:
         secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
         payload = jwt.decode(token, secret, algorithms=["HS256"])
-        return payload.get("user_id", payload.get("id", payload.get("sub", "unknown")))
     except Exception:
         raise HTTPException(401, "Invalid token")
+    from utils.admin_guard import is_admin_email
+    is_admin = (
+        payload.get("is_admin")
+        or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+        or is_admin_email(payload.get("email"))
+    )
+    if not is_admin:
+        raise HTTPException(403, "Admin access required (ora-optimize)")
+    return payload.get("user_id", payload.get("id", payload.get("sub", "unknown")))
 
 
 def _get_db():

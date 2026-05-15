@@ -7,16 +7,25 @@ import os
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
 
 # Import existing services
 from services.content_ai import generate_content, CONTENT_TYPES, apply_brand_guard
 from routers.email_service import base_template, send_email, FROM_EMAIL, ADMIN_EMAIL
 
+from utils.require_auth import require_admin
+
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/ai-email", tags=["AI Email"])
+# Bug-fix 135 — was completely unauthenticated; /send and /broadcast turned
+# the platform into a free email spammer + phishing relay under the
+# ora@aurem.live domain. Admin-gated at router level.
+router = APIRouter(
+    prefix="/api/ai-email",
+    tags=["AI Email"],
+    dependencies=[Depends(require_admin)],
+)
 
 # MongoDB reference
 _db = None
