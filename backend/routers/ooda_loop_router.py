@@ -3,7 +3,7 @@ ReRoots AI OODA Loop Automation
 Observe-Orient-Decide-Act cycle for continuous business intelligence
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -321,8 +321,16 @@ async def get_ooda_cycles():
 
 
 @router.post("/execute")
-async def execute_ooda_cycle(data: OODACycleExecution, background_tasks: BackgroundTasks):
-    """Execute an OODA cycle"""
+async def execute_ooda_cycle(data: OODACycleExecution, background_tasks: BackgroundTasks, request: Request):
+    """Execute an OODA cycle.
+
+    Bug-fix #166 (R20): admin auth required. Each cycle invokes the LLM
+    to analyze revenue / orders / churn and can `send_to_stakeholders`,
+    burning EMERGENT_LLM_KEY budget and flooding founder inbox if open.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     if data.cycle_id not in OODA_CYCLES:
         raise HTTPException(status_code=400, detail=f"Unknown cycle: {data.cycle_id}")
     
@@ -443,9 +451,16 @@ async def get_ooda_reports(cycle_id: Optional[str] = None, limit: int = 10):
 @router.post("/schedule")
 async def schedule_ooda_cycle(
     cycle_id: str,
-    cron_expression: str  # e.g., "0 9 * * *" for daily at 9am
+    cron_expression: str,  # e.g., "0 9 * * *" for daily at 9am
+    request: Request = None,
 ):
-    """Schedule an OODA cycle for recurring execution"""
+    """Schedule an OODA cycle for recurring execution.
+
+    Bug-fix #166 (R20): admin auth required.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", "") if request else "")
+
     if cycle_id not in OODA_CYCLES:
         raise HTTPException(status_code=400, detail=f"Unknown cycle: {cycle_id}")
     

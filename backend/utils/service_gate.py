@@ -43,8 +43,28 @@ def _hash_bin(business_id: str) -> str:
     """Anonymize BIN for the admin telemetry pool.
     SHA256 truncated. Not reversible, but consistent so per-BIN patterns
     can still be aggregated without leaking the actual BIN identity.
+
+    Bug-fix #170 (R20): refuse to fall back to the public default salt
+    (`aurem-default-salt`). With a known salt + predictable BIN format
+    (AURE-XXXX) an attacker can precompute the hash table and reverse
+    every telemetry row. Now requires ADMIN_ORA_HASH_SALT to be set
+    explicitly in production, or auto-mints a random per-process salt
+    for dev.
     """
-    salt = os.environ.get("ADMIN_ORA_HASH_SALT", "aurem-default-salt")
+    salt = os.environ.get("ADMIN_ORA_HASH_SALT")
+    if not salt or salt == "aurem-default-salt":
+        if os.environ.get("AUREM_ENV") == "production":
+            raise RuntimeError(
+                "ADMIN_ORA_HASH_SALT not configured — refusing to use default salt in production"
+            )
+        # Dev: mint a random salt once per process to keep tests stable.
+        global _DEV_BIN_SALT
+        try:
+            salt = _DEV_BIN_SALT
+        except NameError:
+            import secrets as _secrets
+            salt = _secrets.token_hex(32)
+            _DEV_BIN_SALT = salt
     return hashlib.sha256(f"{salt}:{business_id}".encode()).hexdigest()[:16]
 
 

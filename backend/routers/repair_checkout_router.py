@@ -277,7 +277,7 @@ async def admin_start_repair(request: Request):
     try:
         import jwt as pyjwt
         p = pyjwt.decode(auth.split(" ", 1)[1], secret,
-                         algorithms=["HS256"], options={"verify_exp": False})
+                         algorithms=["HS256"])
     except Exception as e:
         raise HTTPException(401, f"invalid token: {e}")
     if not (p.get("is_admin") or p.get("is_super_admin")

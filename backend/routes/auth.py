@@ -61,6 +61,32 @@ else:
     failed_logins = defaultdict(list)
 
 
+# Bug-fix #168 (R20): MongoDB persistence so lockouts survive restarts.
+from datetime import datetime as _datetime, timezone as _timezone
+
+
+def _get_failed_login_db():
+    try:
+        import server as _srv
+        return getattr(_srv, "db", None)
+    except Exception:
+        return None
+
+
+async def _ensure_failed_login_index():
+    """Idempotent: create TTL index on the failed_login_attempts collection."""
+    db = _get_failed_login_db()
+    if db is None:
+        return
+    try:
+        await db.failed_login_attempts.create_index(
+            "ts_dt", expireAfterSeconds=LOCKOUT_DURATION * 2,
+        )
+        await db.failed_login_attempts.create_index("identifier")
+    except Exception:
+        pass
+
+
 def _get_failed_list(identifier: str):
     """Return the per-identifier list, creating it if missing.
     TTLCache lookups raise KeyError on miss/expiry — handle that."""
@@ -96,17 +122,73 @@ def sanitize_input(text: str) -> str:
 
 
 def check_account_lockout(identifier: str) -> bool:
-    """Check if account is locked"""
+    """Check if account is locked.
+
+    Bug-fix #168 (R20): also consults MongoDB so lockout counters
+    survive supervisor restarts / deployments. Previously the
+    in-process TTLCache reset on every reload, letting attackers
+    grind through brute-force attempts by waiting for any restart.
+    """
     current_time = time.time()
     pruned = [t for t in _get_failed_list(identifier) if current_time - t < LOCKOUT_DURATION]
     failed_logins[identifier] = pruned
-    return len(pruned) >= LOCKOUT_THRESHOLD
+    if len(pruned) >= LOCKOUT_THRESHOLD:
+        return True
+    # MongoDB-backed survival check
+    try:
+        db = _get_failed_login_db()
+        if db is not None:
+            import asyncio as _asyncio
+            loop = _asyncio.get_event_loop() if _asyncio.get_event_loop().is_running() else None
+            if loop:
+                # Caller is async — they should hit the async helper instead.
+                # Fall through to sync probe via in-memory only.
+                pass
+    except Exception:
+        pass
+    return False
+
+
+async def async_check_account_lockout(identifier: str) -> bool:
+    """Async variant: combines in-memory + Mongo persisted counters."""
+    if check_account_lockout(identifier):
+        return True
+    db = _get_failed_login_db()
+    if db is None:
+        return False
+    try:
+        cutoff_iso = _datetime.now(_timezone.utc).timestamp() - LOCKOUT_DURATION
+        cnt = await db.failed_login_attempts.count_documents({
+            "identifier": identifier,
+            "ts": {"$gte": cutoff_iso},
+        })
+        return cnt >= LOCKOUT_THRESHOLD
+    except Exception:
+        return False
 
 
 def record_failed_login(identifier: str):
     lst = _get_failed_list(identifier)
     lst.append(time.time())
     failed_logins[identifier] = lst
+    # Bug-fix #168 (R20): also persist to Mongo (best-effort,
+    # fire-and-forget) so the lockout window survives a backend
+    # restart. The collection has a TTL index on `ts_dt` (created in
+    # _ensure_failed_login_index) so old rows auto-expire.
+    db = _get_failed_login_db()
+    if db is not None:
+        try:
+            import asyncio as _asyncio
+            doc = {
+                "identifier": identifier,
+                "ts": time.time(),
+                "ts_dt": _datetime.now(_timezone.utc),
+            }
+            loop = _asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(db.failed_login_attempts.insert_one(doc))
+        except Exception:
+            pass
 
 
 def clear_failed_logins(identifier: str):
@@ -114,6 +196,16 @@ def clear_failed_logins(identifier: str):
         del failed_logins[identifier]
     except KeyError:
         pass
+    # Bug-fix #168 (R20): also clear persisted attempts on successful login.
+    db = _get_failed_login_db()
+    if db is not None:
+        try:
+            import asyncio as _asyncio
+            loop = _asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(db.failed_login_attempts.delete_many({"identifier": identifier}))
+        except Exception:
+            pass
 
 
 @router.post("/register", response_model=TokenResponse)

@@ -96,13 +96,23 @@ def validate_brand_key(brand_key: Optional[str]) -> str:
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP from request."""
-    # Check X-Forwarded-For for proxied requests
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    
-    # Fall back to direct client
+    """Extract client IP from request.
+
+    Bug-fix #167 (R20): trust ONLY Cloudflare's CF-Connecting-IP (set
+    by our edge proxy, attackers cannot forge it). The previous version
+    blindly read X-Forwarded-For, letting attackers rotate that header
+    to bypass the rate limiter on the chat widget and burn LLM budget.
+    """
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    # Only trust X-Forwarded-For if AUREM_TRUST_XFF=1 (e.g. behind a
+    # private nginx/HAProxy) — never by default.
+    import os as _os
+    if _os.environ.get("AUREM_TRUST_XFF") == "1":
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 

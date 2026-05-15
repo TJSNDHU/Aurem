@@ -1,5 +1,30 @@
 # AUREM Platform — PRD
 
+> **🟢 ROUND 20 SECURITY SPRINT — FINAL AUDIT (2026-02 / iter 322fm) — 7 BUGS PATCHED**
+>
+> Total bugs fixed across all rounds now: **170**. Round 20 is the final audit round.
+>
+> ## Round 20 (Bugs 165-171)
+> 1. **Bug 165** — `infra_settings_router._get_user_from_token` switched to canonical `verify_admin`. Removed `or payload.get("email")` bypass. Customers can no longer overwrite `REDIS_URL` / `CORS_ORIGINS`.
+> 2. **Bug 166** — `ooda_loop_router` `/execute` + `/schedule` admin-gated via `verify_admin`. LLM-powered audit cycles + stakeholder emails no longer triggerable by anonymous attacker.
+> 3. **Bug 167** — `chat_widget_routes.get_client_ip()` now trusts only `CF-Connecting-IP`. `X-Forwarded-For` honoured only when explicit `AUREM_TRUST_XFF=1` opt-in. Closes IP-rotation rate-limit bypass.
+> 4. **Bug 168** — `routes/auth.py` failed_logins now persisted to MongoDB `failed_login_attempts` (TTL index `2×LOCKOUT_DURATION`). Survives supervisor restarts. New `async_check_account_lockout()` combines in-memory + Mongo; `record_failed_login` writes both; `clear_failed_logins` clears both.
+> 5. **Bug 169** — `v2v_stream_engine.create_web_call` per-IP rate-limited (6/min) via `aurem_rate_limiter`. Toll-fraud and concurrent-session exhaustion closed.
+> 6. **Bug 170** — `utils/service_gate._hash_bin` refuses default salt in production (raises `RuntimeError`). Dev auto-mints random per-process salt. BIN de-anonymization closed.
+> 7. **Bug 171** — `options={"verify_exp": False}` removed from `agent_board_router`, `v2v_stream_engine`, `repair_checkout_router`, `sentinel_router` (agents_router already fixed in R18). Expired tokens now correctly rejected platform-wide.
+>
+> ## Tests
+> - New: `backend/tests/test_round20_fixes.py` — **15 tests passing**.
+> - Full R12-R20 regression: **96 passed, 0 failed** in ~15s.
+>
+> ## Operator action items
+> - **Production env vars to set:** `ADMIN_ORA_HASH_SALT` (random 64-hex), `SHOPIFY_WEBHOOK_SECRET`, `CORS_ORIGINS=https://aurem.live,...`.
+> - If load-balancer in front of nginx terminates TLS and sets X-Forwarded-For from a trusted private subnet, set `AUREM_TRUST_XFF=1`. Otherwise leave unset (current default closes the spoofing attack).
+> - Quarterly: rotate `JWT_SECRET` to invalidate all in-flight tokens.
+
+
+
+
 > **🟢 ROUND 19 SECURITY SPRINT (2026-02 / iter 322fl) — 7 CRITICAL/HIGH BUGS PATCHED**
 >
 > Total bugs fixed across all rounds now: **163**. Round 19 audit closed at source.

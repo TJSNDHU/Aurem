@@ -29,7 +29,7 @@ def _require_founder(request: Request):
     try:
         from middleware.tenant_guard import JWT_SECRET, JWT_ALGORITHM
         p = pyjwt.decode(auth.split(" ", 1)[1], JWT_SECRET,
-                         algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+                         algorithms=[JWT_ALGORITHM])
     except Exception as e:
         raise HTTPException(401, f"Invalid token: {e}")
     if not (p.get("is_admin") or p.get("is_super_admin")):

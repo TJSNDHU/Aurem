@@ -26,21 +26,12 @@ def get_db():
 
 
 def _get_user_from_token(request: Request):
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(401, "Missing token")
-    token = auth_header.split(" ", 1)[1]
-    try:
-        import jwt
-        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
-        if not (payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email")):
-            raise HTTPException(403, "Admin access required")
-        return payload
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(401, "Invalid token")
+    """Bug-fix #165 (R20): admin enforcement via the canonical guard.
+    Previously had `or payload.get("email")` which let any authenticated
+    customer rewrite REDIS_URL / CORS_ORIGINS — handing the attacker the
+    session-token store and undoing every CORS hardening shipped."""
+    from utils.admin_guard import verify_admin
+    return verify_admin(request.headers.get("Authorization", ""))
 
 
 class InfraConfigUpdate(BaseModel):

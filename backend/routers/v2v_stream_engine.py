@@ -325,7 +325,24 @@ async def voice_respond(req: VoiceRespondRequest, request: Request):
 
 @router.post("/web-call")
 async def create_web_call(request: Request):
-    """Create a new V2V call session and return config + session token."""
+    """Create a new V2V call session and return config + session token.
+
+    Bug-fix #169 (R20): per-IP rate limit so an attacker can't open
+    thousands of voice sessions (real-time WebSocket cost + Retell/Vapi
+    per-minute fees). 6 sessions/min/IP is generous for legit users.
+    """
+    from utils.aurem_rate_limiter import is_rate_limited  # type: ignore
+    try:
+        client_ip = (request.headers.get("cf-connecting-ip")
+                     or (request.client.host if request.client else "unknown"))
+        if await is_rate_limited(f"v2v_web_call:{client_ip}", limit=6, window=60):
+            raise HTTPException(429, "too many voice sessions — try again in a minute")
+    except HTTPException:
+        raise
+    except Exception:
+        # Rate limiter optional; fail-open is safer than blocking voice on bugs.
+        pass
+
     call_id = str(uuid.uuid4())
 
     # Parse optional user email from body
@@ -345,7 +362,7 @@ async def create_web_call(request: Request):
         if auth_header.startswith("Bearer "):
             caller_payload = pyjwt.decode(
                 auth_header.split(" ", 1)[1], JWT_SECRET,
-                algorithms=[JWT_ALGORITHM], options={"verify_exp": False},
+                algorithms=[JWT_ALGORITHM],
             )
             is_admin_flag = bool(caller_payload.get("is_admin") or caller_payload.get("is_super_admin"))
             if not user_email:
