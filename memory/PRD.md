@@ -1,5 +1,25 @@
 # AUREM Platform — PRD
 
+> **🟢 ROUND 19 SECURITY SPRINT (2026-02 / iter 322fl) — 7 CRITICAL/HIGH BUGS PATCHED**
+>
+> Total bugs fixed across all rounds now: **163**. Round 19 audit closed at source.
+>
+> ## Round 19 (Bugs 157, 161-164 + systemic fixes for 162 in 3 routers)
+> 1. **Bug 157** — `action_engine_router` — `/execute` and `/tool-call` now require admin via `verify_admin`. Previously zero-auth — anyone could create Stripe invoices, payment links, send WhatsApp / email under any `business_id`.
+> 2. **Bug 161** — `public_sites_router` — `/preview/{slug}/custom-url` and `/preview/{slug}/select-theme` now require admin auth. New `_is_safe_external_url()` SSRF guard rejects non-http(s) schemes and private / loopback / link-local / multicast / reserved IPs. AWS metadata exfiltration (`169.254.169.254`) closed.
+> 3. **Bug 162** — Removed `or payload.get("email")` admin-bypass from `subscription_router._require_admin`, `domain_router._verify_admin`, and `pillars_health_router._verify_admin`. Previously any authenticated customer became admin because every JWT carries an `email` claim. Three routers fixed; `/api/admin/tenants` confirmed rejects customer tokens with 403.
+> 4. **Bug 163** — `server_misc_routes.reset_password` — now `$set: {password_hash}` + `$unset: {password}`. Previously wrote bcrypt into the legacy `password` field, conflicting with plaintext writes from older registration paths and causing silent auth failures for post-reset users.
+> 5. **Bug 164** — `SENDGRID_FROM_EMAIL` default changed from `hello@reroots.ca` to `noreply@aurem.live` in `routes/automation_gaps.py`, `routes/automations.py`, `services/email_ai.py`. Customer-facing transactional email now matches AUREM brand.
+> 6. **Bug 159/160 (operational)** — Verified: production `JWT_SECRET` is a 64-char urlsafe secret (already rotated, not the public placeholder). No `.env.txt` committed to git. The email-allowlist admin paths in `admin_guard.py` are safe so long as `JWT_SECRET` stays secret — operator must continue to rotate quarterly.
+> 7. **Bug 158 (deferred)** — `lead_lifecycle_router._get_db()` TOCTOU race is theoretical under cold-start concurrency only. Already auth-gated in R18, attack surface is gone in practice. Deferred to refactor sprint.
+>
+> ## Tests
+> - New: `backend/tests/test_round19_fixes.py` — **15 tests passing** (live HTTP for 157/161/162 + static-code guarantees for 162/163/164).
+> - Full regression: R12 + R15 + R16 + R17 + R18 + R19 = **81 passed, 0 failed** in ~3.3s.
+
+
+
+
 > **🟢 ROUND 18 SECURITY SPRINT + COMMAND PALETTE (⌘K) (2026-02 / iter 322fk) — 8 CRITICAL BUGS PATCHED + FOUNDER VELOCITY FEATURE**
 >
 > Total bugs fixed across all rounds now: **156**. Round 18 audit closed at source. ⌘K Command Palette shipped for unified ORA Admin.

@@ -51,9 +51,16 @@ async def get_tools():
 
 @router.post("/execute")
 async def execute_action(request: ExecuteActionRequest, req: Request):
-    """Execute an action (calendar, payment, email, etc.)"""
+    """Execute an action (calendar, payment, email, etc.).
+
+    Bug-fix #157 (R19): admin auth required. Previously zero-auth — an
+    attacker could create Stripe invoices / payment links / send
+    WhatsApp + email under any business_id.
+    """
     from services.aurem_commercial.action_engine import get_action_engine, ActionType
-    
+    from utils.admin_guard import verify_admin
+    verify_admin(req.headers.get("Authorization", ""))
+
     engine = get_action_engine(get_db())
     ip = req.client.host if req.client else None
     
@@ -89,9 +96,15 @@ async def execute_action(request: ExecuteActionRequest, req: Request):
 
 @router.post("/tool-call")
 async def handle_tool_call(request: ToolCallRequest, req: Request):
-    """Handle an AI function/tool call"""
+    """Handle an AI function/tool call.
+
+    Bug-fix #157 (R19): admin auth required. Same surface as /execute
+    once the LLM picks an action — must be gated identically.
+    """
     from services.aurem_commercial.action_engine import get_action_engine
-    
+    from utils.admin_guard import verify_admin
+    verify_admin(req.headers.get("Authorization", ""))
+
     engine = get_action_engine(get_db())
     ip = req.client.host if req.client else None
     

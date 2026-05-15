@@ -50,7 +50,10 @@ def _verify_admin(authorization: Optional[str]) -> dict:
             (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
             algorithms=["HS256"],
         )
-        if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
+        if payload.get("is_admin") or payload.get("role") in ("admin", "super_admin") or payload.get("is_super_admin"):
+            # Bug-fix #162 (R19): dropped `or payload.get("email")` — every
+            # JWT carries an email claim, so the OR clause granted admin
+            # to any authenticated user.
             return payload
         raise HTTPException(403, "Admin only")
     except HTTPException:

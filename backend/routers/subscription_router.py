@@ -298,7 +298,13 @@ def _require_admin(request: Request):
     if token:
         try:
             payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
+            # Bug-fix #162 (R19): removed `or payload.get("email")` bypass —
+            # every JWT carries an email claim, so the OR clause granted
+            # admin to any authenticated customer. Require an explicit
+            # admin signal instead.
+            if (payload.get("is_admin")
+                    or payload.get("is_super_admin")
+                    or payload.get("role") in ("admin", "super_admin")):
                 return
         except Exception:
             pass

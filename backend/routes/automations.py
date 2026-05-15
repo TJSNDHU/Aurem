@@ -51,8 +51,8 @@ def set_db(database):
 
 # ─── CONFIG ─────────────────────────────────────────────────
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "hello@reroots.ca")
-FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "ReRoots")
+FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@aurem.live")
+FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "AUREM")
 TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 TWILIO_FROM = os.environ.get("TWILIO_PHONE_NUMBER")

@@ -24,7 +24,7 @@ _db = None
 
 # SendGrid configuration
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "hello@reroots.ca")
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@aurem.live")
 SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "ReRoots Skincare")
 
 # LLM configuration

@@ -26,6 +26,43 @@ router = APIRouter(prefix="/api", tags=["Public Sites"])
 _db = None
 
 
+def _is_safe_external_url(url: str) -> bool:
+    """Bug-fix #161 (R19): SSRF guard for user-supplied URLs.
+    Rejects non-http(s) schemes and private / link-local / loopback IPs."""
+    try:
+        from urllib.parse import urlparse
+        import ipaddress
+        import socket
+    except Exception:
+        return False
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        p = urlparse(url)
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https"):
+        return False
+    host = (p.hostname or "").strip().lower()
+    if not host or host in ("localhost",):
+        return False
+    # Resolve and reject if any answer is private/loopback/link-local.
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return False
+    for info in infos:
+        ip = info[4][0]
+        try:
+            ipo = ipaddress.ip_address(ip)
+        except Exception:
+            return False
+        if (ipo.is_private or ipo.is_loopback or ipo.is_link_local
+                or ipo.is_multicast or ipo.is_reserved or ipo.is_unspecified):
+            return False
+    return True
+
+
 _SITE_NOT_FOUND_HTML = """<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -355,8 +392,21 @@ class CustomUrlPayload(BaseModel):
 
 
 @router.post("/preview/{slug}/custom-url")
-async def preview_custom_url(slug: str, body: CustomUrlPayload):
-    """Customer submits a reference URL → scrape style → rebuild site."""
+async def preview_custom_url(slug: str, body: CustomUrlPayload, request: Request):
+    """Customer submits a reference URL → scrape style → rebuild site.
+
+    Bug-fix #161 (R19): admin-gated + SSRF-blocked. Previously zero-auth
+    and unfiltered URL → attacker could submit
+    `http://169.254.169.254/latest/meta-data/...` and exfiltrate AWS
+    instance creds through the screenshot/style scraping pipeline.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
+    target = (body.url or "").strip()
+    if not _is_safe_external_url(target):
+        raise HTTPException(400, "URL blocked (internal / non-http(s) target)")
+
     db = _get_db()
     if db is None:
         raise HTTPException(503, "DB unavailable")
@@ -367,7 +417,7 @@ async def preview_custom_url(slug: str, body: CustomUrlPayload):
         raise HTTPException(404, "site not found")
 
     from services.awb_themes import scrape_one_url
-    theme = await scrape_one_url(body.url.strip())
+    theme = await scrape_one_url(target)
     if not theme or not theme.get("style"):
         raise HTTPException(422, "could not scrape that URL — try another")
 
@@ -399,8 +449,15 @@ async def preview_custom_url(slug: str, body: CustomUrlPayload):
 
 
 @router.post("/preview/{slug}/select-theme")
-async def preview_select_theme(slug: str, body: ThemeSelectPayload):
-    """Customer picks a theme → rebuild site with that style_hint."""
+async def preview_select_theme(slug: str, body: ThemeSelectPayload, request: Request):
+    """Customer picks a theme → rebuild site with that style_hint.
+
+    Bug-fix #161 (R19): admin auth required. Previously zero-auth meant
+    anyone who guessed a slug could trigger a full site rebuild.
+    """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization", ""))
+
     db = _get_db()
     if db is None:
         raise HTTPException(503, "DB unavailable")

@@ -32,8 +32,8 @@ def set_db(database):
     db = database
 
 SITE_URL = "https://www.reroots.ca"
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "hello@reroots.ca")
-FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "ReRoots")
+FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@aurem.live")
+FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "AUREM")
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@reroots.ca")
 OWNER_NAME = os.environ.get("OWNER_NAME", "Tj")
 

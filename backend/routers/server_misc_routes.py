@@ -501,7 +501,13 @@ async def reset_password(request_data: PasswordResetConfirm):
     # / platform_users / team_members collections.
     user_result = await db.users.update_one(
         {"email": email},
-        {"$set": {"password": hashed_password, "password_hash": hashed_password}},
+        # Bug-fix #163 (R19): write ONLY password_hash. Previously also
+        # wrote the bcrypt hash into the legacy `password` field, which
+        # the registration path in aurem_routes stores as PLAINTEXT —
+        # causing a mix of plaintext and hash values in the same field
+        # and breaking direct-compare auth code paths.
+        {"$set": {"password_hash": hashed_password},
+         "$unset": {"password": ""}},
     )
     team_result = await db.team_members.update_one(
         {"email": email}, {"$set": {"password_hash": hashed_password}}

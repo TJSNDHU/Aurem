@@ -60,7 +60,9 @@ def _verify_admin(authorization: Optional[str]) -> dict:
     try:
         secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
         payload = jwt.decode(authorization.split(" ", 1)[1], secret, algorithms=["HS256"])
-        if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
+        if payload.get("is_admin") or payload.get("role") in ("admin", "super_admin") or payload.get("is_super_admin"):
+            # Bug-fix #162 (R19): same email-bypass eliminated as
+            # subscription_router/domain_router.
             return payload
         raise HTTPException(status_code=403, detail="Admin only")
     except Exception:
