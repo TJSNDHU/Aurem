@@ -9,12 +9,21 @@ import time
 import logging
 import httpx
 from typing import Optional, Dict, Any, Literal, List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+
+from utils.require_auth import require_auth
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ai", tags=["AI"])
+# Bug-fix 113 — was completely unauthenticated; every LLM endpoint burned
+# Anthropic / OpenRouter / Emergent budget for anonymous callers. Now
+# requires verified JWT at router level.
+router = APIRouter(
+    prefix="/ai",
+    tags=["AI"],
+    dependencies=[Depends(require_auth)],
+)
 
 # API Keys
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")

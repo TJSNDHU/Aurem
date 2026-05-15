@@ -22,11 +22,19 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from utils.require_auth import require_auth
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/ora", tags=["ora-tts"])
+# Bug-fix 128 — TTS was unauthenticated; attacker could drain OpenAI TTS
+# budget. Auth-gated. (Not admin-only because tenants may legitimately
+# call TTS from authenticated client flows.)
+router = APIRouter(
+    prefix="/api/ora",
+    tags=["ora-tts"],
+    dependencies=[Depends(require_auth)],
+)
 
 _VALID_VOICES = {"alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"}
 _MAX_CHARS = 4000  # OpenAI hard cap is 4096; trim for safety.

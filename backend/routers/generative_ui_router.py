@@ -3,19 +3,24 @@ Generative UI Router
 API endpoints for dynamic component generation
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import logging
+
+from utils.require_auth import require_admin
 
 from services.generative_ui.component_generator import get_component_generator
 from services.generative_ui.dashboard_service import get_dashboard_service
 
 logger = logging.getLogger(__name__)
 
+# Bug-fix 131 — dashboards exposed revenue / plan distribution / agent
+# logs / connector usage to anonymous callers. Admin-gated.
 router = APIRouter(
     prefix="/api/generative-ui",
-    tags=["Generative UI"]
+    tags=["Generative UI"],
+    dependencies=[Depends(require_admin)],
 )
 
 # MongoDB reference

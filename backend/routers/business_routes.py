@@ -61,10 +61,17 @@ class OutboundMessageRequest(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def get_current_user(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    # Token validation would go here
-    return {"_id": "admin", "email": "admin@aurem.live", "role": "admin"}
+    """Bug-fix 108 — was returning hardcoded admin for any Bearer token.
+    Now performs real JWT verification via shared helper."""
+    from utils.require_auth import require_auth
+    payload = await require_auth(authorization=authorization)
+    return {
+        "_id": payload.get("user_id") or payload.get("sub") or payload.get("email", "user"),
+        "email": payload.get("email"),
+        "role": payload.get("role", "user"),
+        "tenant_id": payload.get("tenant_id"),
+        "is_admin": bool(payload.get("is_admin") or payload.get("is_super_admin")),
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

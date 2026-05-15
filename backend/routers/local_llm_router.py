@@ -5,7 +5,8 @@ Manage Ollama connection for local inference (llama3.1 via Cloudflare Tunnel).
 Hybrid mode: ORA Chat uses local Ollama, deep analysis uses cloud GPT-4o.
 """
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel
 from typing import Optional
 
@@ -66,8 +67,14 @@ async def get_llm_config():
 
 
 @router.post("/config")
-async def update_llm_config(update: ConfigUpdate):
-    """Update local LLM configuration."""
+async def update_llm_config(update: ConfigUpdate, _admin: dict = Depends(require_admin)):
+    """Update local LLM configuration.
+
+    Bug-fix 129 — was unauthenticated; attacker could POST a new
+    ollama_url pointing to their own server and proxy all subsequent
+    LLM calls through it (read every prompt + return any response).
+    Admin-only now.
+    """
     if update.ollama_url is not None:
         _config["ollama_url"] = update.ollama_url.rstrip("/")
     if update.model is not None:

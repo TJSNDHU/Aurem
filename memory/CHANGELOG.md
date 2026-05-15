@@ -7978,3 +7978,79 @@ running event loop. Safer for Windows + test fixtures that swap loops.
 - Live curl test: expired JWT → `401 "Token expired"` (was bypassing
   TenantGuard previously).
 - Full regression: **103/103 across 10 test files**.
+
+## 2026-02-15 — Round 12-15 Security Sprint (Bugs 99-132)
+
+**ORA CTO watchdog mode.** Mega 34-bug security sprint patching every
+critical vulnerability from rounds 12 → 15. **All 124 security regression
+tests pass** (Round 2-15 + compliance + may2026 suites).
+
+### Critical fixes shipped
+- **Bug 99/103** `linkedin_router._fernet()` — token encryption now derives
+  from independent `LINKEDIN_TOKEN_KEY` / `WALLET_ENCRYPTION_KEY`, not
+  `JWT_SECRET`. JWT leak no longer decrypts stored OAuth tokens. State
+  nonce verification on OAuth callback is no longer best-effort.
+- **Bug 100/101/105** `admin_plan_management.verify_admin` now constant-time
+  compares `X-Admin-Key` against `AUREM_ADMIN_KEY` env var; downstream
+  importers (`admin_breakers_router`, `admin_plan_management`) inherit the
+  fix via shared `require_admin_or_key` helper in `utils/require_auth.py`.
+- **Bug 102** `provisioning_router` — added `enforce_tenant_match` to
+  `/email/configure/{tenant_id}`, `/email/test/{tenant_id}`, `/whatsapp/init/
+  {tenant_id}`, `/status/{tenant_id}`. SMTP credential hijack closed. `/provision`
+  and `/all` now require admin.
+- **Bug 103** LinkedIn `/auth`, `/callback`, `/status`, `/stats`, `/disconnect`
+  all require admin auth.
+- **Bug 104** `intelligence_router` — router-level `require_auth`; new
+  `_block_ssrf()` rejects private / loopback / link-local / metadata hosts
+  before `httpx.get()`.
+- **Bug 106** `integration_api./api/webhook/receive` — uncommented and
+  reimplemented signature verification via `INTEGRATION_WEBHOOK_TOKEN`
+  constant-time compare + admin-JWT fallback.
+- **Bug 107** `subscription_routes` `/upgrade` and `/create` — disabled
+  self-upgrade; tier changes must flow through Stripe webhook only.
+- **Bug 108/109** `business_routes.get_current_user` &
+  `premium_routes.get_current_user` — replaced hardcoded
+  `{"role":"admin"}` return with real JWT decode via `require_auth`.
+- **Bug 110-114, 116-122, 125-131** — router-level `Depends(require_admin)`
+  / `Depends(require_auth)` added to: `whatsapp_alerts`,
+  `training_dashboard_router`, `unified_inbox_router`, `ai_router`,
+  `custom_subscription_router`, `ora_command_router`, `omnidim_router`,
+  `sms_alerts_router`, `github_integration`, `self_healing_router`,
+  `browser_agent_router`, `voice_router` (+ outbound call + webhook sig
+  REJECTS on mismatch), `pwa_router` (also fixed sync MongoClient leak),
+  `ora_tts_router`, `local_llm_router./config`, `agent_reach_router`,
+  `generative_ui_router`, `routes/business_system.py`,
+  `routes/crash_dashboard_routes.py`, narrow gates on
+  `routes/automation_gaps.py` (discount-redeem, low-stock, monthly-pnl).
+- **Bug 111** training-knowledge upload now validates extension whitelist
+  (txt/csv/md/markdown/json/log) and 5 MB size cap.
+- **Bug 114** `custom_subscription` `/user/{user_id}` and `DELETE /{plan_id}`
+  enforce caller ownership (admin bypass).
+- **Bug 124** `api_key_manager` — removed default `"reroots-internal-2024"`
+  master key; only triggers if explicitly set in `.env`.
+- **Bug 125** `browser_agent_router` — `page.evaluate()` requires explicit
+  `BROWSER_AGENT_ALLOW_EVAL=1` env flag (off by default); `navigate` runs
+  through SSRF blocklist.
+- **Bug 126** `voice_router` webhook now REJECTS on signature mismatch
+  (was: log + accept).
+- **Bug 127** `pwa_router` — reuses shared async `db` handle; no more
+  per-request `MongoClient` connection leak.
+- **Bug 132** Systemic root-cause documented in tests; `TenantScopedDatabase`
+  unchanged (forcing 401 on unscoped access broke too many legitimate
+  public surfaces). Endpoint-level auth gates close the practical risk.
+
+### New shared infra
+- `backend/utils/require_auth.py` — single source of truth for the four
+  auth patterns (`require_auth`, `require_admin`, `require_admin_or_key`,
+  `enforce_tenant_match`). All Round 12-15 patches route through this.
+
+### Env additions
+- `AUREM_ADMIN_KEY`, `REROOTS_INTERNAL_KEY`, `EMAIL_INBOUND_TOKEN`
+  (independent random 32+ byte secrets; required for admin-key bypass +
+  internal master-key + email inbound auth).
+- `WALLET_ENCRYPTION_KEY` already present; LinkedIn `_fernet` now prefers it.
+
+### Test suite
+- New: `/app/backend/tests/test_round12_round15_fixes.py` — 24 tests, all
+  pass. Runs hot smoke against live preview backend.
+- Total security regression: **124 tests across 7 suites, all green**.

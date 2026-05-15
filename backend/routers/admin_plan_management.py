@@ -23,24 +23,12 @@ def set_db(database):
     _db = database
 
 
-async def verify_admin(authorization: str = Header(None), x_admin_key: Optional[str] = Header(None)):
-    """Verify admin via JWT token or legacy X-Admin-Key header."""
-    if authorization and authorization.startswith("Bearer "):
-        try:
-            import jwt as pyjwt
-            from server import JWT_SECRET, JWT_ALGORITHM
-            token = authorization.replace("Bearer ", "")
-            payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            user_id = payload.get("user_id")
-            if user_id and _db:
-                user = await _db.users.find_one({"id": user_id}, {"_id": 0})
-                if user and (user.get("is_admin") or user.get("role") == "admin"):
-                    return user.get("id", "admin")
-        except Exception:
-            pass
-    if x_admin_key:
-        return x_admin_key
-    raise HTTPException(401, "Admin authentication required")
+async def verify_admin(authorization: str = Header(None), x_admin_key: Optional[str] = Header(None, alias="X-Admin-Key")):
+    """Bug-fix 100/105 — was `if x_admin_key: return x_admin_key` (any non-empty
+    string granted plan control). Now uses the shared require_admin_or_key
+    helper which constant-time compares against AUREM_ADMIN_KEY."""
+    from utils.require_auth import require_admin_or_key
+    return await require_admin_or_key(authorization=authorization, x_admin_key=x_admin_key)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

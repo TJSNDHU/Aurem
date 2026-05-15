@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 _db = None
 
 # Master key for internal frontend (whitelisted)
-INTERNAL_MASTER_KEY = os.environ.get("REROOTS_INTERNAL_KEY", "reroots-internal-2024")
+# Bug-fix 124 — was `os.environ.get("REROOTS_INTERNAL_KEY", "reroots-internal-2024")`.
+# Default is now public. Must be explicitly set in .env or master-key bypass disabled.
+INTERNAL_MASTER_KEY = (os.environ.get("REROOTS_INTERNAL_KEY") or "").strip()
 
 # Tier configurations
 TIER_LIMITS = {
@@ -120,8 +122,9 @@ async def validate_api_key(api_key: str) -> Dict[str, Any]:
     if _db is None:
         return {"valid": False, "error": "Database not available"}
     
-    # Check for internal master key (frontend whitelist)
-    if api_key == INTERNAL_MASTER_KEY:
+    # Check for internal master key (frontend whitelist). Bug-fix 124 — guard
+    # against unset env var so we never accept an empty-string master key.
+    if INTERNAL_MASTER_KEY and api_key == INTERNAL_MASTER_KEY:
         return {
             "valid": True,
             "internal": True,
@@ -189,7 +192,7 @@ async def increment_usage(api_key: str) -> bool:
         return False
     
     # Don't track internal key
-    if api_key == INTERNAL_MASTER_KEY:
+    if INTERNAL_MASTER_KEY and api_key == INTERNAL_MASTER_KEY:
         return True
     
     hashed = hash_key(api_key)
@@ -350,8 +353,8 @@ def require_api_key(func):
             for o in internal_origins
         )
         
-        # If internal request without API key, use master key
-        if is_internal and not api_key:
+        # If internal request without API key, use master key (only if configured)
+        if is_internal and not api_key and INTERNAL_MASTER_KEY:
             api_key = INTERNAL_MASTER_KEY
         
         # Require API key for external requests

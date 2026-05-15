@@ -7,11 +7,20 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form, Depends
 from pydantic import BaseModel
 
+from utils.require_auth import require_admin
+
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/training", tags=["Training Dashboard"])
+# Bug-fix 111 — router-level admin gate. Training endpoints poison the AI
+# knowledge base; previously any anonymous caller could inject "All products
+# are free" into ORA's RAG and burn LLM tokens via /a2a/trigger.
+router = APIRouter(
+    prefix="/api/training",
+    tags=["Training Dashboard"],
+    dependencies=[Depends(require_admin)],
+)
 
 db = None
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
@@ -178,7 +187,16 @@ async def upload_knowledge_file(
     if db is None:
         raise HTTPException(500, "Database not available")
 
+    # Bug-fix 111 — file type + size validation. Was unrestricted; an
+    # attacker could upload a 1GB binary blob and store it in MongoDB.
+    allowed_ext = {".txt", ".csv", ".md", ".markdown", ".json", ".log"}
+    fname = (file.filename or "").lower()
+    if not any(fname.endswith(e) for e in allowed_ext):
+        raise HTTPException(415, f"Only text-based files allowed: {sorted(allowed_ext)}")
+
     content = await file.read()
+    if len(content) > 5 * 1024 * 1024:  # 5 MB cap
+        raise HTTPException(413, "File exceeds 5 MB limit")
     text = content.decode("utf-8", errors="ignore")
 
     if len(text) < 10:

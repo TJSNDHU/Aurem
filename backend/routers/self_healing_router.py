@@ -3,7 +3,8 @@ Self-Healing AI Router
 API endpoints for autonomous system monitoring and repair
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -13,7 +14,14 @@ from services.self_healing_ai import get_self_healing_ai
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/ai/self-healing", tags=["Self-Healing AI"])
+# Bug-fix 121 — every endpoint here (/scan /repair /learn /optimize /
+# monitoring/start|stop) was unauthenticated; attacker could disable the
+# security monitor before launching further attacks. Admin-gated.
+router = APIRouter(
+    prefix="/api/ai/self-healing",
+    tags=["Self-Healing AI"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 class AILearningRequest(BaseModel):

@@ -8,9 +8,18 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 import logging
 
+from utils.require_auth import require_admin
+
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin/crash-dashboard", tags=["crash-dashboard"])
+# Bug-fix 120 — circuit-breaker reset and crash-log delete were
+# unauthenticated; attacker could oscillate all breakers to deny service
+# AND destroy forensic evidence. Admin-gated at router level.
+router = APIRouter(
+    prefix="/api/admin/crash-dashboard",
+    tags=["crash-dashboard"],
+    dependencies=[Depends(require_admin)],
+)
 
 # Database reference
 _db = None

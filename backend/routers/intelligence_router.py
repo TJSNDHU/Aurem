@@ -10,8 +10,10 @@ Components:
 5. Recovery Engine — Queues follow-up offers for non-converters
 """
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from fastapi.responses import JSONResponse
+
+from utils.require_auth import require_auth
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -23,7 +25,11 @@ import logging
 import asyncio
 from bs4 import BeautifulSoup
 
-router = APIRouter()
+# Bug-fix 104 — was completely unauthenticated. /dna-profile is a public
+# SSRF endpoint that fetches any URL (including internal services like
+# 169.254.169.254 metadata, MongoDB on localhost:27017). Now requires JWT
+# at the router level.
+router = APIRouter(dependencies=[Depends(require_auth)])
 logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
@@ -60,7 +66,32 @@ def _get_user_id(authorization: str) -> str:
     return "anonymous"
 
 
+def _block_ssrf(url: str) -> None:
+    """Bug-fix 104 — refuse private / loopback / link-local hosts to
+    prevent SSRF to internal services (AWS metadata, MongoDB, Redis)."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "").strip().lower()
+    if not host:
+        raise HTTPException(400, "Invalid URL")
+    if host in {"localhost", "metadata.google.internal", "metadata"}:
+        raise HTTPException(400, "Refused: internal hostname")
+    try:
+        addrs = {ai[4][0] for ai in socket.getaddrinfo(host, None)}
+    except Exception:
+        raise HTTPException(400, "Refused: DNS resolution failed")
+    for a in addrs:
+        try:
+            ip = ipaddress.ip_address(a)
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise HTTPException(400, f"Refused: address {a} is private/loopback/link-local")
+
+
 async def _fetch_html(url: str) -> str:
+    _block_ssrf(url)
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         resp = await client.get(url)
         resp.raise_for_status()

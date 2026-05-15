@@ -19,7 +19,8 @@ import hmac
 import hashlib
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Request, Query, Header
+from fastapi import APIRouter, HTTPException, Request, Query, Header, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/aurem-voice", tags=["AUREM Voice Module"])
@@ -109,17 +110,19 @@ async def handle_webhook(
     body = await request.body()
     raw_body = await request.json()
     
-    # Verify signature if configured
+    # Bug-fix 126 — was previously: if secret and signature were both
+    # present, compare; if mismatch just log warning. Now: if secret is
+    # configured we REQUIRE a valid signature and REJECT on mismatch.
     webhook_secret = os.environ.get("VOICE_WEBHOOK_SECRET")
-    if webhook_secret and x_voice_signature:
+    if webhook_secret:
+        if not x_voice_signature:
+            raise HTTPException(401, "Missing X-Voice-Signature header")
         expected = hmac.new(
-            webhook_secret.encode(),
-            body,
-            hashlib.sha256
+            webhook_secret.encode(), body, hashlib.sha256
         ).hexdigest()
-        
         if not hmac.compare_digest(x_voice_signature, expected):
-            logger.warning("[Voice] Invalid webhook signature")
+            logger.warning("[Voice] Invalid webhook signature — rejected")
+            raise HTTPException(403, "Invalid webhook signature")
     
     metadata = raw_body.get("call", {}).get("metadata", {})
     business_id = (
@@ -352,13 +355,13 @@ async def get_call(
 async def initiate_call(
     business_id: str,
     data: OutboundCallRequest,
-    request: Request
+    request: Request,
+    _admin: dict = Depends(require_admin),
 ):
-    """
-    Initiate an outbound voice call.
-    
-    Uses AUREM DIY Voice Engine. In "No-Key" mode,
-    returns a mock response for UI development.
+    """Initiate an outbound voice call.
+
+    Bug-fix 126 — was completely unauthenticated; anyone could place real
+    outbound calls to attacker-supplied numbers (toll fraud). Admin-gated.
     """
     from services.aurem_commercial.voice_service import (
         get_voice_service, OutboundCallRequest as VoiceOutboundRequest, PersonaType

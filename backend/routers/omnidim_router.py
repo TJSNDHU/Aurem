@@ -22,7 +22,8 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Header, Query, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Header, Query, Request, BackgroundTasks, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel, Field
 
 from services.aurem_commercial.omnidim_service import (
@@ -48,7 +49,12 @@ from services.aurem_commercial.a2a_handoff_service import (
     HandoffPriority
 )
 
-router = APIRouter(tags=["OmniBridge - OmniDimension Integration"])
+# Bug-fix 117 — was unauthenticated; /dispatch placed real outbound calls
+# to attacker-supplied phone numbers (toll fraud, harassment). Admin-gated.
+router = APIRouter(
+    tags=["OmniBridge - OmniDimension Integration"],
+    dependencies=[Depends(require_admin)],
+)
 
 logger = logging.getLogger(__name__)
 

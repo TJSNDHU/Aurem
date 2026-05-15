@@ -11,13 +11,21 @@ import logging
 import httpx
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Request, Query, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel, Field
 import hashlib
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/github", tags=["GitHub Integration"])
+# Bug-fix 119 — /connect /ingest /chat /disconnect were unauthenticated,
+# allowing attacker to overwrite any company's stored GitHub token with
+# their own (hijack repo access). Admin-gated.
+router = APIRouter(
+    prefix="/github",
+    tags=["GitHub Integration"],
+    dependencies=[Depends(require_admin)],
+)
 
 # MongoDB reference
 _db = None

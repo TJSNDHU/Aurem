@@ -8,12 +8,22 @@ import logging
 import httpx
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
+
+from utils.require_auth import require_admin
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/whatsapp-alerts", tags=["WhatsApp Alerts"])
+# Bug-fix 110 — router-level admin dependency closes every endpoint in this
+# file (broadcast / send / order / welcome / restock / etc.) against the
+# anonymous WhatsApp-spam vector. Read-only `/logs`, `/broadcasts`, `/health`
+# are also gated so attacker can't enumerate prior message activity.
+router = APIRouter(
+    prefix="/whatsapp-alerts",
+    tags=["WhatsApp Alerts"],
+    dependencies=[Depends(require_admin)],
+)
 
 # WHAPI Configuration
 WHAPI_API_TOKEN = os.environ.get("WHAPI_API_TOKEN", "")

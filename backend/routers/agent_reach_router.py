@@ -18,10 +18,17 @@ Endpoints:
 import logging
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+from utils.require_auth import require_auth
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/reach", tags=["AUREM Agent-Reach"])
+# Bug-fix 130 — /web fetches arbitrary URLs (SSRF) and /crawler/trigger
+# launches scrape cycles. Auth-gated.
+router = APIRouter(
+    prefix="/api/reach",
+    tags=["AUREM Agent-Reach"],
+    dependencies=[Depends(require_auth)],
+)
 
 logger = logging.getLogger(__name__)
 
@@ -140,16 +147,13 @@ async def get_youtube_transcript(request: YouTubeTranscriptRequest):
 
 @router.post("/web")
 async def read_webpage(request: WebReaderRequest):
+    """Convert any webpage to clean, AI-readable Markdown.
+
+    Bug-fix 130 — SSRF blocklist applied before fetching to prevent
+    internal-service probing.
     """
-    Convert any webpage to clean, AI-readable Markdown.
-    
-    Strips ads, navigation, and clutter using Jina Reader.
-    Perfect for reading product pages or competitor websites.
-    
-    Example:
-    - Competitor product page → Extract features and pricing
-    - Industry article → Summarize for knowledge base
-    """
+    from routers.intelligence_router import _block_ssrf
+    _block_ssrf(request.url)
     from services.aurem_commercial.agent_reach import get_reach_service
     
     service = get_reach_service(get_db())

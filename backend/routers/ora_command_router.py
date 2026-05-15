@@ -17,11 +17,18 @@ import os
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/ora", tags=["ORA Command Center"])
+# Bug-fix 116 — was unauthenticated; /command could trigger mass WhatsApp /
+# SMS blasts, lead scrapes, and intelligence reads. Admin-gated now.
+router = APIRouter(
+    prefix="/api/ora",
+    tags=["ORA Command Center"],
+    dependencies=[Depends(require_admin)],
+)
 
 _db = None
 

@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Header
 from fastapi.responses import RedirectResponse
 
 logger = logging.getLogger(__name__)
@@ -37,11 +37,25 @@ _SCOPES = "r_liteprofile w_member_social"
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Fernet key derivation — JWT_SECRET → 32-byte urlsafe key
+# Fernet key derivation — independent secret (Bug-fix 99 family).
+# Was: derive from JWT_SECRET → if JWT_SECRET leaked, every LinkedIn
+# OAuth token in MongoDB was decryptable. Now: prefer LINKEDIN_TOKEN_KEY,
+# fall back to WALLET_ENCRYPTION_KEY (also an independent secret),
+# only fall back to JWT_SECRET if neither is set (legacy compatibility).
 # ─────────────────────────────────────────────────────────────────────
 def _fernet() -> Fernet:
-    secret = (os.getenv("JWT_SECRET") or "aurem-default-dev-secret").encode()
-    key = base64.urlsafe_b64encode(hashlib.sha256(secret).digest())
+    raw = (os.getenv("LINKEDIN_TOKEN_KEY")
+           or os.getenv("WALLET_ENCRYPTION_KEY")
+           or os.getenv("JWT_SECRET")
+           or "aurem-default-dev-secret")
+    # If env var is already a urlsafe-b64 32-byte key, use as-is. Otherwise
+    # derive via SHA-256 so any input length works.
+    try:
+        if len(raw) >= 43 and raw.replace("-", "").replace("_", "").replace("=", "").isalnum():
+            return Fernet(raw.encode() if isinstance(raw, str) else raw)
+    except Exception:
+        pass
+    key = base64.urlsafe_b64encode(hashlib.sha256(raw.encode()).digest())
     return Fernet(key)
 
 
@@ -87,7 +101,11 @@ async def get_token_doc():
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────
 @router.get("/auth")
-async def linkedin_auth():
+async def linkedin_auth(authorization: str | None = Header(None)):
+    """Bug-fix 103 — was unauthenticated; any caller could initiate the
+    OAuth flow and hijack the "admin" token slot. Admin-only now."""
+    from utils.require_auth import require_admin
+    await require_admin(authorization=authorization)
     from aurem_config import LINKEDIN_CLIENT_ID, linkedin_redirect_uri
     if not LINKEDIN_CLIENT_ID:
         raise HTTPException(500, "LINKEDIN_CLIENT_ID not configured")
@@ -132,12 +150,15 @@ async def linkedin_callback(code: str = Query(""), state: str = Query(""),
         raise HTTPException(500, "LinkedIn credentials not configured")
 
     db = _db()
-    # State check (best-effort — LinkedIn sometimes swallows it)
-    if state and db is not None:
-        try:
-            await db.linkedin_oauth_states.delete_one({"_id": state})
-        except Exception:
-            pass
+    # Bug-fix 103 — was "best-effort" state check that swallowed errors.
+    # Now we REQUIRE a matching state row in linkedin_oauth_states.
+    if not state:
+        raise HTTPException(400, "missing state (csrf protection)")
+    if db is None:
+        raise HTTPException(503, "db unavailable")
+    state_doc = await db.linkedin_oauth_states.find_one_and_delete({"_id": state})
+    if not state_doc:
+        raise HTTPException(400, "invalid or expired state")
 
     # Exchange code
     try:
@@ -212,7 +233,11 @@ async def linkedin_callback(code: str = Query(""), state: str = Query(""),
 
 
 @router.get("/status")
-async def linkedin_status():
+async def linkedin_status(authorization: str | None = Header(None)):
+    """Bug-fix 103 — was unauthenticated; was leaking integration connection
+    state to anyone. Admin-only now."""
+    from utils.require_auth import require_admin
+    await require_admin(authorization=authorization)
     doc = await get_token_doc()
     # iter 282al-12 — emit body-level `status` so the Pillars-Map chip
     # picks the right colour. grey/yellow when not yet connected (cold
@@ -250,7 +275,11 @@ async def linkedin_status():
 
 
 @router.post("/disconnect")
-async def linkedin_disconnect():
+async def linkedin_disconnect(authorization: str | None = Header(None)):
+    """Bug-fix 103 — was completely unauthenticated; anyone could wipe the
+    platform's stored LinkedIn token. Admin-only now."""
+    from utils.require_auth import require_admin
+    await require_admin(authorization=authorization)
     db = _db()
     if db is None:
         return {"disconnected": False, "reason": "db_unavailable"}
@@ -262,7 +291,10 @@ async def linkedin_disconnect():
 
 
 @router.get("/stats")
-async def linkedin_stats():
+async def linkedin_stats(authorization: str | None = Header(None)):
+    """Bug-fix 103 — admin-only stats."""
+    from utils.require_auth import require_admin
+    await require_admin(authorization=authorization)
     """Month-to-date post count + last post summary for the Settings tab."""
     db = _db()
     if db is None:

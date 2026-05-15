@@ -2451,3 +2451,38 @@ Previously backend-complete + frontend-orphan. Now wired:
 - ora_skills_library: `aurem-322eh-real-db-scan` (official schema)
 - ora_skills_broadcast: 9 active skills, 5010 chars addendum (was 8, +1 today)
 - Primary + Secondary Atlas both updated
+
+---
+
+## 2026-02-15 Update — Round 12-15 Security Sprint Complete
+
+### Status snapshot
+- **Total bugs patched across 15 audit rounds: 132**
+- **Security regression test suite: 124 tests, all green** (7 files)
+- Backend running cleanly; preview URL responsive (401 on unauthenticated
+  admin routes confirmed via curl smoke + pytest).
+
+### What's now closed
+- Bugs 99-132 (Round 12-15) — wallet encryption independence, admin-key
+  bypasses, SMTP IDOR, LinkedIn full auth, intelligence SSRF, subscription
+  self-upgrade, hardcoded-admin routers, 14 router-level auth gates, voice
+  webhook signature enforcement, browser agent JS kill-switch, push-broadcast
+  auth + connection-leak, automation-gaps narrow gates.
+
+### Pending / next priorities
+- **P1 — Ghost Scout parked-vertical → Telegram alert** (Issue #2 from
+  handoff). 24h stall detection wiring to existing incident channel.
+- **P2 — Bug 52** WebSocket JWT in URL → first init message. Requires
+  coordinated frontend PWA client update.
+- **P2 — Bug 54** Auth-gate or remove `/test-capture` in `leads_router.py`.
+- **P2 — Phase 2 integrations** HubSpot/Salesforce CRM demock, Telegram
+  inline-button webhook, Day-7 upsell logic.
+
+### Architecture notes
+- New shared helper `utils/require_auth.py` is the canonical entry point
+  for **all future router auth**. Use `Depends(require_auth)` for any
+  verified caller, `Depends(require_admin)` for admin-only,
+  `Depends(require_admin_or_key)` for legacy X-Admin-Key flows.
+- LinkedIn token encryption no longer derives from `JWT_SECRET`. Tokens
+  encrypted under the old key (pre-2026-02-15) require user reconnect.
+

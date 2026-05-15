@@ -3,12 +3,14 @@ Custom Subscription Router - A-la-carte / Build-Your-Own Plans
 Users can select specific services and get custom pricing
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timezone, timedelta
 import secrets
 import logging
+
+from utils.require_auth import require_auth
 
 from models.custom_subscription_models import (
     CustomSubscriptionRequest,
@@ -18,7 +20,14 @@ from models.custom_subscription_models import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/subscriptions/custom", tags=["Custom Subscriptions"])
+# Bug-fix 114 — was completely unauthenticated; anyone could read any user's
+# subscription details and cancel any plan by ID. Now requires verified JWT
+# at router level; per-route we enforce caller ownership.
+router = APIRouter(
+    prefix="/api/subscriptions/custom",
+    tags=["Custom Subscriptions"],
+    dependencies=[Depends(require_auth)],
+)
 
 # MongoDB reference
 _db = None
@@ -213,8 +222,11 @@ async def create_custom_subscription(request: CustomSubscriptionRequest):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/user/{user_id}")
-async def get_user_custom_subscription(user_id: str):
-    """Get user's custom subscription"""
+async def get_user_custom_subscription(user_id: str, user: dict = Depends(require_auth)):
+    """Get user's custom subscription. Bug-fix 114 — caller must own user_id."""
+    caller_id = user.get("user_id") or user.get("sub") or user.get("email")
+    if not user.get("is_admin") and caller_id != user_id:
+        raise HTTPException(403, "Cannot read another user's subscription")
     if _db is None:
         raise HTTPException(500, "Database not initialized")
     
@@ -273,11 +285,20 @@ async def get_available_services():
 
 
 @router.delete("/{plan_id}")
-async def cancel_custom_subscription(plan_id: str):
-    """Cancel a custom subscription"""
+async def cancel_custom_subscription(plan_id: str, user: dict = Depends(require_auth)):
+    """Cancel a custom subscription. Bug-fix 114 — caller must own plan."""
     if _db is None:
         raise HTTPException(500, "Database not initialized")
-    
+
+    # Ownership gate: only the plan owner OR admin can cancel.
+    if not user.get("is_admin"):
+        caller_id = user.get("user_id") or user.get("sub") or user.get("email")
+        plan = await _db.custom_subscriptions.find_one({"plan_id": plan_id}, {"_id": 0, "user_id": 1})
+        if not plan:
+            raise HTTPException(404, "Subscription not found")
+        if plan.get("user_id") != caller_id:
+            raise HTTPException(403, "Cannot cancel another user's subscription")
+
     try:
         result = await _db.custom_subscriptions.update_one(
             {"plan_id": plan_id},

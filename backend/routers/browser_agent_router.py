@@ -3,7 +3,8 @@ ReRoots AI Browser Agent - PinchTab-style Browser Automation
 AI-controlled browser for admin panel actions, competitor monitoring, and data extraction
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
@@ -13,7 +14,14 @@ import asyncio
 import json
 import secrets
 
-router = APIRouter(prefix="/api/browser-agent", tags=["browser-agent"])
+# Bug-fix 125 — was completely unauthenticated; /task/execute let any
+# anonymous caller run arbitrary JS via page.evaluate() and SSRF-navigate
+# to internal services (AWS metadata, MongoDB). Admin-gated.
+router = APIRouter(
+    prefix="/api/browser-agent",
+    tags=["browser-agent"],
+    dependencies=[Depends(require_admin)],
+)
 
 # Database reference
 db: AsyncIOMotorDatabase = None
@@ -153,6 +161,9 @@ class BrowserSession:
         
         try:
             if action.action == "navigate":
+                # Bug-fix 125 — block SSRF to private / loopback / link-local IPs.
+                from routers.intelligence_router import _block_ssrf
+                _block_ssrf(action.url)
                 await self.page.goto(action.url, timeout=action.timeout * 1000)
                 return {"success": True, "url": self.page.url}
             
@@ -190,6 +201,11 @@ class BrowserSession:
                 return {"success": True, "scrolled": True}
             
             elif action.action == "evaluate":
+                # Bug-fix 125 — arbitrary JS execution kill-switched.
+                # Requires BROWSER_AGENT_ALLOW_EVAL=1 in env. Off by default.
+                import os as _os
+                if _os.environ.get("BROWSER_AGENT_ALLOW_EVAL", "").strip() != "1":
+                    return {"error": "page.evaluate disabled — set BROWSER_AGENT_ALLOW_EVAL=1 to enable"}
                 result = await self.page.evaluate(action.text)
                 return {"success": True, "result": result}
             

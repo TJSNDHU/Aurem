@@ -3,13 +3,15 @@ ReRoots AI PWA Backend Router
 Handles Push Notifications, Voice Synthesis, and AI Chat
 """
 
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 import os
 import json
 import httpx
 from datetime import datetime
+
+from utils.require_auth import require_admin
 
 router = APIRouter(prefix="/api/pwa", tags=["PWA"])
 
@@ -123,28 +125,37 @@ async def unsubscribe_push(subscription: PushSubscription):
 async def send_push_notification(
     notification: PushNotification,
     user_id: Optional[str] = None,
-    background_tasks: BackgroundTasks = None
+    background_tasks: BackgroundTasks = None,
+    _admin: dict = Depends(require_admin),
 ):
-    """Send push notification to subscribed users"""
+    """Send push notification to subscribed users.
+
+    Bug-fix 127 — was unauthenticated; anyone could broadcast push
+    notifications to every subscriber. Admin-gated. Also reuses shared
+    async db handle instead of opening a fresh sync MongoClient per call
+    (which blocked the event loop + exhausted connections).
+    """
     try:
         from pywebpush import webpush, WebPushException
-        from pymongo import MongoClient
-        
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url)
-        db = client[db_name]
-        
-        # Get subscriptions
+
+        # Reuse shared async db handle
+        try:
+            import server
+            db = getattr(server, "db", None)
+        except Exception:
+            db = None
+        if db is None:
+            raise HTTPException(503, "Database not available")
+
+        # Get subscriptions (async motor)
         query = {"active": True}
         if user_id:
             query["user_id"] = user_id
-            
-        subscriptions = list(db.push_subscriptions.find(query))
-        
+        subscriptions = await db.push_subscriptions.find(query, {"_id": 0}).to_list(length=1000)
+
         if not subscriptions:
             return {"success": False, "message": "No active subscriptions found"}
-        
+
         # Prepare payload
         payload = json.dumps({
             "title": notification.title,

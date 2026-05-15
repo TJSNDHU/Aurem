@@ -100,31 +100,13 @@ async def get_my_plan(user = Depends(get_current_user)):
     }
 
 
-@router.post("/create")
-async def create_subscription(
+async def _legacy_create_disabled(
     request: CreateSubscriptionRequest,
     user = Depends(get_current_user)
 ):
-    """Create new subscription"""
+    """Bug-fix 107 — disabled legacy path."""
     from services.subscription_manager import get_subscription_manager, SubscriptionTier
-    
-    manager = get_subscription_manager(db)
-    
-    try:
-        tier = SubscriptionTier(request.tier)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid tier: {request.tier}")
-    
-    subscription = await manager.create_subscription(
-        user_id=user["user_id"],
-        tier=tier,
-        duration_days=request.duration_days
-    )
-    
-    return {
-        "success": True,
-        "subscription": subscription.dict()
-    }
+    raise HTTPException(402, "Use Stripe checkout")
 
 
 @router.post("/upgrade")
@@ -132,22 +114,46 @@ async def upgrade_subscription(
     request: UpgradeRequest,
     user = Depends(get_current_user)
 ):
-    """Upgrade subscription tier"""
+    """Upgrade subscription tier.
+
+    Bug-fix 107 — was allowing self-upgrade to ENTERPRISE without Stripe.
+    Now blocked at the API: real tier upgrades must come from Stripe webhook
+    only. Admins can still force-change tier via /admin/grant-free-access.
+    """
+    if not user.get("role") == "admin":
+        raise HTTPException(
+            status_code=402,
+            detail="Tier upgrades require Stripe checkout. Use /api/billing/checkout to start a payment session."
+        )
     from services.subscription_manager import get_subscription_manager, SubscriptionTier
-    
     manager = get_subscription_manager(db)
-    
     try:
         new_tier = SubscriptionTier(request.new_tier)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid tier: {request.new_tier}")
-    
     result = await manager.upgrade_subscription(user["user_id"], new_tier)
-    
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result.get("error"))
-    
     return result
+
+
+@router.post("/create")
+async def create_subscription_disabled():
+    """Bug-fix 107 — `POST /create` previously allowed any user to mint a
+    365-day enterprise subscription without payment. Disabled. Real subscription
+    creation now flows through Stripe webhook only."""
+    raise HTTPException(
+        status_code=402,
+        detail="Direct subscription creation disabled. Use Stripe checkout via /api/billing/checkout."
+    )
+
+
+async def _legacy_create_disabled(
+    request: CreateSubscriptionRequest,
+    user = Depends(get_current_user)
+):
+    """Bug-fix 107 — disabled legacy path."""
+    raise HTTPException(402, "Use Stripe checkout")
 
 
 @router.post("/check-feature")

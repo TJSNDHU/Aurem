@@ -17,8 +17,10 @@ import os
 import random
 import string
 from datetime import datetime, date, timedelta
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
+
+from utils.require_auth import require_admin
 
 router = APIRouter(prefix="/api", tags=["Automation Gaps"])
 
@@ -549,15 +551,19 @@ async def check_discount_code(code: str):
 
 
 @router.post("/discount/{code}/redeem")
-async def redeem_discount_code(code: str):
-    """Mark code as used after successful payment."""
+async def redeem_discount_code(code: str, _admin: dict = Depends(require_admin)):
+    """Mark code as used after successful payment.
+
+    Bug-fix 122 — was unauthenticated; attacker could mark valid codes
+    as redeemed to deny legitimate customers. Admin-gated.
+    """
     await mark_discount_code_used(code)
     return {"success": True}
 
 
 @router.get("/admin/discount-codes")
-async def get_discount_codes(limit: int = Query(100)):
-    """Get all discount codes"""
+async def get_discount_codes(limit: int = Query(100), _admin: dict = Depends(require_admin)):
+    """Get all discount codes (admin)"""
     codes = await db["discount_codes"].find().sort("createdAt", -1).to_list(limit)
     for c in codes:
         c["_id"] = str(c["_id"])
@@ -565,21 +571,21 @@ async def get_discount_codes(limit: int = Query(100)):
 
 
 @router.post("/admin/alerts/test-low-stock")
-async def test_low_stock_alert():
-    """Manually trigger low stock alert check"""
+async def test_low_stock_alert(_admin: dict = Depends(require_admin)):
+    """Manually trigger low stock alert check. Bug-fix 122 — admin-gated."""
     await check_low_stock_alerts()
     return {"success": True, "message": "Low stock check completed"}
 
 
 @router.post("/admin/alerts/test-npn-expiry")
-async def test_npn_expiry_alert():
-    """Manually trigger NPN expiry check"""
+async def test_npn_expiry_alert(_admin: dict = Depends(require_admin)):
+    """Manually trigger NPN expiry check. Bug-fix 122 — admin-gated."""
     await check_npn_expiry_reminders()
     return {"success": True, "message": "NPN expiry check completed"}
 
 
 @router.post("/admin/alerts/test-monthly-pnl")
-async def test_monthly_pnl():
-    """Manually trigger monthly P&L email"""
+async def test_monthly_pnl(_admin: dict = Depends(require_admin)):
+    """Manually trigger monthly P&L email. Bug-fix 122 — admin-gated."""
     await send_monthly_pnl()
     return {"success": True, "message": "Monthly P&L email sent"}

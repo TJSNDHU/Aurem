@@ -3,7 +3,9 @@ AUREM External Integration API
 Handles chat widget, lead capture, webhooks, and third-party integrations
 """
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
+
+from utils.require_auth import require_admin
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
@@ -229,17 +231,32 @@ async def create_booking(booking: BookingRequest):
 
 @router.post("/api/webhook/receive")
 async def receive_webhook(event: WebhookEvent, request: Request):
+    """Receive webhooks from external services (Stripe, Zapier, Make.com, etc.).
+
+    Bug-fix 106 — signature verification was permanently commented out so any
+    caller could inject `payment.success` events under any business_id. Now we
+    require either:
+      • a constant-time match between header `X-Webhook-Token` and the env
+        var `INTEGRATION_WEBHOOK_TOKEN`, OR
+      • a valid Bearer JWT for admin callers (manual testing only).
     """
-    Receive webhooks from external services
-    (Stripe, Zapier, Make.com, etc.)
-    """
+    import hmac as _hmac
+    expected = (os.environ.get("INTEGRATION_WEBHOOK_TOKEN") or "").strip()
+    token_header = request.headers.get("X-Webhook-Token", "")
+    authorized = False
+    if expected and token_header and _hmac.compare_digest(token_header, expected):
+        authorized = True
+    if not authorized:
+        # Fall back to admin JWT for internal testing
+        try:
+            await require_admin(authorization=request.headers.get("Authorization"))
+            authorized = True
+        except HTTPException:
+            pass
+    if not authorized:
+        raise HTTPException(401, "Webhook signature missing or invalid")
     try:
         from server import db
-        
-        # Verify webhook signature (if applicable)
-        # signature = request.headers.get('X-Webhook-Signature')
-        # if not verify_webhook_signature(signature, event):
-        #     raise HTTPException(status_code=401, detail="Invalid signature")
         
         # Store webhook event
         webhook_doc = {

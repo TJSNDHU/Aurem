@@ -56,7 +56,8 @@ class ProvisionRequest(BaseModel):
 @router.post("/provision")
 async def provision_client(req: ProvisionRequest, authorization: str = Header(None)):
     """Admin: Create a new integration profile for a client."""
-    user = await _get_user(authorization)
+    from utils.require_auth import require_admin
+    await require_admin(authorization=authorization)
     from services.provisioning_service import provision_client
     result = await provision_client(req.tenant_id, req.email, req.company_name)
     return result
@@ -66,8 +67,10 @@ async def provision_client(req: ProvisionRequest, authorization: str = Header(No
 
 @router.get("/status/{tenant_id}")
 async def get_integration_status(tenant_id: str, authorization: str = Header(None)):
-    """Get a client's integration profile (email/WhatsApp status)."""
-    await _get_user(authorization)
+    """Get a client's integration profile (email/WhatsApp status). Tenant-scoped."""
+    user = await _get_user(authorization)
+    from utils.require_auth import enforce_tenant_match
+    enforce_tenant_match(user, tenant_id)
     from services.provisioning_service import get_client_integrations
     profile = await get_client_integrations(tenant_id)
     if not profile:
@@ -83,8 +86,15 @@ async def get_integration_status(tenant_id: str, authorization: str = Header(Non
 
 @router.post("/email/configure/{tenant_id}")
 async def configure_email(tenant_id: str, config: EmailConfigRequest, authorization: str = Header(None)):
-    """Client: Set up SMTP email integration."""
-    await _get_user(authorization)
+    """Client: Set up SMTP email integration.
+
+    Bug-fix 102 — was allowing any authenticated user to overwrite ANY
+    tenant's SMTP creds (mail-server hijack via URL path tenant_id).
+    Now enforces caller tenant_id == path tenant_id unless admin.
+    """
+    user = await _get_user(authorization)
+    from utils.require_auth import enforce_tenant_match
+    enforce_tenant_match(user, tenant_id)
     from services.provisioning_service import update_email_config
     result = await update_email_config(tenant_id, config.model_dump())
     return result
@@ -92,8 +102,10 @@ async def configure_email(tenant_id: str, config: EmailConfigRequest, authorizat
 
 @router.post("/email/test/{tenant_id}")
 async def test_email(tenant_id: str, authorization: str = Header(None)):
-    """Client: Test SMTP connection."""
-    await _get_user(authorization)
+    """Client: Test SMTP connection. Bug-fix 102 — tenant-scoped."""
+    user = await _get_user(authorization)
+    from utils.require_auth import enforce_tenant_match
+    enforce_tenant_match(user, tenant_id)
     from services.provisioning_service import test_email_connection
     return await test_email_connection(tenant_id)
 
@@ -102,8 +114,10 @@ async def test_email(tenant_id: str, authorization: str = Header(None)):
 
 @router.post("/whatsapp/init/{tenant_id}")
 async def init_whatsapp(tenant_id: str, authorization: str = Header(None)):
-    """Client: Initialize a WhatsApp QR session."""
-    await _get_user(authorization)
+    """Client: Initialize a WhatsApp QR session. Bug-fix 102 — tenant-scoped."""
+    user = await _get_user(authorization)
+    from utils.require_auth import enforce_tenant_match
+    enforce_tenant_match(user, tenant_id)
     from services.provisioning_service import init_whatsapp_session
     return await init_whatsapp_session(tenant_id)
 
@@ -141,7 +155,8 @@ async def activate_via_link(token: str):
 @router.get("/all")
 async def list_all_integrations(authorization: str = Header(None)):
     """Admin: List all client integration profiles."""
-    await _get_user(authorization)
+    from utils.require_auth import require_admin
+    await require_admin(authorization=authorization)
     if _db is None:
         raise HTTPException(status_code=503, detail="Database not connected")
 

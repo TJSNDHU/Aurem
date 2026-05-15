@@ -3,14 +3,21 @@ ReRoots AI SMS Alerts Router
 Twilio-powered SMS notifications, OTP, and alerts
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
+from utils.require_auth import require_admin
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime, timezone
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import os
 
-router = APIRouter(prefix="/api/sms", tags=["sms-alerts"])
+# Bug-fix 118 — /send /send-otp /bulk-send were unauthenticated, allowing
+# attackers to spam any phone via Twilio + harvest OTPs. Admin-gated.
+router = APIRouter(
+    prefix="/api/sms",
+    tags=["sms-alerts"],
+    dependencies=[Depends(require_admin)],
+)
 
 # Database reference
 db: AsyncIOMotorDatabase = None

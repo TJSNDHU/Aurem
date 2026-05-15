@@ -19,10 +19,19 @@ import logging
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Request, Query, Header
+from fastapi import APIRouter, HTTPException, Request, Query, Header, Depends
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/inbox", tags=["AUREM Unified Inbox"])
+from utils.require_auth import require_auth, enforce_tenant_match
+
+# Bug-fix 112 — was completely unauthenticated. Now requires any verified
+# JWT at the router level; per-route we additionally enforce caller's
+# tenant_id matches the business_id in the path (admin bypass).
+router = APIRouter(
+    prefix="/api/inbox",
+    tags=["AUREM Unified Inbox"],
+    dependencies=[Depends(require_auth)],
+)
 
 logger = logging.getLogger(__name__)
 

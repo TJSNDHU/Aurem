@@ -6,13 +6,20 @@
 # Module 04: Accounting & GST/HST Canada
 # ============================================================
 
-from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi import APIRouter, HTTPException, Body, Query, Depends
+from utils.require_auth import require_admin
 from datetime import datetime, date, timedelta
 from typing import Optional, List
 from bson import ObjectId
 import uuid
 
-router = APIRouter(prefix="/api/business", tags=["Business System"])
+# Bug-fix 115 — was completely unauthenticated; 18 write endpoints across
+# inventory, orders, refunds, accounting, CRM. Admin-gated at router level.
+router = APIRouter(
+    prefix="/api/business",
+    tags=["Business System"],
+    dependencies=[Depends(require_admin)],
+)
 
 # Database reference - will be set by server.py
 db = None
