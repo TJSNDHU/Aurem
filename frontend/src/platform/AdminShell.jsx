@@ -66,6 +66,9 @@ const SECTIONS = [
     id: 'ora', label: 'ORA AGENTS', icon: Brain, accent: '#9B6DD4', pillar: 'P2',
     blurb: 'AI workforce visibility',
     items: [
+      // iter 322fk — unified surface (replaces 4 separate ORA pages).
+      // Chat / Cockpit / Console / Optimizer / Settings live as tabs.
+      { to: '/admin/ora',                label: 'ORA · Unified',       icon: Brain,   hint: 'g o' },
       { to: '/admin/brain-graph',        label: 'Brain Graph',         icon: Network, hint: '' },
       { to: '/admin/browser-agent',      label: 'Browser Agent',       icon: Camera,  hint: '' },
       { to: '/admin/avatar-manager',     label: 'Avatar Manager',      icon: Sparkles,hint: '' },
@@ -85,11 +88,7 @@ const SECTIONS = [
       { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity,   hint: 'g h' },
       { to: '/admin/stem-fix',           label: 'Stem-Fix · Refactor', icon: GitBranch,  hint: '' },
       { to: '/admin/self-repair',        label: 'Self-Repair',         icon: RotateCcw,  hint: '' },
-      { to: '/admin/ora-optimize',       label: 'ORA Optimizer · $',   icon: Zap,        hint: '' },
-      { to: '/admin/ora-cto',            label: 'ORA Activity Logs',  icon: Crown,      hint: '' },
       { to: '/admin/git-gate',           label: 'Git Commit Gate',     icon: GitBranch,  hint: '' },
-      { to: '/admin/ora-chat',           label: 'ORA Chat',            icon: MessageSquare, hint: '' },
-      { to: '/admin/ora-settings',       label: 'ORA Settings',        icon: Settings,   hint: '' },
     ],
   },
   {
@@ -281,11 +280,18 @@ const AdminShellInner = () => {
     try { localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
   }, [collapsed]);
 
-  // Auto-expand only the active section
+  // Auto-expand only the active section.
+  // iter 322fk fix — match by /admin/<section-prefix> not just item.to,
+  // so the new unified `/admin/ora` (no item with longer prefix) still
+  // resolves to the correct section (ora → pillar P2). Without this the
+  // gate fell back to SECTIONS[0] (cockpit/P1) and showed
+  // "checking pillar…" indefinitely.
   const activeSection = useMemo(() => {
-    for (const s of SECTIONS) {
-      if (s.items.some((it) => location.pathname.startsWith(it.to))) return s.id;
-    }
+    // Pass 1: exact prefix match on item.to (longest first).
+    const sortedItems = SECTIONS.flatMap(s => s.items.map(it => ({ ...it, sid: s.id })))
+      .sort((a, b) => b.to.length - a.to.length);
+    const hit = sortedItems.find(it => location.pathname === it.to || location.pathname.startsWith(it.to + '/'));
+    if (hit) return hit.sid;
     return SECTIONS[0].id;
   }, [location.pathname]);
 
