@@ -44,8 +44,12 @@ def _get_db():
 
 
 def _auth(authorization: Optional[str]):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "auth required")
+    """Bug-fix #149 (R18): real JWT verification + admin enforcement.
+    Previously only checked the literal 'Bearer ' prefix, which let any
+    string through. Now decode + verify via the canonical admin guard.
+    """
+    from utils.admin_guard import verify_admin
+    return verify_admin(authorization)
 
 
 # ─────────────────────────────────────────────────────────────

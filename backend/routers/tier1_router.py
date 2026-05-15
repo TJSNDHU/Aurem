@@ -23,13 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 async def _auth(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Auth required")
-    try:
-        import jwt
-        return jwt.decode(authorization.replace("Bearer ", ""), os.getenv("JWT_SECRET"), algorithms=["HS256"])
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    """Bug-fix #152 (R18): require an admin claim, not just a valid JWT.
+    Previously any signed JWT was accepted — letting a customer-tier
+    token run Vanna queries / Tavily / Firecrawl with admin-tier quota.
+    """
+    from utils.admin_guard import verify_admin
+    return verify_admin(authorization)
 
 
 def _tenant(p: dict) -> str:

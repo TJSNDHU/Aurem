@@ -204,6 +204,28 @@ Return ONLY valid JSON, nothing else."""
     if not collection or collection not in safe_names:
         return {"error": f"Collection '{collection}' not found or restricted", "question": question, "available": safe_names[:20]}
 
+    # Bug-fix #152 (R18): block MongoDB JS-injection operators that an
+    # LLM-generated filter could smuggle in via prompt injection. These
+    # operators let a crafted prompt execute arbitrary JavaScript or
+    # accumulator pipelines on the DB server.
+    _BANNED_OPS = {"$where", "$function", "$accumulator", "$expr"}
+
+    def _scrub(obj):
+        if isinstance(obj, dict):
+            for k in list(obj.keys()):
+                if k in _BANNED_OPS:
+                    raise ValueError(f"banned operator: {k}")
+                _scrub(obj[k])
+        elif isinstance(obj, list):
+            for item in obj:
+                _scrub(item)
+
+    try:
+        _scrub(query_spec.get("filter", {}))
+        _scrub(query_spec.get("projection", {}))
+    except ValueError as e:
+        return {"error": f"Unsafe query rejected: {e}", "question": question}
+
     # Execute query safely
     try:
         filt = query_spec.get("filter", {})

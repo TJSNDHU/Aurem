@@ -34,25 +34,18 @@ def set_db(db):
 
 
 def _require_admin(request: Request):
-    """Lightweight admin check — JWT bearer required. Returns decoded payload
-    (dict) when possible so callers can read email/role/user_id. Falls back to
-    the raw token string if decoding fails (preserves pre-existing behaviour)."""
+    """Bug-fix #150 (R18): admin enforcement, no silent admin grant.
+
+    The previous version returned ``{"_token": token}`` on JWT decode
+    failure — granting admin access on every malformed token. Replaced
+    with the canonical ``verify_admin`` guard which raises 401/403.
+    """
+    from utils.admin_guard import verify_admin
     auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(401, "auth required")
-    token = auth.replace("Bearer ", "", 1)
-    try:
-        import os
-        from jose import jwt  # lazy import — already a dep elsewhere
-        secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
-        if secret:
-            payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_exp": False})
-            if isinstance(payload, dict):
-                payload["_token"] = token
-                return payload
-    except Exception:
-        pass
-    return {"_token": token}
+    payload = verify_admin(auth)
+    if isinstance(payload, dict):
+        payload["_token"] = auth.split(" ", 1)[1].strip() if " " in auth else ""
+    return payload
 
 
 # ═══════════════════════════════════════════

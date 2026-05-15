@@ -1,5 +1,40 @@
 # AUREM Platform — PRD
 
+> **🟢 ROUND 18 SECURITY SPRINT + COMMAND PALETTE (⌘K) (2026-02 / iter 322fk) — 8 CRITICAL BUGS PATCHED + FOUNDER VELOCITY FEATURE**
+>
+> Total bugs fixed across all rounds now: **156**. Round 18 audit closed at source. ⌘K Command Palette shipped for unified ORA Admin.
+>
+> ## Round 18 (Bugs 149-156)
+> 1. **Bug 149** — `lead_lifecycle_router._auth()` — replaced literal `Bearer ` prefix check with `utils.admin_guard.verify_admin` (real JWT decode + admin enforcement). Pipeline / drips / morning-digest now reject garbage tokens with 401.
+> 2. **Bug 150** — `agents_router._require_admin()` — eliminated silent admin grant on JWT decode failure (`{"_token": token}` fallback). Now routes through `verify_admin` and raises 401/403 cleanly.
+> 3. **Bug 151** — `shopify_pulse_router` — new `_verify_shopify_hmac()` (HMAC-SHA256 via base64) wired into `/webhook/checkout-created` and `/webhook/order-paid`. Forged webhook attack closed. Fails-closed in production, fails-open in dev for testing.
+> 4. **Bug 152** — `tier1_router._auth()` switched to `verify_admin` (admin-claim enforced). `tier1_upgrades.natural_language_query()` now scrubs LLM-generated filters for `$where`, `$function`, `$accumulator`, `$expr` — blocks prompt-injection NoSQL JavaScript-injection.
+> 5. **Bug 153** — Verified: `aurem_jwt.verify_token()` already consults `is_token_blacklisted(jti)` (logout bypass closed in prior sprint, R18 audit confirmed).
+> 6. **Bug 154** — `/app/backend/.env.production` `CORS_ORIGINS` tightened from `*` to `https://aurem.live,https://app.aurem.live,https://www.aurem.live`. Server.py already supports the allowlist with credentials properly enabled.
+> 7. **Bug 155** — Static + live audit: all mass-trigger recovery endpoints (`/recovery/trigger/{token}`, `/recovery/stats`) confirmed gated by `_verify_admin`. Webhook entry points now HMAC-gated (151). No remaining anonymous mass-email paths.
+> 8. **Bug 156** — `server_misc_routes` `verify-reset-token` no longer returns `email` field (email-enumeration leak closed). `reset-password` now writes `jti` to `password_reset_used` collection (TTL 2h) — one-shot reset tokens, replay blocked.
+>
+> ## Founder Velocity Feature — Command Palette (⌘K)
+> - New: `/app/frontend/src/platform/admin/CommandPalette.jsx` — global Cmd+K / Ctrl+K floating overlay.
+> - Mounted inside `OraAdminUnified.jsx`. Auto-navigation between tabs (Chat / Cockpit / Console / Optimizer / Settings) + Logout/Home shortcuts.
+> - Free-text queries with no local match → POST `/api/ora/agent/run-async` and poll `/status/{job_id}` for ORA reply, rendered inline.
+> - Keyboard: Cmd+K toggles, ↑/↓ moves selection, Enter executes, Esc closes.
+> - data-testid coverage: `command-palette`, `command-palette-input`, `command-palette-item-*`, `command-palette-ask-ora`, `command-palette-ora-output`.
+> - z-index 9999 so it overlays the legacy admin shell palette.
+>
+> ## Tests
+> - New: `backend/tests/test_round18_fixes.py` — **21 tests passing** (4 live HTTP for 149/150/152, 2 live for 156, 15 static-code guarantees for HMAC/admin/blacklist/CORS/replay).
+> - Full regression run: `test_round12_round15_fixes.py` + `test_round16_round17_fixes.py` + `test_round18_fixes.py` = **66 passed, 0 failed** in 30s.
+> - Frontend smoke: Playwright validated ⌘K opens, filters tabs, navigates via Enter, ORA fallback button renders for unmatched query, Escape closes.
+>
+> ## Ops checklist for production
+> - **NEW** Set `SHOPIFY_WEBHOOK_SECRET` (Bug 151) — required for HMAC verification to actually reject forged webhooks. Without it, dev fail-open / prod fail-closed.
+> - Already required from prior rounds: `JWT_SECRET`, `STRIPE_WEBHOOK_SECRET`, `OWNER_PANEL_TOKEN`, `TWILIO_AUTH_TOKEN`, `WHAPI_WEBHOOK_TOKEN`, `EMAIL_INBOUND_TOKEN`.
+> - CORS_ORIGINS in production env now hardened to `https://aurem.live,...`. Set it explicitly per-deployment.
+
+
+
+
 > **🟢 ROUND 11 + P2 FIXES (2026-02 / iter 322fj) — 9 NEW CRITICAL BUGS PATCHED + WS JWT MIGRATION**
 >
 > Total bugs fixed across all rounds now: **98**. Round 11 audit closed at source. P2 bugs 52 + 54 also resolved.

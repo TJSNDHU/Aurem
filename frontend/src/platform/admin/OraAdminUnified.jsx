@@ -39,6 +39,7 @@ import OraChat from "./OraChat";
 import OraCtoCockpit from "./OraCtoCockpit";
 import OraSettings from "./OraSettings";
 import OraOptimizer from "./OraOptimizer";
+import CommandPalette from "./CommandPalette";
 
 // We lazy-load the legacy founder console so its 1374-line bundle only
 // loads when the founder explicitly opens the Console tab.
@@ -264,6 +265,9 @@ export default function OraAdminUnified() {
           <ActiveTab.Comp key={ActiveTab.id} />
         </React.Suspense>
       </main>
+
+      {/* Founder velocity multiplier — ⌘K / Ctrl+K opens overlay */}
+      <CommandPalette tabs={TABS} setActive={setActive} />
     </div>
   );
 }

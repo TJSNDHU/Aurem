@@ -7,6 +7,9 @@ Phase 3: Instant win — auto-fix alt-text via GraphQL mutation
 """
 
 import os
+import hmac as _hmac
+import hashlib
+import base64
 import logging
 import asyncio
 from datetime import datetime, timezone, timedelta
@@ -61,6 +64,24 @@ def _verify_admin(request: Request):
         raise
     except Exception:
         raise HTTPException(401, "Invalid token")
+
+
+def _verify_shopify_hmac(body: bytes, hmac_header: str) -> bool:
+    """Bug-fix #151 (R18): Shopify webhook HMAC verification.
+
+    Without this check, anyone could POST forged cart/order webhooks to
+    /api/shopify/pulse/webhook/* and trigger mass recovery email blasts
+    against arbitrary phone/email pairs.
+    """
+    secret = os.environ.get("SHOPIFY_WEBHOOK_SECRET") or os.environ.get("SHOPIFY_API_SECRET")
+    if not secret:
+        # No secret configured — fail-closed in production, fail-open in dev.
+        return os.environ.get("AUREM_ENV", "development") != "production"
+    if not hmac_header:
+        return False
+    digest = _hmac.new(secret.encode("utf-8"), body, hashlib.sha256).digest()
+    computed = base64.b64encode(digest).decode("utf-8")
+    return _hmac.compare_digest(computed, hmac_header)
 
 
 async def _get_shop_token(db, shop: str) -> Optional[str]:
@@ -913,13 +934,20 @@ async def checkout_created_webhook(request: Request):
     """
     Shopify checkouts/create webhook.
     Stores abandoned checkout and schedules recovery sequence.
+    Bug-fix #151/#155 (R18): HMAC-verified or rejected.
     """
     db = _get_db()
     if not db:
         return {"status": "no_db"}
 
+    raw = await request.body()
+    hmac_header = request.headers.get("X-Shopify-Hmac-Sha256", "") or request.headers.get("x-shopify-hmac-sha256", "")
+    if not _verify_shopify_hmac(raw, hmac_header):
+        raise HTTPException(401, "invalid webhook signature")
+
     try:
-        body = await request.json()
+        import json as _json
+        body = _json.loads(raw) if raw else {}
     except Exception:
         body = {}
 
@@ -1142,13 +1170,20 @@ async def order_paid_webhook(request: Request):
     """
     Shopify orders/paid webhook.
     Checks if the order matches an abandoned cart → marks as recovered → triggers $2 billing.
+    Bug-fix #151 (R18): HMAC-verified.
     """
     db = _get_db()
     if not db:
         return {"status": "no_db"}
 
+    raw = await request.body()
+    hmac_header = request.headers.get("X-Shopify-Hmac-Sha256", "") or request.headers.get("x-shopify-hmac-sha256", "")
+    if not _verify_shopify_hmac(raw, hmac_header):
+        raise HTTPException(401, "invalid webhook signature")
+
     try:
-        body = await request.json()
+        import json as _json
+        body = _json.loads(raw) if raw else {}
     except Exception:
         body = {}
 

@@ -316,6 +316,9 @@ def _create_reset_token(email: str) -> str:
     payload = {
         "email": email,
         "type": "password_reset",
+        # Bug-fix #156 (R18): jti so the token can be one-shot invalidated
+        # after successful reset (prevents replay).
+        "jti": uuid.uuid4().hex,
         "exp": datetime.now(timezone.utc).timestamp() + 3600,
     }
     return jwt.encode(payload, _jwt_secret, algorithm=_jwt_algorithm)
@@ -329,6 +332,46 @@ def _verify_reset_token(token: str) -> Optional[str]:
         return payload.get("email")
     except Exception:
         return None
+
+
+def _decode_reset_payload(token: str) -> Optional[dict]:
+    """Like _verify_reset_token but returns the full payload (for jti)."""
+    try:
+        payload = jwt.decode(token, _jwt_secret, algorithms=[_jwt_algorithm])
+        if payload.get("type") != "password_reset":
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+async def _is_reset_token_consumed(jti: str) -> bool:
+    db = _get_db()
+    if not db or not jti:
+        return False
+    try:
+        doc = await db.password_reset_used.find_one({"jti": jti}, {"_id": 0, "jti": 1})
+        return bool(doc)
+    except Exception:
+        return False
+
+
+async def _consume_reset_token(jti: str, email: str) -> None:
+    db = _get_db()
+    if not db or not jti:
+        return
+    try:
+        await db.password_reset_used.insert_one({
+            "jti": jti,
+            "email": email,
+            "used_at": datetime.now(timezone.utc).isoformat(),
+        })
+        try:
+            await db.password_reset_used.create_index("used_at", expireAfterSeconds=7200)
+        except Exception:
+            pass
+    except Exception as e:
+        logging.warning(f"[RESET] consume jti failed: {e}")
 
 
 @router.post("/auth/forgot-password")
@@ -431,7 +474,14 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
 async def reset_password(request_data: PasswordResetConfirm):
     """Reset password using the token from email"""
     db = _get_db()
-    email = _verify_reset_token(request_data.token)
+    # Bug-fix #156 (R18): one-shot reset tokens.
+    rp = _decode_reset_payload(request_data.token)
+    if not rp:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    email = rp.get("email")
+    jti = rp.get("jti")
+    if jti and await _is_reset_token_consumed(jti):
+        raise HTTPException(status_code=400, detail="Reset token already used")
 
     if not email:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
@@ -469,17 +519,29 @@ async def reset_password(request_data: PasswordResetConfirm):
     if user_result.modified_count == 0 and team_result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")
 
+    # Bug-fix #156 (R18): mark this reset jti as consumed so the same
+    # link can't be replayed within its 1-hour validity window.
+    if jti:
+        await _consume_reset_token(jti, email)
+
     logging.info(f"Password reset successful for: {email}")
     return {"message": "Password reset successful. You can now log in with your new password."}
 
 
 @router.get("/auth/verify-reset-token")
 async def verify_token(token: str):
-    """Verify if a reset token is valid"""
-    email = _verify_reset_token(token)
-    if not email:
+    """Verify if a reset token is valid.
+
+    Bug-fix #156 (R18): do NOT leak the email back to the caller — that
+    let an attacker brute-force-enumerate emails from leaked tokens.
+    Only return a boolean validity flag.
+    """
+    rp = _decode_reset_payload(token)
+    if not rp:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    return {"valid": True, "email": email}
+    if rp.get("jti") and await _is_reset_token_consumed(rp["jti"]):
+        raise HTTPException(status_code=400, detail="Reset token already used")
+    return {"valid": True}
 
 
 # ═══════════════════════════
