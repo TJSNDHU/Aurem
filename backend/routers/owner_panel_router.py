@@ -25,10 +25,19 @@ def set_db(database: AsyncIOMotorDatabase):
 # OWNER AUTHENTICATION (Simple token-based for now)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-OWNER_TOKEN = os.environ.get("OWNER_PANEL_TOKEN", "owner_secret_token_change_me")
+# Bug-fix #83 — previously defaulted to "owner_secret_token_change_me"
+# (a literal in the published source). With that token in the
+# X-Owner-Token header an attacker could DELETE all live Stripe/Twilio
+# credentials, suspend any subscriber, and toggle platform features.
+# Now REQUIRE the env var. If unset the endpoints fail closed.
+OWNER_TOKEN = (os.environ.get("OWNER_PANEL_TOKEN") or "").strip()
 
 async def verify_owner_token(x_owner_token: str = Header(None)):
     """Verify owner access token"""
+    if not OWNER_TOKEN or len(OWNER_TOKEN) < 16:
+        # Fail closed — never accept a request when the token is not
+        # configured to a strong value.
+        raise HTTPException(status_code=503, detail="Owner panel disabled — OWNER_PANEL_TOKEN unset")
     if not x_owner_token or x_owner_token != OWNER_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid owner token")
     return True

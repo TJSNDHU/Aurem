@@ -534,39 +534,170 @@ async def harvest_leads(
 # every N minutes, rotating through a few profitable verticals.
 
 HARVEST_INTERVAL_S = int(os.environ.get("GHOST_SCOUT_INTERVAL_S", "1800"))  # 30 min default
+
+# P0 fix — Ghost Scout was dedup-spinning: 55 runs/day, 0 new leads, the
+# same "roofing contractor / Toronto / ca" query firing every 30 min and
+# returning 100% duplicates. The old 8-entry queue burned proxy bandwidth
+# without harvesting fresh inventory. Now:
+#   1. Wider queue across more verticals + more cities → more entropy.
+#   2. After 3 back-to-back zero-insertion cycles on the SAME (q, loc),
+#      that (q, loc) is parked for 24 h (`_dedup_park`) so we don't keep
+#      grinding the same exhausted SERP.
+#   3. The loop walks the queue but skips parked entries until something
+#      thaws or fresh entries appear.
 HARVEST_QUEUE = [
-    # (query, location, country) — adjust based on what's converting
+    # Canada — GTA core
     ("roofing contractor", "Toronto", "ca"),
     ("plumber", "Mississauga", "ca"),
-    ("hvac", "Brampton", "ca"),
+    ("hvac contractor", "Brampton", "ca"),
     ("auto repair", "Vaughan", "ca"),
     ("dentist", "Markham", "ca"),
+    ("electrician", "Etobicoke", "ca"),
+    ("dental clinic", "North York", "ca"),
+    ("medspa", "Oakville", "ca"),
+    ("law firm", "Scarborough", "ca"),
+    ("accountant", "Richmond Hill", "ca"),
+    # Canada — wider Ontario / west
+    ("roofing contractor", "Ottawa", "ca"),
+    ("plumber", "Hamilton", "ca"),
+    ("hvac contractor", "Kitchener", "ca"),
+    ("dentist", "London, ON", "ca"),
+    ("auto repair", "Calgary", "ca"),
+    ("electrician", "Edmonton", "ca"),
+    ("medspa", "Vancouver", "ca"),
+    ("real estate agent", "Winnipeg", "ca"),
+    # US — Midwest rust-belt + sunbelt SMB density
     ("roofing contractor", "Detroit, MI", "us"),
-    ("hvac", "Cleveland, OH", "us"),
+    ("hvac contractor", "Cleveland, OH", "us"),
     ("plumber", "Buffalo, NY", "us"),
+    ("dentist", "Pittsburgh, PA", "us"),
+    ("auto repair", "Indianapolis, IN", "us"),
+    ("electrician", "Columbus, OH", "us"),
+    ("medspa", "Phoenix, AZ", "us"),
+    ("law firm", "Tampa, FL", "us"),
+    ("roofing contractor", "Houston, TX", "us"),
+    ("hvac contractor", "Atlanta, GA", "us"),
+    ("dental clinic", "Charlotte, NC", "us"),
+    ("plumber", "Nashville, TN", "us"),
 ]
+
+# In-memory bookkeeping for dedup-park (resets on backend restart, which
+# is fine — restart events themselves rotate the IP pool too).
+_QUEUE_STATS: dict[tuple, dict[str, Any]] = {}
+_PARK_AFTER_ZERO_CYCLES = 3
+_PARK_DURATION_S = 24 * 60 * 60  # 24 hours
+
+
+def _entry_key(q: str, loc: str, ctry: str) -> tuple:
+    return (q.lower().strip(), loc.lower().strip(), ctry.lower().strip())
+
+
+def _is_parked(key: tuple) -> bool:
+    s = _QUEUE_STATS.get(key)
+    if not s:
+        return False
+    parked_until = s.get("parked_until", 0)
+    if parked_until and parked_until > datetime.now(timezone.utc).timestamp():
+        return True
+    if parked_until and parked_until <= datetime.now(timezone.utc).timestamp():
+        # Thaw — reset zero streak and let it try again
+        s["parked_until"] = 0
+        s["zero_streak"] = 0
+    return False
+
+
+def _record_cycle(key: tuple, inserted: int) -> None:
+    s = _QUEUE_STATS.setdefault(key, {"zero_streak": 0, "parked_until": 0,
+                                       "total_inserted": 0, "total_runs": 0})
+    s["total_runs"] += 1
+    s["total_inserted"] += inserted
+    if inserted <= 0:
+        s["zero_streak"] += 1
+        if s["zero_streak"] >= _PARK_AFTER_ZERO_CYCLES:
+            s["parked_until"] = datetime.now(timezone.utc).timestamp() + _PARK_DURATION_S
+            logger.warning(
+                f"[ghost-scout] PARK {key} for 24h after "
+                f"{s['zero_streak']} consecutive zero-insert cycles"
+            )
+    else:
+        s["zero_streak"] = 0
+
+
+def _next_unparked_index(start_idx: int) -> int | None:
+    """Walk forward from start_idx looking for an unparked entry. None if all parked."""
+    n = len(HARVEST_QUEUE)
+    for offset in range(n):
+        idx = (start_idx + offset) % n
+        q, loc, ctry = HARVEST_QUEUE[idx]
+        if not _is_parked(_entry_key(q, loc, ctry)):
+            return idx
+    return None
 
 
 async def ghost_scout_loop() -> None:
-    """Background task: harvest one (query, location) per cycle."""
+    """Background task: harvest one (query, location) per cycle. Rotates
+    through HARVEST_QUEUE, skipping entries parked for dedup-exhaustion."""
     if not PROXY_URL:
         print("[ghost-scout] disabled — IPROYAL_PROXY_URL not set", flush=True)
         return
     print(
         f"[ghost-scout] alive — interval={HARVEST_INTERVAL_S}s "
-        f"queue_len={len(HARVEST_QUEUE)}",
+        f"queue_len={len(HARVEST_QUEUE)} park_threshold={_PARK_AFTER_ZERO_CYCLES}",
         flush=True,
     )
     await asyncio.sleep(120)  # let backend stabilise
     idx = 0
     while True:
         try:
-            q, loc, ctry = HARVEST_QUEUE[idx % len(HARVEST_QUEUE)]
-            idx += 1
+            unparked = _next_unparked_index(idx)
+            if unparked is None:
+                logger.warning(
+                    "[ghost-scout] entire queue parked for dedup — sleeping "
+                    "longer and waiting for first park to thaw"
+                )
+                await asyncio.sleep(_PARK_DURATION_S // 8)
+                continue
+            idx = unparked
+            q, loc, ctry = HARVEST_QUEUE[idx]
+            key = _entry_key(q, loc, ctry)
             res = await harvest_leads(q, loc, country=ctry, limit=15)
-            logger.info(f"[ghost-scout] cycle: {res}")
+            inserted = int(res.get("inserted", 0) or 0)
+            _record_cycle(key, inserted)
+            logger.info(
+                f"[ghost-scout] cycle idx={idx} {q!r}/{loc}/{ctry}: "
+                f"inserted={inserted} dup={res.get('skipped_dup', 0)} "
+                f"zero_streak={_QUEUE_STATS.get(key, {}).get('zero_streak', 0)}"
+            )
+            idx = (idx + 1) % len(HARVEST_QUEUE)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             logger.error(f"[ghost-scout] loop err: {e}", exc_info=True)
+            idx = (idx + 1) % len(HARVEST_QUEUE)
         await asyncio.sleep(HARVEST_INTERVAL_S)
+
+
+def get_queue_health() -> dict:
+    """Returns current queue + park stats — used by the admin status endpoint."""
+    entries = []
+    now_ts = datetime.now(timezone.utc).timestamp()
+    for q, loc, ctry in HARVEST_QUEUE:
+        key = _entry_key(q, loc, ctry)
+        s = _QUEUE_STATS.get(key, {})
+        parked_until = s.get("parked_until", 0)
+        entries.append({
+            "query": q, "location": loc, "country": ctry,
+            "total_runs": s.get("total_runs", 0),
+            "total_inserted": s.get("total_inserted", 0),
+            "zero_streak": s.get("zero_streak", 0),
+            "parked": bool(parked_until and parked_until > now_ts),
+            "parked_until_ts": parked_until if parked_until > now_ts else None,
+            "park_remaining_s": int(parked_until - now_ts) if parked_until > now_ts else 0,
+        })
+    return {
+        "queue_len": len(HARVEST_QUEUE),
+        "parked_count": sum(1 for e in entries if e["parked"]),
+        "park_threshold_cycles": _PARK_AFTER_ZERO_CYCLES,
+        "park_duration_hours": _PARK_DURATION_S // 3600,
+        "entries": entries,
+    }

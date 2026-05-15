@@ -105,6 +105,15 @@ async def get_status(_email: str = Depends(_require_admin)) -> dict[str, Any]:
         {"source": "ghost_scout_iproyal"}
     )
 
+    # P0 fix — surface queue rotation + dedup-park state so we can verify
+    # the harvester is not spinning on exhausted queries.
+    queue_health: dict[str, Any] = {}
+    try:
+        from services.ghost_scout_iproyal import get_queue_health
+        queue_health = get_queue_health()
+    except Exception:
+        pass
+
     return {
         "proxy": {
             "configured": bool(proxy_url),
@@ -117,5 +126,6 @@ async def get_status(_email: str = Depends(_require_admin)) -> dict[str, Any]:
         "totals": {
             "leads_from_ghost_scout": total_from_scout,
         },
+        "queue_health": queue_health,
         "recent_batches": history,
     }

@@ -40,10 +40,29 @@ class Cart(BaseModel):
 
 # ============= CART ROUTES =============
 
+# Bug-fix #88 — cart endpoints had ZERO auth and any caller knowing
+# `session_id` could read/modify/clear another user's cart. Once a cart
+# is bound to a logged-in user (via `user_id`), require the request to
+# be authenticated as that user. Guest carts (no `user_id`) remain
+# session-id-only by necessity (anonymous checkout flow).
+async def _enforce_cart_owner(request: Request, db, session_id: str) -> None:
+    cart = await db.carts.find_one({"session_id": session_id}, {"_id": 0, "user_id": 1})
+    if not cart:
+        return  # new cart, no owner yet
+    owner = cart.get("user_id")
+    if not owner:
+        return  # guest cart
+    user = await get_current_user(request)
+    if not user or user.get("id") != owner:
+        raise HTTPException(status_code=403, detail="Cart belongs to another user")
+
+
 @router.get("/cart/{session_id}")
-async def get_cart(session_id: str):
+async def get_cart(session_id: str, request: Request = None):
     """Get or create cart by session ID"""
     db = get_database()
+    if request is not None:
+        await _enforce_cart_owner(request, db, session_id)
     
     cart = await db.carts.find_one({"session_id": session_id}, {"_id": 0})
     if not cart:
@@ -78,9 +97,10 @@ async def get_cart(session_id: str):
 
 
 @router.post("/cart/{session_id}/add")
-async def add_to_cart(session_id: str, item: CartItem):
+async def add_to_cart(session_id: str, item: CartItem, request: Request):
     """Add item to cart"""
     db = get_database()
+    await _enforce_cart_owner(request, db, session_id)
     
     # Support both UUID and slug lookup
     product = await db.products.find_one(
@@ -116,9 +136,10 @@ async def add_to_cart(session_id: str, item: CartItem):
 
 
 @router.put("/cart/{session_id}/update")
-async def update_cart_item(session_id: str, item: CartItem):
+async def update_cart_item(session_id: str, item: CartItem, request: Request):
     """Update cart item quantity"""
     db = get_database()
+    await _enforce_cart_owner(request, db, session_id)
     
     cart = await db.carts.find_one({"session_id": session_id})
     if not cart:
@@ -142,9 +163,10 @@ async def update_cart_item(session_id: str, item: CartItem):
 
 
 @router.delete("/cart/{session_id}/item/{product_id}")
-async def remove_from_cart(session_id: str, product_id: str):
+async def remove_from_cart(session_id: str, product_id: str, request: Request):
     """Remove item from cart"""
     db = get_database()
+    await _enforce_cart_owner(request, db, session_id)
     
     await db.carts.update_one(
         {"session_id": session_id},
@@ -157,9 +179,10 @@ async def remove_from_cart(session_id: str, product_id: str):
 
 
 @router.delete("/cart/{session_id}")
-async def clear_cart(session_id: str):
+async def clear_cart(session_id: str, request: Request):
     """Clear all items from cart"""
     db = get_database()
+    await _enforce_cart_owner(request, db, session_id)
     
     await db.carts.update_one(
         {"session_id": session_id},

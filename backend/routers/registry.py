@@ -460,11 +460,14 @@ def register_all_routers(app, db):
         try:
             mod = __import__(module_path, fromlist=["router", "set_db"])
             if hasattr(mod, "set_db"):
-                mod.set_db(db)
+                try:
+                    mod.set_db(db)
+                except Exception as _e:
+                    logger.warning(f"[REGISTRY] {module_path}.set_db failed: {_e}")
             if mod.router is not None:
                 app.include_router(mod.router)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[REGISTRY] {module_path} not loaded: {e}")
 
     # Self-Repair, Client Dashboard, Patch, Deploy, SOC2
     for module_path in [

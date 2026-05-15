@@ -42,6 +42,44 @@ def get_db():
     return _db
 
 
+# Bug-fix #75 — Auth helper. Previously /customers, /checkout, /portal, /status
+# had ZERO auth — anyone could submit any business_id to /portal and receive
+# the victim tenant's authenticated Stripe Customer Portal URL (cancel sub,
+# update payment, view invoices). Now require a valid JWT + business_id must
+# match caller's tenant unless caller is admin.
+def _verify_caller(request: Request, business_id: Optional[str] = None) -> dict:
+    """Validate JWT, optionally enforce business_id matches caller's tenant."""
+    import jwt as _jwt
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not secret:
+        raise HTTPException(503, "Auth not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    is_admin = bool(
+        payload.get("is_admin") or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+    )
+    if not is_admin:
+        from utils.admin_guard import is_admin_email
+        if is_admin_email(payload.get("email")):
+            is_admin = True
+    if business_id and not is_admin:
+        caller_tenant = (
+            payload.get("tenant_id") or payload.get("business_id")
+            or payload.get("sub") or ""
+        )
+        if caller_tenant != business_id:
+            raise HTTPException(403, "business_id does not belong to caller")
+    return payload
+
+
 @router.get("/stripe-status")
 async def get_stripe_status():
     """Return whether Stripe is in test or live mode (normalized env resolver)."""
@@ -85,6 +123,7 @@ async def create_customer(request: CreateCustomerRequest, req: Request):
     Create a Stripe customer for a business.
     Called after workspace creation.
     """
+    _verify_caller(req, business_id=request.business_id)
     from services.aurem_commercial.billing_service import get_billing_service
     
     db = get_db()
@@ -117,6 +156,7 @@ async def create_checkout(request: CreateCheckoutRequest, req: Request):
     Create a Stripe Checkout session for subscription upgrade.
     Returns a URL to redirect the customer to.
     """
+    _verify_caller(req, business_id=request.business_id)
     from services.aurem_commercial.billing_service import get_billing_service
     from services.aurem_commercial.workspace_service import SubscriptionPlan
     
@@ -159,11 +199,17 @@ async def create_checkout(request: CreateCheckoutRequest, req: Request):
 
 
 @router.post("/portal")
-async def create_portal_session(request: CreatePortalRequest):
+async def create_portal_session(request: CreatePortalRequest, req: Request):
     """
     Create a Stripe Customer Portal session.
     Allows customers to manage subscription, update payment, view invoices.
     """
+    # Bug-fix #75 — this endpoint previously had ZERO auth. An attacker
+    # could POST {"business_id": "VICTIM", "return_url": "https://evil.com"}
+    # and receive an authenticated billing portal URL for the victim
+    # (cancel subscription, view invoices, change payment method). Now
+    # requires JWT + business_id ownership check.
+    _verify_caller(req, business_id=request.business_id)
     from services.aurem_commercial.billing_service import get_billing_service
     
     db = get_db()
@@ -188,11 +234,12 @@ async def create_portal_session(request: CreatePortalRequest):
 
 
 @router.get("/status/{business_id}")
-async def get_billing_status(business_id: str):
+async def get_billing_status(business_id: str, req: Request):
     """
     Get billing status for a business.
     Returns subscription status, plan, period dates, etc.
     """
+    _verify_caller(req, business_id=business_id)
     from services.aurem_commercial.billing_service import get_billing_service
     
     db = get_db()
@@ -236,6 +283,11 @@ async def stripe_webhook(
     payload = await request.body()
     
     # Verify webhook signature
+    # Bug-fix #76 — previously fell back to UNVERIFIED event parsing when
+    # STRIPE_WEBHOOK_SECRET was empty (the default). An attacker could POST
+    # a fake `customer.subscription.updated` event and activate enterprise
+    # plans for free. Now we REQUIRE the secret in any non-explicitly-dev
+    # environment. Set AUREM_ALLOW_UNVERIFIED_WEBHOOK=1 only for local dev.
     if STRIPE_WEBHOOK_SECRET and stripe_signature:
         try:
             event = stripe.Webhook.construct_event(
@@ -245,7 +297,14 @@ async def stripe_webhook(
             logger.warning("[Billing] Invalid webhook signature")
             raise HTTPException(400, "Invalid signature")
     else:
-        # No signature verification (development mode)
+        if os.environ.get("AUREM_ALLOW_UNVERIFIED_WEBHOOK", "").strip() != "1":
+            logger.error(
+                "[Billing] Webhook rejected: STRIPE_WEBHOOK_SECRET unset or "
+                "Stripe-Signature header missing. Set the secret in .env or "
+                "explicitly opt-in via AUREM_ALLOW_UNVERIFIED_WEBHOOK=1 for dev."
+            )
+            raise HTTPException(400, "Webhook signature verification required")
+        # Explicit dev opt-in only
         import json
         event = stripe.Event.construct_from(
             json.loads(payload), stripe.api_key
@@ -276,7 +335,8 @@ async def stripe_webhook(
                     import stripe as _stripe
                     _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
                     try:
-                        cust = _stripe.Customer.retrieve(customer_id)
+                        # Bug-fix #81 — was synchronous, blocked event loop
+                        cust = await asyncio.to_thread(_stripe.Customer.retrieve, customer_id)
                         customer_email = cust.get("email") or ""
                         customer_phone = cust.get("phone") or ""
                         business_name = (cust.get("metadata") or {}).get("business_name", "")
@@ -305,7 +365,8 @@ async def stripe_webhook(
                 if customer_id:
                     import stripe as _stripe
                     _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
-                    cust = _stripe.Customer.retrieve(customer_id)
+                    # Bug-fix #81 — wrap sync stripe call to avoid blocking loop
+                    cust = await asyncio.to_thread(_stripe.Customer.retrieve, customer_id)
                     customer_email = cust.get("email") or ""
                 if customer_email:
                     await handle_new_subscription(db, customer_email, sub.get("id", ""))

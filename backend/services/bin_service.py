@@ -51,40 +51,54 @@ async def get_bin_data(db, bin_id: str) -> Dict:
     now = datetime.now(timezone.utc)
     today_str = now.strftime("%Y-%m-%d")
 
+    # Bug-fix #89 — previously these counts had NO tenant_id filter, so
+    # this public BIN endpoint leaked platform-wide operational metrics
+    # (active campaigns across ALL tenants, total WA/email/ORA volume).
+    # A competitor or auditor with any valid bin_id could observe
+    # real-time AUREM throughput. Now scoped to the BIN's own tenant.
+    t_filter = {"tenant_id": tenant_id} if tenant_id else {}
+
     # 1. Site health score (latest scan)
     site_health = tenant.get("health_score", 0)
     latest_scan = await db.system_auto_repairs.find_one(
-        {}, {"_id": 0, "overall_score": 1, "scanned_at": 1},
+        t_filter, {"_id": 0, "overall_score": 1, "scanned_at": 1},
         sort=[("scanned_at", -1)]
     )
     if latest_scan:
         site_health = latest_scan.get("overall_score", site_health)
 
     # 2. Active campaigns
-    active_campaigns = await db.campaigns.count_documents({"status": {"$in": ["active", "running"]}})
+    active_campaigns = await db.campaigns.count_documents(
+        {**t_filter, "status": {"$in": ["active", "running"]}}
+    )
 
     # 3. Leads in pipeline
-    leads_pipeline = await db.campaign_leads.count_documents({"status": {"$nin": ["closed", "converted", "rejected"]}})
+    leads_pipeline = await db.campaign_leads.count_documents(
+        {**t_filter, "status": {"$nin": ["closed", "converted", "rejected"]}}
+    )
     if leads_pipeline == 0:
-        leads_pipeline = await db.envoy_outreach.count_documents({"status": {"$nin": ["closed", "completed"]}})
+        leads_pipeline = await db.envoy_outreach.count_documents(
+            {**t_filter, "status": {"$nin": ["closed", "completed"]}}
+        )
 
     # 4. Messages sent today
     wa_today = await db.whatsapp_message_log.count_documents({
-        "sent_at": {"$gte": today_str}
+        **t_filter, "sent_at": {"$gte": today_str}
     })
     email_today = await db.email_logs.count_documents({
-        "sent_at": {"$gte": today_str}
+        **t_filter, "sent_at": {"$gte": today_str}
     })
 
     # 5. ORA sessions today
     ora_today = await db.audit_chain.count_documents({
+        **t_filter,
         "event_type": {"$regex": "ora|chat|voice", "$options": "i"},
         "timestamp": {"$gte": today_str}
     })
 
     # 6. Last repair deployed
     last_repair = await db.system_auto_repairs.find_one(
-        {}, {"_id": 0, "completed_at": 1}, sort=[("completed_at", -1)]
+        t_filter, {"_id": 0, "completed_at": 1}, sort=[("completed_at", -1)]
     )
 
     # 7. Monthly usage percent

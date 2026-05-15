@@ -474,7 +474,12 @@ def _redact_env(stdout: str) -> str:
                   # Bug-fix #31 — connection strings, webhooks, and hashes
                   # were leaking through `env` tool output.
                   "URL", "WEBHOOK", "HASH", "PASS", "CREDENTIAL",
-                  "AUTH", "PRIVATE", "SIGNATURE", "API")
+                  "AUTH", "PRIVATE", "SIGNATURE", "API",
+                  # Bug-fix #80 — explicit guard for Redis/DB connection
+                  # strings (URL substring already catches REDIS_URL, but
+                  # adding the prefixes here makes the intent visible and
+                  # protects future REDIS_PASSWORD / DATABASE_KEY env vars).
+                  "REDIS", "DATABASE", "DB_", "CAPSOLVER", "IPROYAL")
     kept = []
     for line in stdout.split("\n"):
         if "=" in line:

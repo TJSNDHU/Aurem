@@ -25,7 +25,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/compliance", tags=["SOC 2 Compliance"])
 
 _db = None
-_jwt_secret = None
+# Bug-fix #79 — initialize from env at module load so kill-switch routes
+# never become permanently unreachable when set_jwt() is never called
+# (race-condition at startup, partial init, hot reload). Without this,
+# _jwt_secret=None made every admin token 401 → kill switch unusable in
+# the actual emergency it was designed for.
+_jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
 _jwt_algorithm = "HS256"
 
 
@@ -38,25 +43,24 @@ def set_db(database):
 
 def set_jwt(secret, algorithm="HS256"):
     global _jwt_secret, _jwt_algorithm
-    _jwt_secret = secret
+    if secret:
+        _jwt_secret = secret
     _jwt_algorithm = algorithm
 
 
 async def _require_admin(request: Request):
-    """Require valid JWT with admin privileges."""
+    """Require valid JWT with admin privileges.
+
+    Bug-fix #74 — previously accepted ANY token with an `email` claim as
+    admin (every JWT has email → every user was "admin"). This let any
+    paying customer call /kill-switch/activate and /data-deletion to wipe
+    competitor tenants. Now uses the centralized unified admin guard
+    which requires explicit `is_admin`/`is_super_admin` claim, `role`
+    admin, or email in the ADMIN_EMAIL_WHITELIST.
+    """
+    from utils.admin_guard import verify_admin as _verify_admin
     auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = auth.split(" ", 1)[1]
-    try:
-        payload = jwt.decode(token, _jwt_secret, algorithms=[_jwt_algorithm])
-        if not (payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email")):
-            raise HTTPException(status_code=403, detail="Admin access required")
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    return _verify_admin(auth, secret=_jwt_secret, algorithm=_jwt_algorithm)
 
 
 def _get_client_info(request: Request):

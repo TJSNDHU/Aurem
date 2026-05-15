@@ -56,7 +56,14 @@ def _verify_admin(authorization: Optional[str]) -> dict:
             (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))),
             algorithms=["HS256"],
         )
-        if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
+        if payload.get("is_admin") or payload.get("is_super_admin") or payload.get("role") in ("admin", "super_admin"):
+            return payload
+        # Bug-fix #84 — was previously `or payload.get("email")` which made
+        # every authenticated user effectively admin (every JWT has email).
+        # Now check the admin whitelist explicitly.
+        from utils.admin_guard import is_admin_email
+        if is_admin_email(payload.get("email")):
+            payload["is_admin"] = True
             return payload
         raise HTTPException(403, "Admin only")
     except HTTPException:

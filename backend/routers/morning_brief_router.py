@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import os
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 import pytz
 import httpx
 
@@ -37,6 +37,45 @@ def get_db():
     if _db is None:
         raise HTTPException(500, "Database not initialized")
     return _db
+
+
+# Bug-fix #87 — /tasks POST and DELETE previously accepted business_id
+# as a plain query parameter with NO auth. Anyone could inject critical
+# (priority=1) tasks into any business's task queue (which feeds into the
+# morning brief surfaced to the owner and processed by autonomous
+# agents), or delete a business's entire task queue. Require a valid JWT
+# whose tenant matches business_id (admins may pass any business_id).
+def _require_business_owner(request: Request, business_id: str) -> dict:
+    import jwt as _jwt
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(401, "Authorization required")
+    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    if not secret:
+        raise HTTPException(503, "Auth not configured")
+    try:
+        payload = _jwt.decode(auth.split(" ", 1)[1], secret, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
+    is_admin = bool(
+        payload.get("is_admin") or payload.get("is_super_admin")
+        or payload.get("role") in ("admin", "super_admin")
+    )
+    if not is_admin:
+        from utils.admin_guard import is_admin_email
+        if is_admin_email(payload.get("email")):
+            is_admin = True
+    if is_admin:
+        return payload
+    caller_tenant = (
+        payload.get("tenant_id") or payload.get("business_id")
+        or payload.get("sub") or payload.get("email") or ""
+    )
+    if caller_tenant != business_id:
+        raise HTTPException(403, "business_id does not belong to caller")
+    return payload
 
 
 # Business timezone (Mississauga/Eastern)
@@ -489,6 +528,7 @@ async def get_narration_only(
 
 @router.post("/tasks")
 async def create_task(
+    request: Request,
     business_id: str,
     title: str,
     description: str = "",
@@ -500,6 +540,7 @@ async def create_task(
     
     Priority levels: 1=Critical, 2=High, 3=Medium, 4=Low, 5=Backlog
     """
+    _require_business_owner(request, business_id)
     import json
     
     task = {
@@ -535,8 +576,9 @@ async def create_task(
 
 
 @router.delete("/tasks/{task_id}")
-async def complete_task(task_id: str, business_id: str = Query(...)):
+async def complete_task(task_id: str, request: Request, business_id: str = Query(...)):
     """Mark a task as complete (removes from pending)."""
+    _require_business_owner(request, business_id)
     try:
         import json
         from utils.redis_pool import get_async_redis

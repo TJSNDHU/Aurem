@@ -5,10 +5,11 @@ Customers can view plans and subscribe
 ALL responses in TOON format
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 import logging
+import os
 
 from services.toon_service import get_toon_service
 from services.toon_stripe_service import get_toon_stripe_service
@@ -162,13 +163,21 @@ async def create_checkout_session(request: CheckoutRequest):
 
 
 @router.post("/sync-stripe")
-async def sync_plans_to_stripe():
+async def sync_plans_to_stripe(request: Request):
     """
     Sync all TOON plans to Stripe (create products + prices)
     
     Admin endpoint - syncs subscription plans to Stripe
     Creates Stripe products and prices for all active plans
+
+    Bug-fix #78 — previously had ZERO auth despite the comment saying
+    "Admin endpoint". Any unauthenticated caller could trigger creation
+    of Stripe products/prices using the LIVE STRIPE_SECRET_KEY,
+    corrupting the pricing catalog. Now require admin auth.
     """
+    from utils.admin_guard import verify_admin
+    verify_admin(request.headers.get("Authorization"))
+
     if _db is None:
         raise HTTPException(500, "Database not initialized")
     

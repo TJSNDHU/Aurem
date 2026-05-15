@@ -1,5 +1,43 @@
 # AUREM Platform — PRD
 
+> **🟢 ROUND 9 + 10 SECURITY HARDENING + GHOST SCOUT ROTATION (2026-02 / iter 322fi) — 16 CRITICAL BUGS PATCHED + P0 HARVESTER FIX**
+>
+> Total bugs fixed across all rounds now: **89**. All Round 9 + Round 10 audit findings closed at source. Ghost Scout dedup-spin (55 runs/day, 0 inserts) eliminated via dedup-park + 30-entry rotation queue.
+>
+> ## Round 9 (Bugs 74-82)
+> 1. **Bug 74** — `soc2_compliance_router._require_admin` — removed `or payload.get("email")`. Now uses unified `verify_admin` (whitelist + explicit `is_admin` claim). Kill-switch & GDPR data-deletion no longer reachable by any authenticated user.
+> 2. **Bug 75** — `aurem_billing_router` /customers, /checkout, /portal, /status — added `_verify_caller(req, business_id=…)` JWT helper. Stripe Billing Portal IDOR fixed.
+> 3. **Bug 76** — `aurem_billing_router` webhook — refuses unsigned events unless `AUREM_ALLOW_UNVERIFIED_WEBHOOK=1` is explicitly set. No more free enterprise subscription via fake webhook.
+> 4. **Bug 77** — `panic_takeover_router` — replaced silent `current_tenant` fallback with strict `_require_tenant(request)` for all 4 routes (takeover, resume, resolve, send-message). No more anonymous customer message injection.
+> 5. **Bug 78** — `subscription_public_router /sync-stripe` — now calls `verify_admin`. Stripe product catalog safe from anonymous corruption.
+> 6. **Bug 79** — `_jwt_secret` initialised from `JWT_SECRET` env at module load so kill-switch stays reachable even if `set_jwt()` never fires.
+> 7. **Bug 80** — `ora_tools._redact_env` — explicit guards added for `REDIS`, `DATABASE`, `DB_`, `CAPSOLVER`, `IPROYAL` env-var prefixes.
+> 8. **Bug 81** — `aurem_billing_router` webhook — wrapped both `_stripe.Customer.retrieve(...)` calls with `asyncio.to_thread(...)` so event loop is not blocked by sync stripe network I/O.
+> 9. **Bug 82** — `aurem_onboarding /by-session/{id}` was already auth-gated (Bug-fix #34 from earlier round). Re-verified.
+>
+> ## Round 10 (Bugs 83-89)
+> 10. **Bug 83** — `owner_panel_router` — removed `"owner_secret_token_change_me"` default. Now requires `OWNER_PANEL_TOKEN ≥16 chars` in env; fails 503 closed if unset.
+> 11. **Bug 84** — `ssot_admin_router._verify_admin` — removed `or payload.get("email")` admin bypass. SSOT pricing edits locked to true admins.
+> 12. **Bug 85** — `a2a_learning_router` `/message`, `/daily-learning`, `/skills/upgrade` — all 3 now call `_require_admin_a2a(request)`. Agent knowledge-base poisoning attack closed.
+> 13. **Bug 86** — `github_deploy_service.push_fix` — validates `repo` is in tenant's `authorized_repos` list before any commit. Cross-tenant repo push attack closed.
+> 14. **Bug 87** — `morning_brief_router` `/tasks` POST + DELETE — added `_require_business_owner(request, business_id)` gate.
+> 15. **Bug 88** — `routes/orders.py` cart endpoints — added `_enforce_cart_owner(request, db, session_id)`. Bound carts (carts with `user_id`) now require authenticated request whose `user.id` matches.
+> 16. **Bug 89** — `services/bin_service.get_bin_data` — counts now filtered with `{"tenant_id": tenant_id}`. Public BIN no longer leaks platform-wide operational metrics.
+>
+> ## P0 — Ghost Scout Dedup-Spin Eliminated
+> - `services/ghost_scout_iproyal.py` — `HARVEST_QUEUE` expanded from 8 → 30 entries spanning 12 verticals × 25 cities (GTA + wider Ontario + US Midwest/Sunbelt).
+> - In-memory `_QUEUE_STATS` tracks zero-insertion streaks per `(query, location, country)`. After 3 consecutive zero cycles the entry is parked for 24h.
+> - `_next_unparked_index(idx)` skips parked entries; the loop sleeps long if entire queue is parked (recovery state).
+> - New `get_queue_health()` helper surfaces per-entry telemetry through `/api/admin/ghost-scout/status` → `queue_health`.
+>
+> ## Registry log visibility (incidental)
+> - `routers/registry.py` "subscription_public/owner_panel" block now logs failures instead of `except Exception: pass`. The two routers still aren't reaching the route tree at runtime in Preview (known issue carried over from handoff — `LEAN_MODE` dynamic-import quirk). All security fixes in those routers ARE present at source for production deploys.
+>
+> ## Tests
+> - New regression suite: `backend/tests/test_round9_round10_fixes.py` (22 tests, all passing).
+> - Combined with prior `test_round5_round8_fixes.py` (38 tests) → **60 tests passing** locking the 89 patches.
+
+
 > **🟢 ITER 322fc–322fh (2026-05-13) — CHAT UI · ANTI-HALLUCINATION · AUTO-TOOLS · FULL INCIDENT PIPELINE · LEGION DEPLOY FIX · CLAUDE FALLBACK**
 >
 > 6 iterations shipped in one session. Every claim verified via the new `claim_build_done` tool — no theater, every byte real.

@@ -62,8 +62,14 @@ async def _get_tenant_github_token(tenant_id: str) -> Optional[str]:
     return cred.get("token") if cred else None
 
 
-async def connect_github(tenant_id: str, token: str) -> Dict:
-    """Store customer GitHub token securely per tenant."""
+async def connect_github(tenant_id: str, token: str, repo: Optional[str] = None) -> Dict:
+    """Store customer GitHub token securely per tenant.
+
+    Bug-fix #86 — the optional `repo` arg lets the tenant declare which
+    repository AUREM is authorized to push to. push_fix() will reject any
+    repo that doesn't match this declaration (or the list under
+    `authorized_repos` for multi-repo tenants).
+    """
     db = _get_db()
     if db is None:
         return {"connected": False, "error": "no_db"}
@@ -76,21 +82,49 @@ async def connect_github(tenant_id: str, token: str) -> Dict:
         user_data = resp.json()
 
     now = datetime.now(timezone.utc).isoformat()
+    update: Dict = {
+        "tenant_id": tenant_id,
+        "token": token,
+        "github_username": user_data.get("login", ""),
+        "github_name": user_data.get("name", ""),
+        "status": "connected",
+        "connected_at": now,
+        "updated_at": now,
+    }
+    if repo:
+        update["authorized_repo"] = repo
     await db.github_connections.update_one(
         {"tenant_id": tenant_id},
-        {"$set": {
-            "tenant_id": tenant_id,
-            "token": token,
-            "github_username": user_data.get("login", ""),
-            "github_name": user_data.get("name", ""),
-            "status": "connected",
-            "connected_at": now,
-            "updated_at": now,
-        }},
+        {"$set": update,
+         "$addToSet": {"authorized_repos": repo} if repo else {}},
         upsert=True,
     )
     logger.info(f"[GitHub] Connected for tenant {tenant_id} as {user_data.get('login')}")
     return {"connected": True, "username": user_data.get("login"), "name": user_data.get("name")}
+
+
+async def _is_repo_authorized(tenant_id: str, repo: str) -> bool:
+    """Bug-fix #86 — verify `repo` is in the tenant's authorized list.
+    Without this, an attacker with a valid JWT could connect their own
+    low-privilege GitHub token and then call push_fix with repo set to a
+    victim's repository — if the token has any collaborator access,
+    AUREM would commit malicious CI YAML on the attacker's behalf.
+    """
+    db = _get_db()
+    if db is None:
+        return False
+    doc = await db.github_connections.find_one(
+        {"tenant_id": tenant_id, "status": "connected"},
+        {"_id": 0, "authorized_repo": 1, "authorized_repos": 1},
+    )
+    if not doc:
+        return False
+    authorized = set()
+    if doc.get("authorized_repo"):
+        authorized.add(doc["authorized_repo"])
+    for r in (doc.get("authorized_repos") or []):
+        authorized.add(r)
+    return repo in authorized
 
 
 async def push_fix(
@@ -109,6 +143,13 @@ async def push_fix(
     token = await _get_tenant_github_token(tenant_id)
     if not token:
         return {"success": False, "error": "No GitHub token for this tenant. Connect GitHub first."}
+
+    # Bug-fix #86 — verify the requested repo is in the tenant's
+    # authorized list before pushing. Without this an attacker with a
+    # valid JWT could pass arbitrary `repo` and have AUREM commit
+    # malicious code to any repository their token has access to.
+    if not await _is_repo_authorized(tenant_id, repo):
+        return {"success": False, "error": f"Repo {repo!r} not in tenant's authorized list. Re-connect GitHub with this repo."}
 
     branch_name = f"aurem/fix-{secrets.token_hex(6)}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
