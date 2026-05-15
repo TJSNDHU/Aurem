@@ -63,7 +63,14 @@ class AskReq(BaseModel):
 @router.post("/ask")
 async def ask(body: AskReq, authorization: Optional[str] = Header(None)):
     """Ask ORA a question — uses the tool-call loop so all answers are
-    tool-grounded (real subprocess + db + curl), never fabricated."""
+    tool-grounded (real subprocess + db + curl), never fabricated.
+
+    iter 322ew prod-guard — wrapped in asyncio.wait_for so the request can
+    NEVER hang infinitely on a stuck tool-iteration / LLM provider. Cap at
+    90s. If we hit the cap the client gets a clear timeout response
+    instead of a spinning loader.
+    """
+    import asyncio
     user = await _require_admin(authorization)
     from services.llm_gateway import call_llm_with_tools
     system = body.system or (
@@ -73,11 +80,30 @@ async def ask(body: AskReq, authorization: Optional[str] = Header(None)):
         "the tools to fetch real data. Quote tool output verbatim. End every "
         "answer with the mandatory 3-proof footer."
     )
-    res = await call_llm_with_tools(
-        system_prompt=system,
-        user_prompt=body.prompt,
-        max_tokens=900,
-        max_tool_iters=max(1, min(body.max_tool_iters, 6)),
-        actor=user["email"],
-    )
-    return res
+    try:
+        res = await asyncio.wait_for(
+            call_llm_with_tools(
+                system_prompt=system,
+                user_prompt=body.prompt,
+                max_tokens=900,
+                max_tool_iters=max(1, min(body.max_tool_iters, 6)),
+                actor=user["email"],
+            ),
+            timeout=90.0,
+        )
+        return res
+    except asyncio.TimeoutError:
+        logger.warning(f"[ora-chat] /ask timed out at 90s for {user.get('email')}")
+        return {
+            "ok": False,
+            "content": (
+                "(ORA timed out — request exceeded 90s. The Sovereign tunnel "
+                "may be down or all LLM providers are slow. Try again, or "
+                "check /admin/ora-settings for provider health.)"
+            ),
+            "tool_calls_run": 0,
+            "tool_invocations": [],
+            "iterations": 0,
+            "provider": "timeout",
+            "error": "request_timeout_90s",
+        }
