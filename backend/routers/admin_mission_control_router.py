@@ -192,14 +192,23 @@ async def verify_admin(authorization: Optional[str] = Header(None), x_admin_key:
         try:
             secret = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured")))
             payload = jwt.decode(token, secret, algorithms=["HS256"])
-            # Support both is_admin flag and role field
-            if payload.get("is_admin") or payload.get("role") == "admin" or payload.get("email"):
+            # Bug-fix #101 — was `payload.get("email")` truthy bypass (every JWT
+            # has email). Now require explicit admin claim or whitelist email.
+            if payload.get("is_admin") or payload.get("is_super_admin") or payload.get("role") in ("admin", "super_admin"):
+                return payload
+            from utils.admin_guard import is_admin_email
+            if is_admin_email(payload.get("email")):
+                payload["is_admin"] = True
                 return payload
         except Exception:
             pass
-    # Fallback to X-Admin-Key
+    # Bug-fix #100/105 — was `if x_admin_key: return ...` accepting any
+    # non-empty string. Now constant-time compare against AUREM_ADMIN_KEY.
     if x_admin_key:
-        return {"admin_key": x_admin_key}
+        import hmac as _hmac
+        expected = (os.environ.get("AUREM_ADMIN_KEY") or "").strip()
+        if expected and _hmac.compare_digest(x_admin_key, expected):
+            return {"admin_key": "valid"}
     raise HTTPException(401, "Admin authentication required")
 
 
