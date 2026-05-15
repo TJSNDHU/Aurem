@@ -74,7 +74,12 @@ HISTORY_CAP:           int = 40   # non-system messages kept per session
 _GROQ_HTTPX_TIMEOUT:  float = 18.0   # httpx connect+read
 _GROQ_WAIT_FOR:       float = 20.0   # asyncio.wait_for wrapper
 _CLAUDE_WAIT_FOR:     float = 15.0
-_OLLAMA_WAIT_FOR:     float = 120.0
+# Iter 322ex — production safety: Legion Ollama runs on the founder's
+# laptop via ngrok. When the tunnel is dead, the previous 120s wait made
+# ORA "silently scroll forever" before falling through. We honour
+# LEGION_OLLAMA_TIMEOUT_S env so prod can set a short value (15s)
+# while preview keeps the long value for cold-model loads.
+_OLLAMA_WAIT_FOR:     float = float(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "120"))
 
 
 # ── Tier policy ───────────────────────────────────────────────────────

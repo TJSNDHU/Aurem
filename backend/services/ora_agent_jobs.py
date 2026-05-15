@@ -202,7 +202,12 @@ async def worker_loop() -> None:
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            logger.warning("[ora-jobs] worker iter error: %s", e)
+            # Iter 322ex — was sleeping the normal _WORKER_POLL_S after an
+            # error, leading to 2 log lines/sec when MongoDB blips. Now we
+            # back off to 5s on errors so log noise stays manageable.
+            logger.warning("[ora-jobs] worker iter error: %s", str(e)[:200])
+            await asyncio.sleep(5.0)
+            continue
         await asyncio.sleep(_WORKER_POLL_S)
 
 

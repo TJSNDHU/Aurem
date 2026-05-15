@@ -1212,6 +1212,28 @@ async def startup_event():
             except Exception as e:
                 logging.warning(f"[STARTUP-BG] Rate limiter init failed: {e}")
         asyncio.create_task(_bg_ratelimit_init())
+
+        # ════════════════════════════════════════════════════════════════
+        # [iter 322ex] ORA Agent Jobs background worker
+        # ════════════════════════════════════════════════════════════════
+        # Production bug found: /admin/ora-chat enqueues a job via
+        # POST /api/ora/agent/run-async but NOTHING WAS DRAINING THE QUEUE.
+        # Frontend polls /status for 5.4 min, sees "pending" forever, gives
+        # up — user feels "spinner scrolls then goes silent".
+        # This boot wires the single-process worker into the live loop
+        # right after Mongo is ready so every enqueued job gets executed.
+        async def _bg_ora_agent_jobs_worker():
+            try:
+                from services import ora_agent_jobs
+                # Re-bind db in case set_db wasn't called yet via the
+                # ora_agent_router import path.
+                if db is not None:
+                    ora_agent_jobs.set_db(db)
+                ora_agent_jobs.start_worker()
+                logging.info("[STARTUP-BG] ✓ ora_agent_jobs worker started")
+            except Exception as e:
+                logging.warning(f"[STARTUP-BG] ora_agent_jobs worker failed: {e}")
+        asyncio.create_task(_bg_ora_agent_jobs_worker())
         
         # Initialize DB Query routes with shared db connection
         if db is not None:
