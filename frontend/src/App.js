@@ -95,6 +95,7 @@ import OraCtoCockpit from './platform/admin/OraCtoCockpit';
 import GitCommitGate from './platform/admin/GitCommitGate';
 import OraChat from './platform/admin/OraChat';
 import OraSettings from './platform/admin/OraSettings';
+import OraAdminUnified from './platform/admin/OraAdminUnified';
 import FounderSaves from './platform/admin/FounderSaves';
 import IncidentLedger from './platform/admin/IncidentLedger';
 import DesignExtractPublic from './platform/DesignExtractPublic';
@@ -335,12 +336,18 @@ function AppRouter() {
         <Route path="/admin/brain" element={<AdminBrainPage />} />
         <Route path="/admin/council-audit" element={<CouncilAuditPage />} />
         <Route path="/admin/design-extract" element={<DesignExtractStudio />} />
-        <Route path="/admin/ora-optimize" element={<OraOptimizer />} />
-        <Route path="/admin/ora-cto" element={<OraCtoCockpit />} />
+        {/* iter 322ex — ORA unified admin surface. Single page hosts Chat /
+            Cockpit / Console / Optimizer / Settings as tabs. Backend
+            auto-routes tools via ora_agent.run_turn. Old URLs redirect
+            here with the right tab pre-selected so existing bookmarks +
+            sidebar links keep working. */}
+        <Route path="/admin/ora" element={<OraAdminUnified />} />
+        <Route path="/admin/ora-optimize" element={<Navigate to="/admin/ora?tab=optimizer" replace />} />
+        <Route path="/admin/ora-cto" element={<Navigate to="/admin/ora?tab=cockpit" replace />} />
         <Route path="/admin/git-gate" element={<GitCommitGate />} />
-        <Route path="/admin/ora-chat" element={<OraChat />} />
+        <Route path="/admin/ora-chat" element={<Navigate to="/admin/ora?tab=chat" replace />} />
         <Route path="/admin/incident-ledger" element={<IncidentLedger />} />
-        <Route path="/admin/ora-settings" element={<OraSettings />} />
+        <Route path="/admin/ora-settings" element={<Navigate to="/admin/ora?tab=settings" replace />} />
         <Route path="/admin/founder-saves" element={<FounderSaves />} />
         <Route path="/design-extract" element={<DesignExtractPublic />} />
         <Route path="/admin/links" element={<AdminLinksHub />} />
