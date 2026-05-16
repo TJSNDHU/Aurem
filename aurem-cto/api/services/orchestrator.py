@@ -39,10 +39,37 @@ async def chat_with_tools(
     jwt_token: str,
     system: Optional[str] = None,
     max_iters: int = 4,
+    session_id: Optional[str] = None,
+    mongo_client=None,
 ) -> dict:
     """Run the LLM tool-call loop until final answer (no more tool calls)
     or `max_iters` cap is hit.  Every tool call goes through `tools_bridge`
-    which HTTP-proxies to upstream AUREM (`/api/ora-tools/execute`)."""
+    which HTTP-proxies to upstream AUREM (`/api/ora-tools/execute`).
+
+    iter 322fk-4 — when `session_id` + `mongo_client` are supplied, the
+    previous turns of this session are prepended to the transcript so ORA
+    remembers context. After answering, the new prompt + reply are
+    persisted back into `aurem_cto_sessions` for the next turn.
+    """
+    # iter 322fk-4: load prior conversation, if any.
+    history_lines: list[str] = []
+    sessions_col = None
+    if session_id and mongo_client is not None:
+        try:
+            db = mongo_client.get_default_database() or mongo_client["aurem_db"]
+            sessions_col = db["aurem_cto_sessions"]
+            doc = await sessions_col.find_one(
+                {"session_id": session_id},
+                {"_id": 0, "turns": 1},
+            )
+            for t in (doc or {}).get("turns") or []:
+                role = t.get("role", "user")
+                content = (t.get("content") or "").strip()
+                if content:
+                    history_lines.append(f"[{role.upper()}] {content}")
+            history_lines = history_lines[-20:]
+        except Exception as e:
+            logger.warning(f"session history load failed (continuing fresh): {e!r}")
 
     # 1. Fetch tool catalog from upstream
     try:
@@ -61,7 +88,16 @@ async def chat_with_tools(
     base_system = system or "You are ORA CTO Sovereign, running on the Legion laptop."
     enhanced_system = base_system + _TOOL_HELP_TEMPLATE + catalog_text
 
-    transcript = prompt
+    # iter 322fk-4: stitch session memory into the transcript.
+    if history_lines:
+        transcript = (
+            "=== PRIOR CONVERSATION (most recent last) ===\n"
+            + "\n".join(history_lines)
+            + "\n=== END PRIOR CONVERSATION ===\n\n"
+            + f"[USER] {prompt}"
+        )
+    else:
+        transcript = prompt
     invocations: list[dict] = []
     final_provider = "?"
     iters = 0
@@ -80,6 +116,31 @@ async def chat_with_tools(
 
         calls = extract_tool_calls(content)
         if not calls:
+            # iter 322fk-4: persist this turn so the next call has memory.
+            if sessions_col is not None and session_id:
+                try:
+                    import time as _t
+                    now = _t.time()
+                    await sessions_col.update_one(
+                        {"session_id": session_id},
+                        {
+                            "$setOnInsert": {"session_id": session_id, "created_at": now},
+                            "$set": {"updated_at": now},
+                            "$push": {
+                                "turns": {
+                                    "$each": [
+                                        {"role": "user",      "content": prompt,  "ts": now},
+                                        {"role": "assistant", "content": content, "ts": now,
+                                         "provider": final_provider},
+                                    ],
+                                    "$slice": -40,  # bound at 40 turns / 20 pairs
+                                },
+                            },
+                        },
+                        upsert=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"session history save failed: {e!r}")
             return {
                 "ok": meta.get("ok", True),
                 "content": content,

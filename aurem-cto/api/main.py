@@ -110,6 +110,12 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     prompt: str
     max_tool_iters: int = 4
+    # iter 322fk-4 — session memory. Without this every chat turn is a
+    # fresh transcript; ORA forgets the previous message. The frontend
+    # MUST send a stable session_id per chat thread (e.g. a uuid kept
+    # in localStorage). If omitted, a one-shot "ephemeral" session is
+    # used and no history is persisted.
+    session_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -117,6 +123,7 @@ class ChatResponse(BaseModel):
     content: str
     provider: str
     iterations: int
+    session_id: Optional[str] = None
 
 
 # JWT authentication dependency
@@ -202,7 +209,14 @@ async def chat(
 ):
     """Real LLM + tool-call loop (iter 322ex). Routes through:
        Groq llama-3.3-70b → OpenRouter Haiku → Emergent Claude Sonnet 4.5.
-       Tool execution proxied to upstream AUREM via tools_bridge."""
+       Tool execution proxied to upstream AUREM via tools_bridge.
+
+       iter 322fk-4: session-scoped memory. When `session_id` is supplied,
+       previous turns of the same session are loaded from MongoDB
+       (`aurem_cto_sessions`) and stitched into the LLM transcript so ORA
+       remembers what was said. After the reply, the user prompt + ORA
+       answer are appended back so the NEXT turn has the same memory.
+    """
     logger.info(f"Chat from {user.get('email') or user.get('sub','?')}: {request.prompt[:80]}")
     jwt_token = ""
     if authorization and authorization.lower().startswith("bearer "):
@@ -212,12 +226,15 @@ async def chat(
         prompt=request.prompt,
         jwt_token=jwt_token,
         max_iters=max(1, min(request.max_tool_iters, 6)),
+        session_id=request.session_id,
+        mongo_client=app.state.mongo_client,
     )
     return ChatResponse(
         ok=res.get("ok", True),
         content=res.get("content") or "(no response)",
         provider=res.get("provider") or "?",
         iterations=res.get("iterations") or 0,
+        session_id=request.session_id,
     )
 
 
