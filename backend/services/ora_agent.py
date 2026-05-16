@@ -81,6 +81,41 @@ _CLAUDE_WAIT_FOR:     float = 15.0
 # while preview keeps the long value for cold-model loads.
 _OLLAMA_WAIT_FOR:     float = float(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "120"))
 
+# iter 322fk-3 — Legion/Ollama circuit breaker.
+# When the user's local Legion daemon / ngrok tunnel is offline, every
+# ORA request used to hang on the 120s ollama timeout before falling
+# through to Claude. After ONE failure we skip ollama for 60s and route
+# straight to the cloud fallback. Reply time after ngrok drop: 120s → 2s.
+_OLLAMA_CB_FAIL_THRESHOLD = int(os.environ.get("ORA_OLLAMA_CB_THRESHOLD", "1"))
+_OLLAMA_CB_COOLDOWN_S     = float(os.environ.get("ORA_OLLAMA_CB_COOLDOWN_S", "60"))
+_ollama_cb_fails  = 0
+_ollama_cb_until  = 0.0  # epoch-seconds; ollama skipped until this time
+
+
+def _ollama_cb_open() -> bool:
+    import time as _t
+    return _ollama_cb_until > _t.time()
+
+
+def _ollama_cb_record_failure() -> None:
+    global _ollama_cb_fails, _ollama_cb_until
+    import time as _t
+    _ollama_cb_fails += 1
+    if _ollama_cb_fails >= _OLLAMA_CB_FAIL_THRESHOLD:
+        _ollama_cb_until = _t.time() + _OLLAMA_CB_COOLDOWN_S
+        logger.warning(
+            f"[ora-agent] ollama circuit OPEN for {_OLLAMA_CB_COOLDOWN_S:.0f}s "
+            f"(fails={_ollama_cb_fails}). Routing to fallback."
+        )
+
+
+def _ollama_cb_record_success() -> None:
+    global _ollama_cb_fails, _ollama_cb_until
+    if _ollama_cb_fails or _ollama_cb_until:
+        logger.info("[ora-agent] ollama circuit CLOSED — success after failure")
+    _ollama_cb_fails = 0
+    _ollama_cb_until = 0.0
+
 
 # ── Tier policy ───────────────────────────────────────────────────────
 # RULE: a tool name must appear in EXACTLY ONE tier set.
@@ -310,11 +345,19 @@ async def _llm_turn(
     order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
     for provider in order:
+        # iter 322fk-3 — skip ollama while the circuit breaker is open.
+        if provider in ("legion_ollama", "ollama", "legion") and _ollama_cb_open():
+            logger.info("[ora-agent] ollama CB open — skipping legion_ollama")
+            continue
         try:
             if provider in ("legion_ollama", "ollama", "legion"):
                 msg = await asyncio.wait_for(
                     _ollama_with_tools(messages), timeout=_OLLAMA_WAIT_FOR
                 )
+                if msg is None:
+                    _ollama_cb_record_failure()
+                else:
+                    _ollama_cb_record_success()
             elif provider == "groq":
                 msg = await asyncio.wait_for(
                     _groq_with_tools(messages, model=model), timeout=_GROQ_WAIT_FOR
@@ -333,11 +376,15 @@ async def _llm_turn(
 
         except asyncio.TimeoutError:
             logger.warning(f"[ora-agent] provider={provider} hard-timeout — skipping")
+            if provider in ("legion_ollama", "ollama", "legion"):
+                _ollama_cb_record_failure()
         except Exception as e:
             logger.warning(
                 f"[ora-agent] provider={provider} crashed: "
                 f"{type(e).__name__}: {e}"
             )
+            if provider in ("legion_ollama", "ollama", "legion"):
+                _ollama_cb_record_failure()
 
     return None
 

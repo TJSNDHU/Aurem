@@ -60,12 +60,30 @@ async def sovereign_warmer_loop() -> None:
                     )
                 if r.status_code == 200:
                     logger.debug(f"[SovereignWarmer] ping ok — {url}")
+                    # iter 322fk-3 — proactive CB CLOSE on warmer success.
+                    try:
+                        from services.ora_agent import _ollama_cb_record_success as _cb_ok
+                        _cb_ok()
+                    except Exception:
+                        pass
                 else:
                     logger.warning(
                         f"[SovereignWarmer] ping non-200 ({r.status_code}) — {url}"
                     )
+                    # iter 322fk-3 — proactive CB OPEN so ORA requests
+                    # don't waste 120s waiting for a confirmed-dead tunnel.
+                    try:
+                        from services.ora_agent import _ollama_cb_record_failure as _cb_fail
+                        _cb_fail()
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.warning(f"[SovereignWarmer] ping failed ({type(e).__name__}): {e}")
+                try:
+                    from services.ora_agent import _ollama_cb_record_failure as _cb_fail
+                    _cb_fail()
+                except Exception:
+                    pass
         else:
             logger.debug("[SovereignWarmer] skipped — sovereign disabled or no URL")
 
