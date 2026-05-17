@@ -57,7 +57,7 @@ async def websocket_endpoint(websocket: WebSocket, business_id: str, token: str 
         await websocket.close(code=4003, reason="Tenant mismatch")
         return
 
-    from services.aurem_commercial.websocket_hub import get_websocket_hub
+    from shared.commercial.websocket_hub import get_websocket_hub
     
     hub = await get_websocket_hub()
     await hub.register(websocket, business_id)
@@ -73,7 +73,7 @@ async def websocket_endpoint(websocket: WebSocket, business_id: str, token: str 
             
             # Handle state sync requests
             elif data.get("type") == "sync_state":
-                from services.aurem_commercial.redis_memory import get_aurem_memory
+                from shared.commercial.redis_memory import get_aurem_memory
                 memory = await get_aurem_memory()
                 state_key = data.get("key")
                 if state_key:
@@ -96,7 +96,7 @@ async def websocket_endpoint(websocket: WebSocket, business_id: str, token: str 
 @router.get("/memory/{business_id}")
 async def get_memory_stats(business_id: str):
     """Get Redis memory stats for a business"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
+    from shared.commercial.redis_memory import get_aurem_memory
     
     memory = await get_aurem_memory()
     if not memory.available:
@@ -123,7 +123,7 @@ async def get_memory_stats(business_id: str):
 @router.get("/context/{business_id}/{conversation_id}")
 async def get_conversation_context(business_id: str, conversation_id: str):
     """Get conversation context from Redis"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
+    from shared.commercial.redis_memory import get_aurem_memory
     
     memory = await get_aurem_memory()
     context = await memory.get_context(business_id, conversation_id)
@@ -135,7 +135,7 @@ async def get_conversation_context(business_id: str, conversation_id: str):
 @router.get("/cache/{business_id}")
 async def get_cache_stats(business_id: str):
     """Get semantic cache stats"""
-    from services.aurem_commercial.semantic_cache import get_semantic_cache
+    from shared.commercial.semantic_cache import get_semantic_cache
     
     cache = await get_semantic_cache()
     return await cache.get_stats(business_id)
@@ -144,7 +144,7 @@ async def get_cache_stats(business_id: str):
 @router.post("/cache/{business_id}/invalidate")
 async def invalidate_cache(business_id: str, query: Optional[str] = None):
     """Invalidate cache entries"""
-    from services.aurem_commercial.semantic_cache import get_semantic_cache
+    from shared.commercial.semantic_cache import get_semantic_cache
     
     cache = await get_semantic_cache()
     await cache.invalidate(business_id, query)
@@ -160,7 +160,7 @@ async def get_rate_limit_status(
     plan: str = Query("trial")
 ):
     """Check rate limit status"""
-    from services.aurem_commercial.rate_limiter import get_rate_limiter
+    from shared.commercial.rate_limiter import get_rate_limiter
     
     limiter = await get_rate_limiter()
     return await limiter.check_limit(business_id, channel, plan)
@@ -169,7 +169,7 @@ async def get_rate_limit_status(
 @router.get("/rate-limit/{business_id}/usage")
 async def get_rate_limit_usage(business_id: str):
     """Get current usage across all channels"""
-    from services.aurem_commercial.rate_limiter import get_rate_limiter
+    from shared.commercial.rate_limiter import get_rate_limiter
     
     limiter = await get_rate_limiter()
     return await limiter.get_usage(business_id)
@@ -180,7 +180,7 @@ async def get_rate_limit_usage(business_id: str):
 @router.get("/activities/{business_id}")
 async def get_activities(business_id: str, limit: int = Query(20, le=50)):
     """Get recent activities for dashboard"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
+    from shared.commercial.redis_memory import get_aurem_memory
     
     memory = await get_aurem_memory()
     activities = await memory.get_activities(business_id, limit)
@@ -190,8 +190,8 @@ async def get_activities(business_id: str, limit: int = Query(20, le=50)):
 @router.post("/activity/{business_id}")
 async def log_activity(business_id: str, activity: ActivityRequest):
     """Log an activity (for testing/manual triggers)"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
-    from services.aurem_commercial.websocket_hub import get_websocket_hub
+    from shared.commercial.redis_memory import get_aurem_memory
+    from shared.commercial.websocket_hub import get_websocket_hub
     
     memory = await get_aurem_memory()
     await memory.log_activity(
@@ -218,7 +218,7 @@ async def log_activity(business_id: str, activity: ActivityRequest):
 @router.get("/state/{business_id}/{key}")
 async def get_state(business_id: str, key: str):
     """Get UI state value"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
+    from shared.commercial.redis_memory import get_aurem_memory
     
     memory = await get_aurem_memory()
     value = await memory.get_state(business_id, key)
@@ -228,7 +228,7 @@ async def get_state(business_id: str, key: str):
 @router.post("/state/{business_id}")
 async def set_state(business_id: str, state: StateRequest):
     """Set UI state value"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
+    from shared.commercial.redis_memory import get_aurem_memory
     
     memory = await get_aurem_memory()
     await memory.set_state(business_id, state.key, state.value)
@@ -240,10 +240,10 @@ async def set_state(business_id: str, state: StateRequest):
 @router.get("/health")
 async def health_check():
     """Health check for all Redis services"""
-    from services.aurem_commercial.redis_memory import get_aurem_memory
-    from services.aurem_commercial.semantic_cache import get_semantic_cache
-    from services.aurem_commercial.rate_limiter import get_rate_limiter
-    from services.aurem_commercial.websocket_hub import get_websocket_hub
+    from shared.commercial.redis_memory import get_aurem_memory
+    from shared.commercial.semantic_cache import get_semantic_cache
+    from shared.commercial.rate_limiter import get_rate_limiter
+    from shared.commercial.websocket_hub import get_websocket_hub
     
     memory = await get_aurem_memory()
     cache = await get_semantic_cache()

@@ -161,7 +161,7 @@ class UnifiedInboxService:
         Uses the Brain Orchestrator's OODA loop.
         """
         try:
-            from services.aurem_commercial.brain_orchestrator import (
+            from shared.commercial.brain_orchestrator import (
                 get_brain_orchestrator, BrainInput
             )
             
@@ -216,7 +216,7 @@ class UnifiedInboxService:
     async def _push_new_message(self, business_id: str, message: Dict):
         """Push new message notification to WebSocket"""
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             
             # Clean message for WebSocket
@@ -373,7 +373,7 @@ class UnifiedInboxService:
         
         if action_tool:
             try:
-                from services.aurem_commercial.action_engine import get_action_engine
+                from shared.commercial.action_engine import get_action_engine
                 engine = get_action_engine(self.db)
                 
                 result = await engine.handle_tool_call(
@@ -508,7 +508,7 @@ class UnifiedInboxService:
     async def _push_status_update(self, business_id: str, message_id: str, status: str):
         """Push status update to WebSocket"""
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             
             await hub.broadcast_to_business(business_id, {

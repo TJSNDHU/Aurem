@@ -129,7 +129,7 @@ async def get_inbox(
     sorted by received time (newest first). Each message includes Brain suggestions
     for quick action approval.
     """
-    from services.aurem_commercial.unified_inbox_service import (
+    from shared.commercial.unified_inbox_service import (
         get_unified_inbox_service, ChannelType, MessageStatus
     )
     
@@ -172,7 +172,7 @@ async def get_message(
     """
     Get a single inbox message with full details including Brain suggestion.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -201,7 +201,7 @@ async def ingest_message(
     
     Auto-generates a Brain suggestion by default.
     """
-    from services.aurem_commercial.unified_inbox_service import (
+    from shared.commercial.unified_inbox_service import (
         get_unified_inbox_service, ChannelType
     )
     
@@ -238,7 +238,7 @@ async def approve_suggestion(
     This will execute the suggested action (e.g., send email, book appointment).
     You can optionally modify the action parameters before execution.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -267,7 +267,7 @@ async def reject_suggestion(
     
     The message will be marked as rejected and you can provide a reason.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -295,7 +295,7 @@ async def archive_message(
     Archived messages are hidden from the default inbox view but can be
     retrieved by setting include_archived=true.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -321,7 +321,7 @@ async def regenerate_suggestion(
     
     Useful if context has changed or you want a fresh analysis.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -345,7 +345,7 @@ async def bulk_archive(
     """
     Archive multiple inbox messages at once.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -365,7 +365,7 @@ async def get_stats(
     """
     Get inbox statistics: total messages, by channel, by status, pending actions.
     """
-    from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+    from shared.commercial.unified_inbox_service import get_unified_inbox_service
     
     inbox_service = get_unified_inbox_service(get_db())
     
@@ -396,8 +396,8 @@ async def sync_gmail(
     
     Fetches unread messages from Gmail and creates inbox entries with suggestions.
     """
-    from services.aurem_commercial.gmail_service import get_gmail_service
-    from services.aurem_commercial.unified_inbox_service import (
+    from shared.commercial.gmail_service import get_gmail_service
+    from shared.commercial.unified_inbox_service import (
         get_unified_inbox_service, ChannelType
     )
     

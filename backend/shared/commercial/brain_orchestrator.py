@@ -293,7 +293,7 @@ class AuremBrainOrchestrator:
         
         try:
             # Get conversation history from Redis Memory
-            from services.aurem_commercial import get_aurem_memory
+            from shared.commercial import get_aurem_memory
             memory = await get_aurem_memory()
             
             conv_id = input_data.conversation_id or f"conv_{secrets.token_hex(6)}"
@@ -630,7 +630,7 @@ NOTE: If lead score > 80, classify urgency as 'high'. If churn_rate > 20%, flag 
         if decided.selected_tool:
             try:
                 # Execute via Action Engine
-                from services.aurem_commercial.action_engine import get_action_engine
+                from shared.commercial.action_engine import get_action_engine
                 engine = get_action_engine(self.db)
                 
                 result = await engine.handle_tool_call(
@@ -662,7 +662,7 @@ NOTE: If lead score > 80, classify urgency as 'high'. If churn_rate > 20%, flag 
         
         # Push to WebSocket
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             
             if action_id:
@@ -680,7 +680,7 @@ NOTE: If lead score > 80, classify urgency as 'high'. If churn_rate > 20%, flag 
         
         # Store assistant response in memory
         try:
-            from services.aurem_commercial import get_aurem_memory
+            from shared.commercial import get_aurem_memory
             memory = await get_aurem_memory()
             await memory.store_message(business_id, "conv_default", "assistant", final_response)
         except Exception:
@@ -721,7 +721,7 @@ NOTE: If lead score > 80, classify urgency as 'high'. If churn_rate > 20%, flag 
         - Auto-timezone to Mississauga/Eastern
         - Fallback to raw extracted date if parsing fails
         """
-        from services.aurem_commercial.date_parser import parse_date_for_tool
+        from shared.commercial.date_parser import parse_date_for_tool
         
         entities = oriented.entities
         params = {}
@@ -901,7 +901,7 @@ guide them on what information you need."""
     async def _push_status(self, business_id: str, agent: str, status: str, thought_id: str):
         """Push agent status to WebSocket"""
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             await hub.push_agent_status(business_id, agent, status, 0)
         except Exception:
@@ -910,7 +910,7 @@ guide them on what information you need."""
     async def _push_activity(self, business_id: str, description: str, activity_type: str, metadata: Dict):
         """Push activity to WebSocket"""
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             await hub.push_activity(business_id, activity_type, description, "brain", metadata)
         except Exception:

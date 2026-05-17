@@ -532,7 +532,7 @@ class AuremVoiceService:
         logger.info(f"[Voice] Tool call: {func_name} with args: {args}")
         
         try:
-            from services.aurem_commercial.action_engine import get_action_engine
+            from shared.commercial.action_engine import get_action_engine
             engine = get_action_engine(self.db)
             
             # Execute the tool via Action Engine
@@ -896,7 +896,7 @@ class AuremVoiceService:
     async def _push_handoff_context(self, business_id: str, context: Dict) -> None:
         """Push handoff context to WebSocket for live dashboard popup"""
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             
             await hub.push_activity(
@@ -916,7 +916,7 @@ class AuremVoiceService:
     async def _create_handoff_inbox_message(self, business_id: str, context: Dict) -> None:
         """Create urgent Unified Inbox message for handoff"""
         try:
-            from services.aurem_commercial.unified_inbox_service import (
+            from shared.commercial.unified_inbox_service import (
                 get_unified_inbox_service, ChannelType
             )
             
@@ -976,7 +976,7 @@ class AuremVoiceService:
         allowing developers to see AI reasoning in real-time during calls.
         """
         try:
-            from services.aurem_commercial.brain_orchestrator import (
+            from shared.commercial.brain_orchestrator import (
                 get_brain_orchestrator, BrainInput
             )
             
@@ -1025,7 +1025,7 @@ class AuremVoiceService:
         a summary and any actions taken during the call.
         """
         try:
-            from services.aurem_commercial.unified_inbox_service import (
+            from shared.commercial.unified_inbox_service import (
                 get_unified_inbox_service, ChannelType
             )
             
@@ -1087,7 +1087,7 @@ class AuremVoiceService:
     ) -> None:
         """Push call updates to WebSocket for live dashboard"""
         try:
-            from services.aurem_commercial import get_websocket_hub
+            from shared.commercial import get_websocket_hub
             hub = await get_websocket_hub()
             
             await hub.push_activity(
@@ -1168,7 +1168,7 @@ class AuremVoiceService:
         Used to configure the AUREM V2V stream engine with
         tool definitions for calendar, payments, etc.
         """
-        from services.aurem_commercial.action_engine import TOOL_DEFINITIONS
+        from shared.commercial.action_engine import TOOL_DEFINITIONS
         
         # Convert Action Engine tools to voice function format
         voice_functions = []

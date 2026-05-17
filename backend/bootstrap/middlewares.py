@@ -163,7 +163,7 @@ def register_usage_metering(app, db_getter, jwt_secret: str, jwt_alg: str = "HS2
                         )
                         db = db_getter()
                         if tenant_id and db is not None:
-                            from services.aurem_commercial.usage_service import (
+                            from shared.commercial.usage_service import (
                                 get_usage_meter,
                             )
                             meter = get_usage_meter(db)

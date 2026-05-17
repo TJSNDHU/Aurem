@@ -266,7 +266,7 @@ class AuremKeyService:
         
         # Also track in Redis rate limiter
         try:
-            from services.aurem_commercial import get_rate_limiter
+            from shared.commercial import get_rate_limiter
             limiter = await get_rate_limiter()
             await limiter.check_limit(business_id, "llm_calls", "pro")
         except Exception:

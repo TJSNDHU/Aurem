@@ -128,7 +128,7 @@ async def create_api_key(
                     "You can only create keys for your own business_id.",
                 )
 
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
 
     key_service = get_aurem_key_service(get_db())
 
@@ -164,7 +164,7 @@ async def create_api_key(
 async def list_api_keys(business_id: str, authorization: str = Header(None)):
     """List all API keys for a business (without revealing full keys)"""
     _verify_business_caller(authorization, business_id)
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
     keys = await key_service.list_keys(business_id)
@@ -176,7 +176,7 @@ async def list_api_keys(business_id: str, authorization: str = Header(None)):
 async def revoke_api_key(request: RevokeKeyRequest, authorization: str = Header(None)):
     """Revoke an API key"""
     _verify_business_caller(authorization, request.business_id)
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
     success = await key_service.revoke_key(request.key_id, request.business_id)
@@ -191,7 +191,7 @@ async def revoke_api_key(request: RevokeKeyRequest, authorization: str = Header(
 async def get_usage_stats(business_id: str, billing_period: Optional[str] = None, authorization: str = Header(None)):
     """Get usage statistics for billing"""
     _verify_business_caller(authorization, business_id)
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
     stats = await key_service.get_usage_stats(business_id, billing_period)
@@ -206,7 +206,7 @@ async def validate_api_key(request: ValidateKeyRequest):
     
     Returns key info if valid (without sensitive data).
     """
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
     key_info = await key_service.validate_key(request.api_key)
@@ -234,7 +234,7 @@ async def health():
 @router.get("/scope-bundles")
 async def get_scope_bundles():
     """Get available scope bundles and their permissions"""
-    from services.aurem_commercial.key_service import SCOPE_BUNDLES, KeyScope
+    from shared.commercial.key_service import SCOPE_BUNDLES, KeyScope
     
     return {
         "bundles": {

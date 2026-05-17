@@ -82,7 +82,7 @@ async def think(
     api_key = authorization.replace("Bearer ", "").strip()
     
     # Validate API key
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     key_service = get_aurem_key_service(get_db())
     key_info = await key_service.validate_key(api_key)
     
@@ -98,7 +98,7 @@ async def think(
     client_ip = req.client.host if req.client else None
     
     # Process through Brain
-    from services.aurem_commercial.brain_orchestrator import get_brain_orchestrator, BrainInput
+    from shared.commercial.brain_orchestrator import get_brain_orchestrator, BrainInput
     brain = get_brain_orchestrator(get_db())
     
     result = await brain.think(
@@ -150,14 +150,14 @@ async def get_thought(
     
     api_key = authorization.replace("Bearer ", "").strip()
     
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     key_service = get_aurem_key_service(get_db())
     key_info = await key_service.validate_key(api_key)
     
     if not key_info:
         raise HTTPException(401, "Invalid API key")
     
-    from services.aurem_commercial.brain_orchestrator import get_brain_orchestrator
+    from shared.commercial.brain_orchestrator import get_brain_orchestrator
     brain = get_brain_orchestrator(get_db())
     
     thought = await brain.get_thought(thought_id)
@@ -188,7 +188,7 @@ async def get_thoughts(
     
     api_key = authorization.replace("Bearer ", "").strip()
     
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     key_service = get_aurem_key_service(get_db())
     key_info = await key_service.validate_key(api_key)
     
@@ -198,7 +198,7 @@ async def get_thoughts(
     # Use the key's business_id, ignore the path parameter for security
     actual_business_id = key_info["business_id"]
     
-    from services.aurem_commercial.brain_orchestrator import get_brain_orchestrator
+    from shared.commercial.brain_orchestrator import get_brain_orchestrator
     brain = get_brain_orchestrator(get_db())
     
     thoughts = await brain.get_thoughts_for_business(actual_business_id, limit)
@@ -221,14 +221,14 @@ async def get_my_thoughts(
     
     api_key = authorization.replace("Bearer ", "").strip()
     
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     key_service = get_aurem_key_service(get_db())
     key_info = await key_service.validate_key(api_key)
     
     if not key_info:
         raise HTTPException(401, "Invalid API key")
     
-    from services.aurem_commercial.brain_orchestrator import get_brain_orchestrator
+    from shared.commercial.brain_orchestrator import get_brain_orchestrator
     brain = get_brain_orchestrator(get_db())
     
     thoughts = await brain.get_thoughts_for_business(key_info["business_id"], limit)
@@ -243,7 +243,7 @@ async def get_available_intents():
     
     Public endpoint - no auth required.
     """
-    from services.aurem_commercial.brain_orchestrator import IntentType, INTENT_TO_TOOL
+    from shared.commercial.brain_orchestrator import IntentType, INTENT_TO_TOOL
     
     intents = []
     for intent in IntentType:
@@ -273,7 +273,7 @@ async def health():
     """Health check for Brain Orchestrator"""
     try:
         # Check if we can import the brain
-        from services.aurem_commercial.brain_orchestrator import get_brain_orchestrator
+        from shared.commercial.brain_orchestrator import get_brain_orchestrator
         
         # Check LLM key
         import os

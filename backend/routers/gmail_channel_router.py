@@ -149,7 +149,7 @@ async def list_messages(
         List of messages with pagination info
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -197,7 +197,7 @@ async def get_message(
         Full message object with headers, body, etc.
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -233,8 +233,8 @@ async def send_email(
         Sent message info or error
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
-    from services.aurem_commercial import get_workspace_service
+    from shared.commercial.gmail_service import get_gmail_service
+    from shared.commercial import get_workspace_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -283,7 +283,7 @@ async def get_labels(business_id: str, request: Request):
         List of labels with their IDs and types
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -314,7 +314,7 @@ async def create_label(
         Created label info
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -342,7 +342,7 @@ async def mark_as_read(
 ):
     """Mark a message as read"""
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -368,7 +368,7 @@ async def mark_as_unread(
 ):
     """Mark a message as unread"""
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -394,7 +394,7 @@ async def archive_message(
 ):
     """Archive a message (remove from inbox)"""
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -420,7 +420,7 @@ async def trash_message(
 ):
     """Move a message to trash"""
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -447,7 +447,7 @@ async def get_profile(business_id: str, request: Request):
         Email address, message count, thread count
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -482,7 +482,7 @@ async def get_thread(
         Thread with all messages
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)
@@ -507,7 +507,7 @@ async def health_check(business_id: str, request: Request):
     Tests if the connection is working by fetching the profile.
     """
     _require_owner_or_admin(business_id, request)  # Bug-fix #67
-    from services.aurem_commercial.gmail_service import get_gmail_service
+    from shared.commercial.gmail_service import get_gmail_service
     
     db = get_db()
     gmail_service = get_gmail_service(db)

@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException, Header, Query, Request, Background
 from utils.require_auth import require_admin
 from pydantic import BaseModel, Field
 
-from services.aurem_commercial.omnidim_service import (
+from shared.commercial.omnidim_service import (
     OmniDimConfig,
     CallResult,
     SocialLead,
@@ -37,12 +37,12 @@ from services.aurem_commercial.omnidim_service import (
     briefing_dispatcher,
     set_dependencies
 )
-from services.aurem_commercial.mapping_service import (
+from shared.commercial.mapping_service import (
     get_mapping_service,
     set_mapping_db,
     BusinessMappingService
 )
-from services.aurem_commercial.a2a_handoff_service import (
+from shared.commercial.a2a_handoff_service import (
     get_a2a_service,
     set_a2a_handoff_db,
     HandoffType,

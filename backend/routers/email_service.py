@@ -19,7 +19,7 @@ async def _get_gmail_service():
     """Get the GmailService instance from the running app."""
     try:
         from server import db
-        from services.aurem_commercial.gmail_service import get_gmail_service
+        from shared.commercial.gmail_service import get_gmail_service
         return get_gmail_service(db)
     except Exception as e:
         logger.warning(f"GmailService not available: {e}")

@@ -62,7 +62,7 @@ async def validate_aurem_authorization(authorization: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid API key. Must be sk_aurem_live_xxx or sk_aurem_test_xxx")
     
     # Validate key against database
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(db)
     key_info = await key_service.validate_key(api_key)
@@ -90,7 +90,7 @@ async def call_aurem_llm(
     try:
         # If key_info provided, use proxy with tracking
         if key_info:
-            from services.aurem_commercial.llm_proxy import get_llm_proxy
+            from shared.commercial.llm_proxy import get_llm_proxy
             proxy = get_llm_proxy(db)
             return await proxy.simple_completion(
                 aurem_key_info=key_info,
@@ -579,7 +579,7 @@ async def execute_vanguard_swarm(mission_id: str, config: VanguardMission, key_i
         # Also push to Redis activity feed if key_info available
         if key_info:
             try:
-                from services.aurem_commercial import get_aurem_memory
+                from shared.commercial import get_aurem_memory
                 memory = await get_aurem_memory()
                 await memory.log_activity(
                     business_id=key_info["business_id"],

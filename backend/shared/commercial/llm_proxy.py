@@ -60,7 +60,7 @@ class AuremLLMProxy:
         Returns:
             Chat completion response
         """
-        from services.aurem_commercial.key_service import get_aurem_key_service
+        from shared.commercial.key_service import get_aurem_key_service
         
         start_time = time.time()
         key_service = get_aurem_key_service(self.db)
@@ -171,7 +171,7 @@ class AuremLLMProxy:
     async def _track_redis_usage(self, business_id: str, model: str, tokens: float):
         """Track usage in Redis for real-time monitoring"""
         try:
-            from services.aurem_commercial import get_aurem_memory, get_websocket_hub
+            from shared.commercial import get_aurem_memory, get_websocket_hub
             
             memory = await get_aurem_memory()
             hub = await get_websocket_hub()

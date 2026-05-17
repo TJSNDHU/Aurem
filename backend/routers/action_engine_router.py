@@ -44,7 +44,7 @@ class ToolCallRequest(BaseModel):
 @router.get("/tools")
 async def get_tools():
     """Get all available tool definitions for AI function calling"""
-    from services.aurem_commercial.action_engine import get_action_engine
+    from shared.commercial.action_engine import get_action_engine
     engine = get_action_engine(get_db())
     return {"tools": engine.get_tool_definitions()}
 
@@ -57,7 +57,7 @@ async def execute_action(request: ExecuteActionRequest, req: Request):
     attacker could create Stripe invoices / payment links / send
     WhatsApp + email under any business_id.
     """
-    from services.aurem_commercial.action_engine import get_action_engine, ActionType
+    from shared.commercial.action_engine import get_action_engine, ActionType
     from utils.admin_guard import verify_admin
     verify_admin(req.headers.get("Authorization", ""))
 
@@ -101,7 +101,7 @@ async def handle_tool_call(request: ToolCallRequest, req: Request):
     Bug-fix #157 (R19): admin auth required. Same surface as /execute
     once the LLM picks an action — must be gated identically.
     """
-    from services.aurem_commercial.action_engine import get_action_engine
+    from shared.commercial.action_engine import get_action_engine
     from utils.admin_guard import verify_admin
     verify_admin(req.headers.get("Authorization", ""))
 
@@ -134,7 +134,7 @@ async def get_action_history(business_id: str, limit: int = 20):
 @router.get("/health")
 async def health():
     """Health check"""
-    from services.aurem_commercial.action_engine import get_action_engine
+    from shared.commercial.action_engine import get_action_engine
     
     try:
         engine = get_action_engine(get_db())

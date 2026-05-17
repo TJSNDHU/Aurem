@@ -72,7 +72,7 @@ async def validate_aurem_key(authorization: str) -> Dict[str, Any]:
     if not (api_key.startswith("sk_aurem_live_") or api_key.startswith("sk_aurem_test_")):
         raise HTTPException(401, "Invalid API key format. Must start with sk_aurem_live_ or sk_aurem_test_")
     
-    from services.aurem_commercial.key_service import get_aurem_key_service
+    from shared.commercial.key_service import get_aurem_key_service
     
     key_service = get_aurem_key_service(get_db())
     key_info = await key_service.validate_key(api_key)
@@ -102,7 +102,7 @@ async def chat_completions(
     # Validate AUREM key
     key_info = await validate_aurem_key(authorization)
     
-    from services.aurem_commercial.llm_proxy import get_llm_proxy
+    from shared.commercial.llm_proxy import get_llm_proxy
     
     proxy = get_llm_proxy(get_db())
     
@@ -134,7 +134,7 @@ async def completions(
     # Validate AUREM key
     key_info = await validate_aurem_key(authorization)
     
-    from services.aurem_commercial.llm_proxy import get_llm_proxy
+    from shared.commercial.llm_proxy import get_llm_proxy
     
     proxy = get_llm_proxy(get_db())
     

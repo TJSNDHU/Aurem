@@ -153,7 +153,7 @@ async def start_oauth(
     Returns:
         Redirect to Google OAuth consent screen
     """
-    from services.aurem_commercial import get_workspace_service
+    from shared.commercial import get_workspace_service
     
     db = get_db()
     workspace_service = get_workspace_service(db)
@@ -224,8 +224,8 @@ async def oauth_callback(
     Returns:
         Redirect to frontend with success/error status
     """
-    from services.aurem_commercial import get_token_vault, IntegrationProvider
-    from services.aurem_commercial import get_audit_logger, AuditAction
+    from shared.commercial import get_token_vault, IntegrationProvider
+    from shared.commercial import get_audit_logger, AuditAction
     
     # Handle error
     if error:
@@ -342,7 +342,7 @@ async def get_gmail_status(business_id: str, request: Request):
     Returns:
         Connection status including email and expiry info
     """
-    from services.aurem_commercial import get_token_vault, IntegrationProvider
+    from shared.commercial import get_token_vault, IntegrationProvider
     
     db = get_db()
     token_vault = get_token_vault(db)
@@ -386,7 +386,7 @@ async def disconnect_gmail(business_id: str, request: Request):
     Returns:
         Success status
     """
-    from services.aurem_commercial import get_token_vault, IntegrationProvider
+    from shared.commercial import get_token_vault, IntegrationProvider
     
     db = get_db()
     token_vault = get_token_vault(db)

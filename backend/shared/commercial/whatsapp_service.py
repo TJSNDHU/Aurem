@@ -398,7 +398,7 @@ class WhatsAppService:
         
         # Ingest into Unified Inbox
         try:
-            from services.aurem_commercial.unified_inbox_service import (
+            from shared.commercial.unified_inbox_service import (
                 get_unified_inbox_service, ChannelType
             )
             

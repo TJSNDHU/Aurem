@@ -371,9 +371,9 @@ class TestShimImports:
             pytest.fail(f"memory_tiers shim broken: {e}")
     
     def test_commercial_shim(self):
-        """services.aurem_commercial must import from shared.commercial"""
+        """shared.commercial must import from shared.commercial"""
         try:
-            from services.aurem_commercial import ActionEngine, get_action_engine
+            from shared.commercial import ActionEngine, get_action_engine
             print("✓ aurem_commercial shim imports work")
         except ImportError as e:
             pytest.fail(f"aurem_commercial shim broken: {e}")

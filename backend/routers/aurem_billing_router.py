@@ -124,7 +124,7 @@ async def create_customer(request: CreateCustomerRequest, req: Request):
     Called after workspace creation.
     """
     _verify_caller(req, business_id=request.business_id)
-    from services.aurem_commercial.billing_service import get_billing_service
+    from shared.commercial.billing_service import get_billing_service
     
     db = get_db()
     billing_service = get_billing_service(db)
@@ -157,8 +157,8 @@ async def create_checkout(request: CreateCheckoutRequest, req: Request):
     Returns a URL to redirect the customer to.
     """
     _verify_caller(req, business_id=request.business_id)
-    from services.aurem_commercial.billing_service import get_billing_service
-    from services.aurem_commercial.workspace_service import SubscriptionPlan
+    from shared.commercial.billing_service import get_billing_service
+    from shared.commercial.workspace_service import SubscriptionPlan
     
     db = get_db()
     billing_service = get_billing_service(db)
@@ -210,7 +210,7 @@ async def create_portal_session(request: CreatePortalRequest, req: Request):
     # (cancel subscription, view invoices, change payment method). Now
     # requires JWT + business_id ownership check.
     _verify_caller(req, business_id=request.business_id)
-    from services.aurem_commercial.billing_service import get_billing_service
+    from shared.commercial.billing_service import get_billing_service
     
     db = get_db()
     billing_service = get_billing_service(db)
@@ -240,7 +240,7 @@ async def get_billing_status(business_id: str, req: Request):
     Returns subscription status, plan, period dates, etc.
     """
     _verify_caller(req, business_id=business_id)
-    from services.aurem_commercial.billing_service import get_billing_service
+    from shared.commercial.billing_service import get_billing_service
     
     db = get_db()
     billing_service = get_billing_service(db)
@@ -277,7 +277,7 @@ async def stripe_webhook(
     Stripe webhook handler.
     Receives events for subscription changes, payments, etc.
     """
-    from services.aurem_commercial.billing_service import get_billing_service
+    from shared.commercial.billing_service import get_billing_service
     
     # Get raw body
     payload = await request.body()
@@ -447,7 +447,7 @@ async def get_available_plans():
     """
     Get available subscription plans with pricing.
     """
-    from services.aurem_commercial.workspace_service import PLAN_LIMITS, SubscriptionPlan
+    from shared.commercial.workspace_service import PLAN_LIMITS, SubscriptionPlan
     
     plans = []
     for plan_key, limits in PLAN_LIMITS.items():

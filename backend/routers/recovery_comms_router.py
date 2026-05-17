@@ -158,7 +158,7 @@ async def _real_send(channel: str, recipient: str, message: dict, tenant_id: str
 
     try:
         if channel == "email":
-            from services.aurem_commercial.gmail_service import get_gmail_service
+            from shared.commercial.gmail_service import get_gmail_service
             gmail = get_gmail_service(db)
 
             subject = message.get("subject", "A message from your team")
@@ -186,7 +186,7 @@ async def _real_send(channel: str, recipient: str, message: dict, tenant_id: str
                 return {"status": "failed", "channel": "email", "recipient": recipient, "message_id": msg_id, "error": error}
 
         elif channel == "whatsapp":
-            from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+            from shared.commercial.whatsapp_service import get_whatsapp_service
             wa = get_whatsapp_service(db)
 
             body_text = message.get("body", "")

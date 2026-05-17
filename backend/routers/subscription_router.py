@@ -57,7 +57,7 @@ PLAN_TIERS = {
 async def get_current_usage(request: Request):
     user = await _auth(request)
     db = _get_db()
-    from services.aurem_commercial.usage_service import get_usage_meter
+    from shared.commercial.usage_service import get_usage_meter
     meter = get_usage_meter(db)
     tenant_id = user.get("tenant_id", user.get("user_id", user.get("id", "default")))
     return await meter.get_current(tenant_id)
@@ -67,7 +67,7 @@ async def get_current_usage(request: Request):
 async def get_usage_history(request: Request, months: int = 6):
     user = await _auth(request)
     db = _get_db()
-    from services.aurem_commercial.usage_service import get_usage_meter
+    from shared.commercial.usage_service import get_usage_meter
     meter = get_usage_meter(db)
     tenant_id = user.get("tenant_id", user.get("user_id", user.get("id", "default")))
     history = await meter.get_history(tenant_id, months)
@@ -78,7 +78,7 @@ async def get_usage_history(request: Request, months: int = 6):
 async def get_usage_quota(request: Request):
     user = await _auth(request)
     db = _get_db()
-    from services.aurem_commercial.usage_service import get_usage_meter
+    from shared.commercial.usage_service import get_usage_meter
     meter = get_usage_meter(db)
     tenant_id = user.get("tenant_id", user.get("user_id", user.get("id", "default")))
     plan = user.get("plan", "trial")
@@ -316,7 +316,7 @@ async def admin_list_tenants(request: Request):
     _require_admin(request)
     db = _get_db()
     tenants = await db["aurem_billing"].find({}, {"_id": 0}).to_list(500)
-    from services.aurem_commercial.usage_service import get_usage_meter
+    from shared.commercial.usage_service import get_usage_meter
     meter = get_usage_meter(db)
     all_usage = await meter.get_all_tenants_usage()
     usage_map = {u["tenant_id"]: u for u in all_usage}

@@ -103,7 +103,7 @@ async def handle_webhook(
     - hang: Customer hung up
     """
     import os
-    from services.aurem_commercial.voice_service import (
+    from shared.commercial.voice_service import (
         get_voice_service, VoiceWebhookPayload
     )
     
@@ -154,7 +154,7 @@ async def handle_webhook_with_business(
     Use this URL format when configuring AUREM voice assistants for specific businesses:
     https://your-domain/api/voice/webhook/{business_id}
     """
-    from services.aurem_commercial.voice_service import (
+    from shared.commercial.voice_service import (
         get_voice_service, VoiceWebhookPayload
     )
     
@@ -186,7 +186,7 @@ async def get_call_history(
     
     Returns completed and active calls with transcripts and actions.
     """
-    from services.aurem_commercial.voice_service import get_voice_service
+    from shared.commercial.voice_service import get_voice_service
     
     voice_service = get_voice_service(get_db())
     result = await voice_service.get_call_history(business_id, limit, offset)
@@ -204,7 +204,7 @@ async def get_active_calls(
     
     Use this for the live call feed in the VoiceCommand dashboard.
     """
-    from services.aurem_commercial.voice_service import get_voice_service
+    from shared.commercial.voice_service import get_voice_service
     
     voice_service = get_voice_service(get_db())
     calls = await voice_service.get_active_calls(business_id)
@@ -234,7 +234,7 @@ async def get_voice_analytics(
     
     Use this data for the VoiceAnalytics dashboard.
     """
-    from services.aurem_commercial.voice_service import get_voice_service
+    from shared.commercial.voice_service import get_voice_service
     from datetime import datetime, timedelta
     
     voice_service = get_voice_service(get_db())
@@ -337,7 +337,7 @@ async def get_call(
     
     Includes transcript, OODA thoughts, and actions taken.
     """
-    from services.aurem_commercial.voice_service import get_voice_service
+    from shared.commercial.voice_service import get_voice_service
     
     voice_service = get_voice_service(get_db())
     call = await voice_service.get_call(call_id)
@@ -363,7 +363,7 @@ async def initiate_call(
     Bug-fix 126 — was completely unauthenticated; anyone could place real
     outbound calls to attacker-supplied numbers (toll fraud). Admin-gated.
     """
-    from services.aurem_commercial.voice_service import (
+    from shared.commercial.voice_service import (
         get_voice_service, OutboundCallRequest as VoiceOutboundRequest, PersonaType
     )
     
@@ -404,7 +404,7 @@ async def get_assistant_config(
     
     VIP personas (skincare_luxe_vip, auto_advisor_vip) automatically use GPT-4o.
     """
-    from services.aurem_commercial.voice_service import (
+    from shared.commercial.voice_service import (
         get_voice_service, PersonaType
     )
     
@@ -438,7 +438,7 @@ async def list_personas():
     """
     List available voice personas with their descriptions.
     """
-    from services.aurem_commercial.voice_service import PersonaType, PERSONA_PROMPTS
+    from shared.commercial.voice_service import PersonaType, PERSONA_PROMPTS
     
     personas = []
     descriptions = {
@@ -506,7 +506,7 @@ async def get_tool_definitions():
     Get Action Engine tool definitions in OpenAI function format.
     Used when configuring AUREM voice AI assistant functions.
     """
-    from services.aurem_commercial.action_engine import TOOL_DEFINITIONS
+    from shared.commercial.action_engine import TOOL_DEFINITIONS
     
     # Convert to function format
     voice_functions = []
@@ -564,7 +564,7 @@ async def parse_natural_date(request: DateParseRequest):
     - "can I come in tomorrow morning?" → 2026-04-03T09:00:00-04:00
     - "schedule something end of month" → 2026-04-30T09:00:00-04:00
     """
-    from services.aurem_commercial.date_parser import parse_date_for_tool
+    from shared.commercial.date_parser import parse_date_for_tool
     
     result = parse_date_for_tool(request.text, request.timezone)
     
@@ -588,7 +588,7 @@ async def get_date_parsing_examples():
     
     Useful for testing and understanding the parser's capabilities.
     """
-    from services.aurem_commercial.date_parser import parse_date_for_tool
+    from shared.commercial.date_parser import parse_date_for_tool
     
     examples = [
         "tomorrow at 3pm",

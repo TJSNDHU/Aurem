@@ -85,7 +85,7 @@ async def search_twitter(request: TwitterSearchRequest):
     - "PDRN skincare reviews" → Recent tweets about your product
     - "@competitorname" → Monitor competitor mentions
     """
-    from services.aurem_commercial.agent_reach import get_reach_service
+    from shared.commercial.agent_reach import get_reach_service
     
     service = get_reach_service(get_db())
     result = await service.search_twitter(
@@ -109,7 +109,7 @@ async def search_reddit(request: RedditSearchRequest):
     - "best auto mechanic Toronto" → Find local recommendations
     - "skincare routine PDRN" → Detailed product discussions
     """
-    from services.aurem_commercial.agent_reach import get_reach_service
+    from shared.commercial.agent_reach import get_reach_service
     
     service = get_reach_service(get_db())
     result = await service.search_reddit(
@@ -134,7 +134,7 @@ async def get_youtube_transcript(request: YouTubeTranscriptRequest):
     - Competitor product demo → Extract and summarize
     - Tutorial videos → Import into AUREM knowledge base
     """
-    from services.aurem_commercial.agent_reach import get_reach_service
+    from shared.commercial.agent_reach import get_reach_service
     
     service = get_reach_service(get_db())
     result = await service.get_youtube_transcript(
@@ -154,7 +154,7 @@ async def read_webpage(request: WebReaderRequest):
     """
     from routers.intelligence_router import _block_ssrf
     _block_ssrf(request.url)
-    from services.aurem_commercial.agent_reach import get_reach_service
+    from shared.commercial.agent_reach import get_reach_service
     
     service = get_reach_service(get_db())
     result = await service.read_webpage(
@@ -172,7 +172,7 @@ async def get_tool_status():
     
     Shows which tools are installed and ready to use.
     """
-    from services.aurem_commercial.agent_reach import get_reach_service, REACH_TOOL_DEFINITIONS
+    from shared.commercial.agent_reach import get_reach_service, REACH_TOOL_DEFINITIONS
     
     service = get_reach_service(get_db())
     available = service.get_available_tools()
@@ -219,7 +219,7 @@ async def get_search_history(
     
     Useful for reviewing past searches and building analytics.
     """
-    from services.aurem_commercial.agent_reach import get_reach_service
+    from shared.commercial.agent_reach import get_reach_service
     
     service = get_reach_service(get_db())
     history = await service.get_search_history(business_id, tool, limit)
@@ -239,7 +239,7 @@ async def get_skill_definitions():
     Use this to register Agent-Reach tools with the Scout Agent.
     The Scout Agent reads SKILL.md to learn available commands.
     """
-    from services.aurem_commercial.agent_reach import REACH_TOOL_DEFINITIONS
+    from shared.commercial.agent_reach import REACH_TOOL_DEFINITIONS
     
     # Generate SKILL.md format
     skill_md = """# AUREM Agent-Reach Skills
@@ -335,7 +335,7 @@ async def health():
     
     Shows tool availability and configuration status.
     """
-    from services.aurem_commercial.agent_reach import get_reach_service
+    from shared.commercial.agent_reach import get_reach_service
     import os
     
     service = get_reach_service(get_db())

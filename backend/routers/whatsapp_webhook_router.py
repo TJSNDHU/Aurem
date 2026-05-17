@@ -95,7 +95,7 @@ async def verify_webhook(
     Meta sends a GET request with hub.mode, hub.verify_token, and hub.challenge.
     If the verify_token matches, return the challenge string.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     
@@ -119,7 +119,7 @@ async def receive_webhook(request: Request):
     - statuses: Message delivery status updates (sent, delivered, read, failed)
     - account_update: Account-level events
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     
@@ -200,7 +200,7 @@ async def get_status(business_id: str):
     
     Returns connection state, WABA ID, phone number, etc.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     status = await whatsapp.get_connection_status(business_id)
@@ -217,7 +217,7 @@ async def initiate_connection(business_id: str):
     The user will authorize the app on Facebook and connect their
     WhatsApp Business Account.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     result = await whatsapp.initiate_embedded_signup(business_id)
@@ -240,7 +240,7 @@ async def oauth_callback(
     Exchanges the authorization code for an access token and
     retrieves WhatsApp Business Account details.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     result = await whatsapp.complete_embedded_signup(business_id, code, state)
@@ -258,7 +258,7 @@ async def disconnect(business_id: str):
     
     Removes access tokens and connection details.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     result = await whatsapp.disconnect(business_id)
@@ -278,7 +278,7 @@ async def send_message(
     
     Requires WhatsApp to be connected for the business.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     result = await whatsapp.send_text_message(
@@ -305,7 +305,7 @@ async def send_template(
     Template messages are required for initiating conversations
     or sending messages outside the 24-hour window.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     result = await whatsapp.send_template_message(
@@ -333,7 +333,7 @@ async def get_messages(
     
     Optionally filter by phone number to get a specific conversation.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     messages = await whatsapp.get_message_history(
@@ -352,7 +352,7 @@ async def get_phone_numbers(business_id: str):
     """
     Get phone numbers associated with the WhatsApp Business Account.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     import httpx
     import os
     
@@ -390,7 +390,7 @@ async def get_verify_token(business_id: str):
     This token should be entered in the Meta App Dashboard
     when configuring webhooks.
     """
-    from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+    from shared.commercial.whatsapp_service import get_whatsapp_service
     
     whatsapp = get_whatsapp_service(get_db())
     

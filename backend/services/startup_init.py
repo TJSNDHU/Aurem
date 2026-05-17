@@ -214,7 +214,7 @@ async def init_aurem_indexes(db):
     have live data (983 audit_log rows).
     """
     try:
-        from services.aurem_commercial import (
+        from shared.commercial import (
             get_workspace_service,
             get_audit_logger, get_billing_service,
         )
@@ -235,7 +235,7 @@ async def init_aurem_indexes(db):
         ).lower() in ("1", "true", "yes")
 
         if commercial_enabled:
-            from services.aurem_commercial import (
+            from shared.commercial import (
                 get_token_vault, get_consent_tracker,
             )
             await safe_ensure_indexes(get_token_vault(db), "TokenVault")
@@ -243,28 +243,28 @@ async def init_aurem_indexes(db):
 
             # Gmail service indexes
             try:
-                from services.aurem_commercial import get_gmail_service
+                from shared.commercial import get_gmail_service
                 await safe_ensure_indexes(get_gmail_service(db), "GmailService")
             except ImportError:
                 pass
 
             # Unified Inbox indexes
             try:
-                from services.aurem_commercial.unified_inbox_service import get_unified_inbox_service
+                from shared.commercial.unified_inbox_service import get_unified_inbox_service
                 await safe_ensure_indexes(get_unified_inbox_service(db), "UnifiedInbox")
             except ImportError:
                 pass
 
             # WhatsApp indexes
             try:
-                from services.aurem_commercial.whatsapp_service import get_whatsapp_service
+                from shared.commercial.whatsapp_service import get_whatsapp_service
                 await safe_ensure_indexes(get_whatsapp_service(db), "WhatsApp")
             except ImportError:
                 pass
 
             # Key Service indexes
             try:
-                from services.aurem_commercial.key_service import get_aurem_key_service
+                from shared.commercial.key_service import get_aurem_key_service
                 await safe_ensure_indexes(get_aurem_key_service(db), "KeyService")
             except ImportError:
                 pass
@@ -359,7 +359,7 @@ async def ensure_indexes(db):
 async def init_aurem_redis():
     """Initialize AUREM Redis services (Memory, Cache, RateLimiter, WebSocket)."""
     try:
-        from services.aurem_commercial import (
+        from shared.commercial import (
             get_aurem_memory, get_semantic_cache,
             get_rate_limiter, get_websocket_hub,
         )

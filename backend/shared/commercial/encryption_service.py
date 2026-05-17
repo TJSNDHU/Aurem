@@ -4,7 +4,7 @@ AES-256 encryption for sensitive data (tokens, PII)
 PIPEDA Compliant - Canada Privacy Law
 
 Usage:
-    from services.aurem_commercial.encryption_service import EncryptionService
+    from shared.commercial.encryption_service import EncryptionService
     
     enc = EncryptionService()
     encrypted = enc.encrypt("my_secret_token")

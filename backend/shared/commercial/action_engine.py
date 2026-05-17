@@ -104,7 +104,7 @@ class ActionEngine:
     
     async def _push_activity(self, business_id: str, action_type: ActionType, result: ActionResult, agent: str):
         try:
-            from services.aurem_commercial import get_aurem_memory, get_websocket_hub
+            from shared.commercial import get_aurem_memory, get_websocket_hub
             memory = await get_aurem_memory()
             hub = await get_websocket_hub()
             icons = {ActionType.CALENDAR_BOOK: "📅", ActionType.STRIPE_INVOICE: "💰", ActionType.STRIPE_LINK: "💳", ActionType.EMAIL_SEND: "📧", ActionType.WHATSAPP_SEND: "💬"}
@@ -131,7 +131,7 @@ class ActionEngine:
         
         meet_link = None
         try:
-            from services.aurem_commercial import get_token_vault, IntegrationProvider
+            from shared.commercial import get_token_vault, IntegrationProvider
             from google.oauth2.credentials import Credentials
             from googleapiclient.discovery import build
             import os
@@ -182,7 +182,7 @@ class ActionEngine:
         return {"url": link.url, "amount": params.get("amount")}
     
     async def _send_email(self, business_id: str, params: Dict, ip: str) -> Dict:
-        from services.aurem_commercial import get_gmail_service
+        from shared.commercial import get_gmail_service
         gmail = get_gmail_service(self.db)
         result = await gmail.send_email(business_id, params.get("to"), params.get("subject"), params.get("body"), ip_address=ip)
         if "error" in result:
