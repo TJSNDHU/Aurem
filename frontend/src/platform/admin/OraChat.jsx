@@ -92,6 +92,8 @@ export default function OraChat() {
   const [history, setHistory] = useState([]);   // {role, content, ts, tool_calls?, ...}
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [busyStartedAt, setBusyStartedAt] = useState(0); // wall-clock ms when send() flipped busy=true
+  const [busyElapsedS, setBusyElapsedS] = useState(0);   // seconds ticker, updated by interval
   const [pending, setPending] = useState(null); // current action_required
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [error, setError] = useState(null);
@@ -147,6 +149,21 @@ export default function OraChat() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [history, busy, pending]);
+
+  // ── Elapsed-time ticker for the WORKING… indicator (iter 323k) ─────
+  // ORA's Groq tool-calling loop legitimately takes 30-60 s on complex
+  // queries. Without a live counter the UI looks frozen and the founder
+  // closes the tab thinking it crashed. Tick every second while busy so
+  // the user sees "ORA is working… 12s" and knows the system is alive.
+  useEffect(() => {
+    if (!busy) { setBusyElapsedS(0); return undefined; }
+    const start = busyStartedAt || Date.now();
+    setBusyElapsedS(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    const id = setInterval(() => {
+      setBusyElapsedS(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [busy, busyStartedAt]);
 
   const copy = async (text, idx) => {
     try {
@@ -240,6 +257,7 @@ export default function OraChat() {
     setError(null);
     setHistory((h) => [...h, { role: "user", content: q, ts: Date.now() }]);
     setInput("");
+    setBusyStartedAt(Date.now());
     setBusy(true);
     try {
       const j = await runAsyncPolling(q);
@@ -387,8 +405,33 @@ export default function OraChat() {
         )}
 
         {busy && !pending && (
-          <div style={{ color: TEXT_DIM, fontSize: 13, padding: 8 }}>
-            <Loader2 size={14} className="spin" /> ORA is working…
+          <div
+            data-testid="ora-working-indicator"
+            style={{ color: TEXT_DIM, fontSize: 13, padding: 8,
+                     display: "flex", alignItems: "center", gap: 8 }}>
+            <Loader2 size={14} className="spin" />
+            <span>ORA is working…</span>
+            <span data-testid="ora-elapsed-s"
+                  style={{ color: GOLD, fontWeight: 600,
+                           fontVariantNumeric: "tabular-nums",
+                           fontSize: 12 }}>
+              {busyElapsedS}s
+            </span>
+            {busyElapsedS >= 20 && busyElapsedS < 90 && (
+              <span style={{ color: TEXT_DIM, fontSize: 11, opacity: 0.8 }}>
+                · tool-loop usually 30–60 s on complex queries — hang tight
+              </span>
+            )}
+            {busyElapsedS >= 90 && busyElapsedS < 240 && (
+              <span style={{ color: AMBER, fontSize: 11 }}>
+                · taking longer than usual — Legion / Groq may be slow
+              </span>
+            )}
+            {busyElapsedS >= 240 && (
+              <span style={{ color: RED, fontSize: 11 }}>
+                · close to 5 min hard cap — will fail if no result
+              </span>
+            )}
           </div>
         )}
       </div>
