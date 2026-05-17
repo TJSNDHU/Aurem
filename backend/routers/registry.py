@@ -329,6 +329,7 @@ def register_all_routers(app, db):
         "orchestrator_brain_router",    # 10 ep — multi-agent orchestration
         "orchestrator_customer_router", # 2 ep — customer-scoped read-only (iter 323d)
         "customer_vanguard_router",     # 1 ep — fast vanguard status (iter 323f)
+        "pixel_bridge_router",          # 3 ep — pixel→ORA bridge admin (iter 323g)
         "ooda_loop_router",             # 5 ep — OODA automation
         "a2a_learning_router",          # 8 ep — agent-to-agent learning
         "browser_agent_router",         # 7 ep — browser automation
@@ -2775,6 +2776,27 @@ def register_all_routers(app, db):
             logger.info("[REGISTRY] Sentinel repair loop scheduled (every 300s — was 60s, reduced to prevent event-loop pile-up)")
         except Exception as sr_e:
             logger.warning(f"[REGISTRY] Sentinel repair loop schedule failed: {sr_e}")
+
+        # iter 323g — Pixel → ORA Bridge (5 min cron, no LLM call inside)
+        try:
+            from services.pixel_to_ora_bridge import PixelToOraBridge
+            from apscheduler.triggers.interval import IntervalTrigger as _IT_PB
+            _pb = PixelToOraBridge()
+            async def _pixel_bridge_job():
+                await _pb.run_cycle(db)
+            aurem_scheduler.add_job(
+                _pixel_bridge_job,
+                _IT_PB(seconds=300, jitter=30),
+                id="pixel_to_ora_bridge",
+                name="Pixel → ORA Bridge (5 min scan, enqueue only)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=120,
+            )
+            logger.info("[REGISTRY] Pixel → ORA Bridge scheduled (every 300s)")
+        except Exception as pb_e:
+            logger.warning(f"[REGISTRY] Pixel→ORA bridge schedule failed: {pb_e}")
 
         # iter 322 — Trial reminder + expiry sweep (hourly)
         try:
