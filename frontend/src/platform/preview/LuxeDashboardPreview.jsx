@@ -869,7 +869,7 @@ const AgentsTileWrap = ({ agents }) => (
 // ── Inner shell (auth-gated) ─────────────────────────────────────────
 const Inner = () => {
   const { token, user, loading, logout } = useLuxeAuth();
-  const { isMobile } = useViewport();
+  const { isMobile, isTablet, isDesktop } = useViewport();
   const [active, setActive] = useState('home');
   const [mobileOpen, setMobileOpen] = useState(false);
   const data = useLuxeDashboardData(token);
@@ -884,7 +884,7 @@ const Inner = () => {
       case 'ora':           return <ORAPage />;
       case 'integrations':  return <IntegrationsPage />;
       case 'settings':      return <SettingsPage />;
-      default:              return <HomePage data={data} />;
+      default:              return <HomePage data={data} isMobile={isMobile} isTablet={isTablet} />;
     }
   }, [active, data]);
 
@@ -916,7 +916,7 @@ const Inner = () => {
         />
         <div style={{
           flex: 1,
-          padding: isMobile ? '12px 12px 24px' : 18,
+          padding: isMobile ? '12px 12px 24px' : isDesktop ? '24px 28px 32px' : 18,
           overflowY: 'auto',
           minHeight: 0,
           WebkitOverflowScrolling: 'touch',
