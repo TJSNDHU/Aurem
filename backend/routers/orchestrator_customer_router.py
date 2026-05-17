@@ -27,12 +27,36 @@ def set_db(database):
 
 
 async def _current_user(request: Request) -> Dict[str, Any]:
-    """Return the decoded JWT user; raise 401 on missing/bad token."""
+    """Return the decoded JWT user; raise 401 on missing/bad token.
+
+    Tries the canonical `utils.auth_utils.get_current_user` first, then
+    falls back to a minimal in-router decode so this endpoint never
+    depends on a single import path during incremental boot.
+    """
+    import os as _os
+    user = None
     try:
-        from server import get_current_user
-        user = await get_current_user(request)
+        from utils.auth_utils import get_current_user as _auth_get
+        user = await _auth_get(request)
     except Exception:
         user = None
+    if not user:
+        try:
+            import jwt as _jwt
+            secret = _os.environ.get("JWT_SECRET") or ""
+            hdr = request.headers.get("Authorization") or ""
+            if secret and hdr.lower().startswith("bearer "):
+                payload = _jwt.decode(hdr.split(" ", 1)[1].strip(), secret, algorithms=["HS256"])
+                user = {
+                    "user_id": payload.get("user_id") or payload.get("sub"),
+                    "email": payload.get("email"),
+                    "is_admin": bool(payload.get("is_admin")),
+                    "role": payload.get("role"),
+                    "tenant_id": payload.get("tenant_id"),
+                    "business_id": payload.get("business_id"),
+                }
+        except Exception:
+            user = None
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user

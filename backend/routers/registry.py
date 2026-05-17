@@ -328,6 +328,7 @@ def register_all_routers(app, db):
         "brain_router",                 # 6 ep — master brain
         "orchestrator_brain_router",    # 10 ep — multi-agent orchestration
         "orchestrator_customer_router", # 2 ep — customer-scoped read-only (iter 323d)
+        "customer_vanguard_router",     # 1 ep — fast vanguard status (iter 323f)
         "ooda_loop_router",             # 5 ep — OODA automation
         "a2a_learning_router",          # 8 ep — agent-to-agent learning
         "browser_agent_router",         # 7 ep — browser automation
