@@ -59,7 +59,7 @@ async def _send_one_reminder(db, row: dict) -> bool:
     """Send one Resend reminder + mark the row. Returns True on success."""
     resend = _resend_client()
     if resend is None:
-        logger.warning("[onboarding-reminder] Resend not configured — skipping send")
+        logger.debug("[onboarding-reminder] Resend not configured — skipping send")
         return False
 
     email = row.get("email")

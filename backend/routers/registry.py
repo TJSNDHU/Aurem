@@ -1954,16 +1954,16 @@ def register_all_routers(app, db):
             aurem_scheduler.add_job(
                 _wedge_job,
                 IntervalTrigger(
-                    seconds=int(_WEDGE_INTERVAL),
+                    seconds=max(int(_WEDGE_INTERVAL), 300),  # iter 323c — floor at 5min to prevent pile-up
                     start_date=_wedge_first_run,
-                    jitter=20,
+                    jitter=60,
                 ),
                 id='agent_wedge_scan',
                 name='Agent A2A Self-Heal Loop',
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
-                misfire_grace_time=30,
+                misfire_grace_time=120,
             )
             logger.info(
                 f"[scheduler] agent_wedge_scan scheduled every {_WEDGE_INTERVAL}s "
@@ -2762,15 +2762,15 @@ def register_all_routers(app, db):
             from apscheduler.triggers.interval import IntervalTrigger as _IT
             aurem_scheduler.add_job(
                 run_sentinel_repair_cycle,
-                _IT(seconds=60, jitter=20),
+                _IT(seconds=300, jitter=60),
                 id="sentinel_repair_loop",
                 name="Sentinel Repair Loop (A2A → Council → ORA + AI Diagnose)",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
-                misfire_grace_time=30,
+                misfire_grace_time=120,
             )
-            logger.info("[REGISTRY] Sentinel repair loop scheduled (every 60s)")
+            logger.info("[REGISTRY] Sentinel repair loop scheduled (every 300s — was 60s, reduced to prevent event-loop pile-up)")
         except Exception as sr_e:
             logger.warning(f"[REGISTRY] Sentinel repair loop schedule failed: {sr_e}")
 
@@ -2817,15 +2817,15 @@ def register_all_routers(app, db):
             from apscheduler.triggers.interval import IntervalTrigger as _IT3
             aurem_scheduler.add_job(
                 ora_bridge_tick,
-                _IT3(seconds=60, jitter=20),
+                _IT3(seconds=300, jitter=60),
                 id="ora_proposal_bridge",
                 name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
-                misfire_grace_time=30,
+                misfire_grace_time=120,
             )
-            logger.info("[REGISTRY] ORA proposal bridge scheduled (every 60s)")
+            logger.info("[REGISTRY] ORA proposal bridge scheduled (every 300s — was 60s)")
         except Exception as ob_e:
             logger.warning(f"[REGISTRY] ORA proposal bridge schedule failed: {ob_e}")
 
