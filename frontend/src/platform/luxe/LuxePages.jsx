@@ -677,13 +677,13 @@ export const AutomationPage = () => {
     const load = async () => {
       const headers = { Authorization: `Bearer ${token}` };
       try {
-        const wf = (await axios.get(`${API}/api/orchestrator/workflows`, { headers, timeout: 10000 })).data;
+        const wf = (await axios.get(`${API}/api/customer/orchestrator/workflows`, { headers, timeout: 10000 })).data;
         // Handle various response formats: {workflows: []}, {items: []}, or direct array
         const wfList = Array.isArray(wf) ? wf : (wf?.workflows || wf?.items || []);
         setWorkflows(Array.isArray(wfList) ? wfList : []);
       } catch { setWorkflows([]); }
       try {
-        const q = (await axios.get(`${API}/api/orchestrator/queue`, { headers, timeout: 10000 })).data;
+        const q = (await axios.get(`${API}/api/customer/orchestrator/queue`, { headers, timeout: 10000 })).data;
         const items = Array.isArray(q) ? q : (q?.items || []);
         setQueue({ depth: q?.depth ?? items.length, items: Array.isArray(items) ? items : [] });
       } catch { setQueue({ depth: 0, items: [] }); }

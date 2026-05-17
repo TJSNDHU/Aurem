@@ -62,8 +62,14 @@ class WhatsAppEngine:
         """
         config = await self.get_tenant_config(tenant_id)
 
-        # Clean phone number
-        to_clean = to.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+        # Clean phone number — iter 323d: strict centralized normalizer.
+        # Old logic only stripped 5 chars; WHAPI's regex `^[\d-]{9,31}` rejects
+        # phones containing letters ("ext"), dots, unicode, or empty strings.
+        from utils.phone_format import to_whapi_format
+        to_clean = to_whapi_format(to)
+        if not to_clean:
+            logger.warning(f"[WhatsApp] Skipping send — invalid phone: {str(to)[:20]!r}")
+            return {"success": False, "skipped": True, "error": "invalid_phone", "engine": "validator"}
 
         # 1. Per-tenant WHAPI
         if config.get("whapi_token"):
@@ -146,11 +152,16 @@ class WhatsAppEngine:
             return {"success": False, "provider": "sms", "error": "twilio_not_configured"}
         try:
             import httpx
+            # iter 323d — Twilio requires E.164 format (+1XXXXXXXXXX)
+            from utils.phone_format import to_e164
+            to_e164_val = to_e164(to)
+            if not to_e164_val:
+                return {"success": False, "provider": "sms", "error": "invalid_phone_for_twilio"}
             async with httpx.AsyncClient(timeout=12) as client:
                 resp = await client.post(
                     f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",
                     auth=(sid, token),
-                    data={"From": from_num, "To": to, "Body": message[:1600]},
+                    data={"From": from_num, "To": to_e164_val, "Body": message[:1600]},
                 )
             ok = resp.status_code in (200, 201)
             data = {}

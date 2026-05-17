@@ -70,9 +70,15 @@ async def send_whatsapp(phone: str, message: str) -> Dict:
     except Exception:
         pass
 
-    # Normalize phone number
-    phone = phone.lstrip("+").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
-    
+    # Normalize phone number — iter 323d: centralized strict normalizer.
+    # Rejects empty / non-digit phones BEFORE we hit WHAPI's regex.
+    from utils.phone_format import to_whapi_format
+    phone_clean = to_whapi_format(phone)
+    if not phone_clean:
+        logger.warning(f"[WhatsApp] Skipping invalid phone: {str(phone)[:20]!r}")
+        return {"success": False, "skipped": True, "reason": "invalid_phone"}
+    phone = phone_clean
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(

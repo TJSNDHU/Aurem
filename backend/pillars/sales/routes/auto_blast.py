@@ -705,7 +705,12 @@ async def run_whatsapp_sequence():
                 report_link=f"https://aurem.live/report/{lead.get('lead_id', 'test')}",
                 top_issue="Website performance below average",
             )
-            phone = lead["phone"].replace("+", "").replace("-", "").replace(" ", "")
+            # iter 323d — strict phone normalization (was leaking letters/dots to WHAPI)
+            from utils.phone_format import to_whapi_format
+            phone = to_whapi_format(lead.get("phone", ""))
+            if not phone:
+                logger.debug(f"[CAMPAIGN] skipping lead {lead.get('lead_id')} — invalid phone")
+                continue
             result = await wa_engine.send_message("polaris-built-001", phone, message)
             if result.get("success"):
                     sent += 1
