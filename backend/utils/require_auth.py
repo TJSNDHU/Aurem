@@ -32,7 +32,7 @@ from utils.admin_guard import is_admin_email, verify_admin as _verify_admin
 
 
 def _decode(token: str) -> dict:
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(500, "JWT secret not configured")
     try:

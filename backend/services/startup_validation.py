@@ -192,9 +192,8 @@ class StartupValidator:
         missing_keys = []
         
         api_keys = {
-            "EMERGENT_LLM_KEY": "AI Chat",
-            "STRIPE_API_KEY": "Payments",
-            "EMERGENT_LLM_KEY": "Voice AI + LLM",
+            "EMERGENT_LLM_KEY": "AI Chat + Voice + LLM",
+            "STRIPE_SECRET_KEY": "Payments",
         }
         
         for key, service in api_keys.items():

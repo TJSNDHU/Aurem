@@ -43,7 +43,7 @@ async def _require_admin(request: Request) -> dict:
         raise HTTPException(401, "Authentication required")
     if jwt is None:
         raise HTTPException(503, "jwt module unavailable")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+    secret = os.environ.get("JWT_SECRET") or ""
     try:
         claims = jwt.decode(auth[7:], secret, algorithms=["HS256"])
     except Exception:

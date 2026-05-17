@@ -44,7 +44,7 @@ def _get_db():
 # creating a split-secret scenario where an attacker who knew this string
 # could forge tokens accepted ONLY by /api/aurem/* routes. No fallback now —
 # missing env var fails fast at first use.
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
     import logging as _l
     _l.getLogger(__name__).warning(
@@ -837,7 +837,7 @@ async def get_subscription_status(session_id: str, user = Depends(get_current_us
     try:
         from emergentintegrations.payments.stripe.checkout import StripeCheckout
         
-        stripe_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+        stripe_key = os.environ.get("STRIPE_SECRET_KEY")
         stripe_checkout = StripeCheckout(api_key=stripe_key, webhook_url="")
         
         status = await stripe_checkout.get_checkout_status(session_id)

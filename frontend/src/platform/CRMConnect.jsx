@@ -60,7 +60,7 @@ export default function CRMConnect({ token, user }) {
 
   const fetchConnections = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/crm/connections`, {
+      const res = await fetch(`${API_URL}/api/crm-sync/connections`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -69,7 +69,6 @@ export default function CRMConnect({ token, user }) {
         setSyncStats(data.stats || null);
       }
     } catch (err) {
-      // Use default empty state
       setConnections([]);
       setSyncStats({
         total_contacts: 0,
@@ -84,12 +83,12 @@ export default function CRMConnect({ token, user }) {
 
   const fetchRecentContacts = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/crm/contacts/recent`, {
+      const res = await fetch(`${API_URL}/api/crm-sync/sync-jobs`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setRecentContacts(data.contacts || []);
+        setRecentContacts(data.jobs || []);
       }
     } catch {
       setRecentContacts([]);
@@ -105,14 +104,14 @@ export default function CRMConnect({ token, user }) {
     if (!apiKey.trim()) return;
     setConnecting(true);
     try {
-      const res = await fetch(`${API_URL}/api/crm/connect`, {
+      const res = await fetch(`${API_URL}/api/crm-sync/connect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          provider: providerId,
+          crm_type: providerId,
           api_key: apiKey,
           instance_url: instanceUrl || undefined
         })
@@ -130,9 +129,9 @@ export default function CRMConnect({ token, user }) {
     }
   };
 
-  const handleDisconnect = async (providerId) => {
+  const handleDisconnect = async (connectionId) => {
     try {
-      await fetch(`${API_URL}/api/crm/disconnect/${providerId}`, {
+      await fetch(`${API_URL}/api/crm-sync/disconnect/${connectionId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -142,15 +141,17 @@ export default function CRMConnect({ token, user }) {
     }
   };
 
-  const handleSync = async (providerId) => {
-    setSyncing(providerId);
+  const handleSync = async (connectionId) => {
+    setSyncing(connectionId);
     try {
-      const res = await fetch(`${API_URL}/api/crm/sync/${providerId}`, {
+      const res = await fetch(`${API_URL}/api/crm-sync/sync-contacts`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId })
       });
       if (res.ok) {
         fetchConnections();
+        fetchRecentContacts();
       }
     } catch (err) {
       console.error('Sync failed:', err);
@@ -214,7 +215,10 @@ export default function CRMConnect({ token, user }) {
           <h2 className="text-xs text-[#555] tracking-wider mb-4">AVAILABLE INTEGRATIONS</h2>
           <div className="grid grid-cols-2 gap-4">
             {CRM_PROVIDERS.map((provider) => {
-              const isConnected = connections.some(c => c.provider === provider.id);
+              const liveSupported = provider.id === 'hubspot' || provider.id === 'salesforce';
+              const matchedConn = connections.find(c => (c.crm_type || c.provider) === provider.id);
+              const isConnected = !!matchedConn;
+              const connectionId = matchedConn?.connection_id;
               return (
                 <div
                   key={provider.id}
@@ -263,29 +267,39 @@ export default function CRMConnect({ token, user }) {
                     {isConnected ? (
                       <>
                         <button
-                          onClick={() => handleDisconnect(provider.id)}
+                          onClick={() => handleDisconnect(connectionId)}
                           className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg hover:bg-[#ef4444]/20 transition-colors"
                         >
                           <Unlink className="w-3 h-3" />
                           Disconnect
                         </button>
                         <button
-                          onClick={() => handleSync(provider.id)}
+                          onClick={() => handleSync(connectionId)}
                           data-testid={`sync-${provider.id}-btn`}
                           className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-lg hover:bg-[#D4AF37]/20 transition-colors disabled:opacity-50"
-                          disabled={syncing === provider.id}
+                          disabled={syncing === connectionId}
                         >
-                          <RefreshCw className={`w-3 h-3 ${syncing === provider.id ? 'animate-spin' : ''}`} />
-                          {syncing === provider.id ? 'Syncing...' : 'Sync Now'}
+                          <RefreshCw className={`w-3 h-3 ${syncing === connectionId ? 'animate-spin' : ''}`} />
+                          {syncing === connectionId ? 'Syncing...' : 'Sync Now'}
                         </button>
                       </>
-                    ) : (
+                    ) : liveSupported ? (
                       <button
                         onClick={() => setShowSetup(provider)}
+                        data-testid={`connect-${provider.id}-btn`}
                         className="flex items-center gap-1.5 px-4 py-2 text-[11px] text-[#050505] font-semibold bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity"
                       >
                         <Link2 className="w-3 h-3" />
                         Connect
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        data-testid={`coming-soon-${provider.id}`}
+                        className="flex items-center gap-1.5 px-4 py-2 text-[11px] text-[#888] font-semibold bg-white/40 border border-[#FF6B00]/15 rounded-lg cursor-not-allowed"
+                      >
+                        <Clock className="w-3 h-3" />
+                        Coming Soon
                       </button>
                     )}
                   </div>

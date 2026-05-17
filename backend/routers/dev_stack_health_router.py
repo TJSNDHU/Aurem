@@ -40,7 +40,7 @@ async def _require_admin(request: Request) -> dict:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Authentication required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+    secret = os.environ.get("JWT_SECRET") or ""
     try:
         claims = jwt.decode(auth[7:], secret, algorithms=["HS256"])
     except Exception:

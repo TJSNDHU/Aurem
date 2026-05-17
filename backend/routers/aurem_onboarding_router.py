@@ -78,7 +78,7 @@ async def onboarding_by_session(session_id: str, request: Request):
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Authorization required")
-    _jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    _jwt_secret = os.environ.get("JWT_SECRET")
     if not _jwt_secret:
         raise HTTPException(503, "Auth not configured")
     try:

@@ -133,7 +133,7 @@ async def _make_admin_jwt() -> Optional[str]:
         import jwt as _jwt
         from datetime import timedelta
         secret = os.environ.get("JWT_SECRET") or os.environ.get("SECRET_KEY") or ""
-        algo = os.environ.get("JWT_ALGORITHM") or "HS256"
+        algo = "HS256"
         if not secret:
             return None
         payload = {

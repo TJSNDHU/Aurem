@@ -40,7 +40,7 @@ async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)
     # `if not secret` guard below caught it), but we leave nothing to
     # chance — legion enqueue runs arbitrary shell commands on the
     # founder's laptop, so the auth path here must be airtight.
-    secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY')
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(status_code=500, detail='Server config error')
     try:

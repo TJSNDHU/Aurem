@@ -52,7 +52,7 @@ class UpgradeReq(BaseModel):
 
 
 def _get_stripe_key() -> Optional[str]:
-    return os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+    return os.environ.get("STRIPE_SECRET_KEY")
 
 
 @router.get("/api/billing/plan/state")

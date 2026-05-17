@@ -70,7 +70,7 @@ class BinContextMiddleware:
             await self.app(scope, receive, send)
             return
         token = auth[7:]
-        secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+        secret = os.environ.get("JWT_SECRET") or ""
         if not secret:
             await self.app(scope, receive, send)
             return

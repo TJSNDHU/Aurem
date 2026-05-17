@@ -30,7 +30,7 @@ _db = None
 # (race-condition at startup, partial init, hot reload). Without this,
 # _jwt_secret=None made every admin token 401 → kill switch unusable in
 # the actual emergency it was designed for.
-_jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+_jwt_secret = os.environ.get("JWT_SECRET") or ""
 _jwt_algorithm = "HS256"
 
 

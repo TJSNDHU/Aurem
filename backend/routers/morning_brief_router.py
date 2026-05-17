@@ -50,7 +50,7 @@ def _require_business_owner(request: Request, business_id: str) -> dict:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Authorization required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(503, "Auth not configured")
     try:

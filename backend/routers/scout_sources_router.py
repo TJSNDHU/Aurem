@@ -39,7 +39,7 @@ def _require_admin(request: Request) -> Dict[str, Any]:
     token = auth[7:] if auth.startswith("Bearer ") else ""
     if not token:
         raise HTTPException(401, "Auth required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(500, "JWT_SECRET not configured")
     try:

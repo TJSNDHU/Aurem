@@ -27,7 +27,7 @@ import stripe
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/stripe-embed", tags=["Stripe Embedded Checkout"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
     raise RuntimeError("CRITICAL: JWT_SECRET not set.")
 
@@ -320,14 +320,11 @@ async def health():
     debug = {
         "runtime_sk_prefix": runtime_sk[:10] if runtime_sk else "EMPTY",
         "runtime_pk_prefix": runtime_pk[:10] if runtime_pk else "EMPTY",
-        "runtime_api_key_prefix": (os.environ.get("STRIPE_API_KEY", "") or "")[:10] or "EMPTY",
         "module_sk_prefix": STRIPE_SECRET_KEY[:10] if STRIPE_SECRET_KEY else "EMPTY",
         "module_matches_runtime": STRIPE_SECRET_KEY == runtime_sk,
         "env_production_file_mode": _file_mode("/app/backend/.env.production"),
         "env_dot_file_mode": _file_mode("/app/backend/.env"),
         "app_env_dot_mode": _file_mode("/app/.env"),
-        # Which OTHER env vars match sk_test_/sk_live_ — finds shadow vars
-        # like STRIPE_API_KEY=sk_test_emergent overriding STRIPE_SECRET_KEY
         "all_stripe_env_modes": {
             k: _key_mode(v)[:10] for k, v in os.environ.items()
             if k.startswith("STRIPE_") and (

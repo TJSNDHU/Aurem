@@ -277,7 +277,7 @@ async def empire_hud_nodes(authorization: Optional[str] = Header(None)):
             "kind": "integration",
             "role": "Billing & Subscriptions",
             "icon": "credit-card",
-            **_integration_status("STRIPE_SECRET_KEY", "STRIPE_API_KEY"),
+            **_integration_status("STRIPE_SECRET_KEY"),
         },
     ]
 

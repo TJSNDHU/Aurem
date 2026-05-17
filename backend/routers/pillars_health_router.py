@@ -306,7 +306,7 @@ async def _check_p3_outreach(db) -> str:
 async def _check_p4_revenue(db) -> str:
     """Healthy when Stripe key is configured AND its breaker is not OPEN."""
     has_stripe = bool(
-        os.environ.get("STRIPE_API_KEY") or os.environ.get("STRIPE_SECRET_KEY")
+        os.environ.get("STRIPE_SECRET_KEY")
     )
     open_breakers = _pillar_breakers_open("P4")
     healthy = has_stripe and not open_breakers

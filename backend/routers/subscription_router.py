@@ -132,7 +132,7 @@ async def create_checkout(req: UpgradeRequest, request: Request):
     if plan not in PLAN_TIERS or plan == "trial":
         raise HTTPException(400, "Invalid plan")
 
-    stripe_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
     is_mock = not stripe_key or stripe_key == "sk_test_emergent"
 
     if is_mock:

@@ -30,7 +30,7 @@ def set_db(db):
 def _require_admin(authorization: Optional[str]):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "auth required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     try:
         p = pyjwt.decode(authorization.split(" ", 1)[1], secret,
                          algorithms=["HS256"], options={"verify_exp": False})

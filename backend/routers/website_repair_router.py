@@ -291,7 +291,7 @@ async def create_invoice(
 
     try:
         from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
-        sk = os.environ.get("STRIPE_API_KEY", "") or os.environ.get("STRIPE_SECRET_KEY", "")
+        sk = os.environ.get("STRIPE_SECRET_KEY", "")
         if not sk:
             raise HTTPException(503, "Stripe key not configured")
         host_url = os.environ.get("AUREM_PUBLIC_URL", "https://aurem.live").rstrip("/")

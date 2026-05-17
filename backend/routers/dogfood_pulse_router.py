@@ -45,7 +45,7 @@ async def _verify_admin(request: Request) -> dict:
         raise HTTPException(401, "Authentication required")
     token = auth[7:]
     secret = (
-        os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+        os.environ.get("JWT_SECRET") or ""
     )
     if not secret:
         raise HTTPException(500, "JWT secret not configured")

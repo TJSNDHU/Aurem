@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/bin-auth", tags=["BIN Auth"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
     raise RuntimeError("CRITICAL: JWT_SECRET not set.")
 JWT_ALGORITHM = "HS256"

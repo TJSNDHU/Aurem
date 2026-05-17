@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # Initialize Stripe (accepts either STRIPE_SECRET_KEY or legacy STRIPE_API_KEY)
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 
 class TOONStripeService:
@@ -25,7 +25,7 @@ class TOONStripeService:
     def __init__(self, db):
         self.db = db
         
-        stripe_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+        stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
         
         # Check if key is valid (not the placeholder test key)
         if not stripe_key or stripe_key == "" or stripe_key == "sk_test_emergent":

@@ -36,7 +36,7 @@ from dotenv import load_dotenv
 load_dotenv(override=False)
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
-STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 
 try:
     from emergentintegrations.llm.chat import LlmChat, UserMessage

@@ -34,7 +34,7 @@ def _require_admin(request: Request) -> Dict[str, Any]:
     token = auth[7:] if auth.startswith("Bearer ") else ""
     if not token:
         raise HTTPException(401, "Auth required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(500, "JWT_SECRET not configured")
     try:
@@ -49,7 +49,7 @@ def _require_admin(request: Request) -> Dict[str, Any]:
 
 def _stripe_status() -> str:
     """live | test | missing — derived from STRIPE_SECRET_KEY prefix."""
-    sk = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or ""
+    sk = os.environ.get("STRIPE_SECRET_KEY") or ""
     if not sk:
         return "missing"
     if sk.startswith("sk_live_"):

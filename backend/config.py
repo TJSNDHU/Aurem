@@ -34,7 +34,7 @@ if not DB_NAME:
 #
 # This makes sessions survive pod restarts even when env var isn't set —
 # admins stop getting random "Signature has expired" re-logins.
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+JWT_SECRET = os.environ.get("JWT_SECRET")
 _JWT_SECRET_SOURCE = "env"
 
 if not JWT_SECRET:
@@ -80,7 +80,7 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 
 # API Keys
-STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID", "")
 PAYPAL_SECRET = os.environ.get("PAYPAL_SECRET", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")

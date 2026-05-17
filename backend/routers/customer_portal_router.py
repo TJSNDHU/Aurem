@@ -33,7 +33,7 @@ import jwt
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/customer", tags=["Customer Portal"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
     raise RuntimeError("CRITICAL: JWT_SECRET not set.")
 
@@ -360,7 +360,7 @@ async def billing_portal(request: Request):
 
     try:
         import stripe
-        stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+        stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
         customer_id = user.get("stripe_customer_id")
         if not customer_id:
             # Try to find from invoices or create

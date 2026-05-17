@@ -496,7 +496,7 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 
 # Stripe (accepts either STRIPE_SECRET_KEY or legacy STRIPE_API_KEY)
-STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY")
 
 # Bambora/TD Merchant Configuration
 BAMBORA_MERCHANT_ID = os.environ.get("BAMBORA_MERCHANT_ID")
@@ -1249,7 +1249,7 @@ async def startup_event():
         # Initialize extracted modules (Milestone, Cron, Misc Routes)
         set_milestone_db(db)
         set_cron_db(db)
-        set_misc_deps(db, os.environ.get("JWT_SECRET", ""), "HS256", ws_manager)
+        set_misc_deps(db, os.environ.get("JWT_SECRET") or "", "HS256", ws_manager)
         logging.info("✓ Extracted modules initialized (Milestone, Cron, Misc Routes)")
 
         # iter 322 — expose db on app.state for service_gate decorator
@@ -1552,7 +1552,7 @@ async def startup_event():
         
         # Initialize Admin routes with shared dependencies
         t0 = time.time()
-        init_admin_routes(db, os.environ.get("JWT_SECRET", ""), None, None)
+        init_admin_routes(db, os.environ.get("JWT_SECRET") or "", None, None)
         logging.info(f"✓ Admin routes module initialized ({time.time()-t0:.2f}s)")
         
         # ═══ BULK SERVICE INIT (Extracted to services/startup_init.py) ═══

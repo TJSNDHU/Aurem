@@ -39,7 +39,7 @@ ALERT_PHONE = os.environ.get("FOUNDER_PHONE", "+16134000000")
 def _stripe_key() -> str:
     """Mirror stripe_payment_router._get_stripe_key() (placeholder-safe)."""
     sec = os.environ.get("STRIPE_SECRET_KEY") or ""
-    api = os.environ.get("STRIPE_API_KEY") or ""
+    api = os.environ.get("STRIPE_SECRET_KEY") or ""
     if sec:
         return sec
     if api and len(api) >= 30 and api.startswith(("sk_live_", "sk_test_")):

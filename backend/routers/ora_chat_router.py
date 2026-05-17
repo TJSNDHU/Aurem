@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ora-chat", tags=["ORA · Chat"])
 
 _db = None
-_jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
-_jwt_algo = os.environ.get("JWT_ALGO", "HS256")
+_jwt_secret = os.environ.get("JWT_SECRET") or ""
+_jwt_algo = "HS256"
 
 
 def set_db(database) -> None:

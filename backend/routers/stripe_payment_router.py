@@ -105,17 +105,8 @@ class CheckoutStatusRequest(BaseModel):
 # ═══════════════════════════════════════════════════
 
 def _get_stripe_key():
-    """Return the live Stripe key, ignoring an empty/placeholder
-    STRIPE_API_KEY shell-injected value (~16-char `sk_test_emergent`)."""
-    sec = os.environ.get("STRIPE_SECRET_KEY") or ""
-    api = os.environ.get("STRIPE_API_KEY") or ""
-    # Prefer SECRET_KEY (canonical). Fall back only if SECRET_KEY is empty
-    # AND STRIPE_API_KEY looks real (>= 30 chars, sk_live_/sk_test_ prefix).
-    if sec:
-        return sec
-    if api and len(api) >= 30 and api.startswith(("sk_live_", "sk_test_")):
-        return api
-    return api or sec  # last-ditch (lets stripe surface a clean error)
+    """Return the configured Stripe secret key."""
+    return os.environ.get("STRIPE_SECRET_KEY") or ""
 
 
 def _get_user_from_request(request: Request) -> dict:

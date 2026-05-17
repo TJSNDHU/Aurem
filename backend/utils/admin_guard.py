@@ -55,7 +55,7 @@ def is_admin_email(email: Optional[str]) -> bool:
 
 def decode_token(token: str, secret: Optional[str] = None, algorithm: str = "HS256") -> dict:
     """Decode a JWT, raising 401 on any failure."""
-    key = secret or os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+    key = secret or os.environ.get("JWT_SECRET") or ""
     if not key:
         raise HTTPException(status_code=500, detail="JWT secret not configured")
     try:

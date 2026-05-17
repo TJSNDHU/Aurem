@@ -410,7 +410,7 @@ async def no_website_instant(
     )
 
     # 4) Issue JWT for auto-login (matches /api/auth/login claims).
-    jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    jwt_secret = os.environ.get("JWT_SECRET")
     if not jwt_secret:
         raise HTTPException(500, "JWT_SECRET not configured")
     token = _jwt.encode(

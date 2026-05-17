@@ -45,7 +45,7 @@ async def handle_new_subscription(db, referee_email: str, stripe_subscription_id
     # Apply coupon to referrer's active subscription
     try:
         import stripe
-        stripe.api_key = os.environ.get("STRIPE_API_KEY") or os.environ.get("STRIPE_SECRET_KEY")
+        stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
         referrer = await db.platform_users.find_one({"email": referrer_email}, {"_id": 0, "stripe_customer_id": 1, "stripe_subscription_id": 1}) \
             or await db.users.find_one({"email": referrer_email}, {"_id": 0, "stripe_customer_id": 1, "stripe_subscription_id": 1})

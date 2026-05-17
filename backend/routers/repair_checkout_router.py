@@ -271,7 +271,7 @@ async def admin_start_repair(request: Request):
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "auth required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(500, "jwt secret unset")
     try:

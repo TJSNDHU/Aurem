@@ -67,7 +67,7 @@ async def _kpis_for_customer(u: Dict[str, Any]) -> Dict[str, Any]:
     revenue_total = 0.0
     revenue_delta_pct = 0.0
     revenue_delta_value = 0.0
-    api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+    api_key = os.environ.get("STRIPE_SECRET_KEY")
     if api_key:
         try:
             import stripe  # type: ignore

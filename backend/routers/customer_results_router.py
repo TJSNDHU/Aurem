@@ -41,7 +41,7 @@ def set_db(database) -> None:
 
 
 def _decode(token: str) -> dict:
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+    secret = os.environ.get("JWT_SECRET") or ""
     if not secret:
         raise HTTPException(500, "JWT secret not configured")
     try:

@@ -66,7 +66,7 @@ def _rate_limit(ip: str) -> bool:
 async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)):
     if not creds:
         raise HTTPException(401, "Missing bearer token")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+    secret = os.environ.get("JWT_SECRET") or ""
     if not secret:
         raise HTTPException(500, "Server config error")
     try:

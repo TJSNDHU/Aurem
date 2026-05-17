@@ -177,7 +177,7 @@ async def real_count_signups_today() -> int:
 
 async def real_revenue_today() -> Tuple[float, int]:
     """Return (revenue_today_usd, active_subscribers_count) from live Stripe."""
-    api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+    api_key = os.environ.get("STRIPE_SECRET_KEY")
     if not api_key:
         return (0.0, 0)
     try:

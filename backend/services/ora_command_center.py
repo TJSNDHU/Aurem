@@ -1452,7 +1452,7 @@ async def _exec_integrations_ping(db, params: Dict[str, Any]) -> Dict[str, Any]:
     checks.append(("Twilio", bool(os.environ.get("TWILIO_AUTH_TOKEN")) and bool(os.environ.get("TWILIO_ACCOUNT_SID"))))
     checks.append(("Telegram", bool(os.environ.get("TELEGRAM_BOT_TOKEN"))))
     checks.append(("Apollo", bool(os.environ.get("APOLLO_API_KEY"))))
-    checks.append(("Stripe", bool(os.environ.get("STRIPE_API_KEY"))))
+    checks.append(("Stripe", bool(os.environ.get("STRIPE_SECRET_KEY"))))
     checks.append(("Emergent LLM", bool(os.environ.get("EMERGENT_LLM_KEY"))))
     lines = ["🔌 *Integrations*"]
     for name, ok in checks:

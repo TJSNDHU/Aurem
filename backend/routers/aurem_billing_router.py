@@ -53,7 +53,7 @@ def _verify_caller(request: Request, business_id: Optional[str] = None) -> dict:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Authorization required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(503, "Auth not configured")
     try:
@@ -333,7 +333,7 @@ async def stripe_webhook(
                 business_name = ""
                 if customer_id:
                     import stripe as _stripe
-                    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+                    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
                     try:
                         # Bug-fix #81 — was synchronous, blocked event loop
                         cust = await asyncio.to_thread(_stripe.Customer.retrieve, customer_id)
@@ -364,7 +364,7 @@ async def stripe_webhook(
                 customer_email = ""
                 if customer_id:
                     import stripe as _stripe
-                    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+                    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
                     # Bug-fix #81 — wrap sync stripe call to avoid blocking loop
                     cust = await asyncio.to_thread(_stripe.Customer.retrieve, customer_id)
                     customer_email = cust.get("email") or ""

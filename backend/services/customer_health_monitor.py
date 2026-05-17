@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Internal API loopback — every check runs inside the pod
 BACKEND_URL = "http://localhost:8001"
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+JWT_SECRET = os.environ.get("JWT_SECRET") or ""
 
 _db = None
 

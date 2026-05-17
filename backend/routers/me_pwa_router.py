@@ -244,7 +244,7 @@ async def me_billing(
     authorization: Optional[str] = Header(None),
 ) -> Dict[str, Any]:
     u = await _require_user(authorization)
-    api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY")
+    api_key = os.environ.get("STRIPE_SECRET_KEY")
     if not api_key:
         return {"ok": True, "scope": u["scope"], "bin": u["bin"],
                 "stripe_configured": False,

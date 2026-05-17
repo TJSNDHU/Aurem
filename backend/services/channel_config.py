@@ -116,12 +116,12 @@ def get_stripe_api_key() -> Optional[str]:
         # fall through so callers still get *some* key rather than None
 
     if mode == "live":
-        live_key = _env("STRIPE_SECRET_KEY") or _env("STRIPE_API_KEY")
+        live_key = _env("STRIPE_SECRET_KEY") or _env("STRIPE_SECRET_KEY")
         if live_key:
             return live_key
 
     # Default / legacy single-key path
-    return _env("STRIPE_SECRET_KEY") or _env("STRIPE_API_KEY") or None
+    return _env("STRIPE_SECRET_KEY") or _env("STRIPE_SECRET_KEY") or None
 
 
 def stripe_status() -> Dict[str, Any]:

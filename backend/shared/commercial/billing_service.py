@@ -45,7 +45,7 @@ async def _stripe_call(fn, *args, **kwargs):
     return await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
 
 # Initialize Stripe
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 # Stripe Price IDs (create these in Stripe Dashboard)
 # For now, we'll create them dynamically if they don't exist

@@ -1071,7 +1071,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 # Stripe setup
-STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY", "")
+STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 
 try:
     from emergentintegrations.payments.stripe.checkout import (
@@ -1477,7 +1477,7 @@ async def free_tier_deploy(deploy_id: str, authorization: str = Header(None), x_
     is_admin_bypass = False
     try:
         import jwt as _jwt
-        secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+        secret = os.environ.get("JWT_SECRET") or ""
         payload = _jwt.decode((authorization or "").replace("Bearer ", "").strip(), secret, algorithms=["HS256"])
         from utils.admin_guard import is_admin_email
         is_admin_bypass = bool(

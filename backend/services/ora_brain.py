@@ -62,8 +62,8 @@ async def _hybrid_classify(text: str) -> str:
 
     Order:
       1. Cheap keyword pre-filter — strong dev signals → mode_2 immediately
-      2. If OLLAMA_HOST is set, ask local Llama (free, fast)
-      3. Otherwise ask Claude Sonnet via Emergent LLM key (paid, accurate)
+      2. Sovereign Legion (LEGION_OLLAMA_URL / OLLAMA_URL) — FREE & local
+      3. Otherwise ask Claude Sonnet via Emergent LLM key (paid, fallback)
       4. On any failure → default to mode_1 (safe — Mode 1 can still answer
          most things correctly, while Mode 2 incorrectly entered would
          clutter the approval queue).
@@ -71,15 +71,29 @@ async def _hybrid_classify(text: str) -> str:
     if _DEV_KEYWORDS.search(text):
         return "mode_2"
 
-    ollama_host = os.environ.get("OLLAMA_HOST", "").strip()
+    # iter 323 — route classify through the FREE Sovereign Legion node first.
+    # Order of preference: LEGION_OLLAMA_URL (Legion daemon ngrok) →
+    # OLLAMA_URL (alt mount) → OLLAMA_HOST (legacy). Picks the first set.
+    ollama_host = (
+        os.environ.get("LEGION_OLLAMA_URL")
+        or os.environ.get("OLLAMA_URL")
+        or os.environ.get("OLLAMA_HOST")
+        or ""
+    ).strip()
     if ollama_host:
         try:
             import httpx
-            async with httpx.AsyncClient(timeout=2.5) as c:
+            classify_model = (
+                os.environ.get("OLLAMA_CLASSIFY_MODEL")
+                or os.environ.get("LOCAL_LLM_MODEL")
+                or os.environ.get("LEGION_OLLAMA_MODEL")
+                or "llama3.1"
+            )
+            async with httpx.AsyncClient(timeout=5.0) as c:
                 r = await c.post(
                     f"{ollama_host.rstrip('/')}/api/generate",
                     json={
-                        "model": os.environ.get("OLLAMA_CLASSIFY_MODEL", "llama3.1"),
+                        "model": classify_model,
                         "prompt": _CLASSIFY_PROMPT.format(text=text[:500]),
                         "stream": False,
                         "options": {"temperature": 0.0, "num_predict": 6},
@@ -87,9 +101,10 @@ async def _hybrid_classify(text: str) -> str:
                 )
             if r.status_code == 200:
                 out = (r.json().get("response") or "").strip().lower()
+                logger.info(f"[ORA-brain] sovereign classify → {out[:20]}")
                 return "mode_2" if "mode_2" in out or "engineer" in out else "mode_1"
         except Exception as e:
-            logger.warning(f"[ORA-brain] Ollama classifier failed: {e}")
+            logger.warning(f"[ORA-brain] Sovereign Legion classifier failed: {e}")
 
     # Cloud classifier via Emergent LLM key
     try:

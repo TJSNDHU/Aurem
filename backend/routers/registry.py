@@ -2271,14 +2271,14 @@ def register_all_routers(app, db):
             except Exception as _e:
                 logger.warning(f"[scheduler] scrapling_warmup not scheduled: {_e}")
 
-            # Daily 4 PM EST — WhatsApp outreach (DISABLED iter 282m — push+email only)
-            # aurem_scheduler.add_job(
-            #     run_whatsapp_sequence,
-            #     CronTrigger(hour=21, minute=0, timezone="UTC"),
-            #     id='campaign_whatsapp_sequence',
-            #     name='Campaign: WhatsApp Sequence',
-            #     replace_existing=True,
-            # )
+            # Daily 4 PM EST — WhatsApp outreach (re-enabled per user request)
+            aurem_scheduler.add_job(
+                run_whatsapp_sequence,
+                CronTrigger(hour=21, minute=0, timezone="UTC"),
+                id='campaign_whatsapp_sequence',
+                name='Campaign: WhatsApp Sequence',
+                replace_existing=True,
+            )
 
             logger.info("[REGISTRY] Campaign automation scheduler started (9AM scrape, 10AM scan, 2PM email, 4PM WhatsApp)")
 

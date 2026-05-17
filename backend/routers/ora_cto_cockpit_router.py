@@ -43,7 +43,7 @@ def _verify_token(authorization: Optional[str] = None) -> str:
     if not token:
         raise HTTPException(401, "Authorization required")
     try:
-        secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+        secret = os.environ.get("JWT_SECRET") or ""
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload.get("user_id", payload.get("id", payload.get("sub", "unknown")))
     except Exception:

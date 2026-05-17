@@ -40,7 +40,7 @@ IMPORTANT_SECRETS = [
     "LLM_API_KEY",
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
-    "STRIPE_API_KEY",
+    "STRIPE_SECRET_KEY",
     "RESEND_API_KEY",
     "REDIS_URL",
 ]
@@ -70,7 +70,7 @@ OPTIONAL_SECRETS = [
 SUPER_SENSITIVE = [
     "MONGO_URL",
     "JWT_SECRET",
-    "STRIPE_API_KEY",
+    "STRIPE_SECRET_KEY",
     "TWILIO_AUTH_TOKEN",
 ]
 
@@ -207,7 +207,7 @@ def get_llm_key() -> str:
 
 
 def get_stripe_key() -> str:
-    return get_secret("STRIPE_API_KEY", "")
+    return get_secret("STRIPE_SECRET_KEY", "")
 
 
 def get_twilio_credentials() -> tuple:

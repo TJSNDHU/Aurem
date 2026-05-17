@@ -38,7 +38,7 @@ def set_db(db):
 def _require_admin(authorization: Optional[str]) -> Dict[str, Any]:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Auth required")
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
+    secret = os.environ.get("JWT_SECRET")
     if not secret:
         raise HTTPException(500, "JWT secret unset")
     try:

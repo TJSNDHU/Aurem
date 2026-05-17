@@ -23,7 +23,7 @@ def set_db(database: AsyncIOMotorDatabase):
 
 async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
-    secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY") or ""
+    secret = os.environ.get("JWT_SECRET") or ""
     if not secret:
         logger.error("JWT_SECRET not configured")
         raise HTTPException(status_code=500, detail="Server config error")
