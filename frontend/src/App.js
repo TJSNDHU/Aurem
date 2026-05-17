@@ -80,11 +80,8 @@ import AdminSidebarBlocks from './platform/AdminSidebarBlocks';
 import AdminVanguard from './platform/AdminVanguard';
 import SystemOverview from './platform/SystemOverview';
 import SystemPulseLive from './platform/SystemPulseLive';
-// CustomerSiteMonitor + CustomerBoardReport are now lazy-loaded INSIDE
-// CustomerPortal (see CustomerPortal.jsx). They were previously standalone
-// /my/monitor and /my/board-report routes which bypassed the portal's auth
-// context + sidebar chrome — causing them to render as "blank" full-page
-// components. Imports removed to drop dead code from the App.js bundle.
+// CustomerSiteMonitor + CustomerBoardReport: dead code removed iter 323i along
+// with CustomerPortal.jsx. /my/* routes now render LuxeDashboardPreview.
 import AvatarManager from './platform/admin/AvatarManager';
 import CustomerHealthPanel from './platform/admin/CustomerHealthPanel';
 import AdminBrainPage from './platform/admin/AdminBrainPage';
@@ -123,7 +120,8 @@ import AdminBrowserAgent from './platform/AdminBrowserAgent';
 import AdminLeadsMining from './platform/AdminLeadsMining';
 import AdminDailyLog from './platform/AdminDailyLog';
 import BrainGraphShare from './pages/BrainGraphShare';
-import CustomerPortal from './platform/CustomerPortal';
+// CustomerPortal removed (iter 323i) — /my routes now use LuxeDashboardPreview.
+// Previous 870-line CustomerPortal.jsx was imported but never mounted.
 
 // Lazy load components
 
@@ -377,10 +375,8 @@ function AppRouter() {
       <Route path="/admin/command-blocks" element={<Navigate to="/admin/blocks" replace />} />
       <Route path="/admin/campaigns" element={<Navigate to="/admin/mission-control" replace />} />
       <Route path="/graph/share/:id" element={<BrainGraphShare />} />
-      {/* Note: /my/monitor and /my/board-report are now rendered INSIDE
-          CustomerPortal via its <Route path="*"> child — see CustomerPortal.jsx.
-          Keeping them out of the sidebar wrapper made every /my/* sub-route
-          look "blank" because CustomerPortal's auth + chrome never mounted. */}
+      {/* /my/* routes mount LuxeDashboardPreview (iter 323i cleanup —
+          CustomerPortal removed as dead code). */}
       <Route path="/monitor-free" element={<MonitorFreeLanding />} />
       <Route path="/repair-quote" element={<RepairQuote />} />
       <Route path="/r/:quote_id" element={<ShareableReport />} />

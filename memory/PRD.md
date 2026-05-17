@@ -1,6 +1,25 @@
 # AUREM Platform — PRD
 
 
+> **🟢 PRODUCTION REDEPLOY VERIFIED + CUSTOMERPORTAL CLEANUP (2026-02 / iter 323i)**
+>
+> ## Production verification
+> - `GET /api/health` → 200 OK
+> - `GET /api/admin/pixel-bridge/status` → 401 (live, auth gated)
+> - `GET /api/customer/vanguard/status` → 401 (live, auth gated)
+> - All iter 323b–h fixes are live on production.
+>
+> ## CustomerPortal dead-code cleanup
+> - `frontend/src/platform/CustomerPortal.jsx` (870 lines) **deleted**.
+> - `App.js` import removed + 2 stale comment blocks updated.
+> - `/my` and `/my/*` already routed to `LuxeDashboardPreview` — no behaviour change.
+> - ESLint clean. Frontend compiled clean. Preview `/my` renders Customer Access.
+> - Net: −870 lines frontend bundle.
+>
+> ---
+
+
+
 > **🟢 PHASE 1 + 2 .ENV CLEANUP + 3 USER TASKS (2026-02 / iter 323)**
 >
 > ## Env Cleanup (Phase 1 — mechanical renames)

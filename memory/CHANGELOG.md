@@ -1,3 +1,31 @@
+## 2026-02 — iter 323i — CustomerPortal Dead Code Cleanup
+
+**Trigger**: handoff backlog P2 — 870 lines of `CustomerPortal.jsx` imported but never mounted in App.js (routes `/my` and `/my/*` already point to `LuxeDashboardPreview`).
+
+**Production verification (pre-cleanup)**
+- `GET /api/health` → 200 `{"status":"ok","platform":"aurem"}`
+- `GET /api/admin/pixel-bridge/status` → 401 (endpoint live, auth gated) ✅
+- `GET /api/customer/vanguard/status` → 401 (endpoint live, auth gated) ✅
+- Confirms iter 323b–h all landed on production.
+
+**Changes shipped**
+- `frontend/src/App.js`:
+  - Removed `import CustomerPortal from './platform/CustomerPortal';` (line 126).
+  - Replaced stale lazy-load comment block with iter-323i marker.
+  - Replaced stale `/my/*` routing comment with new explanation pointing to `LuxeDashboardPreview`.
+- `frontend/src/platform/CustomerPortal.jsx` — **deleted** (870 lines).
+
+**Verification**
+- `grep -rn "CustomerPortal" /app/frontend/src` → 9 hits, all comment-only.
+- ESLint clean (`No issues found`).
+- Frontend recompiled cleanly (only pre-existing mediapipe source-map warning).
+- Preview `/my` route renders Customer Access screen as expected, no blank state.
+
+**Net diff**: −870 lines frontend bundle.
+
+---
+
+
 ## 2026-02 — iter R234D — Auto-Blast Aggressive Reclamation
 
 **Trigger**: founder asked for aggressive mode after seeing 0 sent and 123-cycle zero-streak.
