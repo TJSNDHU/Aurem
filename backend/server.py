@@ -1092,26 +1092,59 @@ async def startup_event():
                 # [DEPLOY FIX iter 322ea] Atlas pool exhaustion was killing
                 # K8s health probes: with maxPoolSize=50 + 4 per-minute
                 # scheduler jobs all hitting Atlas at xx:00, the pool
-                # paused, every awaiting coroutine blocked for 10s, and
-                # the event loop saturated so /api/platform/health
-                # couldn't be scheduled within nginx's 10s upstream
-                # timeout → pod restart loop.
-                #   • maxPoolSize 50 → 200  : room for scheduler burst + user reqs
-                #   • minPoolSize 0 → 10    : warm pool eliminates cold-connect on first probe
-                #   • waitQueueTimeoutMS 10s → 2s : fail fast when pool exhausted
-                #     instead of holding the event loop hostage
+                # iter 323b — REVERTED maxPoolSize 200 → 10 (user directive).
+                # Connection storms during Atlas hiccups were saturating the
+                # pool faster than waitQueueTimeoutMS could fail-fast. Small
+                # pool + tight timeouts = fail-fast + clear error logs.
+                #   • maxPoolSize 10        : enough for steady-state, no storm
+                #   • minPoolSize 1         : single warm connection always ready
+                #   • maxIdleTimeMS 30s     : drop idle connections, force refresh
+                #   • connectTimeoutMS 5s   : was 10s
+                #   • serverSelectionTimeoutMS 5s  : was 5s (unchanged)
+                #   • socketTimeoutMS 10s   : was 20s — fail-fast on stuck Atlas
+                #   • waitQueueTimeoutMS 5s : was 2s — give pool a chance to drain
                 client = AsyncIOMotorClient(
                     mongo_url,
+                    maxPoolSize=10,
+                    minPoolSize=1,
+                    maxIdleTimeMS=30000,
+                    connectTimeoutMS=5000,
                     serverSelectionTimeoutMS=5000,
-                    connectTimeoutMS=10000,
-                    socketTimeoutMS=20000,
-                    maxPoolSize=200,
-                    minPoolSize=10,
-                    waitQueueTimeoutMS=2000,
+                    socketTimeoutMS=10000,
+                    waitQueueTimeoutMS=5000,
                     retryWrites=True,
                 )
                 db = client[db_name]
+                print(f"[STARTUP] ✓ MongoDB client created ({time.time()-t0:.2f}s)", flush=True)
                 logging.info(f"✓ MongoDB client created ({time.time()-t0:.2f}s)")
+
+                # iter 323b — startup health check: ping Mongo within 3s.
+                # If unreachable, log a CLEAR message instead of hanging
+                # silently and letting every downstream request timeout.
+                # Note: uses asyncio.shield + Motor's get_io_loop adapter
+                # to avoid "this event loop is already running" when Motor's
+                # internal Future is awaited under wait_for during lifespan.
+                async def _mongo_ping():
+                    try:
+                        await client.admin.command("ping")
+                        print(f"[STARTUP] ✓ MongoDB ping OK ({time.time()-t0:.2f}s)", flush=True)
+                        logging.info(f"✓ MongoDB ping OK ({time.time()-t0:.2f}s)")
+                    except Exception as _ping_e:
+                        print(f"[STARTUP] 🔴 MONGO UNREACHABLE — ping error: {_ping_e}", flush=True)
+                        logging.error(f"🔴 MONGO UNREACHABLE — ping error: {_ping_e}")
+                try:
+                    import asyncio as _aio
+                    _ping_task = _aio.create_task(_mongo_ping())
+                    try:
+                        await _aio.wait_for(_aio.shield(_ping_task), timeout=3.0)
+                    except _aio.TimeoutError:
+                        print("[STARTUP] 🔴 MONGO UNREACHABLE — ping timeout after 3s", flush=True)
+                        logging.error(
+                            "🔴 MONGO UNREACHABLE — ping timeout after 3s. "
+                            "App will start but DB-dependent routes will fail fast."
+                        )
+                except Exception as _outer_e:
+                    logging.warning(f"[STARTUP] mongo ping check skipped: {_outer_e}")
                 
                 # ════════════════════════════════════════════════════════════════
                 # TENANT SCOPED DB — wrap raw db with auto-scoping proxy

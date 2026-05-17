@@ -364,18 +364,30 @@ async def login(credentials: UserLogin):
                 bid = raw.upper()
                 _adb = get_auth_db()
                 resolved_email = None
-                # Try platform_users (modern) then users (legacy)
-                doc = await _adb.platform_users.find_one(
-                    {"business_id": bid}, {"_id": 0, "email": 1}
-                )
-                if doc and doc.get("email"):
-                    resolved_email = doc["email"]
-                else:
-                    doc = await _adb.users.find_one(
-                        {"business_id": bid}, {"_id": 0, "email": 1}
+                # iter 323b — 5s timeout on BIN→email lookups (same reason as main query)
+                import asyncio as _aio_bin
+                try:
+                    # Try platform_users (modern) then users (legacy)
+                    doc = await _aio_bin.wait_for(
+                        _adb.platform_users.find_one(
+                            {"business_id": bid}, {"_id": 0, "email": 1}
+                        ),
+                        timeout=5.0,
                     )
                     if doc and doc.get("email"):
                         resolved_email = doc["email"]
+                    else:
+                        doc = await _aio_bin.wait_for(
+                            _adb.users.find_one(
+                                {"business_id": bid}, {"_id": 0, "email": 1}
+                            ),
+                            timeout=5.0,
+                        )
+                        if doc and doc.get("email"):
+                            resolved_email = doc["email"]
+                except _aio_bin.TimeoutError:
+                    logging.error(f"[AUTH][{_attempt_id}] 🔴 MONGO UNREACHABLE on BIN lookup (5s timeout)")
+                    raise HTTPException(status_code=503, detail="Database temporarily unavailable")
                 if resolved_email:
                     credentials.email = resolved_email
                 else:
@@ -398,8 +410,19 @@ async def login(credentials: UserLogin):
 
     query = {"email": credentials.email.lower().strip()} if credentials.email else {"phone": credentials.phone.strip()}
 
-    # Check regular users
-    user = await get_auth_db().users.find_one(query, {"_id": 0})
+    # iter 323b — wrap MongoDB user lookup with 5s timeout. Without this,
+    # a stalled Atlas connection (or paused pool) hangs the request and
+    # the entire FastAPI event loop indefinitely. Return 503 fast so the
+    # client can show a clear "DB unavailable" error instead of spinning.
+    import asyncio as _aio_login
+    try:
+        user = await _aio_login.wait_for(
+            get_auth_db().users.find_one(query, {"_id": 0}),
+            timeout=5.0,
+        )
+    except _aio_login.TimeoutError:
+        logging.error(f"[AUTH][{_attempt_id}] 🔴 MONGO UNREACHABLE on login user lookup (5s timeout)")
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
     _t["db_lookup_done"] = _time.monotonic()
     
     # iter 322x — silent retry once on transient DB miss. Atlas M0 cold
@@ -408,14 +431,19 @@ async def login(credentials: UserLogin):
     # a 250ms backoff before declaring the user unknown.
     if user is None and credentials.email:
         try:
-            import asyncio as _aio
-            await _aio.sleep(0.25)
-            user = await get_auth_db().users.find_one(query, {"_id": 0})
+            await _aio_login.sleep(0.25)
+            user = await _aio_login.wait_for(
+                get_auth_db().users.find_one(query, {"_id": 0}),
+                timeout=5.0,
+            )
             if user is not None:
                 logging.warning(
                     f"[AUTH][{_attempt_id}] silent_retry hit — user found on 2nd query "
                     f"(Atlas cold-start signal)"
                 )
+        except _aio_login.TimeoutError:
+            logging.error(f"[AUTH][{_attempt_id}] 🔴 MONGO UNREACHABLE on login silent_retry (5s timeout)")
+            raise HTTPException(status_code=503, detail="Database temporarily unavailable")
         except Exception as _e:
             logging.warning(f"[AUTH][{_attempt_id}] silent_retry raised: {_e}")
     
@@ -591,8 +619,16 @@ async def admin_login(credentials: UserLogin, request: Request):
             detail="Admin account locked. Try again in 15 minutes."
         )
 
-    # Lookup user
-    user = await get_auth_db().users.find_one({"email": email}, {"_id": 0})
+    # Lookup user — iter 323b: 5s timeout to fail-fast on stuck Atlas
+    import asyncio as _aio_admin
+    try:
+        user = await _aio_admin.wait_for(
+            get_auth_db().users.find_one({"email": email}, {"_id": 0}),
+            timeout=5.0,
+        )
+    except _aio_admin.TimeoutError:
+        logging.error(f"[AUTH][admin_login] 🔴 MONGO UNREACHABLE on user lookup (5s timeout)")
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
 
     if not user:
         _admin_fail_append(email)

@@ -103,12 +103,18 @@ def get_database():
             raise RuntimeError("Cannot connect to database: MONGO_URL not configured")
         # Import here to avoid any potential import-time side effects
         from motor.motor_asyncio import AsyncIOMotorClient as MotorClient
+        # iter 323b — conservative pool sizing for stuck-pod recovery.
+        # Large pools (>50) cause connection storms during Atlas hiccups.
+        # Tight timeouts let us fail fast instead of hanging the event loop.
         _client = MotorClient(
             MONGO_URL,
-            serverSelectionTimeoutMS=10000,
-            connectTimeoutMS=20000,
-            socketTimeoutMS=30000,
-            maxPoolSize=50,
+            maxPoolSize=10,
+            minPoolSize=1,
+            maxIdleTimeMS=30000,
+            connectTimeoutMS=5000,
+            serverSelectionTimeoutMS=5000,
+            socketTimeoutMS=10000,
+            waitQueueTimeoutMS=5000,
             retryWrites=True,
             connect=False,  # Don't verify connection at creation time
         )
