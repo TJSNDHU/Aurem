@@ -44,7 +44,7 @@ const NAV = [
 
 // ── Sidebar ──────────────────────────────────────────────────────────
 // Desktop: full 200px rail. Tablet: 200px rail. Mobile: hidden (drawer).
-const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobileClose }) => {
+const Sidebar = ({ active, onNav, onLogout, user, isMobile, isDesktop, mobileOpen, onMobileClose }) => {
   const visible = !isMobile || mobileOpen;
   const navClick = (k) => {
     onNav(k);
@@ -66,7 +66,7 @@ const Sidebar = ({ active, onNav, onLogout, user, isMobile, mobileOpen, onMobile
       <aside
         data-testid="luxe-sidebar"
         style={{
-          width: 232, padding: '22px 16px',
+          width: isDesktop ? 260 : 232, padding: '22px 16px',
           display: visible ? 'flex' : 'none',
           flexDirection: 'column', gap: 4,
           // iter 322bl — 3D glass/water-bubble shine layered look (target match).
@@ -778,7 +778,7 @@ const BusinessGrowthChart = ({ data }) => {
 };
 
 // ── Home (target screenshot layout) ──────────────────────────────────
-const HomePage = ({ data }) => (
+const HomePage = ({ data, isMobile, isTablet }) => (
   <div data-testid="page-home" style={{ padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 14 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <h1 style={{
@@ -796,7 +796,7 @@ const HomePage = ({ data }) => (
     {/* Row 3 — Scan (4 individual dials) · Repair % + sparkline · Alerts */}
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)',
+      gridTemplateColumns: isMobile ? '1fr' : isTablet ? '1fr 1fr' : 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)',
       gap: 12,
     }}>
       <ScanRowFour data={data} />
@@ -808,7 +808,7 @@ const HomePage = ({ data }) => (
     {/* Row 4 — Active Agents · Vanguard Security */}
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+      gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
       gap: 12,
     }}>
       <div style={{ minWidth: 0 }}><AgentsTileWrap agents={data.agents || []} /></div>
