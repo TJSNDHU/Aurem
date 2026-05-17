@@ -329,6 +329,7 @@ def register_all_routers(app, db):
         "orchestrator_brain_router",    # 10 ep — multi-agent orchestration
         "orchestrator_customer_router", # 2 ep — customer-scoped read-only (iter 323d)
         "customer_vanguard_router",     # 1 ep — fast vanguard status (iter 323f)
+        "sovereignty_score_router",     # 1 ep — full sovereignty score (iter 323j)
         "pixel_bridge_router",          # 3 ep — pixel→ORA bridge admin (iter 323g)
         "ooda_loop_router",             # 5 ep — OODA automation
         "a2a_learning_router",          # 8 ep — agent-to-agent learning

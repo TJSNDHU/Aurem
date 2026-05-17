@@ -119,6 +119,7 @@ import AdminLinksHub from './platform/AdminLinksHub';
 import AdminBrowserAgent from './platform/AdminBrowserAgent';
 import AdminLeadsMining from './platform/AdminLeadsMining';
 import AdminDailyLog from './platform/AdminDailyLog';
+import AdminSovereigntyScore from './platform/AdminSovereigntyScore';
 import BrainGraphShare from './pages/BrainGraphShare';
 // CustomerPortal removed (iter 323i) — /my routes now use LuxeDashboardPreview.
 // Previous 870-line CustomerPortal.jsx was imported but never mounted.
@@ -365,6 +366,7 @@ function AppRouter() {
         <Route path="/admin/browser-agent" element={<AdminBrowserAgent />} />
         <Route path="/admin/leads-mining" element={<AdminLeadsMining />} />
         <Route path="/admin/daily-log" element={<AdminDailyLog />} />
+        <Route path="/admin/sovereignty-score" element={<AdminSovereigntyScore />} />
       </Route>
 
       {/* Admin alias redirects (kept outside shell — they Navigate before shell mounts) */}
