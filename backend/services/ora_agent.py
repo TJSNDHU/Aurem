@@ -835,10 +835,15 @@ async def run_turn(
     user_text:     str,
     *,
     founder_email: str,
+    progress_cb:   Any = None,
 ) -> dict[str, Any]:
     """Process one user message. Returns either:
       • {ok: True, reply: "...", history_len: N, done: True}
       • {ok: True, action_required: {action_id, tool, args, tier, summary, ...}}
+
+    iter 323l — `progress_cb` is an optional async callable
+    `(tool_name: str) -> None` invoked right before each tool dispatch so
+    the async job-runner can surface live tool progress to the UI.
     """
     await _expire_old()
     history = await _load_history(session_id)
@@ -860,7 +865,7 @@ async def run_turn(
             "fast_path":   True,
         }
 
-    return await _continue_loop(session_id, history, founder_email)
+    return await _continue_loop(session_id, history, founder_email, progress_cb=progress_cb)
 
 
 async def resume_after_decision(
@@ -975,6 +980,7 @@ async def _continue_loop(
     session_id:    str,
     history:       list[dict[str, Any]],
     founder_email: str,
+    progress_cb:   Any = None,
 ) -> dict[str, Any]:
     """Inner agentic loop.
 
@@ -1159,6 +1165,12 @@ async def _continue_loop(
 
         # ── TIER 1: execute immediately ───────────────────────────────
         if tier == "tier1_auto":
+            # iter 323l — surface live tool progress to the UI (async jobs)
+            if progress_cb is not None:
+                try:
+                    await progress_cb(call["name"])
+                except Exception:
+                    pass  # progress reporting must never crash the loop
             result = await invoke_tool(
                 call["name"], call["args"], actor=f"auto:{founder_email}"
             )

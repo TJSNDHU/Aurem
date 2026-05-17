@@ -95,7 +95,8 @@ async def get_status(job_id: str, founder_email: str) -> Dict[str, Any]:
         {"_id": job_id, "founder_email": founder_email},
         # NOTE: exclude None to keep response small while pending
         {"_id": 0, "status": 1, "result": 1, "error": 1, "created_at": 1,
-         "started_at": 1, "finished_at": 1, "session_id": 1},
+         "started_at": 1, "finished_at": 1, "session_id": 1,
+         "tool_calls_so_far": 1},   # iter 323l — live progress trail
     )
     if not doc:
         return {"ok": False, "error": "not_found"}
@@ -111,6 +112,9 @@ async def get_status(job_id: str, founder_email: str) -> Dict[str, Any]:
         "created_at":  _iso(doc.get("created_at")),
         "started_at":  _iso(doc.get("started_at")),
         "finished_at": _iso(doc.get("finished_at")),
+        # Live tool trail (iter 323l). Always present (possibly empty list)
+        # so the frontend can render its progress strip without a guard.
+        "tool_calls_so_far": list(doc.get("tool_calls_so_far") or []),
     }
 
 
@@ -131,6 +135,19 @@ async def _run_one_job(doc: Dict[str, Any]) -> None:
     try:
         from services import ora_agent
 
+        # iter 323l — live progress callback. ora_agent calls this right
+        # before each tier-1 tool dispatch; we push the name into the job
+        # doc so /status polls can surface "Running campaign_status…" to
+        # the founder while the loop is still mid-flight.
+        async def _on_tool(name: str) -> None:
+            try:
+                await _db[_COLLECTION].update_one(
+                    {"_id": job_id},
+                    {"$push": {"tool_calls_so_far": str(name)[:64]}},
+                )
+            except Exception:
+                pass  # progress is best-effort; never fail the job for it
+
         # Token-cap the model call. Sync path was sending max_tool_iters=4
         # with no cap on response tokens — most genuine queries need 1-2
         # tool passes. Caller can override via metadata in the future, but
@@ -140,6 +157,7 @@ async def _run_one_job(doc: Dict[str, Any]) -> None:
                 doc["session_id"],
                 doc["text"],
                 founder_email=doc["founder_email"],
+                progress_cb=_on_tool,
             ),
             timeout=_JOB_TIMEOUT_S,
         )

@@ -94,6 +94,7 @@ export default function OraChat() {
   const [busy, setBusy] = useState(false);
   const [busyStartedAt, setBusyStartedAt] = useState(0); // wall-clock ms when send() flipped busy=true
   const [busyElapsedS, setBusyElapsedS] = useState(0);   // seconds ticker, updated by interval
+  const [busyTools, setBusyTools] = useState([]);        // live tool_calls_so_far during async job (iter 323l)
   const [pending, setPending] = useState(null); // current action_required
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [error, setError] = useState(null);
@@ -200,7 +201,7 @@ export default function OraChat() {
   const POLL_INTERVAL_MS = 2500;
   const POLL_MAX_TRIES   = 130;   // 130 × 2.5 s = ~5.4 min, matches worker timeout
 
-  const runAsyncPolling = async (q) => {
+  const runAsyncPolling = async (q, onProgress) => {
     // 1) Enqueue
     let startRes;
     try {
@@ -242,6 +243,10 @@ export default function OraChat() {
       }
       const j = await safeJson(pollRes);
       if (!j.ok) throw new Error(j.error || j.detail || "status_lost");
+      // iter 323l — surface live tool trail to the indicator
+      if (typeof onProgress === "function" && Array.isArray(j.tool_calls_so_far)) {
+        try { onProgress(j.tool_calls_so_far); } catch { /* never crash poll */ }
+      }
       if (j.status === "done")   return j.result || { ok: true, reply: "(empty)" };
       if (j.status === "failed") {
         return { ok: false, error: j.error || "ORA job failed" };
@@ -258,14 +263,16 @@ export default function OraChat() {
     setHistory((h) => [...h, { role: "user", content: q, ts: Date.now() }]);
     setInput("");
     setBusyStartedAt(Date.now());
+    setBusyTools([]);
     setBusy(true);
     try {
-      const j = await runAsyncPolling(q);
+      const j = await runAsyncPolling(q, setBusyTools);
       applyTurnResult(j);
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
+      setBusyTools([]);
     }
   };
 
@@ -430,6 +437,33 @@ export default function OraChat() {
             {busyElapsedS >= 240 && (
               <span style={{ color: RED, fontSize: 11 }}>
                 · close to 5 min hard cap — will fail if no result
+              </span>
+            )}
+            {busyTools.length > 0 && (
+              <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4,
+                              marginLeft: 4, alignItems: "center" }}>
+                {busyTools.slice(-4).map((t, i) => (
+                  <span key={`${t}-${i}`}
+                        data-testid="ora-progress-chip"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "2px 7px",
+                          fontSize: 10.5,
+                          fontFamily: "monospace",
+                          color: GREEN,
+                          background: "rgba(103,232,160,0.08)",
+                          border: `1px solid ${GREEN}44`,
+                          borderRadius: 999,
+                          letterSpacing: 0.3,
+                        }}>
+                    <span style={{ opacity: 0.6 }}>›</span>{t}
+                  </span>
+                ))}
+                {busyTools.length > 4 && (
+                  <span style={{ fontSize: 10.5, color: TEXT_DIM, opacity: 0.6 }}>
+                    +{busyTools.length - 4} more
+                  </span>
+                )}
               </span>
             )}
           </div>
