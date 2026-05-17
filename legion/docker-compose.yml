@@ -65,6 +65,42 @@ services:
     container_name: aurem-postiz-redis
     restart: unless-stopped
 
+  # iter 323i — AUREM main backend MongoDB (replaces Atlas)
+  aurem-mongodb:
+    image: mongo:7
+    container_name: aurem-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=aurem
+      - MONGO_INITDB_ROOT_PASSWORD=${AUREM_MONGO_PASSWORD:-AuremMongo2026Strong!}
+      - MONGO_INITDB_DATABASE=aurem_db
+    volumes:
+      - aurem_mongo_data:/data/db
+    command: mongod --auth --bind_ip_all --wiredTigerCacheSizeGB 1
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  # iter 323i — AUREM main backend Redis (replaces Redis Cloud free tier)
+  aurem-redis:
+    image: redis:7-alpine
+    container_name: aurem-main-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - aurem_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+
   n8n:
     image: n8nio/n8n
     container_name: aurem-n8n
@@ -149,3 +185,5 @@ volumes:
   n8n_data:
   pentagi_data:
   pentagi_db_data:
+  aurem_mongo_data:
+  aurem_redis_data:

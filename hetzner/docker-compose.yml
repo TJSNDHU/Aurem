@@ -1,0 +1,106 @@
+# ════════════════════════════════════════════════════════════════════════
+# AUREM — Hetzner Production Stack
+# iter 323i — full self-hosted prod compose
+#
+# Assumes:
+#   - Server: Hetzner CX32 (4 vCPU, 8GB RAM, Ubuntu 24.04)
+#   - Repo cloned at /opt/aurem
+#   - /opt/aurem/.env (gitignored) has all secrets
+#   - Nginx terminates SSL via certbot, proxies to ports below
+# ════════════════════════════════════════════════════════════════════════
+version: "3.8"
+
+services:
+
+  # ── Application backend ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aurem-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    env_file:
+      - ./backend/.env
+    environment:
+      - MONGO_URL=mongodb://aurem:${AUREM_MONGO_PASSWORD:-AuremMongo2026Strong!}@mongo-internal.aurem.live:27017/aurem_db?authSource=admin
+      - REDIS_URL=redis://aurem-redis:6379
+      - AUREM_ENV=production
+      - SOVEREIGN_NODE_URL=${SOVEREIGN_NODE_URL:-https://sovereign.aurem.live}
+      - LOCAL_LLM_ENABLED=true
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-llama3.1}
+    depends_on:
+      aurem-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── Frontend ─────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aurem-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-https://aurem.live}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── Local Redis (sovereign cache + rate-limiter state) ───────────────
+  aurem-redis:
+    image: redis:7-alpine
+    container_name: aurem-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --save 60 1000
+    volumes:
+      - aurem_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  # ── Watchtower (auto-pull updated images) ────────────────────────────
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: aurem-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_LABEL_ENABLE=true
+
+volumes:
+  aurem_redis_data:
