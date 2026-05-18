@@ -424,6 +424,47 @@ async def unflag_all_noise() -> Dict[str, Any]:
 
 
 # ─────────────────────────────────────────────────────────────
+# Watchdog manual reset — iter 323u
+# Reset `zero_sent_streak` to 0 and clear `tripped` flags on the
+# global ora_campaign_health doc. Pair with /why-not-sending +
+# /unflag-all-noise when the watchdog has latched after a long
+# zero-send window and is blocking subsequent cycles. Detection
+# logic is NOT changed — only the latched state.
+# ─────────────────────────────────────────────────────────────
+async def reset_watchdog() -> Dict[str, Any]:
+    """Reset the global campaign watchdog: zero_sent_streak → 0 and
+    tripped → []. Returns the prior state for audit.
+    """
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    prior = await db.ora_campaign_health.find_one(
+        {"_id": "global"}, {"_id": 0}) or {}
+    prior_streak = int(prior.get("zero_sent_streak") or 0)
+    prior_tripped = list(prior.get("tripped") or [])
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.ora_campaign_health.update_one(
+        {"_id": "global"},
+        {"$set": {
+            "zero_sent_streak": 0,
+            "tripped": [],
+            "watchdog_reset_at": now_iso,
+            "watchdog_reset_prior": {
+                "zero_sent_streak": prior_streak,
+                "tripped": prior_tripped,
+            },
+        }},
+        upsert=True,
+    )
+    return {
+        "ok": True,
+        "prior": {"zero_sent_streak": prior_streak, "tripped": prior_tripped},
+        "current": {"zero_sent_streak": 0, "tripped": []},
+        "reset_at": now_iso,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # Main cycle
 # ─────────────────────────────────────────────────────────────
 async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:

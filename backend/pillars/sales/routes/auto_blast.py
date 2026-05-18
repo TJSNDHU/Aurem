@@ -311,6 +311,23 @@ async def auto_blast_unflag_all_noise(request: Request):
     return await unflag_all_noise()
 
 
+# ── iter 323u — manual watchdog reset ────────────────────────────────
+@router.post("/auto-blast/reset-watchdog")
+async def auto_blast_reset_watchdog(request: Request):
+    """Reset the campaign watchdog: zero_sent_streak → 0 and clear `tripped`
+    flags on ora_campaign_health._id='global'. Use when the watchdog has
+    latched after a long zero-send window (e.g. streak=369) and is
+    preventing subsequent cycles from running even though `final_eligible`
+    is non-zero and `blocking_reason` is null.
+
+    Returns the prior state for audit; idempotent. Detection logic is NOT
+    changed — this only clears the latched state so the next cycle can run.
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import reset_watchdog
+    return await reset_watchdog()
+
+
 # ══════════════════════════════════════════════
 # Lead Scraping (Google Maps via Camofox)
 # ══════════════════════════════════════════════
