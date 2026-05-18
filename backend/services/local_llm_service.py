@@ -45,11 +45,13 @@ _PROD_DETECTED = _is_prod()
 _config = {
     "ollama_url": SOVEREIGN_URL,
     "model": SOVEREIGN_MODEL,
-    # In production, force-disable: tunnel is unreachable, and the breaker
-    # logs would otherwise spam every startup. Founder-local laptops always
-    # use preview/local env where this evaluates False.
-    "enabled": (not _PROD_DETECTED)
-               and (os.environ.get("LOCAL_LLM_ENABLED", "true").lower() == "true"),
+    # iter 323x — production now ATTEMPTS Sovereign on every call (subject
+    # to circuit breaker). Founder enabled the Legion tunnel
+    # sovereign.aurem.live → 127.0.0.1:11434; when it's up, prod serves
+    # free locally. When it's down, the breaker (BACKOFF_AFTER_FAILURES=2,
+    # ~6s detection) opens immediately and OpenRouter/Emergent take over.
+    # The prod-hard-disable from iter 322g+ is removed.
+    "enabled": (os.environ.get("LOCAL_LLM_ENABLED", "true").lower() == "true"),
     # iter 322ai — timeout split:
     #   "connect_timeout": fast (5s) — TCP+TLS handshake to ngrok edge.
     #       If this exceeds 5s the tunnel is effectively dead — fail fast
@@ -143,11 +145,10 @@ def _is_backed_off() -> bool:
     callers using `is_backed_off()` as a fast pre-check skip Sovereign
     entirely without paying the connect-timeout cost.
 
-    iter 322g+ prod-guard — in prod, sovereign is permanently "backed off"
-    since the tunnel doesn't reach production network. Skip ALL probes.
+    iter 323x — prod-hard-disable removed. The breaker now governs prod
+    just like preview: when the tunnel is reachable, Sovereign serves;
+    when it's not, the breaker opens within ~6s and stays open 300s.
     """
-    if _PROD_DETECTED:
-        return True
     if not _config.get("enabled", True):
         return True
     if _config["backoff_until"] is None:
@@ -210,7 +211,15 @@ async def _request_with_retry(method: str, url: str, retries: int = MAX_RETRIES,
                     await asyncio.sleep(RETRY_DELAY_S)
                     continue
 
-                return resp
+                # iter 323x — non-200 (404/5xx) means tunnel hostname is
+                # not claimed (Cloudflare "Site not found"), Ollama is
+                # rejecting the path, or the upstream is mis-routed.
+                # Count as a failure so the circuit breaker opens just
+                # like a connect-error. Returning resp here would have
+                # masked the failure from the breaker.
+                last_err = f"HTTP {resp.status_code}"
+                logger.info(f"[Sovereign] non-200 {resp.status_code} attempt {attempt+1}/{retries}")
+                break
 
         except (httpx.ConnectError, httpx.ConnectTimeout) as e:
             # iter 322ai — connect failures mean the tunnel itself is unreachable
@@ -356,11 +365,10 @@ async def is_available() -> bool:
     cold-start tolerance should use chat_local() directly (which retries).
     If the circuit breaker is open we short-circuit to False immediately.
 
-    iter 322g+ prod-guard — in production deployment the tunnel is unreachable,
-    so probe is skipped entirely. Saves 2s × every caller × every startup.
+    iter 323x — prod-hard-skip removed. Production now probes Sovereign
+    just like preview. The 2s timeout + circuit breaker keep the cost
+    bounded when the tunnel is dead.
     """
-    if _PROD_DETECTED:
-        return False
     if _is_backed_off():
         return False
     try:
@@ -370,6 +378,11 @@ async def is_available() -> bool:
                 _config["consecutive_failures"] = 0
                 _config["backoff_until"] = None
                 return True
+            # iter 323x — 404 / 5xx still counts as a miss for the breaker.
+            # Cloudflare returns 404 "Site not found" when no tunnel has
+            # claimed the hostname; treat that as Sovereign unavailable
+            # exactly like a connect-error.
+            logger.debug(f"[Sovereign] probe non-200: HTTP {resp.status_code}")
     except Exception as e:
         logger.debug(f"[Sovereign] probe failed: {type(e).__name__}")
 
@@ -378,11 +391,5 @@ async def is_available() -> bool:
     if _config["consecutive_failures"] >= BACKOFF_AFTER_FAILURES:
         from datetime import timedelta
         _config["backoff_until"] = (datetime.now(timezone.utc) + timedelta(seconds=BACKOFF_DURATION_S)).isoformat()
-        # iter 322g+ — silence the breaker-opened spam in prod (it's expected
-        # and harmless when tunnel is intentionally unreachable). Keep it at
-        # INFO so preview/local devs still see a one-line heads-up.
-        if _PROD_DETECTED:
-            logger.debug(f"[Sovereign] breaker open (prod, expected) — {_config['consecutive_failures']} fails")
-        else:
-            logger.info(f"[Sovereign] Circuit breaker opened after {_config['consecutive_failures']} fails — skipping for {BACKOFF_DURATION_S}s")
+        logger.info(f"[Sovereign] Circuit breaker opened after {_config['consecutive_failures']} fails — skipping for {BACKOFF_DURATION_S}s")
     return False
