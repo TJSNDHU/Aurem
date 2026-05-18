@@ -135,6 +135,9 @@ TIER_1_AUTO: set[str] = {
     "council_consult",
     # iter 322g — autonomous campaign ops (cost <$0.10, no approval needed)
     "campaign_status", "force_blast_cycle", "channel_gating_reseed",
+    # iter 323q — skill-ports (read-only): systematic debug planner +
+    # deterministic code-review pass. Both safe to auto-execute.
+    "debug_systematic", "review_code",
 }
 
 TIER_2_APPROVE: set[str] = {
@@ -704,6 +707,21 @@ Operating principles:
   9. BUG-HUNT WITH git_bisect. When "X used to work, now broken" — DO NOT
      guess. Pick a known-good commit and call git_bisect with a deterministic
      test command. It walks O(log n) commits and returns the exact culprit.
+  10. SYSTEMATIC DEBUG (iter 323q). Before proposing ANY fix for a reported
+      bug, walk these six steps in order: (1) OBSERVE — what is the user
+      actually seeing vs expected, (2) ISOLATE — minimal reproduction case,
+      (3) HYPOTHESIZE — list top 3 root causes ranked by likelihood, (4)
+      VERIFY — which tool call confirms or rules out each, run them, (5)
+      ROOT CAUSE — state the confirmed cause with the evidence, (6) FIX —
+      only now propose the minimal change. No assumptions without evidence.
+      Surface your reasoning so the founder can audit it.
+  11. STOP SLOP PROSE (iter 323q). Write like a sharp human, not an LLM.
+      Banned: throat-clearing openers ("Great question!", "Certainly!"),
+      em-dashes as dramatic pauses, hedge stacks ("It's worth noting that"),
+      vague declaratives, business jargon (synergize, paradigm shift),
+      filler affirmations on their own line. Be direct. Be specific. Cut
+      every sentence that says nothing. The post-processor will catch
+      misses but the bar is YOUR pen.
 """
 
 
@@ -1141,6 +1159,19 @@ async def _continue_loop(
 
         if not tool_calls:
             # LLM produced a final answer with no tool calls — done
+            # iter 323q — Stop Slop prose filter on every final assistant
+            # turn. Idempotent; logs how many AI-tells it scrubbed.
+            try:
+                from services.ora_prose_filter import clean_prose
+                content, _slop_stats = clean_prose(content)
+                if _slop_stats.get("applied") and any(
+                    _slop_stats.get(k, 0) for k in
+                    ("openers_removed", "hedges_removed",
+                     "standalone_filler", "em_dashes", "jargon")
+                ):
+                    logger.info(f"[ora_prose_filter] scrubbed: {_slop_stats}")
+            except Exception as _e:
+                logger.warning(f"[ora_prose_filter] skipped: {_e}")
             history.append({"role": "assistant", "content": content})
             await _save_history(session_id, history)
             return {

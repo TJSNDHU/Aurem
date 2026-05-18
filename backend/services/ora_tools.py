@@ -208,6 +208,175 @@ async def view_dir(path: str, max_entries: int = 60) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
 
 
+# ── iter 323q ─────────────────────────────────────────────────────────
+# Two skill-ports inspired by Claude Skills: Systematic Debug + Code Review.
+# Both are TIER 1 (read-only) — execute immediately, never block on approval.
+
+async def debug_systematic(
+    bug_description: str,
+    error_text: str = "",
+    file_hint: str = "",
+) -> dict:
+    """Force the 6-step systematic debugging framework.
+
+    Returns a STRUCTURED PLAN (not a fix) — the LLM must follow this template
+    via subsequent tool calls. Forces ORA to gather evidence BEFORE proposing
+    fixes, killing the "guess-and-check" anti-pattern.
+    """
+    if not isinstance(bug_description, str) or len(bug_description) < 5:
+        return {"ok": False, "error": "bug_description must be ≥ 5 chars"}
+
+    plan = {
+        "step_1_observe": {
+            "what_user_sees":   "[fill from bug_description]",
+            "what_is_expected": "[infer from user intent]",
+            "delta":            "[the gap that constitutes the bug]",
+        },
+        "step_2_isolate": {
+            "minimal_repro":    "[describe the minimum scenario]",
+            "first_recommended_tool": "view_file" if file_hint else "grep_codebase",
+            "first_tool_args":  ({"path": file_hint, "max_lines": 200}
+                                  if file_hint else
+                                  {"pattern": "[derive from error_text]",
+                                   "file_glob": "*.py",
+                                   "root": "/app/backend"}),
+        },
+        "step_3_hypothesize": {
+            "h1_most_likely":  "[fill: top suspected root cause]",
+            "h2_alternate":    "[fill: second possibility]",
+            "h3_long_tail":    "[fill: less likely but possible]",
+        },
+        "step_4_verify": {
+            "h1_verification_tool": "view_file or db_count",
+            "h2_verification_tool": "curl_internal or grep_codebase",
+            "h3_verification_tool": "git_log or view_dir",
+            "rule": "Run ONE verification tool per turn. Wait for evidence.",
+        },
+        "step_5_root_cause": {
+            "evidence_required": "Cite the exact line / log entry / db count.",
+            "format":            "X is broken BECAUSE Y, evidenced by Z.",
+        },
+        "step_6_fix": {
+            "rule":      "Only propose code change AFTER step 5 is concrete.",
+            "approach":  "Minimal diff. Single concern. Add a regression test.",
+            "tool":      "safe_edit (tier 2 — founder approval required)",
+        },
+        "anti_pattern_alerts": [
+            "Do NOT propose a fix in step 1, 2, or 3.",
+            "Do NOT skip step 4 (verification) — pattern matching is not evidence.",
+            "Do NOT bundle multiple unrelated changes in step 6.",
+        ],
+    }
+
+    return {
+        "ok":               True,
+        "bug":              bug_description[:300],
+        "error_excerpt":    error_text[:300] if error_text else None,
+        "file_hint":        file_hint or None,
+        "systematic_plan":  plan,
+        "next_action":      "Begin step 2 — call the recommended tool to gather evidence.",
+    }
+
+
+async def review_code(path: str, focus: str = "all") -> dict:
+    """Apply the code-review checklist against a file at `path`.
+
+    Reads up to 500 lines, runs deterministic heuristic checks across
+    correctness / security / maintainability / performance, returns a
+    severity-ranked finding list with line refs. Cheap, fast, runs as
+    a first pass BEFORE the LLM does subjective review.
+    """
+    if not _is_path_allowed(path):
+        return {"ok": False, "error": f"path not allowed: {path}"}
+    p = Path(path)
+    if not p.exists() or not p.is_file():
+        return {"ok": False, "error": f"not a file: {path}"}
+    if p.stat().st_size > 2_000_000:
+        return {"ok": False, "error": "file too large for review (>2MB)"}
+    try:
+        content = p.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return {"ok": False, "error": f"read failed: {e}"}
+
+    lines = content.split("\n")
+    findings: list[dict] = []
+
+    def _add(sev: str, line_no: int, category: str, msg: str) -> None:
+        findings.append({"severity": sev, "line": line_no,
+                          "category": category, "msg": msg})
+
+    # ── Security / secrets heuristics ─────────────────────────────
+    secret_patterns = [
+        (r"(?i)(api[_-]?key|secret|password|token)\s*=\s*['\"][A-Za-z0-9_\-]{16,}['\"]",
+         "potential hardcoded secret"),
+        (r"AKIA[0-9A-Z]{16}",                 "AWS access key id pattern"),
+        (r"sk_live_[A-Za-z0-9]{16,}",         "Stripe live key pattern"),
+        (r"ghp_[A-Za-z0-9]{36}",              "GitHub personal access token"),
+    ]
+    for i, line in enumerate(lines[:500], start=1):
+        for pat, desc in secret_patterns:
+            if re.search(pat, line):
+                _add("CRITICAL", i, "security", desc)
+
+    # ── Code smells ───────────────────────────────────────────────
+    for i, line in enumerate(lines[:500], start=1):
+        stripped = line.strip()
+        if re.search(r"(?i)^\s*(#|//|--)\s*TODO\s*[:\-]?\s+", stripped):
+            _add("INFO", i, "maintainability", "TODO comment")
+        if re.search(r"(?i)except\s*:\s*pass\s*$", stripped):
+            _add("HIGH", i, "correctness", "bare 'except: pass' silently swallows all errors")
+        if re.search(r"print\(", stripped) and path.endswith(".py") and "test" not in path:
+            # production print() in non-test file
+            _add("MINOR", i, "logging", "use logger.* instead of print() in production code")
+        if "eval(" in stripped or "exec(" in stripped:
+            _add("CRITICAL", i, "security", "eval()/exec() with user input = RCE")
+        if re.search(r"\.format\([^)]*\)\s*$", stripped) and (
+            "SELECT" in stripped.upper() or "INSERT" in stripped.upper()
+        ):
+            _add("HIGH", i, "security", "SQL string-formatting — use parameterised queries")
+
+    # ── Complexity heuristic — function-length proxy ──────────────
+    fn_pat = re.compile(r"^\s*(?:async\s+)?def\s+([a-zA-Z_]\w*)\s*\(")
+    fn_start: dict[str, int] = {}
+    current_fn: str | None = None
+    current_start = 0
+    for i, line in enumerate(lines[:500], start=1):
+        m = fn_pat.match(line)
+        if m:
+            if current_fn and (i - current_start) > 80:
+                _add("MINOR", current_start, "complexity",
+                     f"function '{current_fn}' is {i - current_start} lines — consider splitting")
+            current_fn = m.group(1)
+            current_start = i
+            fn_start[current_fn] = i
+
+    # Filter by focus
+    if focus in ("security", "correctness", "maintainability", "performance", "logging", "complexity"):
+        findings = [f for f in findings if f["category"] == focus]
+
+    findings.sort(
+        key=lambda f: {"CRITICAL": 0, "HIGH": 1, "MINOR": 2, "INFO": 3}.get(f["severity"], 9)
+    )
+
+    return {
+        "ok":            True,
+        "file":          path,
+        "lines_scanned": min(500, len(lines)),
+        "findings":      findings[:60],
+        "summary": {
+            "critical": sum(1 for f in findings if f["severity"] == "CRITICAL"),
+            "high":     sum(1 for f in findings if f["severity"] == "HIGH"),
+            "minor":    sum(1 for f in findings if f["severity"] == "MINOR"),
+            "info":     sum(1 for f in findings if f["severity"] == "INFO"),
+        },
+        "verdict": (
+            "BLOCK" if any(f["severity"] == "CRITICAL" for f in findings)
+            else "WARN" if any(f["severity"] == "HIGH" for f in findings)
+            else "PASS"
+        ),
+    }
+
+
 async def curl_internal(endpoint: str, method: str = "GET") -> dict:
     """Hit our own backend (localhost:8001 only — no external URLs)."""
     if method.upper() not in ("GET",):
@@ -2385,6 +2554,33 @@ TOOL_REGISTRY: dict[str, dict] = {
                       "max_lines": "int 1-500, default 200",
                       "start": "int (1-based line, default 1)"},
         "description": "Read a file's contents, range-clipped.",
+    },
+    "debug_systematic": {
+        "fn": debug_systematic,
+        "args_spec": {"bug_description": "str (required, ≥5 chars)",
+                      "error_text":       "str (optional traceback/log excerpt)",
+                      "file_hint":        "str (optional file path under /app)"},
+        "description": (
+            "iter 323q — Force the 6-step systematic debug framework BEFORE "
+            "proposing any fix. Returns a structured plan: observe→isolate→"
+            "hypothesize→verify→root_cause→fix. Recommends the FIRST tool to "
+            "call next. Use this whenever the founder reports a bug — it kills "
+            "the guess-and-check anti-pattern and forces evidence-based fixes."
+        ),
+    },
+    "review_code": {
+        "fn": review_code,
+        "args_spec": {"path": "str (required, file inside /app)",
+                      "focus": "str — 'all' (default), 'security', 'correctness', "
+                                "'maintainability', 'performance', 'logging', 'complexity'"},
+        "description": (
+            "iter 323q — Deterministic code-review pass on a single file. "
+            "Heuristic checks for hardcoded secrets, bare except:pass, SQL "
+            "injection, eval/exec, oversized functions, production print(). "
+            "Returns severity-ranked findings + PASS/WARN/BLOCK verdict. Cheap "
+            "first pass BEFORE the LLM does subjective review or before a "
+            "propose_commit. Reads up to 500 lines."
+        ),
     },
     "view_dir": {
         "fn": view_dir,
