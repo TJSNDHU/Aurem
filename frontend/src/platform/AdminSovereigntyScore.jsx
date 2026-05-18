@@ -144,6 +144,7 @@ export default function AdminSovereigntyScore() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [lastFetched, setLastFetched] = useState(null);
+  const [pulse, setPulse] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,6 +160,9 @@ export default function AdminSovereigntyScore() {
       const j = await r.json();
       setData(j);
       setLastFetched(new Date());
+      // (e) visual pulse on every successful refresh
+      setPulse(true);
+      setTimeout(() => setPulse(false), 900);
     } catch (e) {
       setErr(String(e.message || e));
     } finally {
@@ -166,10 +170,32 @@ export default function AdminSovereigntyScore() {
     }
   }, []);
 
+  // (c) auto-pause when tab hidden + (f) instant refresh on focus return
   useEffect(() => {
     load();
-    const id = setInterval(load, 30000);
-    return () => clearInterval(id);
+    let id = null;
+    const start = () => {
+      if (id == null) id = setInterval(load, 30000);
+    };
+    const stop = () => {
+      if (id != null) { clearInterval(id); id = null; }
+    };
+    const onVis = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        load();   // (f) refresh immediately when tab regains focus
+        start();
+      }
+    };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
   }, [load]);
 
   const componentEntries = useMemo(() => {
@@ -270,9 +296,18 @@ export default function AdminSovereigntyScore() {
                 </div>
               </div>
             </div>
-            <div className="mt-6 text-[11px] text-gray-500">
+            <div className="mt-6 flex items-center gap-2 text-[11px] text-gray-500" data-testid="sovereignty-last-probed">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{
+                  backgroundColor: pulse ? "#22C55E" : "rgba(34,197,94,0.35)",
+                  boxShadow: pulse ? "0 0 8px #22C55E" : "none",
+                  transition: "background-color 240ms ease, box-shadow 240ms ease",
+                }}
+                data-testid="sovereignty-live-pulse"
+              />
               {lastFetched
-                ? `Last probed ${lastFetched.toLocaleTimeString()} — auto-refresh every 30 s.`
+                ? `Last probed ${lastFetched.toLocaleTimeString()} — auto-refresh every 30 s (pauses when tab hidden).`
                 : "Probing…"}
             </div>
           </div>
