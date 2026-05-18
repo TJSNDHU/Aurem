@@ -1,6 +1,32 @@
 # AUREM Platform — PRD
 
 
+> **🟢 SYSTEM OVERVIEW PAGE UPDATED (2026-05-18 / iter 323s)**
+>
+> ## What changed
+> - Header iteration fallback `322fa` → `323r`; subline date → `MAY 18, 2026`.
+> - New header quick-link: **SOVEREIGNTY SCORE** (`/admin/sovereignty-score`).
+> - New live tile **SovereigntyScoreTile** mounted between `StackStatusGrid` and customer-features. Polls `/api/admin/sovereignty/score` every 30s. Renders score/100, tier, mission, plus 6 component cards (MongoDB · Ingress · Legion LLM · Redis · LLM Fallbacks · SaaS Deps) with status pills + detail.
+> - New shipped batch tile **ITER 323 — Sovereignty Hardening (May 17-18)** with 8 sub-grids:
+>   - High-burn LLM routed (323r): `lead_enrichment.py`, `intelligence_scan.py`, `deep_scout.py` → `llm_gateway.call_llm()`
+>   - Claude Skills → ORA (323q): Stop Slop · Systematic Debug · Code Reviewer
+>   - Campaign Diagnostic (323p): `/why-not-sending` + `unflag-all-noise`
+>   - Live Sovereignty Score (323j)
+>   - OraChat UX (323k → 323l): elapsed timer + live tool-call chips
+>   - Dead-code purge (323i): 870 lines CustomerPortal removed
+>   - Deploy artifacts (323m → 323o): Hetzner nginx fix · LuxeDashboardPreview responsive · `.env.production` URL forced
+>   - **Observed RED (user actions)**: Sovereign LLM unreachable (start Windows daemon) · RETELL_FROM_NUMBER missing · EMERGENT_LLM budget exhausted · AUREM_ENCRYPTION_KEY pending
+> - Live API confirmed: `/api/admin/sovereignty/score` → 200, score=55/100 (hybrid), legion=degraded (expected — local tunnel down).
+> - Lint clean.
+>
+> ## Red status snapshot at update time
+> - Stack grid: **1 RED / 11** → Sovereign LLM unreachable (user-action: start local daemon).
+> - Sovereignty score: 55/100 → Legion=degraded, Ingress=cloud (Emergent preview), Mongo=local, Redis=in-memory sovereign.
+> - Pending Actions: RETELL_FROM_NUMBER missing (user-action: Retell dashboard).
+>
+> ---
+
+
 > **🟢 PRODUCTION REDEPLOY VERIFIED + CUSTOMERPORTAL CLEANUP (2026-02 / iter 323i)**
 >
 > ## Production verification

@@ -452,6 +452,104 @@ function SkillsAndVoiceOverviewTile() {
   );
 }
 
+/* ═══ iter 323j — LIVE SOVEREIGNTY SCORE TILE (real-time /api/admin/sovereignty/score) ═══ */
+function SovereigntyScoreTile() {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const token = sessionStorage.getItem('platform_token')
+        || sessionStorage.getItem('aurem_platform_token')
+        || localStorage.getItem('aurem_token')
+        || localStorage.getItem('token');
+      try {
+        const r = await fetch(`${API}/api/admin/sovereignty/score`, {
+          headers: { Authorization: `Bearer ${token || ''}` },
+        });
+        if (!cancelled && r.ok) { setD(await r.json()); setErr(false); }
+        else if (!cancelled) setErr(true);
+      } catch { if (!cancelled) setErr(true); }
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+  const score = d?.score ?? 0;
+  const tier = d?.tier || (err ? 'unknown' : 'loading');
+  const comps = d?.components || {};
+  const ringColor = score >= 80 ? '#4ADE80' : score >= 50 ? '#F59E0B' : '#EF4444';
+  const labels = {
+    mongo: 'MongoDB', ingress: 'Ingress / Host', legion: 'Legion LLM',
+    redis: 'Redis', llm_fallbacks: 'LLM Fallbacks', saas_deps: 'SaaS Deps',
+  };
+  const statusTone = (s) => s === 'sovereign' ? '#4ADE80'
+    : s === 'hybrid' ? '#F59E0B'
+    : s === 'degraded' ? '#FF8C42'
+    : s === 'info' ? '#64C8FF'
+    : '#EF4444';
+  return (
+    <div className="sov-card" style={{
+      padding: '24px 32px', marginBottom: 20,
+      border: `1px solid ${ringColor}55`, animation: 'sov-glow 5s ease-in-out infinite',
+    }} data-testid="sov-sovereignty-score-tile">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div className="sov-hdr" style={{ fontSize: 14, color: ringColor }}>
+          FULL SOVEREIGNTY SCORE — LIVE
+        </div>
+        <Link to="/admin/sovereignty-score" className="sov-mono" style={{
+          fontSize: 10, color: GOLD, textDecoration: 'none', letterSpacing: '0.12em',
+          padding: '4px 10px', borderRadius: 6, border: `1px solid ${GOLD}40`,
+        }} data-testid="sov-link-sovereignty-detail">FULL DETAIL →</Link>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ textAlign: 'center', minWidth: 130 }}>
+          <div className="sov-mono" style={{ fontSize: 48, fontWeight: 700, color: ringColor, lineHeight: 1 }}>
+            {score}<span style={{ fontSize: 18, color: '#6A6070' }}>/100</span>
+          </div>
+          <div className="sov-mono" style={{ fontSize: 10, color: '#8A8494', marginTop: 6, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+            {tier} tier
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div className="sov-body" style={{ fontSize: 13, color: '#B8B0A4', lineHeight: 1.5 }}>
+            {d?.mission || 'Migrating off Emergent + Atlas + Redis Cloud onto Hetzner + local Mongo + Legion LLM.'}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+        {Object.entries(comps).map(([key, c]) => (
+          <div key={key} data-testid={`sov-score-comp-${key}`} style={{
+            padding: '10px 14px', borderRadius: 10,
+            background: 'rgba(13,13,13,0.6)',
+            border: `1px solid ${statusTone(c.status)}30`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+              <span className="sov-mono" style={{ fontSize: 10, letterSpacing: '0.1em', color: '#6A6070' }}>
+                {labels[key] || key.toUpperCase()}
+              </span>
+              <span className="sov-mono" style={{ fontSize: 11, fontWeight: 700, color: statusTone(c.status) }}>
+                {c.score ?? 0}
+              </span>
+            </div>
+            <div className="sov-mono" style={{ fontSize: 9.5, color: statusTone(c.status), letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+              {c.status || '—'}
+            </div>
+            <div style={{ fontSize: 10, color: '#8A8494', lineHeight: 1.3 }}>
+              {(c.detail || '').slice(0, 80)}
+            </div>
+          </div>
+        ))}
+      </div>
+      {err && (
+        <div className="sov-mono" style={{ fontSize: 10, color: '#EF4444', marginTop: 10 }}>
+          unable to reach /api/admin/sovereignty/score — admin auth required
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══ iter 322ca — CUSTOMER AUDIT ($49/mo) ═══ */
 function AuditOverviewTile() {
   return (
@@ -533,7 +631,7 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '322fa'} | MAY 2026</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '323r'} | MAY 18, 2026</p>
 
           {/* ═══ SHARE BUTTON ═══ */}
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -581,6 +679,21 @@ export default function SystemOverview() {
               </svg>
               OPEN EMPIRE HUD
             </a>
+            <Link
+              to="/admin/sovereignty-score"
+              data-testid="sov-sovereignty-link"
+              className="sov-mono"
+              style={{
+                padding: '10px 20px', borderRadius: 10, fontSize: 11, fontWeight: 700, letterSpacing: '0.12em',
+                background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.45)', color: '#4ADE80',
+                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>
+              </svg>
+              SOVEREIGNTY SCORE
+            </Link>
           </div>
           <div id="sov-share-toast" style={{
             position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
@@ -599,6 +712,86 @@ export default function SystemOverview() {
         {/* ═══ iter 322ar — REAL AUDIT STATS + LIVE STACK STATUS ═══ */}
         <AuditStatsTile platform={p} audit={data?.audit} />
         <StackStatusGrid />
+
+        {/* ═══ iter 323j — LIVE FULL SOVEREIGNTY SCORE ═══ */}
+        <SovereigntyScoreTile />
+
+        {/* ═══ ITER 323 — MAY 17-18 2026 — SOVEREIGNTY HARDENING BATCH ═══ */}
+        <div className="sov-card" style={{
+          padding: '24px 32px', marginBottom: 20,
+          border: `1px solid #4ADE80`, animation: 'sov-glow 5s ease-in-out infinite',
+          background: 'linear-gradient(135deg, #0D0D0D, #0A1A0A)',
+        }} data-testid="sov-iter323-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: '#4ADE80' }}>
+            ITER 323 — SOVEREIGNTY HARDENING BATCH · MAY 17-18, 2026
+          </div>
+          <p className="sov-body" style={{ fontSize: 12, color: '#6A8A6A', marginBottom: 14, letterSpacing: '0.05em' }}>
+            Token-conscious refactor · 3 high-burn LLM files routed through llm_gateway · 3 Claude Skills wired into ORA · Campaign diagnostic surfaced · 870 lines dead code removed
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            <FeatureGrid title="HIGH-BURN LLM ROUTED (323r)" accent="#4ADE80" items={[
+              'lead_enrichment.py → llm_gateway.call_llm()',
+              'intelligence_scan.py → llm_gateway.call_llm()',
+              'deep_scout.py → llm_gateway.call_llm()',
+              'Route order: Sovereign Ollama → OpenRouter → Emergent (fallback)',
+              'Cuts EMERGENT_LLM_KEY burn on every lead enrich + scout cycle',
+              'Zero direct litellm.* calls remaining in these 3 files',
+            ]} />
+            <FeatureGrid title="CLAUDE SKILLS → ORA (323q)" accent="#8B5CF6" items={[
+              'Stop Slop — services/ora_prose_filter.py (prose lint)',
+              'Systematic Debug — RCA scaffolding tool',
+              'Code Reviewer — file-diff sanity checker',
+              'Registered in services/ora_agent.py tool registry',
+              'Skill-broadcast aware (auto-appended to system prompt)',
+              'Verified via Hinglish prompt round-trip',
+            ]} />
+            <FeatureGrid title="CAMPAIGN DIAGNOSTIC (323p)" accent="#F59E0B" items={[
+              'GET /api/campaign/why-not-sending — exact funnel snapshot',
+              'POST /api/campaign/auto-blast/unflag-all-noise',
+              'Surfaces zero_sent_streak + noise-flagged lead count',
+              'Engine still frozen → root cause: Emergent LLM budget',
+              'Action: refill via Profile→Universal Key→Add Balance',
+              'Run unflag endpoint after refill → next cron cycle resumes',
+            ]} />
+            <FeatureGrid title="LIVE SOVEREIGNTY SCORE (323j)" accent="#C9A84C" items={[
+              '/admin/sovereignty-score — full ring + component breakdown',
+              'GET /api/admin/sovereignty/score — 6 weighted probes',
+              'MongoDB 25 · Ingress 25 · Legion 20 · Redis 15 · LLM-FB 8 · SaaS 7',
+              'p95 < 2.5s (dominated by 2s Legion HTTP probe)',
+              'North-Star metric for Hetzner + local-Mongo + Legion migration',
+              'Live score above ↑ updates every 30s',
+            ]} />
+            <FeatureGrid title="ORACHAT UX (323k → 323l)" accent="#64C8FF" items={[
+              'Elapsed timer during WORKING state (adaptive reassurance)',
+              'Live tool-call progress chips (which tool is firing right now)',
+              'Per-tool tone color · stagger animation',
+              'No more "Is it stuck?" — founders always see liveness',
+              'Mounted on /my/ora + /ora PWA + admin OraChat overlay',
+            ]} />
+            <FeatureGrid title="DEAD CODE PURGE (323i)" accent="#EF4444" items={[
+              'CustomerPortal legacy: 870 lines removed',
+              'Sidebar route map cleaned',
+              'Unused imports / props pruned across 4 files',
+              'Bundle slimmer · zero behaviour change',
+              'Token-conscious mandate: no orphan code lingers',
+            ]} />
+            <FeatureGrid title="DEPLOY ARTIFACTS (323m → 323o)" accent="#F59E0B" items={[
+              'Hetzner nginx bootstrap fixed (TLS handshake path)',
+              'LuxeDashboardPreview responsive: isTablet/isDesktop wired',
+              'frontend/.env.production — REACT_APP_BACKEND_URL forced',
+              'Production build no longer falls back to window.location.origin',
+              'Pre-flight for full self-hosting on Hetzner VPS',
+            ]} />
+            <FeatureGrid title="OBSERVED RED (USER ACTIONS)" accent="#EF4444" items={[
+              'Sovereign LLM (Ollama via Cloudflare) — unreachable',
+              '→ Start Windows daemon: docker compose up on Legion laptop',
+              '→ Confirm sovereign.aurem.live tunnel is live',
+              'RETELL_FROM_NUMBER missing — buy/import in Retell dashboard',
+              'Emergent LLM budget exhausted — refill via /universal-key',
+              'AUREM_ENCRYPTION_KEY — paste into Emergent Secrets dashboard',
+            ]} />
+          </div>
+        </div>
 
         {/* ═══ iter 322as — CUSTOMER FEATURES (A→B→C→D Frontend Batch) ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE8055`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-customer-features">
