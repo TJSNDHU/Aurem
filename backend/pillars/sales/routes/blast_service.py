@@ -231,6 +231,19 @@ async def execute_blast_for_lead(
     else:
         results["email"] = {"success": False, "error": "no email address"}
 
+    # iter 323v — TEMP DEBUG: surface per-channel send result in stdout/stderr
+    # so production cycles can be diagnosed without DB queries. Read-only —
+    # touches no send logic; safe to remove later.
+    try:
+        _r = results.get("email") or {}
+        logger.warning(
+            f"[BLAST-DEBUG] lead={lead_id} channel=email "
+            f"success={bool(_r.get('success'))} "
+            f"error={(_r.get('error') or '')[:160]}"
+        )
+    except Exception:
+        pass
+
     # 2) SMS (Twilio)
     if phone and _gate_open("sms"):
         try:
@@ -254,6 +267,17 @@ async def execute_blast_for_lead(
         results["sms"] = {"success": False, "error": "gated", "to": phone}
     else:
         results["sms"] = {"success": False, "error": "no phone number"}
+
+    # iter 323v — TEMP DEBUG
+    try:
+        _r = results.get("sms") or {}
+        logger.warning(
+            f"[BLAST-DEBUG] lead={lead_id} channel=sms "
+            f"success={bool(_r.get('success'))} "
+            f"error={(_r.get('error') or '')[:160]}"
+        )
+    except Exception:
+        pass
 
     # 3) WHATSAPP
     #
@@ -360,6 +384,17 @@ async def execute_blast_for_lead(
     else:
         results["whatsapp"] = {"success": False, "error": "no phone number"}
 
+    # iter 323v — TEMP DEBUG
+    try:
+        _r = results.get("whatsapp") or {}
+        logger.warning(
+            f"[BLAST-DEBUG] lead={lead_id} channel=whatsapp "
+            f"success={bool(_r.get('success'))} "
+            f"error={(_r.get('error') or '')[:160]}"
+        )
+    except Exception:
+        pass
+
     # 4) VOICE CALL (Twilio)
     if phone and _gate_open("call"):
         try:
@@ -384,6 +419,17 @@ async def execute_blast_for_lead(
         results["voice"] = {"success": False, "error": "gated", "to": phone}
     else:
         results["voice"] = {"success": False, "error": "no phone number"}
+
+    # iter 323v — TEMP DEBUG
+    try:
+        _r = results.get("voice") or {}
+        logger.warning(
+            f"[BLAST-DEBUG] lead={lead_id} channel=voice "
+            f"success={bool(_r.get('success'))} "
+            f"error={(_r.get('error') or '')[:160]}"
+        )
+    except Exception:
+        pass
 
     # Persist all entries + status update
     if history_entries:
