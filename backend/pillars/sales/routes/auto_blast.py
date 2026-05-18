@@ -285,6 +285,32 @@ async def auto_blast_run_now(request: Request):
     }
 
 
+# ── iter 323p — campaign diagnostic + manual noise unflag ────────────
+@router.get("/why-not-sending")
+async def why_not_sending(request: Request):
+    """Read-only deep diagnostic: WHY are cycles producing sent=0?
+
+    Returns the funnel from total_leads → final_eligible_for_blast and
+    points at the single blocking filter, plus sample lead docs for spot
+    inspection. Use this when the watchdog's `zero_sent_streak` is high
+    (the screenshot user saw: streak=180 for 6 days).
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import diagnose_blocker
+    return await diagnose_blocker()
+
+
+@router.post("/auto-blast/unflag-all-noise")
+async def auto_blast_unflag_all_noise(request: Request):
+    """Reset `noise_flag` on every queued lead. Pair with /why-not-sending
+    when blocking_reason == 'all_queued_noise_flagged'. Returns the count
+    of leads cleared. Idempotent and reversible by next cycle's heuristic.
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import unflag_all_noise
+    return await unflag_all_noise()
+
+
 # ══════════════════════════════════════════════
 # Lead Scraping (Google Maps via Camofox)
 # ══════════════════════════════════════════════

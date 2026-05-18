@@ -260,6 +260,180 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
 
 
 # ─────────────────────────────────────────────────────────────
+# Diagnostic — iter 323p
+# Surfaces the EXACT filter that's killing every cycle. Read-only;
+# no side effects. Use from `/api/campaign/why-not-sending` admin route
+# when watchdog reports zero_sent_streak ≥ 3.
+# ─────────────────────────────────────────────────────────────
+async def diagnose_blocker() -> Dict[str, Any]:
+    """Return why auto-blast cycles are producing sent=0.
+
+    Surfaces:
+      - global config state (enabled flag, last cycle stats)
+      - candidate funnel: total → never_blasted → has_contact → status_ok
+        → not_dnc → not_noise → final_eligible
+      - per-filter exclusion counts (with sample lead IDs for spot-check)
+      - "blocking_reason" — the single most-impactful filter to unblock
+
+    Designed to answer "why streak=180?" in one call.
+    """
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+
+    # ── Config state ──────────────────────────────────────────────
+    cfg = await db.auto_blast_config.find_one({"tenant_id": "global"}, {"_id": 0}) or {}
+    health = await db.ora_campaign_health.find_one({"_id": "global"}, {"_id": 0}) or {}
+
+    # ── Funnel: count what each filter drops ──────────────────────
+    total = await db.campaign_leads.count_documents({})
+    never_blasted = await db.campaign_leads.count_documents(
+        {"last_blast_at": {"$exists": False}})
+    queued_with_contact = await db.campaign_leads.count_documents({
+        "last_blast_at": {"$exists": False},
+        "$or": [
+            {"email": {"$nin": ["", None]}},
+            {"phone": {"$nin": ["", None]}},
+        ],
+    })
+    queued_status_ok = await db.campaign_leads.count_documents({
+        "last_blast_at": {"$exists": False},
+        "$or": [
+            {"status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]}},
+            {"status": "not_interested",
+             "noise_reason": {"$in": ["pre-282u-scrape-residue", "listicle-or-directory"]}},
+        ],
+        "$and": [
+            {"$or": [
+                {"email": {"$nin": ["", None]}},
+                {"phone": {"$nin": ["", None]}},
+            ]},
+        ],
+    })
+    queued_not_noise = await db.campaign_leads.count_documents({
+        "last_blast_at": {"$exists": False},
+        "noise_flag": {"$ne": True},
+        "$or": [
+            {"status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]}},
+            {"status": "not_interested",
+             "noise_reason": {"$in": ["pre-282u-scrape-residue", "listicle-or-directory"]}},
+        ],
+        "$and": [
+            {"$or": [
+                {"email": {"$nin": ["", None]}},
+                {"phone": {"$nin": ["", None]}},
+            ]},
+        ],
+    })
+
+    # noise_flag count alone (how many got hard-flagged by previous cycles)
+    noise_flagged = await db.campaign_leads.count_documents({
+        "last_blast_at": {"$exists": False},
+        "noise_flag": True,
+    })
+
+    # Run actual _eligible_leads to get true post-noise count
+    eligible_now = await _eligible_leads(db, limit=100)  # peek up to 100
+
+    # Sample 3 of each exclusion bucket for spot-check
+    async def _sample(query, n=3):
+        out = []
+        async for d in db.campaign_leads.find(
+            query, {"_id": 0, "lead_id": 1, "business_name": 1,
+                    "email": 1, "phone": 1, "status": 1, "noise_flag": 1,
+                    "noise_reason": 1, "source": 1},
+        ).limit(n):
+            out.append(d)
+        return out
+
+    samples = {
+        "noise_flagged": await _sample({"last_blast_at": {"$exists": False},
+                                          "noise_flag": True}),
+        "status_excluded": await _sample({"last_blast_at": {"$exists": False},
+                                            "status": {"$in": ["signed_up",
+                                                                "not_interested",
+                                                                "unsubscribed"]}}),
+        "no_contact": await _sample({
+            "last_blast_at": {"$exists": False},
+            "email": {"$in": ["", None]},
+            "phone": {"$in": ["", None]},
+        }),
+    }
+
+    # ── Compute the single blocking reason ────────────────────────
+    enabled = bool(cfg.get("enabled"))
+    blocking_reason: Optional[str] = None
+    fix_command: Optional[str] = None
+
+    if not enabled:
+        blocking_reason = "engine_disabled"
+        fix_command = "POST /api/campaign/auto-blast/toggle {enabled:true}"
+    elif never_blasted == 0:
+        blocking_reason = "queue_empty"
+        fix_command = "wait for scout to add new leads OR re-arm sent leads"
+    elif queued_with_contact == 0:
+        blocking_reason = "all_queued_leads_contactless"
+        fix_command = "scout pipeline producing leads with no email/phone — check Accurate-Scout & enrichment"
+    elif queued_status_ok == 0:
+        blocking_reason = "all_queued_marked_user_not_interested_or_unsubscribed"
+        fix_command = "manual lead status review needed"
+    elif queued_not_noise == 0:
+        blocking_reason = "all_queued_noise_flagged"
+        fix_command = ("POST /api/campaign/auto-blast/unfllag-all-noise (resets "
+                       "noise_flag so legit SMBs misclassified earlier can re-blast)")
+    elif len(eligible_now) == 0:
+        blocking_reason = "filter_chain_excludes_all_in_eligibility_pass"
+        fix_command = "deeper sampling needed; inspect samples below"
+
+    return {
+        "ok": True,
+        "config": {
+            "enabled": enabled,
+            "tenant_id": cfg.get("tenant_id"),
+            "max_per_cycle": int(cfg.get("max_per_cycle", 10)),
+            "interval_minutes": int(cfg.get("interval_minutes", 5)),
+            "last_run_at": cfg.get("last_run_at"),
+            "last_run_processed": int(cfg.get("last_run_processed") or 0),
+            "last_run_sent": int(cfg.get("last_run_sent") or 0),
+            "last_run_note": cfg.get("last_run_note"),
+        },
+        "watchdog": {
+            "zero_sent_streak": int(health.get("zero_sent_streak") or 0),
+            "heartbeat_age_min": health.get("heartbeat_age_min"),
+            "veto_rate_1h": health.get("veto_rate_1h"),
+            "tripped": health.get("tripped") or [],
+        },
+        "funnel": {
+            "total_leads": total,
+            "never_blasted (queued)": never_blasted,
+            "  ... with contact (email or phone)": queued_with_contact,
+            "  ... status not in dead-set": queued_status_ok,
+            "  ... not noise_flagged": queued_not_noise,
+            "  ... final eligible (post _eligible_leads pass)": len(eligible_now),
+            "noise_flagged_count": noise_flagged,
+        },
+        "samples": samples,
+        "blocking_reason": blocking_reason,
+        "fix_command": fix_command,
+    }
+
+
+async def unflag_all_noise() -> Dict[str, Any]:
+    """Force-clear `noise_flag` on every queued lead. Use when the
+    noise heuristic was too aggressive and buried legit SMBs.
+    """
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    r = await db.campaign_leads.update_many(
+        {"last_blast_at": {"$exists": False}, "noise_flag": True},
+        {"$set": {"noise_flag": False,
+                  "noise_flag_cleared_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"ok": True, "modified": r.modified_count}
+
+
+# ─────────────────────────────────────────────────────────────
 # Main cycle
 # ─────────────────────────────────────────────────────────────
 async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
