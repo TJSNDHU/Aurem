@@ -201,7 +201,12 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
 
     q = {
         "last_blast_at": {"$exists": False},
-        "blast_chain": {"$exists": False},
+        # iter 323w — removed `"blast_chain": {"$exists": False}` clause.
+        # Leads with a partial blast_chain (touch ledger written but
+        # last_blast_at never stamped — e.g. interrupted cycle) ARE
+        # eligible to be retried. Source of the prod "15 stuck leads"
+        # bug where diagnose_blocker reported 15 but _eligible_leads
+        # returned 0.
         # iter R234d — was excluding `not_interested` blindly which caught
         # the 827 noise-falsely-flagged SMBs. We now narrow the exclusion
         # to *user-driven* not_interested OR unsubscribed only; auto-noise
@@ -303,6 +308,14 @@ async def diagnose_blocker() -> Dict[str, Any]:
     queued_not_noise = await db.campaign_leads.count_documents({
         "last_blast_at": {"$exists": False},
         "noise_flag": {"$ne": True},
+        # iter 323w — funnel must mirror runner: exclude leads that
+        # ALREADY have a chain doc written (those are mid-flight or
+        # half-completed by a previous cycle, not "fresh queued").
+        # NOTE (iter 323w): runner now ALLOWS partial-chain retries
+        # (see _eligible_leads). The diagnostic intentionally diverges
+        # here only to surface fresh-queued count distinctly from
+        # retry-queued; eligible_now field below shows the real number.
+        "blast_chain": {"$exists": False},
         "$or": [
             {"status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]}},
             {"status": "not_interested",
