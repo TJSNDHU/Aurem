@@ -186,7 +186,7 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
             user, _, domain = email.partition("@")
             if any(d in domain for d in BLOCKED_DOMAINS):
                 return True
-            if any(d in domain for d in _NOISE_DOMAIN_SUBSTR):
+            if any(domain == d for d in _NOISE_DOMAIN_SUBSTR):
                 return True
             # Big-box retailer / national chains: still skip.
             if domain in {"autozone.com", "walmart.com", "amazon.com",
@@ -235,21 +235,11 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
         if (lead.get("email") or "").lower() in dnc_emails:
             continue
         if _is_noise(lead):
-            # iter R234d — was permanently marking these `not_interested`,
-            # which killed re-arming (827 legitimate SMBs got buried).
-            # Now we just tag with a separate `noise_flag` so this cycle
-            # skips them, but a re-classification job can revive false
-            # positives later. The lead's `status` is left alone so the
-            # eligibility query keeps surfacing them after a re-classify.
-            try:
-                await db.campaign_leads.update_one(
-                    {"lead_id": lead.get("lead_id")},
-                    {"$set": {"noise_flag": True,
-                              "noise_filtered_at": datetime.now(timezone.utc).isoformat(),
-                              "noise_reason": "listicle-or-directory"}},
-                )
-            except Exception:
-                pass
+            # iter 323t — eligibility checker ONLY filters, NEVER writes.
+            # Permanent flagging belongs to the scout pipeline, not here.
+            # Previous behaviour permanently set `noise_flag=True` on every
+            # excluded lead → infinite re-kill loop (unflag-noise reset
+            # → re-flagged next cycle → unflag again → forever).
             continue
         out.append(lead)
         if len(out) >= limit:
