@@ -194,8 +194,10 @@ async def _nvidia_nim_call(prompt: str, system: str,
 async def _ora_call(prompt: str, max_tokens: int = 320,
                      timeout: float = 35.0,
                      provider: str = "claude") -> str:
-    """Single LLM call. Default Claude Sonnet 4.5 via Emergent LLM key.
-    Set provider='nvidia_nim' to route to NVIDIA NIM."""
+    """Single LLM call. Default routes through llm_gateway (Sovereign Ollama
+    → OpenRouter → Emergent fallback chain). Set provider='nvidia_nim' to
+    route to NVIDIA NIM. iter 323r — was direct EMERGENT_LLM_KEY, contributed
+    to the budget-exhaustion campaign freeze."""
     system_msg = (
         "You are ORA, AUREM's strategy brain. Output ONLY the requested "
         "markdown — no preamble, no greeting, no 'here is'. Specific, "
@@ -204,24 +206,18 @@ async def _ora_call(prompt: str, max_tokens: int = 320,
     if provider == "nvidia_nim":
         return await _nvidia_nim_call(prompt, system_msg,
                                         max_tokens=max_tokens, timeout=timeout)
-    api_key = os.environ.get("EMERGENT_LLM_KEY", "")
-    if not api_key:
-        return "❌ EMERGENT_LLM_KEY not configured."
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage  # type: ignore
-    except Exception as e:
-        return f"❌ emergentintegrations unavailable: {e}"
-    try:
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"intel-{uuid.uuid4().hex[:10]}",
-            system_message=system_msg,
-        ).with_model("anthropic", "claude-sonnet-4-5-20250929") \
-         .with_params(max_tokens=max_tokens)
+        from services.llm_gateway import call_llm
         out = await asyncio.wait_for(
-            chat.send_message(UserMessage(text=prompt)), timeout=timeout,
+            call_llm(system_prompt=system_msg,
+                     user_prompt=prompt,
+                     max_tokens=max_tokens),
+            timeout=timeout,
         )
-        return (out or "").strip()
+        out = (out or "").strip()
+        if out.startswith("(LLM unavailable"):
+            return f"❌ {out}"
+        return out
     except Exception as e:
         logger.warning(f"[intel] ora_call failed: {e}")
         return f"❌ ORA call failed: {type(e).__name__}: {str(e)[:120]}"

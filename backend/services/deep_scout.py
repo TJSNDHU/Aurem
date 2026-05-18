@@ -127,13 +127,13 @@ async def _search_step(tenant_id: str, query: str, step: int, previous_findings:
     coverage = round(len(covered_kws) / max(len(keywords), 1) * 100, 1)
 
     # LLM gap analysis — evaluate completeness
+    # iter 323r — routed through llm_gateway (Sovereign Ollama → OpenRouter →
+    # Emergent fallback). Was direct EMERGENT_LLM_KEY → budget exhaustion.
     llm_analysis = ""
     llm_next_query = ""
     try:
-        import os
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        if api_key and unique:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
+        if unique:
+            from services.llm_gateway import call_llm
             findings_text = "\n".join(f"- [{f.get('source')}] {f.get('content','')}" for f in unique[:10])
             prompt = (
                 f"Original query: \"{query}\"\n\n"
@@ -142,18 +142,18 @@ async def _search_step(tenant_id: str, query: str, step: int, previous_findings:
                 f"In 1-2 sentences: What information is still missing to fully answer the query? "
                 f"If complete, say 'COMPLETE'. If incomplete, suggest a focused follow-up search query."
             )
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=f"deep_scout_{tenant_id}_{step}",
-                system_message="You are a research gap analyst. Be concise."
-            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-            response = await chat.send_async(UserMessage(content=prompt))
-            llm_analysis = response.text_content.strip() if response else ""
-            if "COMPLETE" in llm_analysis.upper():
+            llm_analysis = await call_llm(
+                system_prompt="You are a research gap analyst. Be concise.",
+                user_prompt=prompt,
+                max_tokens=300,
+            )
+            llm_analysis = (llm_analysis or "").strip()
+            if llm_analysis.startswith("(LLM unavailable"):
+                llm_analysis = ""
+            elif "COMPLETE" in llm_analysis.upper():
                 coverage = max(coverage, 90)
-            elif llm_analysis:
-                # Extract a suggested next query from the LLM response
-                llm_next_query = llm_analysis.split("search query:")[-1].strip() if "search query:" in llm_analysis.lower() else ""
+            elif llm_analysis and "search query:" in llm_analysis.lower():
+                llm_next_query = llm_analysis.split("search query:")[-1].strip()
     except Exception as e:
         logger.warning(f"[DEEP_SCOUT] LLM gap analysis error (non-fatal): {e}")
 

@@ -103,25 +103,28 @@ async def enrich_lead(lead_id: str, tenant_id: str) -> dict:
     is_decision_maker = _detect_decision_maker(title, email)
 
     # LLM enrichment — deeper company analysis
+    # iter 323r — routed through llm_gateway (Sovereign Ollama → OpenRouter →
+    # Emergent fallback chain). Previously called Emergent LLM key direct,
+    # contributed to budget exhaustion that froze the campaign for 6 days.
     llm_insights = ""
     try:
-        import os
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        if api_key and (company or domain):
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
+        if company or domain:
+            from services.llm_gateway import call_llm
             prompt = (
                 f"Analyze this business lead for a sales team. Be concise (3-4 sentences max):\n"
                 f"Name: {name}\nCompany: {company}\nDomain: {domain}\nTitle: {title}\n\n"
                 f"Provide: likely industry, company maturity estimate, and one personalized "
                 f"outreach angle based on the company name/domain."
             )
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=f"enrich_{lead_id}",
-                system_message="You are a B2B sales intelligence analyst. Be concise and actionable."
-            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-            response = await chat.send_async(UserMessage(content=prompt))
-            llm_insights = response.text_content.strip() if response else ""
+            llm_insights = await call_llm(
+                system_prompt="You are a B2B sales intelligence analyst. Be concise and actionable.",
+                user_prompt=prompt,
+                max_tokens=400,
+            )
+            llm_insights = (llm_insights or "").strip()
+            # gateway returns FAIL_MSG ("(LLM unavailable …") on full chain miss
+            if llm_insights.startswith("(LLM unavailable"):
+                llm_insights = ""
     except Exception as e:
         logger.warning(f"[ENRICHMENT] LLM analysis error (non-fatal): {e}")
 
