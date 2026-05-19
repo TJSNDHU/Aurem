@@ -67,12 +67,21 @@ async def invoke_tool(name: str, args: dict, jwt_token: str) -> dict:
 
 def extract_tool_calls(text: str) -> list[dict]:
     """
-    Parse fenced ```tool_call or ```json blocks containing {"tool": ..., "args": ...}.
-    Returns list of dicts.
+    Parse tool calls from LLM output. Supports 3 emission shapes:
+      1. ```tool_call / ```json fenced JSON (primary — Groq llama-3.3)
+      2. Bare {"tool": "...", "args": {...}} with no fence (qwen/Haiku)
+      3. Bare {"name": "...", "parameters": {...}} (OpenAI-style)
+
+    iter 323ad — added shapes 2 & 3 to stop the "raw JSON dikh raha hai"
+    bug where the parser missed unfenced emissions.
     """
-    calls = []
+    calls: list[dict] = []
+    seen_blocks: set[str] = set()
+
+    # Shape 1 — fenced
     for match in _TOOL_CALL_RE.finditer(text):
         block = match.group(1).strip()
+        seen_blocks.add(block)
         try:
             data = json.loads(block)
             if isinstance(data, dict) and "tool" in data:
@@ -82,4 +91,40 @@ def extract_tool_calls(text: str) -> list[dict]:
                 })
         except json.JSONDecodeError:
             logger.warning(f"Invalid JSON in tool_call block: {block[:100]}")
+
+    if calls:
+        return calls
+
+    # Shape 2 & 3 fallback — bare JSON object containing "tool" or "name".
+    # Conservative non-greedy single-level brace match; nested JSON args
+    # are accepted up to one nesting level.
+    bare_pattern = re.compile(
+        r'\{(?:[^{}]|\{[^{}]*\})*\}',
+        re.DOTALL
+    )
+    for raw in bare_pattern.findall(text):
+        if raw in seen_blocks:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        tool_name = data.get("tool") or data.get("name") or data.get("function")
+        if not isinstance(tool_name, str):
+            continue
+        tool_args = (
+            data.get("args")
+            or data.get("parameters")
+            or data.get("arguments")
+            or {}
+        )
+        if isinstance(tool_args, str):
+            try:
+                tool_args = json.loads(tool_args)
+            except json.JSONDecodeError:
+                tool_args = {}
+        calls.append({"tool": tool_name, "args": tool_args})
+
     return calls

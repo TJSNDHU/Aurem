@@ -164,9 +164,23 @@ async def chat_with_tools(
             })
             results_for_llm.append({"tool": c["tool"], "result": res})
 
+        # iter 323ad — per-tool truncation (was: total 4000 chars cut
+        # across ALL results → ORA half-results dekh ke wrong conclusions).
+        # Each tool result gets its own 2500-char budget so 4 tool calls
+        # in one iter all reach the LLM with usable signal.
+        results_truncated = []
+        for r in results_for_llm:
+            result_str = json.dumps(r["result"], default=str)
+            if len(result_str) > 2500:
+                result_str = (
+                    result_str[:2500]
+                    + "\n... [truncated — call again with narrower args/limit]"
+                )
+            results_truncated.append({"tool": r["tool"], "result": result_str})
+
         transcript = (
             f"{transcript}\n\n=== TOOL RESULTS (iter {iters}) ===\n"
-            f"{json.dumps(results_for_llm, default=str)[:4000]}\n"
+            f"{json.dumps(results_truncated, default=str)}\n"
             f"=== END TOOL RESULTS ===\n"
             f"Now give your FINAL answer using only these real results "
             f"(or call more tools if needed)."

@@ -11,6 +11,17 @@ function App() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // iter 323ad — persistent session id so orchestrator can stitch
+  // multi-turn conversations (was undefined → memory disabled).
+  const [sessionId] = useState(() => {
+    const existing = localStorage.getItem('ora_cto_session');
+    if (existing) return existing;
+    const id = (crypto.randomUUID && crypto.randomUUID())
+      || `s_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem('ora_cto_session', id);
+    return id;
+  });
+
   useEffect(() => {
     const fetchHealth = async () => {
       try {
@@ -59,10 +70,18 @@ function App() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('admin_token');
+      // iter 323ad — multi-source token lookup. Aurem platform writes
+      // platform_token / aurem_token; legacy was admin_token only.
+      const token =
+        localStorage.getItem('admin_token') ||
+        localStorage.getItem('platform_token') ||
+        sessionStorage.getItem('platform_token') ||
+        localStorage.getItem('aurem_token') ||
+        localStorage.getItem('token') ||
+        '';
       const res = await axios.post(
         `${API_BASE}/api/chat`,
-        { prompt: input, max_tool_iters: 4 },
+        { prompt: input, max_tool_iters: 6, session_id: sessionId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const oraMsg = {
