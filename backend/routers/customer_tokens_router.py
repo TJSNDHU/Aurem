@@ -25,10 +25,7 @@ import jwt
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/customer/tokens", tags=["Customer Tokens"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET not set.")
-
+from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 TOKEN_COSTS = {
     "new_page": 2,
     "new_section": 3,

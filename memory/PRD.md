@@ -1,6 +1,31 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324 — JWT SAFE-BOOT + STARTUP REPORT + CAMPAIGN ROOT-CAUSE (2026-02)**
+>
+> ## Shipped
+> - **JWT_SECRET safe-boot**: 24 routers/middleware + `server.py` now use `from config import JWT_SECRET` (3-tier resolver: env → file → ephemeral). No more module-import `RuntimeError` crashes on misconfigured deploys.
+> - **`dump.rdb` removed from git** + `.gitignore` adds `*.rdb` / `appendonly.aof`.
+> - **`bootstrap/startup_validation.py`**: env-var validator (10 groups, never raises) wired into startup; exposed via `GET /api/admin/startup-report`.
+> - **ORA evals harness** at `backend/tests/evals/test_ora_responses.py` (5 tests; 4 pass offline, 1 live-gated).
+>
+> ## Campaign engine — P0 RESOLVED with new root-cause
+> - Triggered `auto-blast/run-now` after the `limit * 50` scan-window fix. Cycle completes, `last_run_note="no-eligible-leads"`.
+> - Funnel: total=1713 → queued=481 → with_contact=421 → alive_status=153 → **not_noise_flagged=0**.
+> - Mongo direct query confirms: 100% of 421 queued+contact leads have `noise_flag=true` because their contact emails are aggregator/social placeholders (`info@fresha.com`, `info@facebook.com`, `info@google.com`, `info@reddit.com`, `info@wikipedia.org`, etc.).
+> - **The "363 buried legit leads" claim from prior handoff was incorrect** — they don't exist. Real fix lives upstream in the lead-source pipeline (`ora_hunt_command`) which is grabbing the first email found on Google SERP results instead of the actual business domain email.
+> - Recommended next move: either (a) wire Accurate-Scout into the hunt pipeline to re-extract the *actual* business email per lead, or (b) gate `ora_hunt_command` ingestion to skip rows whose extracted email matches a known directory/aggregator domain.
+>
+> ## Outstanding (P1/P2)
+> - Re-extract business emails for the 421 queued leads (or drop them and re-scrape with a stricter contact extractor).
+> - Combine duplicated messaging adapters (`services/messaging/`).
+> - Route-based frontend code-splitting (Three.js, face-api).
+> - Hetzner Redis/Mongo migration (user-deferred).
+>
+> ---
+
+
+
 > **🟢 SYSTEM OVERVIEW PAGE UPDATED (2026-05-18 / iter 323s)**
 >
 > ## What changed

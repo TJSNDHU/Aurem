@@ -488,12 +488,10 @@ async def setup_database_indexes():
         print(f"[DB] Index creation warning (may already exist): {e}")
 
 
-# JWT Secret - fallback for local development only
-# P0 SECURITY FIX: No hardcoded fallback - must be explicitly configured
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET environment variable is required. Set it in backend/.env")
-JWT_ALGORITHM = "HS256"
+# JWT Secret — uses safe 3-tier resolver (env -> file -> generated) from config.py
+# so the pod boots even if JWT_SECRET env var isn't injected. K8s health probes
+# stay green; admins don't get ECONNREFUSED on misconfigured deploys.
+from config import JWT_SECRET, JWT_ALGORITHM  # noqa: E402
 
 # Stripe (accepts either STRIPE_SECRET_KEY or legacy STRIPE_API_KEY)
 STRIPE_API_KEY = os.environ.get("STRIPE_SECRET_KEY")
@@ -1164,6 +1162,13 @@ async def startup_event():
                 # budget and the pod is killed before /health ever responds.
                 # ════════════════════════════════════════════════════════════════
                 async def _bg_atlas_init():
+                    # 0. Env-var validation (never raises; flat report)
+                    try:
+                        from bootstrap.startup_validation import validate_environment
+                        validate_environment()
+                    except Exception as e:
+                        logging.warning(f"[STARTUP-BG] env validation skipped: {e}")
+
                     # 1. Startup validation
                     try:
                         from services.startup_validation import run_startup_validation
@@ -2309,6 +2314,14 @@ try:
 except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] csv_leads wire failed: {_e}")
+
+# iter 324 — startup env-var report (admin diagnostic)
+try:
+    from routers.startup_report_router import router as _startup_report_router
+    app.include_router(_startup_report_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] startup_report wire failed: {_e}")
 
 # iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
 try:

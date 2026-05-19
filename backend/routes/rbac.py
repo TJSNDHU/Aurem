@@ -22,9 +22,7 @@ def set_db(database):
     global db
     db = database
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET not set.")
+from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 JWT_EXPIRY_HOURS = 24
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@reroots.ca")
 # Bug-fix #57 — refuse the committed default. If SETUP_KEY is unset

@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/platform/auth", tags=["Platform Auth"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET environment variable not set.")
+from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 24 * 7  # 1 week
 

@@ -27,10 +27,7 @@ import stripe
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/stripe-embed", tags=["Stripe Embedded Checkout"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET not set.")
-
+from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 stripe.api_key = STRIPE_SECRET_KEY

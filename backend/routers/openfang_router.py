@@ -52,10 +52,7 @@ from pydantic import BaseModel, EmailStr, Field
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/openfang", tags=["OpenFang Lead Ingestion"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET not set.")
-
+from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 OPENFANG_SECRET = os.environ.get("OPENFANG_WEBHOOK_SECRET", "")
 DEFAULT_TENANT = os.environ.get("OPENFANG_DEFAULT_TENANT", "aurem_platform")
 OPENFANG_ALLOW_PLAIN = (os.environ.get("OPENFANG_ALLOW_PLAIN_TOKEN", "true").lower() == "true")

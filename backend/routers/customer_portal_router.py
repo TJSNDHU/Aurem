@@ -33,10 +33,7 @@ import jwt
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/customer", tags=["Customer Portal"])
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET not set.")
-
+from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 _db = None
 
 

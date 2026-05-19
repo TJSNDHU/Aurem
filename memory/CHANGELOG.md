@@ -1,3 +1,62 @@
+## 2026-02 — iter 324 — JWT_SECRET safe-boot + startup env report + dump.rdb cleanup + ORA evals
+
+**Trigger**: handoff P1/P2 — ~25 router files were doing `JWT_SECRET = os.environ.get("JWT_SECRET")` followed by `raise RuntimeError` at MODULE level. Any deploy where the env var wasn't injected = full pod crash on import + ECONNREFUSED on health probe. Plus user requested dump.rdb removal from git and a simple ORA evals harness.
+
+**Changes shipped**
+
+- **JWT_SECRET safe-boot (24 router/middleware files + `server.py`)**
+  - Replaced module-level `JWT_SECRET = os.environ.get(...) / if not: raise RuntimeError` blocks with `from config import JWT_SECRET` which already has a safe 3-tier resolver (env → /app/.jwt_secret file → ephemeral-generated).
+  - Files patched (24): `routers/aurem_builder_router.py`, `activity_feed_router.py`, `system_audit_router.py`, `pin_auth_router.py`, `wiring_audit_router.py`, `customer_360_router.py`, `customer_diagnostic_router.py`, `admin_business_id_router.py`, `bin_auth_router.py`, `customer_tokens_router.py`, `legion_health_router.py`, `smart_onboarding_router.py`, `autonomous_stack_router.py`, `business_id_router.py`, `customer_360_actions_router.py`, `ora_context_router.py`, `customer_portal_router.py`, `openfang_router.py`, `stripe_embed_router.py`, `outreach_dedup_router.py`, `platform_auth_router.py`, `admin_financials_router.py`, `routes/rbac.py`, `middleware/tenant_middleware.py`.
+  - `server.py` line 493: same swap.
+  - Effect: pod never fails to import the FastAPI app due to a missing env var; K8s health probes always get a response.
+
+- **dump.rdb removed from git + `.gitignore` hardened**
+  - `git rm --cached dump.rdb` + filesystem delete.
+  - Added `dump.rdb`, `*.rdb`, `appendonly.aof` to `.gitignore` (Redis runtime snapshots).
+
+- **`bootstrap/startup_validation.py` (new, 90 LOC)**
+  - Inspects env vars across 10 groups (core/auth/llm/groq/ollama/redis/stripe/twilio/resend/scraping).
+  - NEVER raises — only logs warnings + caches a flat JSON report.
+  - Wired into the existing `_bg_atlas_init` startup hook in `server.py`.
+
+- **`/api/admin/startup-report` (new admin endpoint)**
+  - `routers/startup_report_router.py` exposes the cached report; `?refresh=true` recomputes live.
+  - Live result on preview: 4 missing vars detected (`REDIS_URL`, `OLLAMA_BASE_URL`, `IPROYAL_*`), JWT source = `env`, all critical groups OK.
+
+- **ORA evals harness (new, `backend/tests/evals/`)**
+  - 5 structural tests for `ora_agent.py`:
+    1. salvage logic present (inline JSON → tool_calls promotion).
+    2. salvage handles multiple key shapes (parameters / arguments / args).
+    3. system prompt contains Canadian-SMB anchor words.
+    4. fallback chain references Groq + Sovereign LLM.
+    5. live chat returns non-empty (skipped under `EVALS_OFFLINE=1`).
+  - All 4 offline tests pass; live test gated for CI.
+
+- **Campaign engine — P0 root cause confirmed (no code change)**
+  - Triggered `POST /api/campaign/auto-blast/run-now` after the prior `limit * 50` scan-window fix.
+  - Funnel reads: total=1713, queued=481, with_contact=421, alive_status=153, **not_noise_flagged=0**, eligible=0.
+  - Mongo direct query confirmed: every single queued+contact lead carries `noise_flag=true` because 100% of contact emails are aggregator/social placeholders (`info@fresha.com`, `info@facebook.com`, `info@google.com`, `info@reddit.com`, `info@wikipedia.org`, `info@tripadvisor.co.uk`, `press@google.com`, etc.).
+  - Conclusion: the scan-window fix is correct as defense-in-depth, but the *real* blocker is upstream — the `ora_hunt_command` lead source is grabbing the first email found on Google SERP listings, which is invariably a directory/social platform email, not the actual business email. The "363 buried legit leads" claim in the previous handoff was incorrect — they don't exist in the DB.
+
+**Verification**
+- Backend boots clean post-refactor (supervisor `RUNNING`, app startup complete).
+- `GET /api/campaign/why-not-sending` → 200 with structured funnel.
+- `GET /api/admin/startup-report?refresh=true` → 200, returns JSON report.
+- `pytest tests/evals/test_ora_responses.py -v` → 4 passed, 1 skipped.
+- Lint: all new files pass ruff.
+
+**Production deployment reminder**
+- These fixes are PREVIEW only. Hit "Redeploy" in Emergent dashboard to push to `aurem.live`.
+
+**Net effect**
+- 25 prod-crash vectors removed (JWT_SECRET).
+- 1 sensitive runtime artifact removed from git (dump.rdb).
+- 1 new admin diagnostic endpoint surfaces all integration gaps in 1 call.
+- ORA regression net armed.
+
+---
+
+
 ## 2026-02 — iter 323i — CustomerPortal Dead Code Cleanup
 
 **Trigger**: handoff backlog P2 — 870 lines of `CustomerPortal.jsx` imported but never mounted in App.js (routes `/my` and `/my/*` already point to `LuxeDashboardPreview`).

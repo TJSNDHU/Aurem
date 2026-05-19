@@ -38,6 +38,11 @@ htmlcov/
 backend/data/lightrag_store/
 backend/uploads/
 backend/graphify-out/
+
+# Redis snapshot — runtime state, never commit (bloats repo, leaks data)
+dump.rdb
+*.rdb
+appendonly.aof
 backend/.chromadb/
 backend/chromadb/
 backend/.chroma/
