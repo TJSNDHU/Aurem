@@ -153,43 +153,100 @@ def _probe_redis() -> Dict[str, Any]:
 
 
 async def _probe_legion() -> Dict[str, Any]:
+    """iter 323z — dual-path Legion probe.
+
+    Sovereign Legion access is now available via TWO independent paths:
+      1. Direct Ollama tunnel (LEGION_OLLAMA_URL / OLLAMA_URL) — fragile
+      2. Reverse-poll daemon (legion_daemon.py polling /api/legion/queue) — stable
+
+    Either path being healthy counts as "sovereign". We prefer the direct
+    tunnel (lower latency) but fall back to daemon heartbeat when the
+    tunnel is dead. This unblocks the score when founders use only the
+    daemon path (the more reliable architecture).
+    """
+    # ── Path 1: Direct Ollama tunnel ──────────────────────────────
     url = (
         (os.environ.get("LEGION_OLLAMA_URL") or "").strip()
         or (os.environ.get("OLLAMA_URL") or "").strip()
         or (os.environ.get("OLLAMA_HOST") or "").strip()
     )
-    if not url:
-        return {"status": "missing", "score": 0, "detail": "No Legion URL configured"}
+    tunnel_alive = False
+    tunnel_detail = ""
+    if url:
+        probe_url = url.rstrip("/") + "/api/tags"
+        try:
+            async with httpx.AsyncClient(timeout=_LEGION_PROBE_TIMEOUT_S) as c:
+                r = await c.get(probe_url)
+                if r.status_code == 200:
+                    model_count = 0
+                    try:
+                        model_count = len((r.json() or {}).get("models") or [])
+                    except Exception:
+                        pass
+                    short = url if len(url) <= 48 else url[:45] + "…"
+                    tunnel_alive = True
+                    tunnel_detail = f"Legion reachable ({model_count} models) — {short}"
+                else:
+                    tunnel_detail = f"tunnel HTTP {r.status_code}"
+        except Exception as e:
+            tunnel_detail = f"tunnel {type(e).__name__}"
 
-    probe_url = url.rstrip("/") + "/api/tags"
+    if tunnel_alive:
+        return {"status": "sovereign", "score": 100, "detail": tunnel_detail}
+
+    # ── Path 2: Reverse-poll daemon heartbeat ─────────────────────
+    # If a daemon is polling /api/legion/queue/_/health within the last
+    # 60s, Legion is reachable via the daemon path even if the tunnel
+    # is dead. This is the more reliable Sovereignty path.
     try:
-        async with httpx.AsyncClient(timeout=_LEGION_PROBE_TIMEOUT_S) as c:
-            r = await c.get(probe_url)
-            if r.status_code == 200:
-                model_count = 0
+        from datetime import datetime, timezone, timedelta
+        from server import db as _db  # main db handle
+        if _db is not None:
+            doc = await _db.legion_daemon_status.find_one({}, {"_id": 0, "last_poll_at": 1})
+            if doc and doc.get("last_poll_at"):
+                last_str = str(doc["last_poll_at"])
+                # ISO string or datetime
                 try:
-                    model_count = len((r.json() or {}).get("models") or [])
+                    last_dt = datetime.fromisoformat(last_str.replace("Z", "+00:00"))
                 except Exception:
-                    pass
-                short = url
-                if len(short) > 48:
-                    short = short[:45] + "…"
-                return {
-                    "status": "sovereign",
-                    "score": 100,
-                    "detail": f"Legion reachable ({model_count} models) — {short}",
-                }
-            return {
-                "status": "degraded",
-                "score": 25,
-                "detail": f"Legion HTTP {r.status_code}",
-            }
+                    last_dt = None
+                if last_dt is not None:
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=timezone.utc)
+                    age = (datetime.now(timezone.utc) - last_dt).total_seconds()
+                    if age < 60:
+                        return {
+                            "status": "sovereign",
+                            "score": 100,
+                            "detail": f"Daemon path live (last poll {int(age)}s ago) — tunnel: {tunnel_detail or 'not configured'}",
+                        }
+                    if age < 300:
+                        return {
+                            "status": "degraded",
+                            "score": 50,
+                            "detail": f"Daemon stale (last poll {int(age)}s ago) — tunnel: {tunnel_detail or 'not configured'}",
+                        }
     except Exception as e:
+        # If the daemon status check fails, fall through to tunnel verdict
+        logger.debug(f"[sovereignty] daemon probe error: {e}")
+
+    # ── Neither path healthy ──────────────────────────────────────
+    if url:
+        is_unreachable = ("ConnectError" in tunnel_detail
+                          or "ConnectTimeout" in tunnel_detail
+                          or "ConnectionError" in tunnel_detail)
+        if is_unreachable:
+            return {
+                "status": "down",
+                "score": 0,
+                "detail": f"No daemon heartbeat — tunnel unreachable ({tunnel_detail})",
+            }
         return {
-            "status": "down",
-            "score": 0,
-            "detail": f"Unreachable: {type(e).__name__}",
+            "status": "degraded",
+            "score": 25,
+            "detail": f"No daemon heartbeat — tunnel: {tunnel_detail}",
         }
+    return {"status": "missing", "score": 0, "detail": "No Legion URL and no daemon heartbeat"}
 
 
 def _probe_ingress() -> Dict[str, Any]:
