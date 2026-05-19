@@ -24,7 +24,7 @@ BACKEND_URL = "http://localhost:8001"
 A2A_AUDIT = REPO / "backend" / "routers" / "a2a_audit_router.py"
 
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 NEW_WIDGETS = [
     "global_pulse", "geo_readiness", "agent_observatory", "intelligence_hub",

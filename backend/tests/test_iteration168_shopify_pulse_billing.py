@@ -31,7 +31,7 @@ class TestShopifyPulseBilling:
         # Login to get token
         login_resp = self.session.post(
             f"{BASE_URL}/api/auth/login",
-            json={"email": "teji.ss1986@gmail.com", "password": "Admin123"}
+            json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"}
         )
         assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
         token = login_resp.json().get("token")
@@ -327,7 +327,7 @@ class TestShopifyBillingSubscribe:
         
         login_resp = self.session.post(
             f"{BASE_URL}/api/auth/login",
-            json={"email": "teji.ss1986@gmail.com", "password": "Admin123"}
+            json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"}
         )
         assert login_resp.status_code == 200
         token = login_resp.json().get("token")

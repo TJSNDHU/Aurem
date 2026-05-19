@@ -28,7 +28,7 @@ def _token():
         return _CACHED_TOKEN
     r = httpx.post(
         f"{API_BASE}/api/auth/login",
-        json={"email": "teji.ss1986@gmail.com", "password": "Admin123"},
+        json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"},
         timeout=10,
     )
     r.raise_for_status()

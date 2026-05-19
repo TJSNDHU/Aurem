@@ -26,7 +26,7 @@ A2A_AUDIT = REPO / "backend" / "routers" / "a2a_audit_router.py"
 REGISTRY = REPO / "backend" / "routers" / "registry.py"
 
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 def _env():

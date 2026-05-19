@@ -290,7 +290,7 @@ curl http://your-domain/api/premium/dashboard/ABC-001 -H "Authorization: Bearer 
 ### Admin Credentials
 ```
 Email: teji.ss1986@gmail.com
-Password: Admin123
+Password: <REDACTED_OLDER_PASS>
 ```
 
 ---

@@ -15,7 +15,7 @@ API=$REACT_APP_BACKEND_URL
 # Admin (works post-rotation 2026-02-04)
 curl -X POST $API/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"teji.ss1986@gmail.com","password":"Singh100123$"}'
+  -d '{"email":"teji.ss1986@gmail.com","password":"<REDACTED_OLD_PASS>"}'
 # Customer email/password
 curl -X POST $API/api/platform/auth/login \
   -H "Content-Type: application/json" \

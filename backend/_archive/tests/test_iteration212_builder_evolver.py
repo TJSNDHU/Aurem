@@ -21,7 +21,7 @@ if not BASE_URL:
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 @pytest.fixture(scope="module")

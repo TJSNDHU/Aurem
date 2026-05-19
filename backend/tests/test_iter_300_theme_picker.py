@@ -26,7 +26,7 @@ def admin_token():
     """Get admin JWT token"""
     resp = requests.post(
         f"{BASE_URL}/api/auth/admin/login",
-        json={"email": "teji.ss1986@gmail.com", "password": "Admin123"},
+        json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"},
         timeout=15,
     )
     if resp.status_code != 200:

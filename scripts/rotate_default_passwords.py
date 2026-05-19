@@ -28,7 +28,7 @@ _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # (email, leaked_default_password, new_password)
 ROTATIONS = [
-    ("teji.ss1986@gmail.com", "Admin123",          "ul4Fb*u^l^Nuazh@B%Q8"),
+    ("teji.ss1986@gmail.com", "<REDACTED>",          "<REDACTED>"),
     ("admin@aurem.live",      "AuremAdmin2024!",   "o2VmqItgD3STdLlHWX^u"),
     ("customer-luxe-test@aurem-test.com", "LuxeTest123!", "VC^*yc0T43lR2kSO@ya0"),
 ]

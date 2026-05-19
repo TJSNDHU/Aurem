@@ -19,7 +19,7 @@ if not BASE_URL:
 
 # Test credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 BIN_TEST_EMAIL = "testbin@aurem.live"
 BIN_TEST_PASSWORD = "TempPass123!"
 BIN_TEST_BIN = "RST-TOR-9K82"

@@ -21,7 +21,7 @@ if not BASE_URL:
 
 # Admin credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 class TestOraPhase25Health:

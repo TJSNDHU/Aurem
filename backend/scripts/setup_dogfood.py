@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv("/app/backend/.env")
 
 EMAIL = "teji.ss1986+dogfood@gmail.com"
-NEW_PW = "AuremFounder2026!"
+NEW_PW = "<REDACTED_SEE_test_credentials.md>"
 NEW_BIN = "AUR-FNDR-001"
 
 

@@ -100,22 +100,15 @@ const FaceIDAuthWrapper = () => {
   }, [searchParams, navigate]);
 
   const handleFaceIDSuccess = async (email) => {
-    try {
-      const data = await safeAuthFetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: 'Admin123' })
-      });
-      if (data._ok && data.token) {
-        setPlatformToken(data.token);
-        setPlatformUser(data);
-        goHome(data.token);
-      } else {
-        setMode('password');
-      }
-    } catch {
-      setMode('password');
-    }
+    // iter 324g — SECURITY: was sending a hardcoded admin password from
+    // frontend JS. Browser-extractable; the literal leaked the old
+    // master password via every bundled `main.js`. Removed.
+    //
+    // Face ID is a UX hint only — the actual auth must happen via a
+    // proper Face-ID-validated server endpoint OR the user typing
+    // their password. Until a backend `/api/auth/face_id` exists,
+    // fall through to password mode.
+    setMode('password');
   };
 
   const handlePasswordLogin = async (email, password) => {

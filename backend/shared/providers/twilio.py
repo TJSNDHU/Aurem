@@ -497,7 +497,7 @@ Someone you referred just completed their Bio-Age Scan!
 
 Keep sharing: {referral_link}
 
-- ReRoots Lab 🧬""",
+- AUREM""",
 
         "almost_there_8": """⚡ You're SO Close!
 
@@ -514,7 +514,7 @@ Hi {name}! You're just {remaining} referral(s) away from unlocking your 30% LIFE
 Share now: {referral_link}
 
 Don't let this slip away! 💪
-- ReRoots Lab""",
+- AUREM""",
 
         "milestone_unlocked": """🏆 CONGRATULATIONS!
 
@@ -527,12 +527,12 @@ You've unlocked your 30% LIFETIME DISCOUNT! 🎉
 
 This discount is now permanently on your account. Every order. Forever.
 
-Shop now: https://reroots.ca/shop
+Shop now: https://aurem.live
 
 Welcome to the inner circle! 💎
-- ReRoots Lab""",
+- AUREM""",
 
-        "launch_invite": """🧬 ReRoots Founding Member Invitation
+        "launch_invite": """AUREM Founding Member Invitation
 
 Hi {name}!
 
@@ -549,7 +549,7 @@ Start now: {referral_link}
 
 This is your chance to lock in founder pricing forever.
 
-- ReRoots Lab 🧬""",
+- AUREM""",
 
         "blog_followup": """📚 Thanks for reading!
 
@@ -561,7 +561,7 @@ Take your free Bio-Age Scan: {scan_link}
 
 Have questions? Just reply here - I'm real! 🙂
 
-- ReRoots Lab""",
+- AUREM""",
 
         "order_confirmation": """✅ Order Confirmed!
 
@@ -576,7 +576,7 @@ We're preparing your skincare essentials now. You'll receive tracking info once 
 
 Questions? Reply here anytime.
 
-- ReRoots Team 🧬""",
+- AUREM""",
 
         "abandoned_cart": """👋 You left something behind!
 
@@ -591,7 +591,7 @@ Complete your order: {checkout_link}
 
 Need help? Just reply here.
 
-- ReRoots Team""",
+- AUREM""",
 
         "review_request": """⭐ How was your experience?
 
@@ -601,10 +601,10 @@ Your order #{order_number} was delivered {days_ago} days ago. We'd love to hear 
 
 Leave a quick review: {review_link}
 
-Your feedback helps us improve and helps others discover ReRoots.
+Your feedback helps us improve and helps others discover AUREM.
 
 Thank you! 🙏
-- ReRoots Team""",
+- AUREM""",
 
         "restock_alert": """🔔 Back in Stock!
 
@@ -618,32 +618,32 @@ Shop now: {product_link}
 
 Don't wait - it sold out fast last time!
 
-- ReRoots Team""",
+- AUREM""",
 
         "birthday": """🎂 Happy Birthday, {name}!
 
-From all of us at ReRoots - have an amazing day!
+From all of us at AUREM - have an amazing day!
 
 Here's a special gift: 25% OFF your next order.
 
 🎁 Use code: BDAY{year}
 Valid for 7 days.
 
-Shop: https://reroots.ca/shop
+Shop: https://aurem.live
 
 Cheers! 🎉
-- ReRoots Team""",
+- AUREM""",
     }
 
 
 def get_sms_templates():
     """Short SMS templates (160 char limit for single SMS)."""
     return {
-        "new_referral": "🎉 New referral counted! Progress: {count}/{threshold}. Keep sharing: {referral_link} -ReRoots",
-        "milestone_unlocked": "🏆 You did it! Your 30% lifetime code: {unlock_code}. Shop: reroots.ca/shop -ReRoots",
-        "shipping": "📦 Order #{order_number} shipped! Track: {tracking_url} -ReRoots",
-        "otp": "Your ReRoots verification code is: {code}. Valid for 10 minutes.",
-        "abandoned_cart": "👋 Your cart is waiting! Complete your order: {checkout_link} -ReRoots",
+        "new_referral": "🎉 New referral counted! Progress: {count}/{threshold}. Keep sharing: {referral_link} -AUREM",
+        "milestone_unlocked": "🏆 You did it! Your 30% lifetime code: {unlock_code}. Shop: aurem.live -AUREM",
+        "shipping": "📦 Order #{order_number} shipped! Track: {tracking_url} -AUREM",
+        "otp": "Your AUREM verification code is: {code}. Valid for 10 minutes.",
+        "abandoned_cart": "👋 Your cart is waiting! Complete your order: {checkout_link} -AUREM",
     }
 
 
@@ -651,20 +651,20 @@ def get_voice_templates():
     """Voice call scripts (TTS)."""
     return {
         "abandoned_cart": """
-            Hello {name}! This is ReRoots calling. 
+            Hello {name}! This is AUREM calling. 
             We noticed you left some items in your cart. 
             Your skincare routine is waiting for you! 
-            Visit reroots.ca to complete your order. 
+            Visit aurem.live to complete your order. 
             Thank you, and have a great day!
         """,
         "order_shipped": """
-            Hello {name}! Great news from ReRoots. 
+            Hello {name}! Great news from AUREM. 
             Your order number {order_number} has shipped and is on its way to you.
             Check your email or text messages for tracking details.
-            Thank you for choosing ReRoots!
+            Thank you for choosing AUREM!
         """,
         "appointment_reminder": """
-            Hello {name}! This is a reminder from ReRoots 
+            Hello {name}! This is a reminder from AUREM 
             about your consultation scheduled for {date} at {time}.
             If you need to reschedule, please visit our website or reply to our text message.
             We look forward to seeing you!
@@ -697,7 +697,7 @@ async def send_milestone_new_referral(
     else:
         remaining_text = "🎉 You've reached the threshold! Check your email for your code."
 
-    referral_link = f"https://reroots.ca/Bio-Age-Repair-Scan?ref={referral_code}"
+    referral_link = f"https://aurem.live?ref={referral_code}"
 
     # Full message for WhatsApp
     whatsapp_message = templates["new_referral"].format(
@@ -750,7 +750,7 @@ async def send_milestone_almost_there(
 
     remaining = threshold - count
     progress_bar = "🟢" * count + "⚪" * remaining
-    referral_link = f"https://reroots.ca/Bio-Age-Repair-Scan?ref={referral_code}"
+    referral_link = f"https://aurem.live?ref={referral_code}"
 
     message = templates["almost_there_8"].format(
         name=name.split()[0] if name else "there",
@@ -821,7 +821,7 @@ async def send_launch_invite(
 
     message = templates["launch_invite"].format(
         name=name.split()[0] if name else "there",
-        referral_link=f"https://reroots.ca/Bio-Age-Repair-Scan?ref={referral_code}",
+        referral_link=f"https://aurem.live?ref={referral_code}",
     )
 
     return await send_notification(phone, message, channels)
@@ -845,7 +845,7 @@ async def send_blog_followup(
         channels = ["whatsapp", "sms"]
     templates = get_milestone_templates()
 
-    scan_link = "https://reroots.ca/Bio-Age-Repair-Scan"
+    scan_link = "https://aurem.live"
     if referral_code:
         scan_link += f"?ref={referral_code}"
 
@@ -911,7 +911,7 @@ async def send_shipping_notification(
 
 Hi {first_name},
 
-Great news! Your ReRoots order is on its way! 🚚
+Great news! Your AUREM order is on its way! 🚚
 
 🧾 Order: #{order_number}
 📍 Carrier: {courier}
@@ -924,9 +924,9 @@ Your skincare essentials will arrive soon! ✨
 
 Questions? Just reply here.
 
-- ReRoots Team 🧬"""
+- AUREM"""
 
-    sms_message = f"📦 Order #{order_number} shipped via {courier}! Track: {tracking_url[:50]} -ReRoots"
+    sms_message = f"📦 Order #{order_number} shipped via {courier}! Track: {tracking_url[:50]} -AUREM"
 
     if "whatsapp" in channels:
         result = await send_whatsapp_message(phone, whatsapp_message)
@@ -965,11 +965,11 @@ async def send_partner_approved(
         channels = ["whatsapp", "sms"]
     first_name = name.split()[0] if name else "there"
 
-    message = f"""🎉 Welcome to the ReRoots Partner Circle!
+    message = f"""🎉 Welcome to the AUREM Partner Circle!
 
 Hi {first_name},
 
-Your application has been APPROVED! You're now an official ReRoots Science Ambassador.
+Your application has been APPROVED! You're now an official AUREM Science Ambassador.
 
 🔑 Your Partner Code:
 {partner_code}
@@ -978,7 +978,7 @@ Your application has been APPROVED! You're now an official ReRoots Science Ambas
 {referral_link}
 
 🧬 What's Next:
-1. Access your Partner Dashboard: https://reroots.ca/partner-dashboard
+1. Access your Partner Dashboard: https://aurem.live/partner-dashboard
 2. Download brand assets from your Resources tab
 3. Share your link & start earning 10-15% commission
 
@@ -987,7 +987,7 @@ Your followers get up to 50% OFF with your code!
 Questions? Just reply here - we're real humans 🙂
 
 Welcome to the lab! 🧬
-- ReRoots Partnership Team"""
+- AUREM Partnership Team"""
 
     return await send_notification(phone, message, channels)
 
@@ -1012,7 +1012,7 @@ async def send_partner_denied(
 
     message = f"""Hi {first_name},
 
-Thank you for your interest in partnering with ReRoots 🧬
+Thank you for your interest in partnering with AUREM 🧬
 
 After reviewing your application, we've decided not to move forward with a partnership at this time. Our program has specific requirements around audience alignment and content focus that we're prioritizing.
 
@@ -1023,11 +1023,11 @@ Here's how you can still benefit:
 • Refer 10 friends to unlock a permanent 30% discount
 • Shop with code WELCOME15 for 15% off your first order
 
-Start here: https://reroots.ca/Bio-Age-Repair-Scan
+Start here: https://aurem.live
 
 We appreciate your interest and wish you success!
 
-- ReRoots Team"""
+- AUREM"""
 
     return await send_notification(phone, message, channels)
 
@@ -1172,7 +1172,7 @@ async def send_otp(phone: str, code: str, channel: str = "sms") -> dict:
     elif channel == "whatsapp":
         return await send_whatsapp_message(phone, message)
     elif channel == "voice":
-        voice_message = f"Your ReRoots verification code is: {' '.join(code)}. I repeat: {' '.join(code)}."
+        voice_message = f"Your AUREM verification code is: {' '.join(code)}. I repeat: {' '.join(code)}."
         return await make_voice_call(phone, message=voice_message)
     
     return {"success": False, "error": f"Unknown channel: {channel}"}
@@ -1387,6 +1387,6 @@ Ready to join them?
 3️⃣ Share with 10 friends
 4️⃣ Unlock 30% off forever
 
-Start: reroots.ca/Bio-Age-Repair-Scan
+Start: aurem.live
 
-#ReRoots #FoundingMember #BiohackingSkincare #PDRN"""
+#AUREM #FoundingMember #BiohackingSkincare #PDRN"""

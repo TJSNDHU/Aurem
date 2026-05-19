@@ -26,8 +26,21 @@ _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 DEFAULT_FOUNDERS = [
     # iter 322 — final BIN names. Old AURE-FNDR-001/AURE-FNDR-002 are
     # cascade-renamed by the db_migrate iter322-cleanup endpoint.
-    {"email": "teji.ss1986@gmail.com", "password": "ul4Fb*u^l^Nuazh@B%Q8", "business_id": "AURE-ADMIN", "full_name": "AUREM Admin"},
-    {"email": "teji.ss1986+dogfood@gmail.com", "password": "AuremFounder2026!", "business_id": "AUR-FNDR-001", "full_name": "AUREM Founder (Dogfood)", "domain": "aurem.live", "dogfood": True},
+    # iter 324g — seed passwords moved to env vars. Hardcoded values
+    # were leaking the production admin credential into git. The flow
+    # below already supports env-driven hashes (`ADMIN_PASSWORD_HASH_N`)
+    # as the preferred prod path; these env reads are just fallbacks
+    # for first-time provisioning on a fresh DB.
+    {"email": "teji.ss1986@gmail.com",
+     "password": os.environ.get("FOUNDER_SEED_PASSWORD_1") or None,
+     "business_id": "AURE-ADMIN",
+     "full_name": "AUREM Admin"},
+    {"email": "teji.ss1986+dogfood@gmail.com",
+     "password": os.environ.get("FOUNDER_SEED_PASSWORD_2") or None,
+     "business_id": "AUR-FNDR-001",
+     "full_name": "AUREM Founder (Dogfood)",
+     "domain": "aurem.live",
+     "dogfood": True},
 ]
 
 # iter 322 — Founder Lifetime Free perks: bypass billing, unlock every

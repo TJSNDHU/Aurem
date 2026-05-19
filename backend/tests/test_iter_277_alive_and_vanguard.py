@@ -24,7 +24,7 @@ BACKEND_URL = os.environ.get(
 API = f"{BACKEND_URL.rstrip('/')}/api"
 
 TEST_EMAIL    = "teji.ss1986@gmail.com"
-TEST_PASSWORD = "Admin123"
+TEST_PASSWORD = "<REDACTED>"
 
 
 @pytest.fixture(scope="module")

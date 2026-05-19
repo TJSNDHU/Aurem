@@ -1811,9 +1811,9 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
     - `routers/server_misc_routes.py reset_password` (the actually-mounted handler) — same fix applied + branding switched to AUREM gold
   - **E2E verified**: forgot → token → reset → admin login → reset back → admin login again — full cycle passes via curl test
 - **2026-02-08 — Auth fixes (founder password reset + Google login)** ✅
-  - Founder admin password reset: `teji.ss1986@gmail.com` / `Aurem@Founder2026!`. Synced across `users` (`password` + `password_hash`), `aurem_users`, `platform_users`. Cleared stale `auth_provider`/`require_sso` blockers.
+  - Founder admin password reset: `teji.ss1986@gmail.com` / `<REDACTED_SEE_test_credentials.md>`. Synced across `users` (`password` + `password_hash`), `aurem_users`, `platform_users`. Cleared stale `auth_provider`/`require_sso` blockers.
   - Created missing **`POST /api/auth/google/callback`** endpoint (`routes/auth.py`). Frontend `GoogleAuthCallback.jsx` was hitting it but it never existed — only `/google/session` and `/google/admin-session` did. The new unified callback peeks at the email and routes to admin or customer flow automatically.
-  - For PRODUCTION: founder must set `ADMIN_PASSWORD_HASH_1` env var (bcrypt of `Aurem@Founder2026!`) via Emergent deploy panel — value in `/app/memory/test_credentials.md`.
+  - For PRODUCTION: founder must set `ADMIN_PASSWORD_HASH_1` env var (bcrypt of `<REDACTED_SEE_test_credentials.md>`) via Emergent deploy panel — value in `/app/memory/test_credentials.md`.
 - **2026-02-08 — Disaster Recovery: Primary → Secondary Atlas mirror live ✅**
   - New service: `/app/backend/services/db_backup_service.py` (drop+insert mirror, per-collection stats, Resend email on failure)
   - New router: `/app/backend/routers/admin_dr_backup_router.py` — `POST /api/admin/backup/trigger`, `GET /api/admin/backup/status` (super_admin only)

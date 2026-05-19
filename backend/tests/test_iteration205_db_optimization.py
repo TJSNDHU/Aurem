@@ -16,7 +16,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
 # Test credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 REROOTS_EMAIL = "pawandeep19may1985@gmail.com"
 REROOTS_PASSWORD = "ReRoots2026!"
 PIXEL_API_KEY = "aurem_rr_45af6c753797473542ad84a85ca9c358"

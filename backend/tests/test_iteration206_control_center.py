@@ -21,7 +21,7 @@ if not BASE_URL:
 
 # Test credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 REROOTS_EMAIL = "pawandeep19may1985@gmail.com"
 REROOTS_PASSWORD = "ReRoots2026!"
 REROOTS_API_KEY = "aurem_rr_45af6c753797473542ad84a85ca9c358"

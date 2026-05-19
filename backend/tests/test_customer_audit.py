@@ -22,7 +22,7 @@ if not BASE_URL:
 
 # Test credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Aurem@Founder2026!"
+ADMIN_PASSWORD = "<REDACTED_SEE_test_credentials.md>"
 
 
 class TestCustomerAuditHealth:

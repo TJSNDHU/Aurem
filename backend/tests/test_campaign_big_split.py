@@ -149,7 +149,7 @@ class TestAuthenticatedFlows:
         """Get auth token for admin user"""
         resp = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "teji.ss1986@gmail.com",
-            "password": "Admin123"
+            "password": "<REDACTED>"
         })
         if resp.status_code != 200:
             pytest.skip(f"Auth failed: {resp.status_code} - {resp.text}")

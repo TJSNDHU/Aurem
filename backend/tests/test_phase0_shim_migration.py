@@ -24,7 +24,7 @@ if not BASE_URL:
 
 # Test credentials from /app/memory/test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 class TestBackendHealth:

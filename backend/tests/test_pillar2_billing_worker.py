@@ -29,7 +29,7 @@ def get_cached_auth_token():
         return _cached_token
     
     admin_email = "teji.ss1986@gmail.com"
-    admin_password = "Admin123"
+    admin_password = "<REDACTED>"
     
     # Retry with backoff for rate limiting
     for attempt in range(3):

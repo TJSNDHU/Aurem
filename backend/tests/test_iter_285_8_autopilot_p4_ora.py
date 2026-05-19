@@ -22,7 +22,7 @@ REPO = Path(__file__).resolve().parents[2]
 BACKEND_URL = "http://localhost:8001"
 
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 def _env():

@@ -16,7 +16,7 @@ import time
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 @pytest.fixture(scope="module")

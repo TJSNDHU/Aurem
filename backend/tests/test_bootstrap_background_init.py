@@ -285,7 +285,7 @@ class TestLoginFlow:
         """POST /api/auth/login with admin credentials returns JWT token"""
         response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            json={"email": "teji.ss1986@gmail.com", "password": "Admin123"},
+            json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"},
             timeout=10
         )
         assert response.status_code == 200
@@ -298,7 +298,7 @@ class TestLoginFlow:
         """POST /api/auth/login returns user object with email"""
         response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            json={"email": "teji.ss1986@gmail.com", "password": "Admin123"},
+            json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"},
             timeout=10
         )
         data = response.json()

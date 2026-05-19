@@ -21,7 +21,7 @@ TEST_SLUG = "tj-auto-clinic-limited"  # TJ Auto Clinic slug from iteration 196
 
 # Admin credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 @pytest.fixture(scope="module")

@@ -27,7 +27,7 @@ def auth_token():
     """Get auth token for API calls."""
     resp = requests.post(
         f"{BASE_URL}/api/auth/login",
-        json={"email": "teji.ss1986@gmail.com", "password": "Admin123"},
+        json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"},
         timeout=15
     )
     if resp.status_code == 200:

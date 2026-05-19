@@ -18,7 +18,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
 # Test credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 PLATFORM_EMAIL = "futuristic_test@aurem-preview.com"
 PLATFORM_PASSWORD = "FutureTest123!"
 PLATFORM_BIN = "PREV-HX5U"

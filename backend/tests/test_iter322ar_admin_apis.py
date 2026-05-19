@@ -16,7 +16,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Aurem@Founder2026!"
+ADMIN_PASSWORD = "<REDACTED_SEE_test_credentials.md>"
 
 # Dogfood BIN for testing (from review request)
 DOGFOOD_BIN = "AUR-FNDR-001"

@@ -18,7 +18,7 @@ MCP_API_KEY = "reroots-mcp-2024"
 
 # Test credentials
 TEST_EMAIL = "teji.ss1986@gmail.com"
-TEST_PASSWORD = "Admin123"
+TEST_PASSWORD = "<REDACTED>"
 
 
 @pytest.fixture(scope="module")

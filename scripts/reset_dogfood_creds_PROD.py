@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-One-shot: set password (Singh100123$) + PIN (7668) for the +dogfood account
+One-shot: set password (<REDACTED_OLD_PASS>) + PIN (7668) for the +dogfood account
 AND set PIN (7668) on admin teji.ss1986@gmail.com (BIN AURE-RUGC).
 
 USAGE (run on a machine with access to your prod Atlas cluster):
@@ -21,7 +21,7 @@ import bcrypt
 from motor.motor_asyncio import AsyncIOMotorClient
 
 
-PASSWORD = "Singh100123$"
+PASSWORD = "<REDACTED_OLD_PASS>"
 PIN = "7668"
 
 
@@ -80,7 +80,7 @@ async def main() -> None:
     print(f"[purge]   pin_login_attempts → deleted={p2.deleted_count}")
 
     print("\n✅ Done. Try login again on aurem.live:")
-    print("   /platform/login — Credentials tab — teji.ss1986+dogfood@gmail.com / Singh100123$")
+    print("   /platform/login — Credentials tab — teji.ss1986+dogfood@gmail.com / <REDACTED_OLD_PASS>")
     print("   /platform/login — BIN+PIN tab    — AURE-RUGC / 7668")
 
 

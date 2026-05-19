@@ -22,7 +22,7 @@ OPENFANG_SECRET = os.environ.get("OPENFANG_WEBHOOK_SECRET", "openfang_aurem_2026
 
 # Admin credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "Admin123"
+ADMIN_PASSWORD = "<REDACTED>"
 
 
 @pytest.fixture(scope="module")

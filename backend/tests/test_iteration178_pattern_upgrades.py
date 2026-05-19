@@ -31,7 +31,7 @@ def get_auth_token():
         session.headers.update({"Content-Type": "application/json"})
         login_res = session.post(f"{BASE_URL}/api/auth/login", json={
             "email": "teji.ss1986@gmail.com",
-            "password": "Admin123"
+            "password": "<REDACTED>"
         })
         if login_res.status_code == 200:
             _auth_token = login_res.json().get("token")
