@@ -132,6 +132,44 @@ async def test_local_llm(req: ChatTest):
     }
 
 
+@router.post("/breaker/reset")
+async def reset_circuit_breaker(_admin: dict = Depends(require_admin)):
+    """iter 323y — manually reset the Sovereign circuit breaker.
+
+    When the Legion tunnel goes down, the breaker opens for 300s and
+    skips ALL Sovereign probes. If the founder fixes the tunnel before
+    the 300s timer elapses, this endpoint clears the latched state so
+    the very next LLM call retries Sovereign.
+
+    Returns prior state for audit. Idempotent.
+    """
+    prior = {
+        "consecutive_failures": _config.get("consecutive_failures"),
+        "backoff_until": _config.get("backoff_until"),
+        "last_status": _config.get("last_status"),
+    }
+    _config["consecutive_failures"] = 0
+    _config["backoff_until"] = None
+    _config["last_status"] = None
+    logger.info("[LocalLLM] Circuit breaker manually reset by admin")
+    # Immediately probe to update last_status
+    try:
+        status = await check_ollama_status()
+    except Exception as e:
+        status = {"online": False, "error": str(e)}
+    return {
+        "ok": True,
+        "prior": prior,
+        "now": {
+            "consecutive_failures": _config.get("consecutive_failures"),
+            "backoff_until": _config.get("backoff_until"),
+            "last_status": _config.get("last_status"),
+            "online": status.get("online"),
+        },
+        "probe": status,
+    }
+
+
 @router.get("/usage")
 async def local_llm_usage():
     """Get local LLM usage stats."""
