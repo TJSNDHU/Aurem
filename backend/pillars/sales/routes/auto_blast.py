@@ -346,6 +346,26 @@ async def auto_blast_scrub_aggregator_emails(request: Request, dry_run: bool = F
     return await scrub_aggregator_emails(dry_run=dry_run)
 
 
+# ── iter 324c — internal/test traffic scrub (QA leakage purge) ───────
+@router.post("/auto-blast/scrub-internal-test-traffic")
+async def auto_blast_scrub_internal_test_traffic(request: Request, dry_run: bool = False):
+    """Mark `noise_flag=True` on every queued lead that came from QA/test
+    harnesses or has a test-only email domain.
+
+    Catches:
+      • source ∈ {no_website_signup, awb_e2e_test, a2a_e2e_test,
+                  playwright_test, qa_smoke}
+      • email @aurem-test.com / @example.com / @test.com / *.test / *.invalid
+
+    These should never have entered the production blaster. Pair with
+    /auto-blast/scrub-aggregator-emails for full queue hygiene.
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import scrub_internal_test_traffic
+    return await scrub_internal_test_traffic(dry_run=dry_run)
+
+
+
 
 # ══════════════════════════════════════════════
 # Lead Scraping (Google Maps via Camofox)

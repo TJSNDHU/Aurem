@@ -34,10 +34,21 @@ AGGREGATOR_DOMAINS: frozenset[str] = frozenset({
     "yelp.com", "yellowpages.com", "yellowpages.ca", "yp.com",
     "tripadvisor.com", "tripadvisor.ca", "tripadvisor.co.uk",
     "manta.com", "bbb.org", "dandb.com", "dnb.com",
-    "chamberofcommerce.com", "canpages.ca", "411.ca",
+    "chamberofcommerce.com", "canpages.ca", "canadapages.com", "411.ca",
     "houzz.com", "thumbtack.com", "homestars.com",
     "realtor.ca", "realtor.com", "zillow.com", "redfin.com",
     "rew.ca", "zolo.ca", "remax.ca", "remax.com",
+    # iter 324c — directory aggregators caught leaking into production sends
+    "cylex.ca", "cylex-canada.ca", "cylex.us", "cylex.co.uk", "cylex.de",
+    "near.co.uk", "near.com", "near.us",
+    "findopen.com", "findopen.ca", "findopen.co.uk",
+    "bleen.com", "bleen.ca",
+    "hamilton-ohio.com",  # city-name listicle aggregator
+    "superlawyers.com", "profiles.superlawyers.com",
+    "desiforce.com",  # local SA-Indian SMB directory
+    "angi.com", "angieslist.com", "trustpilot.com", "glassdoor.com",
+    "crunchbase.com", "indeed.com", "ziprecruiter.com",
+    "g.page", "googleusercontent.com",
     # Booking / SaaS aggregators
     "fresha.com", "booksy.com", "vagaro.com", "mindbody.com",
     "schedulicity.com", "squareup.com", "square.site",

@@ -42,6 +42,26 @@ def test_classify_aggregator_named_email():
     assert v == "junk-aggregator"
 
 
+def test_iter_324c_directory_aggregators_blocked():
+    """iter 324c additions — caught leaking into production sends."""
+    for em in [
+        "info@canadapages.com",
+        "info@cylex-canada.ca",
+        "info@cylex.ca",
+        "info@findopen.com",
+        "info@bleen.com",
+        "info@hamilton-ohio.com",
+        "info@near.co.uk",
+        "info@superlawyers.com",
+        "info@profiles.superlawyers.com",
+        "info@desiforce.com",
+        "info@angi.com",
+        "info@indeed.com",
+    ]:
+        v, _ = classify_email(em)
+        assert v == "junk-aggregator", f"{em} should be junk-aggregator, got {v}"
+
+
 def test_classify_role_only_on_real_domain_allowed():
     v, _ = classify_email("info@manepluse.ca")
     assert v == "junk-role-only"  # allowed by default, just labelled

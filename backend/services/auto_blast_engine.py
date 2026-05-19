@@ -22,10 +22,32 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
+
+# iter 324c — internal/test traffic that must NEVER hit the production blaster.
+# Any lead with one of these source tags is QA fixture data leaked from
+# E2E harnesses. Hard-skip in `_eligible_leads`.
+_INTERNAL_TEST_SOURCES: frozenset[str] = frozenset({
+    "no_website_signup",   # NWS E2E flow fixtures (test@aurem-test.com etc.)
+    "awb_e2e_test",        # AUREM Website Builder E2E suite
+    "a2a_e2e_test",        # Agent-to-agent E2E suite
+    "playwright_test",     # Playwright synthetic prospects
+    "qa_smoke",            # Generic QA smoke fixtures
+})
+
+# Email domains used only for internal QA. NEVER blast.
+_TEST_EMAIL_DOMAINS: frozenset[str] = frozenset({
+    "aurem-test.com", "aurem.test",
+    "example.com", "example.org", "example.net",
+    "test.com", "test.org",
+    "localhost", "localhost.localdomain",
+    "mailinator.com",  # disposable
+    "yopmail.com",
+})
 
 _db = None
 
@@ -240,6 +262,17 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
         ("created_at", -1),
     ]).limit(limit * 50):
         scanned += 1
+        # iter 324c — Reject internal/test sources & test-domain emails.
+        # These leak from QA harness, builder E2E, and agent2agent tests
+        # into the production queue and get blasted (e.g. 18 sends to
+        # @aurem-test.com observed today).
+        if (lead.get("source") or "") in _INTERNAL_TEST_SOURCES:
+            continue
+        _em = (lead.get("email") or "").lower()
+        if "@" in _em:
+            _dom = _em.partition("@")[2]
+            if _dom in _TEST_EMAIL_DOMAINS or _dom.endswith(".test") or _dom.endswith(".invalid"):
+                continue
         if (lead.get("phone") or "") in dnc_phones:
             continue
         if (lead.get("email") or "").lower() in dnc_emails:
@@ -528,6 +561,66 @@ async def scrub_aggregator_emails(dry_run: bool = False) -> Dict[str, Any]:
         "top_domains":    sorted(domain_hist.items(), key=lambda x: -x[1])[:10],
         "samples":        sample,
         "ran_at":         now_iso,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Internal/test traffic scrub — iter 324c
+# Marks leads as `noise_flag=True` when they originated from QA/test
+# harnesses (source ∈ {no_website_signup, awb_e2e_test, a2a_e2e_test,
+# playwright_test, qa_smoke}) OR have an email on a test-only domain
+# (aurem-test.com, example.com, *.test, *.invalid, …).
+#
+# These NEVER should have entered the production blaster. This endpoint
+# is for one-shot reclamation of the currently-stuck queue.
+# ─────────────────────────────────────────────────────────────
+async def scrub_internal_test_traffic(dry_run: bool = False) -> Dict[str, Any]:
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Build query mirroring the gate in `_eligible_leads`
+    q = {
+        "$or": [
+            {"source": {"$in": list(_INTERNAL_TEST_SOURCES)}},
+            {"email": {"$regex":
+                "@(" + "|".join(re.escape(d) for d in _TEST_EMAIL_DOMAINS) + ")$",
+                "$options": "i"}},
+            {"email": {"$regex": r"\.(test|invalid|localhost)$", "$options": "i"}},
+        ],
+    }
+
+    matched = await db.campaign_leads.count_documents(q)
+
+    # Sample for audit
+    sample: List[Dict[str, Any]] = []
+    async for d in db.campaign_leads.find(
+        q,
+        {"_id": 0, "lead_id": 1, "business_name": 1, "email": 1, "source": 1},
+    ).limit(15):
+        sample.append(d)
+
+    modified = 0
+    if not dry_run and matched > 0:
+        r = await db.campaign_leads.update_many(
+            q,
+            {"$set": {
+                "noise_flag":         True,
+                "noise_reason":       "internal-test-traffic (iter-324c)",
+                "noise_filtered_at":  now_iso,
+                "status":             "internal_test",
+            }},
+        )
+        modified = r.modified_count
+
+    return {
+        "ok":       True,
+        "dry_run":  dry_run,
+        "matched":  matched,
+        "modified": modified,
+        "samples":  sample,
+        "ran_at":   now_iso,
     }
 
 
