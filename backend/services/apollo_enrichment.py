@@ -46,6 +46,35 @@ async def enrich_lead_with_apollo_diy(
         return {"email": None, "status": "skipped",
                 "skipped_reason": "no_domain", "sources": []}
 
+    # iter 324b — Reject aggregator/social/SaaS domains before we waste
+    # any cycles. These produce junk role-emails like `info@facebook.com`
+    # that pass `noise_flag` filters but are unblastable. (Root cause of
+    # the "421 queued, 0 eligible" funnel collapse.)
+    try:
+        from services.contact_quality import is_aggregator_domain
+        if is_aggregator_domain(domain):
+            logger.info(f"[enrich] skipping aggregator domain: {domain} (lead={lead_id})")
+            # Mark the lead so the noise pipeline can act on it.
+            try:
+                await db.campaign_leads.update_one(
+                    {"lead_id": lead_id},
+                    {"$set": {
+                        "enrichment_sources":  ["aggregator-skipped"],
+                        "enriched_at":         datetime.now(timezone.utc).isoformat(),
+                        "email_confidence":    "NONE",
+                        "noise_flag":          True,
+                        "noise_reason":        f"aggregator-domain:{domain} (iter-324b)",
+                        "noise_filtered_at":   datetime.now(timezone.utc).isoformat(),
+                    }},
+                )
+            except Exception:
+                pass
+            return {"email": None, "status": "skipped",
+                    "skipped_reason": f"aggregator-domain:{domain}",
+                    "sources": ["aggregator-skipped"]}
+    except Exception as _e:
+        logger.warning(f"[enrich] contact_quality check failed for {domain}: {_e}")
+
     sources_used: list[str] = []
 
     # ── Step 1: Website scan (primary) ──

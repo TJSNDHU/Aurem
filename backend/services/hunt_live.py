@@ -512,6 +512,16 @@ async def _run_hunt_pipeline(
         )
         is_directory = any(h in website_lower for h in DIRECTORY_HOSTS) or \
                        any(h in biz_name_lower for h in ("near me", "directory", "better business bureau"))
+        # iter 324b — also reject aggregator/social/SaaS domains (the root
+        # cause of `info@facebook.com / info@reddit.com / info@youtube.com`
+        # junk in the queue). One source-of-truth blocklist in
+        # services/contact_quality.py.
+        try:
+            from services.contact_quality import is_aggregator_domain
+            if business.get("website") and is_aggregator_domain(business["website"]):
+                is_directory = True
+        except Exception:
+            pass
         no_contact = not business.get("phone") and not business.get("website")
 
         if is_directory or no_contact:

@@ -244,6 +244,17 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
             continue
         if (lead.get("email") or "").lower() in dnc_emails:
             continue
+        # iter 324b — Defense in depth: reject aggregator junk emails
+        # (e.g. info@facebook.com) even if `noise_flag` wasn't set. This
+        # prevents future regressions if the noise-flagging pipeline
+        # misses a domain.
+        try:
+            from services.contact_quality import classify_email
+            verdict, _reason = classify_email(lead.get("email"))
+            if verdict == "junk-aggregator" and not (lead.get("phone") or ""):
+                continue
+        except Exception:
+            pass
         if _is_noise(lead):
             # iter 323t — eligibility checker ONLY filters, NEVER writes.
             # Permanent flagging belongs to the scout pipeline, not here.
@@ -439,6 +450,85 @@ async def unflag_all_noise() -> Dict[str, Any]:
                   "noise_flag_cleared_at": datetime.now(timezone.utc).isoformat()}},
     )
     return {"ok": True, "modified": r.modified_count}
+
+
+# ─────────────────────────────────────────────────────────────
+# Aggregator-email scrub — iter 324b
+# Clears `email` field on every queued lead whose email is on
+# the aggregator blocklist (info@facebook.com, info@fresha.com,
+# etc.). These were planted by the role-email fallback in
+# apollo_enrichment.py when the lead's `website_url` was a
+# social/SaaS aggregator. Returns a count + a sample of what
+# was scrubbed for auditing.
+# ─────────────────────────────────────────────────────────────
+async def scrub_aggregator_emails(dry_run: bool = False) -> Dict[str, Any]:
+    """Walk every queued lead and clear junk `email` values.
+
+    A junk email is one whose domain is on the aggregator blocklist
+    (facebook.com, fresha.com, google.com, realtor.ca, etc.). The
+    actual email value is preserved in `email_scrubbed_from` for
+    audit; `email` becomes empty so downstream filters treat the
+    lead as contactless instead of falsely "with-contact".
+    """
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        from services.contact_quality import classify_email
+    except Exception as e:
+        return {"ok": False, "error": f"contact_quality unavailable: {e}"}
+
+    scanned = 0
+    matched = 0
+    sample: List[Dict[str, Any]] = []
+    domain_hist: Dict[str, int] = {}
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    cursor = db.campaign_leads.find(
+        {
+            "last_blast_at": {"$exists": False},
+            "email": {"$nin": ["", None]},
+        },
+        {"_id": 0, "lead_id": 1, "business_name": 1, "email": 1, "phone": 1},
+    )
+    async for lead in cursor:
+        scanned += 1
+        verdict, reason = classify_email(lead.get("email"))
+        if verdict != "junk-aggregator":
+            continue
+        matched += 1
+        domain = (lead.get("email") or "").split("@", 1)[-1].lower()
+        domain_hist[domain] = domain_hist.get(domain, 0) + 1
+        if len(sample) < 10:
+            sample.append({
+                "lead_id":       lead.get("lead_id"),
+                "business_name": lead.get("business_name"),
+                "scrubbed":      lead.get("email"),
+                "reason":        reason,
+            })
+        if not dry_run:
+            await db.campaign_leads.update_one(
+                {"lead_id": lead["lead_id"]},
+                {"$set": {
+                    "email":              "",
+                    "email_confidence":   "NONE",
+                    "email_source":       "scrubbed-aggregator",
+                    "email_scrubbed_at":  now_iso,
+                    "email_scrubbed_from": lead.get("email"),
+                    "noise_flag":         True,
+                    "noise_reason":       reason or "aggregator-email (iter-324b)",
+                }},
+            )
+    return {
+        "ok":             True,
+        "dry_run":        dry_run,
+        "scanned":        scanned,
+        "matched":        matched,
+        "modified":       0 if dry_run else matched,
+        "top_domains":    sorted(domain_hist.items(), key=lambda x: -x[1])[:10],
+        "samples":        sample,
+        "ran_at":         now_iso,
+    }
 
 
 # ─────────────────────────────────────────────────────────────

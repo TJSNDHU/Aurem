@@ -328,6 +328,25 @@ async def auto_blast_reset_watchdog(request: Request):
     return await reset_watchdog()
 
 
+# ── iter 324b — aggregator-email scrub (P0 funnel unblocker) ─────────
+@router.post("/auto-blast/scrub-aggregator-emails")
+async def auto_blast_scrub_aggregator_emails(request: Request, dry_run: bool = False):
+    """Clear `email` field on queued leads whose email is on the
+    aggregator/social/SaaS blocklist (info@facebook.com, info@fresha.com,
+    info@google.com, etc.). Root cause of the "421 queued, 0 eligible"
+    funnel collapse — the role-email fallback in apollo_enrichment.py
+    built `info@<aggregator>` when the lead's website_url was a social
+    page instead of an actual business domain.
+
+    Pass `?dry_run=true` to preview without modifying. The original
+    junk value is preserved in `email_scrubbed_from` for audit.
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import scrub_aggregator_emails
+    return await scrub_aggregator_emails(dry_run=dry_run)
+
+
+
 # ══════════════════════════════════════════════
 # Lead Scraping (Google Maps via Camofox)
 # ══════════════════════════════════════════════

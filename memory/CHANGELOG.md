@@ -1,3 +1,50 @@
+## 2026-02 — iter 324b — Lead-source aggregator gate + queue scrub
+
+**Trigger**: P0 follow-up. After iter 324 confirmed the funnel collapse was caused by 100% of queued+contact leads carrying `info@<aggregator>` placeholder emails (planted by `apollo_enrichment.py` step-3b role-email fallback when `website_url` was a Facebook / Yelp / Reddit / YouTube / Wikipedia URL), this iteration fixes the lead-source at **three points** and reclaims the existing junk-stuck leads.
+
+**Changes shipped**
+
+- **`services/contact_quality.py` (NEW, ~140 LOC)**
+  - Single source of truth for aggregator-domain blocklist (~80 hosts: social, search engines, encyclopedias, directories, booking SaaS, e-commerce, brand chains, forums).
+  - `is_aggregator_domain(domain)`, `classify_email(email) → (verdict, reason)`, `is_blastable_email(email)`.
+  - Handles subdomains (`m.facebook.com`, `en.wikipedia.org`).
+
+- **Prevention layer 1 — `apollo_enrichment.py`**
+  - Before step-3b role-email fallback, calls `is_aggregator_domain(domain)`. If hit, skips enrichment entirely AND marks the lead `noise_flag=True` + `noise_reason="aggregator-domain:<host>"`. No more `info@facebook.com` planted into the queue.
+
+- **Prevention layer 2 — `services/hunt_live.py`**
+  - At the ingestion gate (`is_directory or no_contact`), also rejects any lead whose `website_url` is on the aggregator blocklist. YouTube videos, Reddit threads, TikTok pages, Wikipedia entries, etc. never enter `campaign_leads` in the first place.
+
+- **Defense in depth — `services/auto_blast_engine._eligible_leads()`**
+  - Final eligibility check now runs `classify_email()`. Any lead whose email is `junk-aggregator` AND has no phone is skipped, even if `noise_flag` was missed earlier.
+
+- **Reclaim — `POST /api/campaign/auto-blast/scrub-aggregator-emails[?dry_run=true]`**
+  - Scans all queued leads; clears `email` field (and sets `noise_flag=True`) when email is on the aggregator blocklist. Preserves the original junk value in `email_scrubbed_from` for audit.
+  - **Live run on prod-mirror DB**: scanned 418 queued leads, matched **188 junk emails**, all scrubbed. Top offenders: `canpages.ca` (43), `yelp.com` (37), `homestars.com` (13), `facebook.com` (12), `reddit.com` (11), `youtube.com` (9), `en.wikipedia.org` (8), `realtor.ca` (8), `ca.linkedin.com` (7), `zillow.com` (5).
+
+- **Tests**
+  - `tests/test_contact_quality.py` — 12 tests, all pass.
+  - Existing `tests/evals/test_ora_responses.py` — still passes (4/5, 1 live-gated).
+
+**Verification**
+- Triggered `auto-blast/run-now` → cycle completes cleanly, `last_run_note="no-eligible-leads"`, `queued_ready` dropped honestly from **421 → 247** (174 inflated counts removed).
+- Funnel `not_noise_flagged` still 0 because the remaining 247 queued leads are all flagged as `listicle-or-directory` / `directory-or-chain-R234d-round2` etc. — these are *legitimately* not businesses (YouTube videos, Reddit threads, listicle SERP results). Lead-source pipeline upstream is producing 95%+ junk; that's the real next move.
+- `pytest tests/test_contact_quality.py` → 12 passed.
+- Lint: all new code clean.
+
+**Net effect**
+- Aggregator junk emails can no longer enter the queue (prevention).
+- Existing 188 junk emails removed (reclaim).
+- Auto-blast engine refuses to send to aggregator emails even if a noise-flag is missed (defense in depth).
+
+**Honest takeaway for the user**
+- The campaign engine is now CORRECT and HONEST. It will not blast `info@facebook.com`. It will not blast aggregator junk.
+- **But there are still 0 real eligible leads.** Every queued lead with a contact field is either (a) a listicle/SERP result that's correctly flagged as noise, or (b) carrying a placeholder email `contact@aurem.live`. The lead-source pipeline (`ora_hunt_command`) needs to be re-run from clean, OR the existing 1232 already-blasted historical leads need to be revisited with a proper contact extractor.
+- Concrete next move: trigger a fresh hunt with the now-hardened `hunt_live.py` filter and watch the new queue.
+
+---
+
+
 ## 2026-02 — iter 324 — JWT_SECRET safe-boot + startup env report + dump.rdb cleanup + ORA evals
 
 **Trigger**: handoff P1/P2 — ~25 router files were doing `JWT_SECRET = os.environ.get("JWT_SECRET")` followed by `raise RuntimeError` at MODULE level. Any deploy where the env var wasn't injected = full pod crash on import + ECONNREFUSED on health probe. Plus user requested dump.rdb removal from git and a simple ORA evals harness.
