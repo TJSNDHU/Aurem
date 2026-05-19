@@ -227,13 +227,18 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
     }
     out: List[Dict[str, Any]] = []
     scanned = 0
-    # Sample 5× the cap so we can skip noise and still reach the limit.
+    # iter 323ac — scan window 5× → 50×.
+    # Runner default cap=10 scanned only 50 leads. When the first 50
+    # were all noise (yelp/directory residue) runner returned 0 while
+    # diagnose_blocker (which uses cap=100 → 500 scan) saw 15 eligible.
+    # That divergence kept zero_sent_streak climbing despite real legit
+    # leads in the queue. 50× now matches diagnostic scan depth.
     # iter 282aa — Sort prefers Yelp Fusion leads (real SMB phones) first;
     # within source, newest-created comes first.
     async for lead in db.campaign_leads.find(q, {"_id": 0}).sort([
         ("source", -1),       # "yelp_fusion" > "osm_overpass" > "google_places" alphabetically; -1 puts yelp_fusion first
         ("created_at", -1),
-    ]).limit(limit * 5):
+    ]).limit(limit * 50):
         scanned += 1
         if (lead.get("phone") or "") in dnc_phones:
             continue
