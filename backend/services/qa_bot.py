@@ -48,7 +48,7 @@ CRITICAL_ENDPOINTS: List[Dict[str, Any]] = [
     {"id": "auth_login_gate",    "method": "POST", "path": "/api/auth/login",    "body": {"email": "qa-bot@example.com", "password": "nope"}, "expect": [400, 401, 403, 422], "category": "auth", "label": "Login validation"},
 
     # SEO / Audit
-    {"id": "seo_audit_scan",    "method": "POST", "path": "/api/seo-audit/scan", "body": {"url": "https://aurem.live", "email": "qa-bot@aurem.live"}, "expect": [200, 202, 429], "timeout": 35.0, "category": "seo", "label": "SEO Audit Scan"},
+    {"id": "seo_audit_scan",    "method": "POST", "path": "/api/seo-audit/scan", "body": {"url": "https://aurem.live", "email": "qa-bot@example.com"}, "expect": [200, 202, 429], "timeout": 35.0, "category": "seo", "label": "SEO Audit Scan"},
     {"id": "robots_txt",        "method": "GET",  "path": "/robots.txt",                       "expect": [200, 404], "category": "seo",      "label": "robots.txt"},
     {"id": "sitemap_xml",       "method": "GET",  "path": "/sitemap.xml",                      "expect": [200, 404], "category": "seo",      "label": "sitemap.xml"},
     {"id": "llms_txt",          "method": "GET",  "path": "/llms.txt",                         "expect": [200, 404], "category": "seo",      "label": "llms.txt"},

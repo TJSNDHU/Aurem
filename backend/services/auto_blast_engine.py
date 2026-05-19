@@ -186,6 +186,9 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
         "shopify.com", "etsy.com", "ebay.com", "kijiji.ca",
         "realtor.ca", "realtor.com", "zolo.ca", "zillow.com",
         "remax.ca", "remax.com", "century21",
+        # Our own domain — never blast to ourselves (qa-bot, info, etc.).
+        # Belt-and-suspenders alongside recipient_guard's resend-level block.
+        "aurem.live",
     )
 
     def _is_noise(lead: Dict[str, Any]) -> bool:

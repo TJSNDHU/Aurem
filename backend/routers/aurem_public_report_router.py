@@ -393,7 +393,36 @@ async def get_public_report(slug: str, request: Request):
 
     lead = await db.campaign_leads.find_one({"lead_id": slug}, {"_id": 0})
     if not lead:
-        raise HTTPException(404, "Report not found. The business may not be in our scout database yet.")
+        # Fallback: legacy outreach emails embed slug = _slugify(business_name)
+        # when lead_id was missing at send-time. Try matching by the slugified
+        # business_name so the public report still resolves for those leads.
+        try:
+            import re as _re
+            pat = "^" + _re.escape(slug).replace(r"\-", "[ \\-]+") + "$"
+            lead = await db.campaign_leads.find_one(
+                {"$expr": {
+                    "$regexMatch": {
+                        "input": {"$toLower": {"$ifNull": ["$business_name", ""]}},
+                        "regex": pat.replace(" ", "[ \\-]+"),
+                    }
+                }},
+                {"_id": 0},
+            )
+        except Exception as _slug_err:
+            logger.debug(f"[public-report] slug fallback failed: {_slug_err}")
+        if not lead:
+            # Final fallback: case-insensitive search on a name reconstructed
+            # from the slug (replace hyphens with spaces).
+            name_guess = slug.replace("-", " ")
+            try:
+                lead = await db.campaign_leads.find_one(
+                    {"business_name": {"$regex": f"^{name_guess}$", "$options": "i"}},
+                    {"_id": 0},
+                )
+            except Exception:
+                lead = None
+        if not lead:
+            raise HTTPException(404, "Report not found. The business may not be in our scout database yet.")
 
     from services.aurem_outreach_templates import build_variables
     variables = build_variables(lead)

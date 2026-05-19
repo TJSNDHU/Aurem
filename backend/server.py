@@ -995,6 +995,16 @@ async def create_indexes():
             logging.info(f"[startup] auth indexes ensured — {res.get('ok')} ok, {res.get('errors')} errors")
         except Exception as e:
             logging.warning(f"[startup] auth index setup failed (non-fatal): {e}")
+
+        # Seed internal @aurem.live addresses into do_not_contact so any
+        # legacy code paths that pre-check DNC also respect the block.
+        try:
+            from services.recipient_guard import ensure_dnc_seeded
+            seeded = await ensure_dnc_seeded(db)
+            if seeded:
+                logging.info(f"[recipient-guard] seeded {seeded} internal addresses into do_not_contact")
+        except Exception as e:
+            logging.warning(f"[recipient-guard] DNC seed failed (non-fatal): {e}")
     except Exception as e:
         logging.warning(f"Index creation warning (may already exist): {e}")
 
@@ -1061,6 +1071,17 @@ async def startup_event():
             logging.info(f"[SMS] kill switch active: SMS_DISABLED={is_sms_disabled()}")
         except Exception as e:  # noqa: BLE001
             logging.warning(f"[SMS] kill switch install failed: {e}")
+
+        # ═══ RECIPIENT GUARD (block @aurem.live outbound except ora@) ═══
+        # Globally monkey-patch resend.Emails.send so EVERY outbound email
+        # path filters out internal/own-domain recipients (qa-bot@aurem.live,
+        # etc.). Prevents the self-spam loop where qa_bot's SEO probe
+        # auto-subscribed itself into the outreach pipeline.
+        try:
+            from services.recipient_guard import install_recipient_guard
+            install_recipient_guard()
+        except Exception as e:  # noqa: BLE001
+            logging.warning(f"[recipient-guard] install failed: {e}")
         
         # Log critical environment variables (for debugging production issues)
         logging.info(f"[ENV] MONGO_URL set: {'✓' if os.environ.get('MONGO_URL') else '❌'}")

@@ -1,6 +1,22 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324i — RECIPIENT GUARD + PUBLIC-REPORT SLUG FALLBACK (2026-05-19)**
+>
+> ## Shipped
+> - **`services/recipient_guard.py`** — new module that monkey-patches `resend.Emails.send` at server startup. Hard-blocks any outbound email to `@aurem.live` (the only allowlisted address is `ora@aurem.live`). Closes the self-spam loop where `qa_bot.py` was firing SEO-audit probes that auto-subscribed `qa-bot@aurem.live` into outreach (12 suppressed sends/hour in Resend dashboard).
+> - **DNC seed at startup** — 10 internal addresses (`qa-bot@`, `qa@`, `admin@`, `no-reply@`, `noreply@`, `support@`, `test@`, `hello@`, `team@`, `qa-bot-invalid@`) auto-seeded into `do_not_contact` collection. Idempotent. Extra entries can be added via `AUREM_INTERNAL_BLOCKED_EMAILS` env var.
+> - **`auto_blast_engine._NOISE_DOMAIN_SUBSTR`** now includes `aurem.live` — belt-and-suspenders defence so noise filter also catches self-sends before they reach the recipient guard.
+> - **`services/qa_bot.py`** SEO-audit probe `email` field changed from `qa-bot@aurem.live` → `qa-bot@example.com` (root cause of the original Resend-suppression flood).
+> - **`routers/aurem_public_report_router.py::get_public_report`** — slug lookup now has a 2-step fallback when `campaign_leads.lead_id` doesn't match the email-template slug: (1) regex match on slugified `business_name`, (2) plain `business_name` lookup with hyphens→spaces. Fixes "See the full analysis" button 404s for leads whose `lead_id` was unset at send-time.
+> - **`tests/test_recipient_guard.py`** — 9 tests covering blocking, allowlist, name-format parsing, idempotent install, monkey-patch sentinel return. All pass.
+>
+> ## Production action required
+> - User must hit **Redeploy** on Emergent dashboard to push iter 324i to `aurem.live`. Preview verified.
+>
+> ---
+
+
 > **🟢 ITER 324 — JWT SAFE-BOOT + STARTUP REPORT + CAMPAIGN ROOT-CAUSE (2026-02)**
 >
 > ## Shipped
