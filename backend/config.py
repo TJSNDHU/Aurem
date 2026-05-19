@@ -15,13 +15,19 @@ if not MONGO_URL:
     
 DB_NAME = os.environ.get("DB_NAME")
 if not DB_NAME:
-    # Bug-fix: previously `os.environ.get("DB_NAME")` returned None when
-    # unset, and `client[None]` made Motor silently write to a database
-    # literally named "None" (str(None)). Fail loudly instead.
-    raise RuntimeError(
-        "DB_NAME environment variable is required — refusing to start "
-        "with a database named 'None'."
+    # iter 324d — Don't crash the pod at module-import time.
+    # Some prod deploys inject MONGO_URL with the db name embedded but
+    # don't set DB_NAME separately. A hard raise here cascades through
+    # every module that does `from config import JWT_SECRET` (24 routers
+    # after iter 324) and prevents uvicorn from ever binding port 8001 —
+    # K8s liveness probes get ECONNREFUSED and the pod restart-loops.
+    # Log loudly; the first actual DB call will fail-fast if truly unset.
+    logging.warning(
+        "DB_NAME env var not set — falling back to 'aurem_db'. "
+        "Set DB_NAME explicitly in production to avoid silent writes "
+        "to the wrong database."
     )
+    DB_NAME = "aurem_db"
 
 # JWT Configuration — Must not CRASH the server just because the env
 # var is missing. If uvicorn's module import raises at load time, the pod

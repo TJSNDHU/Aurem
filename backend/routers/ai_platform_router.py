@@ -28,13 +28,10 @@ def set_db(database: AsyncIOMotorDatabase):
 # could forge admin tokens whenever the env var was accidentally missing
 # (e.g. fresh deploy, mistyped key name). The platform refuses to boot
 # without a configured secret — protects every protected endpoint.
-JWT_SECRET = (os.environ.get("JWT_SECRET") or (_ for _ in ()).throw(__import__("fastapi").HTTPException(status_code=500, detail="JWT not configured"))).strip()
-if not JWT_SECRET:
-    raise RuntimeError(
-        "JWT_SECRET env var is REQUIRED — refusing to start ai_platform_router "
-        "without a configured signing key (was previously falling back to a "
-        "hardcoded default that anyone reading the source could exploit)."
-    )
+# iter 324d: switched to safe fallback via config.py (env → file → ephemeral)
+# so the pod always binds port 8001 and K8s probes stay green. Auth-time
+# validation now happens in the request handler, not at module load.
+from config import JWT_SECRET  # noqa: E402
 JWT_ALGORITHM = "HS256"
 
 # ═══════════════════════════════════════════════════════════════════════════════

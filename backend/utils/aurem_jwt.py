@@ -25,10 +25,14 @@ except ImportError:
     logger.warning("[AUREM JWT] PyJWT not installed")
     jwt = None
 
-# JWT Configuration
-JWT_SECRET = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET not set.")
+# JWT Configuration — iter 324d: safe fallback via config.py instead of
+# hard-raise at module level. Hard-raise crashed prod pod boot when
+# JWT_SECRET_KEY env var wasn't injected separately.
+_LEGACY_KEY = os.environ.get("JWT_SECRET_KEY")
+if _LEGACY_KEY:
+    JWT_SECRET = _LEGACY_KEY
+else:
+    from config import JWT_SECRET  # noqa: E402
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 24
 REFRESH_TOKEN_EXPIRY_DAYS = 30

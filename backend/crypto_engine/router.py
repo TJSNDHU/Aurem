@@ -25,10 +25,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/crypto", tags=["Crypto Signal Engine"])
 
-# JWT Configuration
-JWT_SECRET = os.environ.get("CRYPTO_JWT_SECRET") or os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise RuntimeError("CRITICAL: JWT_SECRET environment variable not set. Server cannot start without it.")
+# JWT Configuration — iter 324d: safe fallback (env → file → ephemeral)
+# instead of hard-raise; module-level raise crashes the whole pod boot
+# if the env var isn't perfectly injected, leaving K8s probes in
+# ECONNREFUSED restart-loop.
+_CRYPTO_SECRET = os.environ.get("CRYPTO_JWT_SECRET")
+if _CRYPTO_SECRET:
+    JWT_SECRET = _CRYPTO_SECRET
+else:
+    from config import JWT_SECRET  # falls back to file/ephemeral if env missing
 JWT_ALGORITHM = "HS256"
 # Bug-fix #70 — the previous fallback `"signal123"` was committed to
 # source, so any caller could POST {"password": "signal123"} to

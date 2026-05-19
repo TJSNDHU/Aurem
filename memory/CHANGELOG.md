@@ -1,3 +1,44 @@
+## 2026-05 — iter 324d — Production deploy fix: kill DB_NAME hard-raise + 3 more JWT_SECRET module-level traps
+
+**Trigger**: Production deploy failed. K8s pod logs showed nginx hammering `Connection refused (111)` against `127.0.0.1:8001/api/*` for every route, including `/api/health`. Only two backend stdout lines surfaced before death: `[STARTUP] Exception→Incident Middleware loaded` and `[STARTUP] Error Ledger crash-catcher installed`. Uvicorn never bound port 8001 → liveness probes ECONNREFUSED in restart-loop.
+
+**Root cause**
+
+`config.py` had a `raise RuntimeError` at module-import time when `DB_NAME` env var was missing. Prior to iter 324, no router imported `config.py`, so this trap was inert. After iter 324, **24 routers** were switched to `from config import JWT_SECRET` for safer JWT handling — which now drags `config.py`'s `DB_NAME` check into the import path of every one of those routers.
+
+The Emergent prod K8s deploy doesn't necessarily inject `DB_NAME` as a separate env var (it may live embedded in `MONGO_URL`). Result: `config.py` raised on import → all 24 routers failed to import → `from routers.registry import register_all_routers` failed → entire `server.py` module crashed → uvicorn never bound port → pod restart-loop.
+
+Notably **zero files in the codebase actually `from config import DB_NAME`** — so the defensive `raise` was guarding usage that didn't exist.
+
+**Also caught during cleanup**: 3 more module-level `JWT_SECRET` hard-raises that escaped iter 324's grep pattern:
+- `crypto_engine/router.py:31` — checked `CRYPTO_JWT_SECRET` first then fell through to bare `JWT_SECRET = os.environ.get(...)` + raise
+- `routers/ai_platform_router.py:33` — `(_ for _ in ()).throw(...)` generator hack + redundant raise
+- `utils/aurem_jwt.py:31` — checked `JWT_SECRET_KEY` first then fell through to raise
+
+Each of these would crash the pod on prod boot under the same conditions.
+
+**Changes shipped**
+
+- `backend/config.py` lines 16-32: `DB_NAME` `raise RuntimeError` → soft fallback to `"aurem_db"` with a loud warning. Zero callers import `DB_NAME` from this module; `server.py` has its own resolver (`os.environ.get("DB_NAME") or extract_db_from_url(mongo_url)`) so the fallback is purely a safety net.
+- `backend/crypto_engine/router.py`: `JWT_SECRET = os.environ.get(...) or raise` → check `CRYPTO_JWT_SECRET` first, else `from config import JWT_SECRET` (3-tier safe resolver).
+- `backend/routers/ai_platform_router.py`: removed both the throw-generator hack AND the redundant raise; `from config import JWT_SECRET`.
+- `backend/utils/aurem_jwt.py`: same pattern, `JWT_SECRET_KEY` legacy env first, else config fallback.
+
+**Verification**
+
+Prod-simulation: cleared `DB_NAME`, `JWT_SECRET`, `CRYPTO_JWT_SECRET`, `JWT_SECRET_KEY` from process env, then imported all 8 critical modules. All ✓ — module load no longer crashes regardless of which env vars are missing.
+
+Preview backend restarted clean, `/api/health` returns 200 in <100ms.
+
+**Net effect**
+
+- 4 module-import-time `raise` traps eliminated (1 DB_NAME + 3 JWT_SECRET stragglers).
+- Prod pod will now boot even with a partial env-var set; auth-time validation moved to request handlers (where 401 is the correct response, not pod restart-loop).
+- Total JWT_SECRET safe-boot fixes across iter 324 + 324d: **27 files**.
+
+---
+
+
 ## 2026-02 — iter 324b — Lead-source aggregator gate + queue scrub
 
 **Trigger**: P0 follow-up. After iter 324 confirmed the funnel collapse was caused by 100% of queued+contact leads carrying `info@<aggregator>` placeholder emails (planted by `apollo_enrichment.py` step-3b role-email fallback when `website_url` was a Facebook / Yelp / Reddit / YouTube / Wikipedia URL), this iteration fixes the lead-source at **three points** and reclaims the existing junk-stuck leads.
