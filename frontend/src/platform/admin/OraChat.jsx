@@ -198,8 +198,11 @@ export default function OraChat() {
   //
   // If /run-async doesn't exist on the deployed backend (e.g. running
   // a stale build), we transparently fall back to the legacy /run.
-  const POLL_INTERVAL_MS = 2500;
-  const POLL_MAX_TRIES   = 130;   // 130 × 2.5 s = ~5.4 min, matches worker timeout
+  // iter 323aa — tightened to 1200 ms (was 2500 ms). At 1.2s the perceived
+  // latency floor for a 5s real backend response drops from ~3.75s to
+  // ~2.0s. Job-status endpoint is a single Mongo lookup, very cheap.
+  const POLL_INTERVAL_MS = 1200;
+  const POLL_MAX_TRIES   = 280;   // 280 × 1.2 s = ~5.6 min, matches worker timeout
 
   const runAsyncPolling = async (q, onProgress) => {
     // 1) Enqueue

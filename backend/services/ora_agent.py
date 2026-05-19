@@ -79,14 +79,14 @@ _CLAUDE_WAIT_FOR:     float = 15.0
 # ORA "silently scroll forever" before falling through. We honour
 # LEGION_OLLAMA_TIMEOUT_S env so prod can set a short value (15s)
 # while preview keeps the long value for cold-model loads.
-_OLLAMA_WAIT_FOR:     float = float(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "120"))
+_OLLAMA_WAIT_FOR:     float = float(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "45"))
 
 # iter 322fk-3 — Legion/Ollama circuit breaker.
 # When the user's local Legion daemon / ngrok tunnel is offline, every
 # ORA request used to hang on the 120s ollama timeout before falling
 # through to Claude. After ONE failure we skip ollama for 60s and route
 # straight to the cloud fallback. Reply time after ngrok drop: 120s → 2s.
-_OLLAMA_CB_FAIL_THRESHOLD = int(os.environ.get("ORA_OLLAMA_CB_THRESHOLD", "1"))
+_OLLAMA_CB_FAIL_THRESHOLD = int(os.environ.get("ORA_OLLAMA_CB_THRESHOLD", "2"))
 _OLLAMA_CB_COOLDOWN_S     = float(os.environ.get("ORA_OLLAMA_CB_COOLDOWN_S", "60"))
 _ollama_cb_fails  = 0
 _ollama_cb_until  = 0.0  # epoch-seconds; ollama skipped until this time
@@ -344,7 +344,7 @@ async def _llm_turn(
     Returns OpenAI-format message dict (may have tool_calls), or None if
     every provider failed.
     """
-    order_env = os.environ.get("ORA_AGENT_PROVIDER_ORDER", "legion_ollama,claude")
+    order_env = os.environ.get("ORA_AGENT_PROVIDER_ORDER", "legion_ollama,groq,claude")
     order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
     for provider in order:
@@ -487,8 +487,14 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     import shlex
 
     model     = os.environ.get("LEGION_OLLAMA_MODEL", "qwen2.5:7b")
-    url       = os.environ.get("LEGION_OLLAMA_URL",   "http://localhost:11434")
-    timeout_s = int(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "180"))
+    # iter 323aa — the `legion_exec` path dispatches this curl to the
+    # daemon, which runs it on the LAPTOP. The URL therefore must be
+    # the laptop-local Ollama (default 127.0.0.1:11434), NOT the public
+    # tunnel URL (LEGION_OLLAMA_URL) which the daemon would also resolve
+    # over the network — slower, fragile, and 404s when the tunnel dies.
+    # Override via LEGION_OLLAMA_DAEMON_URL if Ollama binds to a custom port.
+    url       = os.environ.get("LEGION_OLLAMA_DAEMON_URL", "http://127.0.0.1:11434")
+    timeout_s = int(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "45"))
 
     payload: dict[str, Any] = {
         "model":      model,
@@ -496,7 +502,7 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
         "tools":      lean_ollama_tool_schemas(),
         "stream":     False,
         "keep_alive": "60m",
-        "options":    {"temperature": 0.25, "num_predict": 1000},
+        "options":    {"temperature": 0.25, "num_predict": 500},
     }
     body = json.dumps(payload, ensure_ascii=False)
     cmd  = (
