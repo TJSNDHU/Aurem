@@ -487,13 +487,19 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
     import shlex
 
     model     = os.environ.get("LEGION_OLLAMA_MODEL", "qwen2.5:7b")
-    # iter 323aa — the `legion_exec` path dispatches this curl to the
-    # daemon, which runs it on the LAPTOP. The URL therefore must be
-    # the laptop-local Ollama (default 127.0.0.1:11434), NOT the public
-    # tunnel URL (LEGION_OLLAMA_URL) which the daemon would also resolve
-    # over the network — slower, fragile, and 404s when the tunnel dies.
-    # Override via LEGION_OLLAMA_DAEMON_URL if Ollama binds to a custom port.
-    url       = os.environ.get("LEGION_OLLAMA_DAEMON_URL", "http://127.0.0.1:11434")
+    # iter 323aa+ — multi-URL fallback chain. Daemon may run on Windows
+    # native (where 127.0.0.1 hits Ollama directly) OR inside WSL (where
+    # 127.0.0.1 is the WSL network namespace and Ollama lives on Windows
+    # host, reachable via host.docker.internal). The shell `||` chain
+    # tries each URL in order — first reachable wins. Operator can
+    # override the entire chain via LEGION_OLLAMA_DAEMON_URLS (csv).
+    url_chain = os.environ.get(
+        "LEGION_OLLAMA_DAEMON_URLS",
+        "http://127.0.0.1:11434,http://host.docker.internal:11434",
+    )
+    urls = [u.strip().rstrip("/") for u in url_chain.split(",") if u.strip()]
+    if not urls:
+        urls = ["http://127.0.0.1:11434"]
     timeout_s = int(os.environ.get("LEGION_OLLAMA_TIMEOUT_S", "45"))
 
     payload: dict[str, Any] = {
@@ -505,12 +511,18 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
         "options":    {"temperature": 0.25, "num_predict": 500},
     }
     body = json.dumps(payload, ensure_ascii=False)
-    cmd  = (
-        f"curl -sS --max-time {timeout_s} "
-        f"-H 'Content-Type: application/json' "
-        f"-d {shlex.quote(body)} "
-        f"{url.rstrip('/')}/api/chat"
-    )
+    body_q = shlex.quote(body)
+    # Build a chained curl command — succeed on first reachable URL.
+    # Each curl uses -fsS so 4xx/5xx fall through to the next URL.
+    parts = []
+    for u in urls:
+        parts.append(
+            f"curl -fsS --max-time {timeout_s} "
+            f"-H 'Content-Type: application/json' "
+            f"-d {body_q} "
+            f"{u}/api/chat"
+        )
+    cmd = " || ".join(parts)
     result = await legion_exec(
         cmd=cmd, cwd="/tmp",
         timeout_s=timeout_s + 10,
