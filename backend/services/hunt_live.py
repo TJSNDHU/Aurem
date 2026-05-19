@@ -166,6 +166,63 @@ async def _run_verify(business: Dict[str, Any], mock: bool) -> Dict[str, Any]:
         }
 
 
+# ──────────────────────────────────────────────────────────────
+# iter 324e — Listicle / SEO-page-title detector
+# ──────────────────────────────────────────────────────────────
+# When Tavily / DDG / SERP scraping leaks in, business_name ends up
+# being an HTML <title> tag like:
+#   "Dental Care That Feels Like Self-Care | Boston Dental"
+#   "Buy a Well-established Spa And Salon - Eastern Canada"
+#   "Top 10 Plumbers in Toronto (2025 Edition) - HomeStars"
+# These are NOT businesses. This detector rejects them at the gate.
+_LISTICLE_SEPARATORS = ("|", "—", " - ", " :: ", " » ", " › ")
+_LISTICLE_KEYWORDS = (
+    "top ", " top ", "best ", " best ",
+    "list of", "the top", "guide to",
+    "buy ", "buying ", "for sale", "businesses for sale",
+    "how to", "what is", "why ", "should you",
+    "cost of", "price of", "free ",
+    "near me", "near you",
+    "(20", "(2020", "(2021", "(2022", "(2023", "(2024", "(2025", "(2026",
+    "edition)", "rated)",
+    " | ", " — ", " :: ", " » ",
+)
+_SEO_SUFFIXES = (
+    "yelp", "yellowpages", "yp.com", "bbb",
+    "google reviews", "facebook", "instagram",
+    "tripadvisor", "houzz", "homestars", "thumbtack",
+    "businessesforsale", "near.com", "near.co.uk",
+    "cylex", "findopen", "bleen",
+    "wikipedia", "reddit", "quora",
+)
+
+
+def _is_listicle_title(business_name: str) -> tuple[bool, str]:
+    """Return (True, reason) if the business name looks like an HTML
+    page title / listicle / aggregator listing rather than an actual
+    business name."""
+    if not business_name:
+        return (True, "empty")
+    name = business_name.strip()
+    if len(name) > 90:
+        return (True, "too-long")
+    name_l = name.lower()
+    # Pipe / em-dash separators are the strongest signal — real
+    # businesses don't have those in their names.
+    for sep in _LISTICLE_SEPARATORS:
+        if sep in name:
+            return (True, f"title-separator:{sep!r}")
+    # Listicle / SEO-content keywords
+    for kw in _LISTICLE_KEYWORDS:
+        if kw in name_l:
+            return (True, f"listicle-keyword:{kw!r}")
+    # Aggregator brand at the end (e.g. "Plumbing Co - Yelp")
+    for suf in _SEO_SUFFIXES:
+        if name_l.endswith(suf):
+            return (True, f"aggregator-suffix:{suf!r}")
+    return (False, "")
+
+
 async def _run_website(db, lead_doc: Dict[str, Any], mock: bool) -> Optional[str]:
     """Generate (or reuse) a sample website. Returns the public URL slug."""
     slug = lead_doc.get("lead_id") or re.sub(r"[^a-z0-9]+", "-", lead_doc["business_name"].lower()).strip("-")[:60]
@@ -227,16 +284,22 @@ async def _run_blast_one(
 async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
     """Discover a LIST of businesses matching a free-text query.
 
-    iter 322av — OSM Overpass is now the PRIMARY source (100% free, no key,
-    no quota, no billing risk). Yelp + Google Places are silent fallbacks
-    that activate only when the key is valid AND OSM returned 0.
+    iter 324e — Production data showed 100% of last-48h ingestion came
+    from the Tavily/DDG web-fallback branches at the bottom of this
+    function, producing leads like
+        business_name: "Dental Benefits for Individuals & Groups - Delta Dental"
+        email:         info@deltadentalma.com   (planted by apollo_enrichment)
+    i.e. HTML page titles + role-email guesses, not real businesses.
 
-    Order:
-      1. OSM Overpass (PRIMARY, free)   — community-maintained, real SMB data
-      2. Yelp Fusion                    — only if YELP_API_KEY is still valid
-      3. Google Places                  — high quality if billed
-      4. Tavily discovery               — search-based fallback
-      5. DuckDuckGo                     — last-resort web fallback
+    These two branches are now **disabled by default**. Set
+    `HUNT_ENABLE_WEB_FALLBACK=1` in env to re-enable (NOT recommended).
+
+    Order (post-324e):
+      1. Google Places — official SMB pool, phone+website+address+rating
+      2. Yelp Fusion   — 5000 free calls/day, phone+rating+review_count
+      3. OSM Overpass  — community-maintained, free, fallback
+      4. Tavily        — disabled by default (web titles → junk leads)
+      5. DuckDuckGo    — disabled by default (web titles → junk leads)
     """
     import os
     import re
@@ -253,63 +316,10 @@ async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
     industry_for_lookup = industry_for_lookup.strip()
     city_for_lookup = (city_for_lookup or "").strip() or "Mississauga, ON"
 
-    # ── 1. OSM Overpass (PRIMARY — iter 322av) ─────────────────
-    try:
-        from services.osm_scout import osm_leads
-        ores = await osm_leads(
-            query=industry_for_lookup,
-            location=city_for_lookup,
-            limit=min(int(limit) * 2, 50),
-            radius_m=15000,
-        )
-        if ores.get("success") and ores.get("leads"):
-            for lead in ores["leads"][:limit]:
-                results.append({
-                    "business_name": lead["business_name"],
-                    "phone":   lead.get("phone") or "",
-                    "address": lead.get("address") or lead.get("city") or "",
-                    "website": lead.get("website") or "",
-                    "rating":  lead.get("rating") or 4.0,
-                    "email":   lead.get("email") or "",
-                    "osm_id":  lead.get("osm_id"),
-                    "source":  "osm_overpass",
-                })
-            if results:
-                logger.info(f"[hunt_live] OSM Overpass → {len(results)} businesses (primary)")
-                return results
-    except Exception as e:
-        logger.warning(f"[hunt_live] OSM Overpass discovery failed: {e}")
-
-    # ── 2. Yelp Fusion (fallback — iter 322av) ─────────────────
-    yelp_key = os.environ.get("YELP_API_KEY", "").strip()
-    if yelp_key:
-        try:
-            from services.yelp_scout import yelp_leads
-            yres = await yelp_leads(
-                query=industry_for_lookup,
-                location=city_for_lookup,
-                limit=min(int(limit) * 2, 50),
-                radius_m=15000,
-            )
-            if yres.get("success") and yres.get("leads"):
-                for lead in yres["leads"][:limit]:
-                    results.append({
-                        "business_name": lead["business_name"],
-                        "phone":   lead.get("phone") or "",
-                        "address": lead.get("address") or lead.get("city") or "",
-                        "website": lead.get("website") or "",
-                        "rating":  lead.get("rating") or 4.0,
-                        "review_count": lead.get("review_count") or 0,
-                        "yelp_url": lead.get("yelp_url") or "",
-                        "source":  "yelp_fusion",
-                    })
-                if results:
-                    logger.info(f"[hunt_live] Yelp Fusion → {len(results)} businesses (fallback)")
-                    return results
-        except Exception as e:
-            logger.warning(f"[hunt_live] Yelp Fusion discovery failed: {e}")
-
-    # ── 3. Google Places (fallback) ──────────────────────────
+    # ── 1. Google Places (PRIMARY — iter 324e) ─────────────────
+    # Highest quality: official SMB API. Returns real business names,
+    # not HTML page titles. Phone is canonical. Website is the actual
+    # company site, never a SERP fragment.
     gp_key = os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")
     if gp_key:
         try:
@@ -334,13 +344,85 @@ async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
                             "address": p.get("formattedAddress", ""),
                             "website": p.get("websiteUri", ""),
                             "rating":  p.get("rating") or 4.0,
+                            "review_count": p.get("userRatingCount") or 0,
                             "source":  "google_places",
                         })
                     if results:
-                        logger.info(f"[hunt_live] Google Places → {len(results)} businesses (tertiary)")
+                        logger.info(f"[hunt_live] Google Places → {len(results)} businesses (primary)")
                         return results
+                else:
+                    logger.warning(f"[hunt_live] Google Places HTTP {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.warning(f"[hunt_live] Google Places discovery failed: {e}")
+
+    # ── 2. Yelp Fusion (secondary — iter 324e) ─────────────────
+    yelp_key = os.environ.get("YELP_API_KEY", "").strip()
+    if yelp_key:
+        try:
+            from services.yelp_scout import yelp_leads
+            yres = await yelp_leads(
+                query=industry_for_lookup,
+                location=city_for_lookup,
+                limit=min(int(limit) * 2, 50),
+                radius_m=15000,
+            )
+            if yres.get("success") and yres.get("leads"):
+                for lead in yres["leads"][:limit]:
+                    results.append({
+                        "business_name": lead["business_name"],
+                        "phone":   lead.get("phone") or "",
+                        "address": lead.get("address") or lead.get("city") or "",
+                        "website": lead.get("website") or "",
+                        "rating":  lead.get("rating") or 4.0,
+                        "review_count": lead.get("review_count") or 0,
+                        "yelp_url": lead.get("yelp_url") or "",
+                        "source":  "yelp_fusion",
+                    })
+                if results:
+                    logger.info(f"[hunt_live] Yelp Fusion → {len(results)} businesses (secondary)")
+                    return results
+        except Exception as e:
+            logger.warning(f"[hunt_live] Yelp Fusion discovery failed: {e}")
+
+    # ── 3. OSM Overpass (tertiary — free fallback) ─────────────
+    try:
+        from services.osm_scout import osm_leads
+        ores = await osm_leads(
+            query=industry_for_lookup,
+            location=city_for_lookup,
+            limit=min(int(limit) * 2, 50),
+            radius_m=15000,
+        )
+        if ores.get("success") and ores.get("leads"):
+            for lead in ores["leads"][:limit]:
+                results.append({
+                    "business_name": lead["business_name"],
+                    "phone":   lead.get("phone") or "",
+                    "address": lead.get("address") or lead.get("city") or "",
+                    "website": lead.get("website") or "",
+                    "rating":  lead.get("rating") or 4.0,
+                    "email":   lead.get("email") or "",
+                    "osm_id":  lead.get("osm_id"),
+                    "source":  "osm_overpass",
+                })
+            if results:
+                logger.info(f"[hunt_live] OSM Overpass → {len(results)} businesses (tertiary)")
+                return results
+    except Exception as e:
+        logger.warning(f"[hunt_live] OSM Overpass discovery failed: {e}")
+
+    # ── 4 + 5. Tavily + DDG (disabled by default — iter 324e) ──
+    # Set HUNT_ENABLE_WEB_FALLBACK=1 to re-enable. NOT RECOMMENDED.
+    # Production data showed 100% of last-48h ingestion came from these
+    # branches, producing HTML-page-title leads like
+    #   "Dental Benefits for Individuals & Groups - Delta Dental"
+    # paired with `info@deltadentalma.com` role-email fallbacks.
+    if os.environ.get("HUNT_ENABLE_WEB_FALLBACK", "0").strip() not in ("1", "true", "yes"):
+        logger.warning(
+            f"[hunt_live] all 3 primary sources returned 0 for '{query}'. "
+            "Web fallback disabled (HUNT_ENABLE_WEB_FALLBACK!=1). Returning empty."
+        )
+        return []
 
     # ── 2. Tavily ─────────────────────────────────────────────
     tv_key = os.environ.get("TAVILY_API_KEY")
@@ -522,6 +604,14 @@ async def _run_hunt_pipeline(
                 is_directory = True
         except Exception:
             pass
+        # iter 324e — reject HTML page titles / SEO listicles. These come
+        # from Tavily/DDG web fallback when no real-business source returned
+        # results. 100% of last-48h junk had business_name like
+        # "Dental Care That Feels Like Self-Care | Boston Dental".
+        _bn_listicle, _bn_reason = _is_listicle_title(business.get("business_name", ""))
+        if _bn_listicle:
+            is_directory = True
+            logger.debug(f"[hunt_live] rejected listicle title: {business.get('business_name', '')!r} ({_bn_reason})")
         no_contact = not business.get("phone") and not business.get("website")
 
         if is_directory or no_contact:
@@ -560,6 +650,11 @@ async def _run_hunt_pipeline(
                              {"business": biz_name, "confidence": confidence, "gating": gating})
 
         # Build lead document (insert-only fields; mutable fields go in $set below)
+        # iter 324e — preserve the actual discovery source ("google_places",
+        # "yelp_fusion", "osm_overpass", "tavily", "duckduckgo") instead of
+        # collapsing everything to "ora_hunt_command". Without this signal,
+        # quality audits can't tell which source is producing junk.
+        _discovery_source = business.get("source") or "unknown"
         lead_doc = {
             "lead_id": slug,
             "tenant_id": "aurem_platform",
@@ -571,7 +666,9 @@ async def _run_hunt_pipeline(
             "city": city,
             "rating": rating,
             "score": int(float(rating or 4) * 20),
-            "source": "ora_hunt_command",
+            "source": _discovery_source,             # ← real source now
+            "ingest_origin": "ora_hunt_command",     # ← legacy "where ingestion happened"
+            "discovery_source": _discovery_source,   # ← explicit alias for audits
             "hunt_id": hunt_id,
             "channel_gating": gating,
             "whatsapp_sent": False,

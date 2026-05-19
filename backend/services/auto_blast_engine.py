@@ -625,6 +625,75 @@ async def scrub_internal_test_traffic(dry_run: bool = False) -> Dict[str, Any]:
 
 
 # ─────────────────────────────────────────────────────────────
+# Listicle / SEO-page-title scrub — iter 324e
+# Marks `noise_flag=True` on every queued lead whose `business_name`
+# looks like an HTML <title> tag (separators like "|", "—", " - "),
+# a listicle ("Top 10 ... Best ... Buy ..."), or an aggregator suffix
+# ("... - Yelp", "... - Wikipedia").
+#
+# Source of the bug: Tavily/DDG web fallback in `_discover_businesses`
+# was grabbing search-result titles as "business names". 100% of last-
+# 48h ingestion was this junk. Web fallback now disabled by default;
+# this scrub cleans up the historical damage.
+# ─────────────────────────────────────────────────────────────
+async def scrub_listicle_titles(dry_run: bool = False) -> Dict[str, Any]:
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        from services.hunt_live import _is_listicle_title
+    except Exception as e:
+        return {"ok": False, "error": f"hunt_live unavailable: {e}"}
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    scanned = 0
+    matched = 0
+    sample: List[Dict[str, Any]] = []
+    reason_hist: Dict[str, int] = {}
+
+    cursor = db.campaign_leads.find(
+        {
+            "last_blast_at": {"$exists": False},
+            "noise_flag":    {"$ne": True},
+        },
+        {"_id": 0, "lead_id": 1, "business_name": 1, "email": 1, "phone": 1},
+    )
+    async for lead in cursor:
+        scanned += 1
+        listicle, reason = _is_listicle_title(lead.get("business_name") or "")
+        if not listicle:
+            continue
+        matched += 1
+        reason_hist[reason] = reason_hist.get(reason, 0) + 1
+        if len(sample) < 10:
+            sample.append({
+                "lead_id":       lead.get("lead_id"),
+                "business_name": lead.get("business_name"),
+                "reason":        reason,
+            })
+        if not dry_run:
+            await db.campaign_leads.update_one(
+                {"lead_id": lead["lead_id"]},
+                {"$set": {
+                    "noise_flag":         True,
+                    "noise_reason":       f"listicle-title:{reason} (iter-324e)",
+                    "noise_filtered_at":  now_iso,
+                }},
+            )
+
+    return {
+        "ok":            True,
+        "dry_run":       dry_run,
+        "scanned":       scanned,
+        "matched":       matched,
+        "modified":      0 if dry_run else matched,
+        "top_reasons":   sorted(reason_hist.items(), key=lambda x: -x[1])[:10],
+        "samples":       sample,
+        "ran_at":        now_iso,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
 # Watchdog manual reset — iter 323u
 # Reset `zero_sent_streak` to 0 and clear `tripped` flags on the
 # global ora_campaign_health doc. Pair with /why-not-sending +

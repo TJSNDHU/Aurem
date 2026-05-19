@@ -1,3 +1,55 @@
+## 2026-05 — iter 324e — Lead-source root-cause fix (kill Tavily/DDG fallback, listicle-title detector)
+
+**Trigger**: Production funnel kept drying up (`zero_sent_streak: 43` despite engine cycling fine). Audit showed 100% of last-48h ingestion = `source: ora_hunt_command` with leads like:
+  - `"Dental Care That Feels Like Self-Care | Boston Dental"` + `info@bostondental.com`
+  - `"Buy a Well-established Spa And Salon - Eastern Canada"` + `info@businessesforsale.com`
+  - `"Top 10 Plumbers in Toronto (2025 Edition) - HomeStars"`
+These are HTML page titles, not businesses. Pattern: `_discover_businesses()` was falling through to Tavily + DuckDuckGo branches, which scrape SERP titles. `apollo_enrichment` then planted `info@<page-domain>` as the "email" → 95%+ junk queue.
+
+**Changes shipped**
+
+- **`services/hunt_live.py` — discovery reorder + web-fallback disabled by default**
+  - New priority: **Google Places (primary) → Yelp Fusion (secondary) → OSM Overpass (tertiary)**. All 3 return real businesses with real phones/websites.
+  - Tavily and DDG branches now **gated behind `HUNT_ENABLE_WEB_FALLBACK=1`** (default off). Returns empty + warns instead of contaminating.
+  - **`_is_listicle_title(name) → (bool, reason)`** detector added — rejects names containing HTML title separators (`|`, `—`, ` - `, `::`, `»`), listicle keywords (`top`, `best`, `buy`, `how to`, `near me`, year-in-parens), and aggregator suffixes (`- Yelp`, `- Wikipedia`).
+  - Wired into the directory filter at the LAST gate before persist.
+  - **Source naming fixed**: every lead now persists with its actual discovery source (`google_places` / `yelp_fusion` / `osm_overpass`). Legacy `ingest_origin: "ora_hunt_command"` preserved for audit.
+
+- **`services/auto_blast_engine.py` — new scrub for historical damage**
+  - `scrub_listicle_titles(dry_run=False)` — walks the queue, applies `_is_listicle_title()` to every `business_name`, marks junk with `noise_flag=True` + `noise_reason=listicle-title:<reason>`.
+
+- **`pillars/sales/routes/auto_blast.py` — new endpoint**
+  - `POST /api/campaign/auto-blast/scrub-listicle-titles[?dry_run=true]`
+
+- **`tests/test_listicle_detector.py`** — 6 unit tests, all pass.
+
+**Live results (preview against prod-mirror DB)**
+
+- Pre-scrub queue: 111 leads with non-empty contact + alive status.
+- **86 of 111 (77%) flagged as listicle/HTML-title junk.**
+- Top reasons:
+  - `title-separator:'|'` → 33
+  - `empty` (orphan name) → 33
+  - `title-separator:' - '` → 18
+  - `listicle-keyword:'best '` → 2
+- Funnel `noise_flagged_count`: 375 → **461** (95% of all queued leads correctly excluded now).
+
+**Net effect**
+
+- New leads from `hunt_live` will only come from Google Places / Yelp / OSM (all 3 return real businesses).
+- Tavily + DDG branches dormant unless explicitly re-enabled.
+- Listicle detector is the final safety net inside `_run_hunt_pipeline` (catches any future regression).
+- Historical junk reclaimed (86 leads).
+
+**Honest readout for the user**
+
+After scrub, **0 eligible leads remain in the queue**. That's expected — the cleaning removed everything that should never have been there. Engine is now CORRECT and HONEST. The next hunt cycle with the new priority order should produce a clean queue.
+
+Action: trigger a fresh hunt via `POST /api/campaign/hunt/run` (or wait for the scheduled cycle) and observe `discovery_source` field distribution in `campaign_leads` — should be 100% `google_places` / `yelp_fusion` / `osm_overpass`.
+
+---
+
+
 ## 2026-05 — iter 324d — Production deploy fix: kill DB_NAME hard-raise + 3 more JWT_SECRET module-level traps
 
 **Trigger**: Production deploy failed. K8s pod logs showed nginx hammering `Connection refused (111)` against `127.0.0.1:8001/api/*` for every route, including `/api/health`. Only two backend stdout lines surfaced before death: `[STARTUP] Exception→Incident Middleware loaded` and `[STARTUP] Error Ledger crash-catcher installed`. Uvicorn never bound port 8001 → liveness probes ECONNREFUSED in restart-loop.

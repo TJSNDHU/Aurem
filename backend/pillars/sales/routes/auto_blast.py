@@ -365,6 +365,28 @@ async def auto_blast_scrub_internal_test_traffic(request: Request, dry_run: bool
     return await scrub_internal_test_traffic(dry_run=dry_run)
 
 
+# ── iter 324e — listicle / HTML-title scrub (Tavily/DDG junk purge) ──
+@router.post("/auto-blast/scrub-listicle-titles")
+async def auto_blast_scrub_listicle_titles(request: Request, dry_run: bool = False):
+    """Mark `noise_flag=True` on every queued lead whose `business_name`
+    is actually an HTML page title, SEO listicle, or aggregator listing.
+
+    Examples that get flagged:
+      • "Dental Care That Feels Like Self-Care | Boston Dental"
+      • "Top 10 Plumbers in Toronto (2025 Edition) - HomeStars"
+      • "Buy a Well-established Spa And Salon - Eastern Canada"
+      • "Mississauga Plumbing - Yelp"
+
+    Root cause: Tavily/DuckDuckGo web fallback in `_discover_businesses`
+    was grabbing SERP titles as business names. Web fallback now
+    disabled by default; this endpoint cleans up the historical damage.
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import scrub_listicle_titles
+    return await scrub_listicle_titles(dry_run=dry_run)
+
+
+
 
 
 # ══════════════════════════════════════════════
