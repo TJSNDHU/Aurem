@@ -386,6 +386,24 @@ async def auto_blast_scrub_listicle_titles(request: Request, dry_run: bool = Fal
     return await scrub_listicle_titles(dry_run=dry_run)
 
 
+# ── iter 324h — burnt-domains emergency quarantine ───────────────────
+@router.post("/auto-blast/quarantine-burnt-domains")
+async def auto_blast_quarantine_burnt_domains(request: Request, dry_run: bool = False):
+    """EMERGENCY: walks the last 24h of BLASTED leads, identifies those
+    whose `business_name` is a listicle / HTML title (per iter-324e
+    detector), and inserts their email addresses into `do_not_contact`.
+
+    Why this matters: prod's `auto_blast_engine._eligible_leads()` reads
+    `do_not_contact` every cycle (already-deployed code). Inserts made
+    via this endpoint take effect on the NEXT scheduled cycle — no
+    redeploy required. Buys time while the iter-324e listicle filter
+    waits for a proper deploy.
+    """
+    _verify_admin(request)
+    from services.auto_blast_engine import quarantine_burnt_domains_24h
+    return await quarantine_burnt_domains_24h(dry_run=dry_run)
+
+
 
 
 

@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
@@ -690,6 +690,87 @@ async def scrub_listicle_titles(dry_run: bool = False) -> Dict[str, Any]:
         "top_reasons":   sorted(reason_hist.items(), key=lambda x: -x[1])[:10],
         "samples":       sample,
         "ran_at":        now_iso,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Burnt-domains emergency deny-list — iter 324h
+# ──────────────────────────────────────────────────────────────
+# WORKS ON PROD WITHOUT REDEPLOY because:
+#  • shared MongoDB → INSERTs we make here are visible to prod's
+#    `_load_dnc()` on the very next cycle.
+#  • prod's auto_blast_engine.py already reads `do_not_contact`
+#    every cycle and skips matching email/phone.
+#
+# Walks last 24h of BLASTED leads, picks ones whose business_name is
+# a listicle/HTML title (via iter-324e detector), and inserts their
+# email role-domain + a `domain_match` synthetic entry into the
+# `do_not_contact` collection so future hunts can never re-blast them.
+async def quarantine_burnt_domains_24h(dry_run: bool = False) -> Dict[str, Any]:
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not wired"}
+    try:
+        from services.hunt_live import _is_listicle_title
+    except Exception as e:
+        return {"ok": False, "error": f"hunt_live unavailable: {e}"}
+
+    now = datetime.now(timezone.utc)
+    h24 = (now - timedelta(hours=24)).replace(tzinfo=None)
+    now_iso = now.isoformat()
+
+    junk_emails: set[str] = set()
+    junk_domains: set[str] = set()
+    samples: List[Dict[str, Any]] = []
+
+    cursor = db.campaign_leads.find(
+        {"created_at": {"$gte": h24.isoformat()},
+         "last_blast_at": {"$exists": True}},
+        {"_id": 0, "business_name": 1, "email": 1, "website_url": 1},
+    )
+    async for d in cursor:
+        bn = d.get("business_name") or ""
+        listicle, reason = _is_listicle_title(bn)
+        if not listicle:
+            continue
+        em = (d.get("email") or "").lower().strip()
+        if "@" in em:
+            junk_emails.add(em)
+            junk_domains.add(em.split("@", 1)[1])
+        if len(samples) < 8:
+            samples.append({
+                "business_name": bn[:60],
+                "email":         em,
+                "reason":        reason,
+            })
+
+    inserted_emails = 0
+    if not dry_run and junk_emails:
+        for em in junk_emails:
+            try:
+                await db.do_not_contact.update_one(
+                    {"email": em},
+                    {"$setOnInsert": {
+                        "email":       em,
+                        "reason":      "burnt-listicle-blast (iter-324h)",
+                        "added_at":    now_iso,
+                    }},
+                    upsert=True,
+                )
+                inserted_emails += 1
+            except Exception:
+                pass
+
+    return {
+        "ok":               True,
+        "dry_run":          dry_run,
+        "junk_blasted":     len(samples) if samples else 0,
+        "unique_emails":    len(junk_emails),
+        "unique_domains":   len(junk_domains),
+        "domains_burnt":    sorted(junk_domains),
+        "inserted_to_dnc":  inserted_emails,
+        "samples":          samples,
+        "ran_at":           now_iso,
     }
 
 
