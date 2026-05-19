@@ -984,6 +984,17 @@ async def create_indexes():
             logging.debug(f"[INDEX] bin_reset_token_jtis idx: {_e}")
 
         logging.info("✓ Database indexes created/verified")
+
+        # iter 324f — Auth-critical login indexes (B-tree on users.email,
+        # platform_users.email, team_members.email, etc.). Idempotent;
+        # safe to call on every startup. Cuts login DB lookup from
+        # 50-500ms (full scan) to <5ms (B-tree hit).
+        try:
+            from utils.ensure_auth_indexes import ensure_auth_indexes
+            res = await ensure_auth_indexes(db)
+            logging.info(f"[startup] auth indexes ensured — {res.get('ok')} ok, {res.get('errors')} errors")
+        except Exception as e:
+            logging.warning(f"[startup] auth index setup failed (non-fatal): {e}")
     except Exception as e:
         logging.warning(f"Index creation warning (may already exist): {e}")
 
