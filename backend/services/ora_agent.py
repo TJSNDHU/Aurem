@@ -564,6 +564,48 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
         )
         return None
 
+    # iter 323ab — Salvage qwen2.5-coder tool-call leakage.
+    # qwen2.5-coder and similar local models often emit tool calls as
+    # plain JSON inside `content` instead of populating `tool_calls`.
+    # Example user-visible failure: ORA replies with
+    #   `{"name": "grep_codebase", "parameters": {...}}`
+    # instead of executing the tool. We detect that shape and promote
+    # it to a proper OpenAI tool_calls array so the agent loop can run.
+    if not (msg.get("tool_calls") or []):
+        content_raw = (msg.get("content") or "").strip()
+        if content_raw.startswith("{") and content_raw.endswith("}"):
+            try:
+                parsed = json.loads(content_raw)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, dict):
+                # Accept {name, parameters} or {tool, args} or {function, arguments}
+                tool_name = (
+                    parsed.get("name")
+                    or parsed.get("tool")
+                    or parsed.get("function")
+                )
+                tool_args = (
+                    parsed.get("parameters")
+                    or parsed.get("args")
+                    or parsed.get("arguments")
+                    or {}
+                )
+                if tool_name and isinstance(tool_name, str):
+                    import uuid as _uuid
+                    msg["tool_calls"] = [{
+                        "id": f"salvage_{_uuid.uuid4().hex[:8]}",
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "arguments": json.dumps(tool_args, ensure_ascii=False),
+                        },
+                    }]
+                    msg["content"] = ""  # blank content so caller treats as tool call
+                    logger.info(
+                        f"[ora-agent] SALVAGED qwen tool-call: name={tool_name}"
+                    )
+
     logger.info(
         f"[ora-agent] ollama OK: model={data.get('model')} "
         f"eval_count={data.get('eval_count')} "
