@@ -69,14 +69,40 @@ DEFAULT_CITIES = [
 ]
 
 DEFAULT_INDUSTRIES = [
+    # ── Trades (always converts well, high SMB pain) ─────────────
     "plumber",
     "electrician",
     "hvac",
-    "hair_salon",
-    "auto_repair",
-    "dental",
-    "cleaning_services",
+    "locksmith",
+    "pest_control",
     "landscape",
+    "lawn_care",
+    # ── Personal services ─────────────────────────────────────────
+    "hair_salon",
+    "barber",
+    "beauty_salon",
+    # ── Auto ──────────────────────────────────────────────────────
+    "auto_repair",
+    "car_wash",
+    # ── Healthcare (high-LTV) ─────────────────────────────────────
+    "dental",
+    "chiropractor",
+    "physiotherapy",
+    "optometrist",
+    # ── Professional services ─────────────────────────────────────
+    "lawyer",
+    "accountant",
+    "real_estate_agent",
+    "marketing_agency",
+    # ── Home services ─────────────────────────────────────────────
+    "cleaning_services",
+    "janitorial",
+    "moving_company",
+    # ── Hospitality / B2C SMB ─────────────────────────────────────
+    "photographer",
+    "daycare",
+    "personal_trainer",
+    "yoga_studio",
 ]
 
 

@@ -1,6 +1,38 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324m — LLM GATEWAY DEEPSEEK/KIMI + INDUSTRIES EXPANSION (2026-05-20)**
+>
+> ## Shipped
+>
+> ### A. LLM Gateway v2 — cheap middle tier
+> - `services/llm_gateway_v2.py` ROUTING_TABLE updated:
+>   - `code_fix`        → groq → **deepseek/deepseek-chat-v3.1** → claude
+>   - `ora_brain`       → groq → **moonshotai/kimi-k2-0905** → claude
+>   - `repair_diagnose` → **deepseek/deepseek-chat-v3.1** → claude
+>   - `learning_digest` → **deepseek/deepseek-chat-v3.1** → claude
+> - **Privacy guard** (`SENSITIVE_TASKS` + `_redact_sensitive_providers`): `auth_token_decision`, `billing_compute`, `password_reset_decision`, `stripe_webhook`, `pii_extract`, `kyc_decision` are stripped of all China-origin models (deepseek/kimi/moonshot/qwen/glm/zai/minimax) and forced to Claude-only.
+> - Cost-tracking confirmed working: `db.llm_costs` stores `tokens_in`/`tokens_out` correctly (my earlier "0/0 bug" was a query field-name mistake on my side — code was always logging right).
+> - Live E2E: `repair_diagnose` → DeepSeek V3.1 returned text + 11 in / 7 out tokens logged. `code_fix` & `ora_brain` → free Groq (saves Claude credits when prompt is small).
+> - `tests/test_llm_gateway_v2_routing.py` — 5 tests covering sensitive-task redaction, cheap-tier presence, default fallback. Pass.
+>
+> ### B. Scout matrix expansion 8 → 27 industries
+> - `services/scout_replenish_cron.py` `DEFAULT_INDUSTRIES` now covers: plumber, electrician, hvac, locksmith, pest_control, landscape, lawn_care, hair_salon, barber, beauty_salon, auto_repair, car_wash, dental, chiropractor, physiotherapy, optometrist, lawyer, accountant, real_estate_agent, marketing_agency, cleaning_services, janitorial, moving_company, photographer, daycare, personal_trainer, yoga_studio.
+> - Matrix size: 8 cities × 27 industries = **216 cells**.
+> - With `AUREM_SCOUT_CRON_INTERVAL_MIN=60`, full sweep ≈ 9 days. Apollo enrichment auto-fires per lead.
+> - Live verified: first tick from new matrix wrote **3 fresh `lawn_care` leads** in Mississauga (industry not in original 8).
+> - `tests/test_scout_replenish_cron.py` — added 2 tests asserting all 27 industries resolve to OSM tags + minimum matrix size. 6 tests total. Pass.
+>
+> ## All-up test status: 20/20 pytest pass (gateway + scout + recipient guard)
+>
+> ## Outstanding
+> - **User** — Redeploy preview → prod to push 324i + j + k + l + m to `aurem.live`.
+> - **User** — Rotate Google Places + Yelp Fusion keys when convenient (OSM 130-industry coverage handles GTA-side gap).
+> - **P2** — Parallelize cron ticks (2 cells per tick → matrix sweep in ~4.5 days vs 9).
+>
+> ---
+
+
 > **🟢 ITER 324l — SCOUT REPLENISH CRON (P1) (2026-05-20)**
 >
 > ## Shipped

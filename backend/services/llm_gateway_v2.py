@@ -86,12 +86,68 @@ ROUTING_TABLE: Dict[str, Chain] = {
     "pattern_match":   ("openrouter", "meta-llama/llama-3.3-70b-instruct:free"),
 
     # ─── PAID — Claude Sonnet via Emergent (complex reasoning only) ─
-    "repair_diagnose": ("anthropic",  "claude-sonnet-4-5-20250929"),
-    "ora_brain":       ("anthropic",  "claude-sonnet-4-5-20250929"),
-    "code_fix":        ("anthropic",  "claude-sonnet-4-5-20250929"),
-    "learning_digest": ("anthropic",  "claude-sonnet-4-5-20250929"),
+    # iter 324m — Insert DeepSeek V3.1 + Kimi K2 (via OpenRouter) as
+    # middle tier between free Groq and paid Claude. DeepSeek is ~10×
+    # cheaper than Claude Sonnet for comparable code/reasoning quality;
+    # Kimi K2 is ~5× cheaper than Claude for general ORA brain tasks.
+    # Free models still get tried first. Claude remains last-resort.
+    "repair_diagnose": [
+        ("openrouter", "deepseek/deepseek-chat-v3.1"),
+        ("anthropic",  "claude-sonnet-4-5-20250929"),
+    ],
+    "ora_brain": [
+        ("groq",       "llama-3.3-70b-versatile"),
+        ("openrouter", "moonshotai/kimi-k2-0905"),
+        ("anthropic",  "claude-sonnet-4-5-20250929"),
+    ],
+    "code_fix": [
+        ("groq",       "llama-3.3-70b-versatile"),
+        ("openrouter", "deepseek/deepseek-chat-v3.1"),
+        ("anthropic",  "claude-sonnet-4-5-20250929"),
+    ],
+    "learning_digest": [
+        ("openrouter", "deepseek/deepseek-chat-v3.1"),
+        ("anthropic",  "claude-sonnet-4-5-20250929"),
+    ],
 }
 DEFAULT: Tuple[str, str] = ("anthropic", "claude-sonnet-4-5-20250929")
+
+# ── iter 324m — Privacy guard ────────────────────────────────────────
+# Tasks that touch authentication, billing, PII, payments, or any
+# customer-credential decisioning MUST NOT be routed to Chinese-origin
+# models (DeepSeek, Kimi/Moonshot, Qwen, GLM/Zai). Compliance teams
+# regularly block these providers for sensitive data. Claude + Groq
+# (US-hosted) are the only allowed providers for these task types.
+SENSITIVE_TASKS = {
+    "auth_token_decision",
+    "billing_compute",
+    "password_reset_decision",
+    "stripe_webhook",
+    "pii_extract",
+    "kyc_decision",
+}
+
+_BLOCKED_SENSITIVE_MODEL_KEYWORDS = (
+    "deepseek", "kimi", "moonshot", "qwen", "glm", "zai-org", "minimax",
+)
+
+
+def _redact_sensitive_providers(task_type: str, chain: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    """Strip Chinese-origin models from the chain for sensitive tasks.
+    Falls back to default Claude entry if the strip leaves an empty chain."""
+    if task_type not in SENSITIVE_TASKS:
+        return chain
+    safe = [
+        (p, m) for p, m in chain
+        if not any(kw in m.lower() for kw in _BLOCKED_SENSITIVE_MODEL_KEYWORDS)
+    ]
+    if not safe:
+        logger.warning(
+            f"[gateway] sensitive task {task_type!r} had no safe providers "
+            f"in chain — defaulting to Claude Sonnet."
+        )
+        return [DEFAULT]
+    return safe
 
 
 def _get_db():
@@ -264,11 +320,15 @@ _PROVIDER_DISPATCH = {
 
 
 def _chain_for(task_type: str) -> List[Tuple[str, str]]:
-    """Normalize ROUTING_TABLE entries (tuple or list) into a chain."""
+    """Normalize ROUTING_TABLE entries (tuple or list) into a chain.
+    Applies the sensitive-task guard so PII/billing/auth tasks never
+    leak into Chinese-origin models."""
     entry = ROUTING_TABLE.get(task_type, DEFAULT)
     if isinstance(entry, tuple):
-        return [entry]
-    return list(entry)
+        chain = [entry]
+    else:
+        chain = list(entry)
+    return _redact_sensitive_providers(task_type, chain)
 
 
 async def route(

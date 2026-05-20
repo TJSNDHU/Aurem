@@ -52,3 +52,24 @@ def test_install_scheduler_returns_job_id():
     job = sched.get_job(job_id)
     assert job is not None
     assert job.name == "Scout Replenish Cron"
+
+
+def test_all_default_industries_resolve_to_osm_tags():
+    """iter 324m — guard: every cron industry MUST exist in OSM tag dict
+    so the matrix never hits a 'no_osm_tags_for_industry' wall."""
+    from services.osm_scout import INDUSTRY_TO_OSM_TAGS, _normalise_industry
+    missing = []
+    for ind in cron.DEFAULT_INDUSTRIES:
+        n = _normalise_industry(ind)
+        if n not in INDUSTRY_TO_OSM_TAGS:
+            missing.append((ind, n))
+    assert not missing, f"DEFAULT_INDUSTRIES missing OSM tags: {missing}"
+
+
+def test_industries_matrix_minimum_size():
+    """Ensure the SMB coverage matrix is wide enough for production."""
+    assert len(cron.DEFAULT_INDUSTRIES) >= 20, (
+        f"Expected >=20 industries for production coverage, "
+        f"got {len(cron.DEFAULT_INDUSTRIES)}"
+    )
+    assert len(cron.DEFAULT_CITIES) >= 4
