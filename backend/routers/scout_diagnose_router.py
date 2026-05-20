@@ -218,106 +218,207 @@ async def diagnose():
 
 
 class OSMHuntBody(BaseModel):
-    industry: str
+    # Accept singular `industry` (str) OR plural `industries` (list[str]).
+    # Accept `count` OR `limit` as the per-industry cap.
+    industry: Optional[str] = None
+    industries: Optional[list] = None
     city: str = "Mississauga, ON"
     count: int = 20
+    limit: Optional[int] = None  # alias for `count`
+    background: Optional[bool] = None  # force async mode (auto-on if >=4 industries)
+
+
+async def _run_osm_hunt_core(ind_list: list, city: str, per_industry_cap: int,
+                              job_id: Optional[str] = None) -> Dict[str, Any]:
+    """Shared core logic. Used by both sync and background paths."""
+    from services.osm_scout import osm_leads
+
+    overall_written = 0
+    overall_skipped_dup = 0
+    overall_skipped_no_contact = 0
+    overall_raw = 0
+    per_industry: list = []
+
+    now = datetime.now(timezone.utc).isoformat()
+    city_slug = city.split(",")[0].strip().lower().replace(" ", "-")
+
+    import asyncio as _aio
+    osm_tasks = [
+        osm_leads(query=industry, location=city,
+                  limit=per_industry_cap, radius_m=15000)
+        for industry in ind_list
+    ]
+    osm_results = await _aio.gather(*osm_tasks, return_exceptions=True)
+
+    for industry, res in zip(ind_list, osm_results):
+        if isinstance(res, Exception):
+            per_industry.append({"industry": industry, "ok": False,
+                                  "error": f"{type(res).__name__}: {str(res)[:120]}",
+                                  "written": 0})
+            continue
+        if not res.get("success"):
+            per_industry.append({"industry": industry, "ok": False,
+                                  "error": res.get("error", "osm_failed"),
+                                  "written": 0})
+            continue
+
+        leads = res.get("leads", [])
+        overall_raw += len(leads)
+        written = 0
+        skipped_no_contact = 0
+        skipped_duplicate = 0
+
+        for lead in leads:
+            email = (lead.get("email") or "").strip()
+            phone = (lead.get("phone") or "").strip()
+            website = (lead.get("website") or "").strip()
+            if not (email or phone or website):
+                skipped_no_contact += 1
+                continue
+
+            existing = await _db.campaign_leads.find_one(
+                {"business_name": lead["business_name"], "city": city},
+                {"_id": 1},
+            )
+            if existing:
+                skipped_duplicate += 1
+                continue
+
+            lead_id = f"osm-{city_slug}-{uuid.uuid4().hex[:10]}"
+            doc = {
+                "lead_id": lead_id,
+                "business_name": lead["business_name"],
+                "category":      industry,
+                "city":          city,
+                "phone":         phone,
+                "email":         email,
+                "website_url":   website,
+                "website":       website,
+                "address":       lead.get("address") or "",
+                "rating":        lead.get("rating"),
+                "review_count":  lead.get("review_count") or 0,
+                "source":        "osm_overpass_admin_hunt",
+                "status":        "queued",
+                "noise_flag":    False,
+                "created_at":    now,
+                "ingested_via":  "admin_run_osm_hunt",
+            }
+            await _db.campaign_leads.insert_one(doc)
+            written += 1
+
+            if website:
+                try:
+                    from services.apollo_enrichment import enrich_lead_with_apollo_diy
+                    _aio.create_task(enrich_lead_with_apollo_diy(
+                        _db, lead_id, website,
+                    ))
+                except Exception as _en:
+                    logger.debug(f"[scout-diagnose] enrichment kickoff failed for {lead_id}: {_en}")
+
+        overall_written += written
+        overall_skipped_dup += skipped_duplicate
+        overall_skipped_no_contact += skipped_no_contact
+        per_industry.append({"industry": industry, "ok": True,
+                              "raw_returned": len(leads), "written": written,
+                              "skipped_duplicate": skipped_duplicate,
+                              "skipped_no_contact": skipped_no_contact})
+        logger.info(f"[scout-diagnose] OSM {industry!r}@{city!r}: written={written}")
+
+    summary = {
+        "success": True,
+        "city": city,
+        "industries_run": ind_list,
+        "raw_returned_total": overall_raw,
+        "leads_written_total": overall_written,
+        "skipped_duplicate_total": overall_skipped_dup,
+        "skipped_no_contact_total": overall_skipped_no_contact,
+        "per_industry": per_industry,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Persist result if this is a background job so caller can poll.
+    if job_id and _db is not None:
+        await _db.scout_hunt_jobs.update_one(
+            {"job_id": job_id},
+            {"$set": {**summary, "status": "complete", "job_id": job_id}},
+            upsert=True,
+        )
+    return summary
 
 
 @router.post("/run-osm-hunt")
 async def run_osm_hunt(body: OSMHuntBody = Body(...)):
     """
-    Emergency hunt that uses ONLY OpenStreetMap Overpass (no API key required).
-    Writes results straight into `campaign_leads` collection with status='queued'
-    so the auto-blast engine picks them up on the next cycle.
+    Emergency hunt that uses ONLY OpenStreetMap Overpass (no API key).
 
-    Use this when Google Places / Yelp are dead and you need leads RIGHT NOW.
+    Modes:
+    • Synchronous (default for ≤3 industries): waits, returns full result.
+    • Background  (auto for ≥4 industries, or `background:true`): returns
+      a `job_id` immediately. Poll `GET /api/admin/scout/hunt-job/{job_id}`
+      for status + result. Avoids ingress 60s timeout when OSM mirrors lag.
     """
     if _db is None:
         raise HTTPException(503, "Database unavailable")
 
-    from services.osm_scout import osm_leads
+    # Normalize industry list.
+    ind_list: list = []
+    if body.industries and isinstance(body.industries, list):
+        ind_list = [str(x).strip() for x in body.industries if str(x).strip()]
+    if body.industry:
+        ind_list.append(body.industry.strip())
+    seen = set()
+    ind_list = [x for x in ind_list if not (x in seen or seen.add(x))]
+    if not ind_list:
+        raise HTTPException(400, "Provide `industry` (str) or `industries` (list[str]).")
 
-    res = await osm_leads(
-        query=body.industry,
-        location=body.city,
-        limit=int(body.count),
-        radius_m=15000,
-    )
+    per_industry_cap = int(body.limit or body.count or 20)
 
-    if not res.get("success"):
+    # Decide sync vs background.
+    use_background = body.background if body.background is not None else (len(ind_list) >= 4)
+
+    if not use_background:
         return {
-            "success": False,
-            "error": res.get("error", "osm_failed"),
-            "industry": body.industry,
-            "city": body.city,
-            "leads_written": 0,
+            **(await _run_osm_hunt_core(ind_list, body.city, per_industry_cap)),
+            "mode": "sync",
+            "enrichment": "Apollo DIY enrichment fired as background task per lead.",
+            "next_step": "Visit /api/campaign/why-not-sending to verify funnel.",
         }
 
-    leads = res.get("leads", [])
-    written = 0
-    skipped_no_contact = 0
-    skipped_duplicate = 0
-
-    now = datetime.now(timezone.utc).isoformat()
-    city_slug = body.city.split(",")[0].strip().lower().replace(" ", "-")
-
-    for lead in leads:
-        # Aurem outreach needs at least phone OR email OR website.
-        email = (lead.get("email") or "").strip()
-        phone = (lead.get("phone") or "").strip()
-        website = (lead.get("website") or "").strip()
-        if not (email or phone or website):
-            skipped_no_contact += 1
-            continue
-
-        # Dedupe by business_name + city.
-        existing = await _db.campaign_leads.find_one(
-            {"business_name": lead["business_name"], "city": body.city},
-            {"_id": 1},
-        )
-        if existing:
-            skipped_duplicate += 1
-            continue
-
-        lead_id = f"osm-{city_slug}-{uuid.uuid4().hex[:10]}"
-        doc = {
-            "lead_id": lead_id,
-            "business_name": lead["business_name"],
-            "category":      body.industry,
-            "city":          body.city,
-            "phone":         phone,
-            "email":         email,
-            "website_url":   website,
-            "website":       website,
-            "address":       lead.get("address") or "",
-            "rating":        lead.get("rating"),
-            "review_count":  lead.get("review_count") or 0,
-            "source":        "osm_overpass_admin_hunt",
-            "status":        "queued",
-            "noise_flag":    False,
-            "created_at":    now,
-            "ingested_via":  "admin_run_osm_hunt",
-        }
-        await _db.campaign_leads.insert_one(doc)
-        written += 1
-
-    logger.info(
-        f"[scout-diagnose] OSM hunt complete: industry={body.industry!r} "
-        f"city={body.city!r} written={written} duplicate={skipped_duplicate} "
-        f"no_contact={skipped_no_contact}"
-    )
+    # Background mode — return 202 with job_id; run in background task.
+    import asyncio as _aio
+    job_id = f"hunt-{uuid.uuid4().hex[:12]}"
+    await _db.scout_hunt_jobs.insert_one({
+        "job_id": job_id,
+        "status": "running",
+        "city": body.city,
+        "industries": ind_list,
+        "per_industry_cap": per_industry_cap,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    })
+    _aio.create_task(_run_osm_hunt_core(ind_list, body.city, per_industry_cap, job_id=job_id))
 
     return {
         "success": True,
-        "industry": body.industry,
+        "mode": "background",
+        "job_id": job_id,
+        "status": "running",
+        "industries": ind_list,
         "city": body.city,
-        "raw_returned": len(leads),
-        "leads_written": written,
-        "skipped_duplicate": skipped_duplicate,
-        "skipped_no_contact": skipped_no_contact,
+        "poll_url": f"/api/admin/scout/hunt-job/{job_id}",
+        "eta_seconds": min(15 * len(ind_list), 120),
         "next_step": (
-            "auto_blast_engine will pick these up on next cycle. Visit "
-            "/api/campaign/auto-blast/diagnose-blocker to verify the "
-            "eligibility funnel sees them."
-        ) if written else "Try a different industry — see osm_scout.INDUSTRY_TO_OSM_TAGS.",
+            f"GET /api/admin/scout/hunt-job/{job_id} every 10s until "
+            f"status='complete'. Then /api/campaign/why-not-sending."
+        ),
     }
+
+
+@router.get("/hunt-job/{job_id}")
+async def get_hunt_job(job_id: str):
+    """Poll the status + result of a background OSM hunt job."""
+    if _db is None:
+        raise HTTPException(503, "Database unavailable")
+    job = await _db.scout_hunt_jobs.find_one({"job_id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return job

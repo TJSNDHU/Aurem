@@ -34,6 +34,18 @@ logger = logging.getLogger(__name__)
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
+# iter 324k — Mirror fallbacks. Overpass main server has frequent
+# transient outages (504 / ConnectError). When the primary is dead the
+# OSM scout retries the same query on these community mirrors before
+# giving up. Order matters — keep most-reliable first.
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.openstreetmap.ru/cgi/interpreter",
+    "https://overpass.openstreetmap.fr/api/interpreter",
+]
+
 # ── Industry name → list of OSM tag pairs to OR together
 # Format: [(key, value), ...] — each pair becomes one Overpass query line.
 INDUSTRY_TO_OSM_TAGS: Dict[str, List[Tuple[str, str]]] = {
@@ -117,6 +129,10 @@ INDUSTRY_TO_OSM_TAGS: Dict[str, List[Tuple[str, str]]] = {
     "it_service":           [("office", "it")],
     "barber":               [("shop", "hairdresser")],
     "barbershop":           [("shop", "hairdresser")],
+    "hair_salon":           [("shop", "hairdresser"), ("shop", "beauty")],
+    "hair_salons":          [("shop", "hairdresser"), ("shop", "beauty")],
+    "hairdresser":          [("shop", "hairdresser")],
+    "beauty_salon":         [("shop", "beauty"), ("shop", "hairdresser")],
     "nail_salon":           [("shop", "beauty")],
     "nails":                [("shop", "beauty")],
     "massage":              [("shop", "massage")],
@@ -278,26 +294,43 @@ async def osm_leads(
 
     lat, lon = centroid
     overpass = _build_overpass_query(industry, lat, lon, radius_m)
-    try:
-        async with httpx.AsyncClient(
-            timeout=30.0,
-            headers={
-                "User-Agent": "AUREM-AutomationPlatform/322av (https://aurem.live; ops@aurem.live)",
-                "Accept": "application/json",
-            },
-        ) as client:
-            r = await client.post(
-                OVERPASS_URL,
-                content=f"data={overpass}",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-            if r.status_code != 200:
-                logger.warning(f"[osm-scout] HTTP {r.status_code}: {r.text[:200]}")
-                return {"success": False, "leads": [], "total": 0, "source": "osm_overpass", "error": f"http_{r.status_code}"}
-            data = r.json()
-    except Exception as e:
-        logger.warning(f"[osm-scout] request failed: {e}")
-        return {"success": False, "leads": [], "total": 0, "source": "osm_overpass", "error": str(e)[:120]}
+
+    # iter 324k — Try each Overpass mirror in turn. Bail out on the
+    # first 200. Surface a single combined error if all fail so the
+    # caller knows it's an infra outage, not a query bug.
+    last_err: str = ""
+    data: Dict[str, Any] | None = None
+    for mirror in OVERPASS_MIRRORS:
+        try:
+            async with httpx.AsyncClient(
+                timeout=8.0,
+                headers={
+                    "User-Agent": "AUREM-AutomationPlatform/324k (https://aurem.live; ops@aurem.live)",
+                    "Accept": "application/json",
+                },
+            ) as client:
+                r = await client.post(
+                    mirror,
+                    content=f"data={overpass}",
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+                if r.status_code != 200:
+                    last_err = f"{mirror} → http_{r.status_code}"
+                    logger.debug(f"[osm-scout] {last_err}")
+                    continue
+                data = r.json()
+                logger.info(f"[osm-scout] mirror hit: {mirror}")
+                break
+        except Exception as e:
+            last_err = f"{mirror} → {type(e).__name__}"
+            logger.debug(f"[osm-scout] {last_err}: {str(e)[:120]}")
+            continue
+
+    if data is None:
+        logger.warning(f"[osm-scout] all mirrors failed: {last_err}")
+        return {"success": False, "leads": [], "total": 0,
+                "source": "osm_overpass",
+                "error": f"all_mirrors_failed:{last_err[:120]}"}
 
     raw = data.get("elements", []) or []
     leads: List[Dict[str, Any]] = []
