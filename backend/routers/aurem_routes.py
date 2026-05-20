@@ -3,7 +3,7 @@ AUREM AI API Routes
 Complete API for the AUREM platform
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Header, Request
+from fastapi import APIRouter, HTTPException, Depends, Header, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
@@ -153,8 +153,38 @@ async def get_current_user(authorization: str = Header(None)):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/auth/register")
-async def register(request: OnboardingRequest):
-    """Register a new AUREM user with onboarding data"""
+async def register(request: OnboardingRequest, response: Response):
+    """Register a new AUREM user with onboarding data.
+
+    ⚠️ DEPRECATED (iter 324p). New clients should use
+       POST /api/platform/auth/register
+    instead. This endpoint is preserved for backward compatibility but
+    will be removed in a future release. Every call writes RFC 8594
+    Deprecation + Sunset response headers and logs usage to
+    `deprecated_endpoint_hits` so we can track who still depends on it.
+    """
+    # iter 324p — deprecation surfacing. Surface to callers via headers
+    # AND log so we can attribute the remaining usage before final removal.
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "Wed, 31 Dec 2026 23:59:59 GMT"
+    response.headers["Link"] = (
+        '</api/platform/auth/register>; rel="successor-version"'
+    )
+    response.headers["Warning"] = (
+        '299 - "/api/aurem/auth/register is deprecated; '
+        'use /api/platform/auth/register"'
+    )
+    try:
+        if db is not None:
+            await db.deprecated_endpoint_hits.insert_one({
+                "endpoint": "/api/aurem/auth/register",
+                "email": (request.email or "").lower(),
+                "at": datetime.now(timezone.utc).isoformat(),
+                "iter_logged": "324p",
+            })
+    except Exception:
+        pass
+
     try:
         # Check if user exists
         if db is not None:

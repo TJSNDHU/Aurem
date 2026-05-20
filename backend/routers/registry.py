@@ -2790,6 +2790,15 @@ def register_all_routers(app, db):
         except Exception as sc_e:
             logger.warning(f"[REGISTRY] Scout replenish cron schedule failed: {sc_e}")
 
+        # iter 324p — Warm Prober. Pings /api/health every 90s so cold-start
+        # never hits a real customer. K8s pod warm-up latency was 15-25s
+        # on first hit before this — see iter 324o E2E audit.
+        try:
+            from services.warm_prober import install_scheduler as _install_warm_prober
+            _install_warm_prober(aurem_scheduler)
+        except Exception as wp_e:
+            logger.warning(f"[REGISTRY] Warm prober schedule failed: {wp_e}")
+
         # iter 323g — Pixel → ORA Bridge (5 min cron, no LLM call inside)
         try:
             from services.pixel_to_ora_bridge import PixelToOraBridge

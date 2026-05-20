@@ -1,6 +1,41 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324p — WARM PROBER + AUTH DEPRECATION (2026-05-20)**
+>
+> ## Shipped
+>
+> ### Warm Prober (`services/warm_prober.py`)
+> - APScheduler job pings 5 internal endpoints every 90s: `/api/health`, `/api/public/status`, `/api/catalog/services`, `/api/platform/auth/health`, `/api/onboarding/status-health`.
+> - Calls `http://127.0.0.1:8001` directly — bypasses ingress, zero DNS cost, zero external traffic.
+> - Disable knob: `AUREM_WARM_PROBER_DISABLED=1`.
+> - Logs WARN only when any endpoint > 2s; otherwise quiet at DEBUG.
+> - Hooked into `aurem_scheduler` via `routers/registry.py`. Verified registered (job_id=`aurem_warm_prober`, 69 total scheduler jobs).
+> - Live tick: all 5 endpoints responded 4-9ms.
+>
+> ### Deprecation of `/api/aurem/auth/register`
+> - Endpoint still works (preserves backward compat for any 3rd-party consumer).
+> - Every response now carries:
+>   - `Deprecation: true`
+>   - `Sunset: Wed, 31 Dec 2026 23:59:59 GMT`
+>   - `Link: </api/platform/auth/register>; rel="successor-version"`
+>   - `Warning: 299 - "/api/aurem/auth/register is deprecated; use /api/platform/auth/register"`
+> - Each call inserts into `deprecated_endpoint_hits` collection (`{endpoint, email, at, iter_logged}`) so we can attribute remaining usage before final removal.
+> - Frontend `/my` already uses `/api/platform/auth/register` — no client work needed.
+>
+> ## E2E verified on preview
+> 1. `GET /api/admin/scheduler/count` → `aurem_warm_prober` registered, scheduler running.
+> 2. Manual `warm_probe_tick()` → 5/5 endpoints 200, max latency 9ms.
+> 3. POST to deprecated endpoint → 200 + all 4 deprecation headers + DB row inserted.
+> 4. Customer E2E after deprecation: register → pixel install → site monitor → onboarding — all 200.
+>
+> ## Outstanding
+> - User: redeploy preview → prod
+> - When `deprecated_endpoint_hits` count stays at 0 for 30+ days, safe to remove `/api/aurem/auth/register` entirely
+>
+> ---
+
+
 > **🟢 ITER 324o — PROD E2E AUDIT: NEW-CUSTOMER FLOW WAS BROKEN (2026-05-20)**
 >
 > ## What I found on https://aurem.live (running as a fake customer)
