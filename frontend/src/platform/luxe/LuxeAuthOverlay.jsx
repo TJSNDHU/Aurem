@@ -382,6 +382,37 @@ export const LuxeAuthOverlay = () => {
           </button>
         </div>
 
+        {/* iter 324o — Implicit terms consent line for signup mode.
+            Backend requires terms_accepted=true; we set it true on submit
+            and surface this disclosure so consent is informed. */}
+        {mode === 'signup' && (
+          <div
+            data-testid="auth-terms-consent"
+            style={{
+              marginTop: 10, textAlign: 'center',
+              fontFamily: fontMono, fontSize: 9, color: TEXT_LO,
+              letterSpacing: '0.04em', lineHeight: 1.6,
+            }}
+          >
+            By creating an account you agree to our{' '}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="auth-terms-link"
+              style={{ color: GOLD_HI, textDecoration: 'underline' }}
+            >Terms</a>
+            {' '}and{' '}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="auth-privacy-link"
+              style={{ color: GOLD_HI, textDecoration: 'underline' }}
+            >Privacy Policy</a>.
+          </div>
+        )}
+
         {/* Footer links — different per mode */}
         <div style={{
           marginTop: 16, textAlign: 'center',

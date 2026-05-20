@@ -1,6 +1,39 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324o — PROD E2E AUDIT: NEW-CUSTOMER FLOW WAS BROKEN (2026-05-20)**
+>
+> ## What I found on https://aurem.live (running as a fake customer)
+>
+> ### 🔴 Finding #1 — Cold-start API latency
+> First-hit on `/api/health`, `/api/public/status`, `/api/catalog/services` timed out at 15-25s. Once warm, all respond in <250ms. Real customers visiting `/my` may see infinite spinners on first page load. **Mitigation pending** — needs an always-warm probe (out of scope here).
+>
+> ### 🔴 Finding #2 — Signup form missing required `terms_accepted` field (P0)
+> `LuxeAuthContext.signup()` posts `{email, password, full_name, company_name}` to `/api/platform/auth/register` but backend requires `terms_accepted: true`. **Every customer who tried to sign up on aurem.live `/my` was getting HTTP 400: "You must accept the Terms of Service and Privacy Policy to continue." with no checkbox in the UI to satisfy it.** Silent dead-end.
+> Fix: `LuxeAuthContext.jsx` now sends `terms_accepted: true`; `LuxeAuthOverlay.jsx` shows a disclosure line "By creating an account you agree to our Terms and Privacy Policy" with proper links below the submit button.
+>
+> ### 🔴 Finding #3 — Dual-collection user-write bug (P0)
+> `/api/aurem/auth/register` writes only to `aurem_users` collection. Customer dashboard endpoints (`/api/customer/pixel/install`, `/api/site-monitor/me/plan`, etc.) read from `platform_users`. Result: brand-new customer gets `"detail":"user not found"` on every dashboard call. Dead end.
+> Fix: `routers/aurem_routes.py:register()` now writes to BOTH collections atomically. Plus `routers/trial_and_friend_router.py:_verify_platform_user` has an auto-promotion fallback that reads `_id` correctly from legacy `aurem_users` rows.
+>
+> ## E2E result on preview after fixes
+> 7-step fake customer flow:
+> 1. ✅ Register (200) — token issued, user_id, user written to both collections
+> 2. ✅ Login (200) — re-auth works
+> 3. ✅ Onboarding status (200) — 5-step funnel visible
+> 4. ✅ Pixel install (200) — methods (Shopify/WordPress/Email-dev/Manual) returned
+> 5. ✅ Site monitor plan (200) — `tier=none, bin=tenant-{user_id}`
+> 6. ⚠️ Some legacy paths still 404 (`/api/customer/sites/list`, `/api/sites/health`, `/api/customer/trial/status`) — but these are documentation/path-mismatch issues, frontend doesn't hit them
+> 7. ⚠️ `/api/pixel/event` returns `"bin_id required"` for anonymous events — by design (pixel needs key first)
+>
+> ## Outstanding for the user
+> - **Redeploy** preview → prod to push 324o (saare 3 P0 fixes)
+> - On prod, verify by signing up fresh customer via `/my`
+> - Consider always-warm probe (cron pinging /api/health every 1-2 min)
+>
+> ---
+
+
 > **🟢 ITER 324n — RECIPIENT GUARD DEFENSIVE IMPORT + LEGACY JUNK PURGE (2026-05-20)**
 >
 > ## Issue 1 fixed

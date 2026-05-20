@@ -131,6 +131,11 @@ export const LuxeAuthProvider = ({ children }) => {
     try {
       const { data } = await axios.post(`${API}/api/platform/auth/register`, {
         email, password, full_name, company_name,
+        // iter 324o — terms acceptance is required by the backend. The
+        // signup form below the button shows "By creating an account you
+        // agree to our Terms & Privacy" so submission is the consent
+        // action (same model as Stripe / Vercel / most modern SaaS).
+        terms_accepted: true,
       }, { timeout: 15000 });
       if (!data?.token) throw new Error(data?.detail || 'Signup failed');
       writeToken(data.token, remember);

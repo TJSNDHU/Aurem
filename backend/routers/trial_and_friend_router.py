@@ -50,6 +50,44 @@ async def _verify_platform_user(request: Request) -> dict:
     if not email or _db is None:
         raise HTTPException(401, "unauthorized")
     doc = await _db.platform_users.find_one({"email": email}, {"_id": 0, "password_hash": 0})
+    # iter 324o — backward compat: some legacy signups landed in `aurem_users`
+    # (via /api/aurem/auth/register). Auto-promote them into platform_users
+    # on first dashboard hit so the customer is not dead-ended on pixel
+    # install. Idempotent — runs only when platform_users entry missing.
+    if not doc:
+        legacy = await _db.aurem_users.find_one(
+            {"email": email}, {"password_hash": 0}
+        )
+        if legacy:
+            # iter 324o — aurem_users stores user_id in `_id` field
+            # (uuid string). Read either `_id` or `user_id` to backfill.
+            uid = legacy.get("user_id") or legacy.get("_id") or ""
+            uid = str(uid)
+            tenant_id = f"tenant-{uid[:12]}" if uid else f"tenant-{email.split('@')[0][:12]}"
+            promoted = {
+                "user_id": uid,
+                "email": email,
+                "full_name": legacy.get("full_name") or "",
+                "company_name": legacy.get("company_name") or "My Company",
+                "industry": legacy.get("industry") or "",
+                "tier": legacy.get("tier") or "starter",
+                "terms_accepted": True,
+                "terms_accepted_at": legacy.get("created_at"),
+                "promoted_from": "aurem_users",
+                "promoted_at": datetime.now(timezone.utc).isoformat(),
+                "tenant_id": tenant_id,
+                "bin": tenant_id,
+            }
+            await _db.platform_users.insert_one(promoted)
+            promoted.pop("_id", None)  # in case mongo added one
+            doc = promoted
+            try:
+                from logging import getLogger
+                getLogger(__name__).info(
+                    f"[auth] auto-promoted {email} aurem_users → platform_users (uid={uid[:12]})"
+                )
+            except Exception:
+                pass
     if not doc:
         raise HTTPException(404, "user not found")
     doc["bin"] = doc.get("bin") or doc.get("business_id") or doc.get("tenant_id")

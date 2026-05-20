@@ -187,6 +187,36 @@ async def register(request: OnboardingRequest):
         
         if db is not None:
             await db.aurem_users.insert_one(user_data)
+
+            # iter 324o — also write a `platform_users` row so the customer
+            # dashboard endpoints (pixel install, site monitor, trial,
+            # CRM, etc.) all find this user. Otherwise the customer is
+            # dead-ended on every dashboard call with "user not found".
+            # Idempotent: skip if already present.
+            try:
+                existing_pu = await db.platform_users.find_one(
+                    {"email": request.email.lower()}, {"_id": 1}
+                )
+                if not existing_pu:
+                    tenant_id = f"tenant-{user_id[:12]}"
+                    await db.platform_users.insert_one({
+                        "user_id": user_id,
+                        "email": request.email.lower(),
+                        "password_hash": password_hash,
+                        "full_name": request.full_name,
+                        "company_name": request.company_name,
+                        "industry": request.industry,
+                        "tier": "starter",
+                        "tier_status": "active",
+                        "terms_accepted": True,
+                        "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "tenant_id": tenant_id,
+                        "bin": tenant_id,
+                        "synced_from": "aurem_users_register",
+                    })
+            except Exception as _pu_err:
+                logger.warning(f"[aurem-register] platform_users sync failed: {_pu_err}")
         
         token = create_token(user_id, request.email.lower())
         
