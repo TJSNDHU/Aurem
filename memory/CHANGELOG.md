@@ -1,3 +1,21 @@
+## 2026-05-20 — iter 325b — Deployment audit + 404 noise fix
+
+**Trigger**: Founder shared "deployment build error logs" — actually runtime logs, not build errors. Deployment agent confirmed deploy is **PASSING** (no hardcoded URLs, env vars properly read, supervisor warning is sandbox-only).
+
+**Real issues found in logs**:
+1. **`/api/customer/pipeline/scan-events`** — Frontend (`useLuxeDashboardData.js`) hits this every dashboard refresh, but no backend route existed. Returned 404, swallowed silently by `safeGet`, but spammed logs. **FIXED**: Created `routers/customer_pipeline_router.py` with auth-gated `/scan-events` endpoint that pulls from `customer_scans` / `scan_history` / `scans` collections. Wired in `registry.py` direct routers list.
+2. `/api/onboarding/status-health` 404 — intentional warm-prober probe, comment in `services/warm_prober.py:31` confirms.
+3. `/api/repair/*` 404s in prod logs — `ai_repair_router` IS loaded (33 routes, verified in preview, not in `SKIP_IN_LEAN`). Likely stale logs from a pre-deploy snapshot.
+4. `zero_sent_streak=624` — campaign runtime issue, not deploy-related. User has the JS commands to purge legacy junk + reset watchdog (must be run from authenticated browser console).
+
+**Non-issues** (deployment_agent verified):
+- All env vars (`MONGO_URL`, `DB_NAME`, `REACT_APP_BACKEND_URL`) read via `os.environ.get`, no fallbacks
+- No hardcoded `preview.emergentagent.com` URLs in code
+- No supervisor changes needed (auto-configured in prod)
+
+**Files**: `/app/backend/routers/customer_pipeline_router.py` (new, 1 endpoint), `/app/backend/routers/registry.py` (+1 line).
+
+
 ## 2026-05-20 — iter 325 — react-doctor CI gate + frontend dead-code purge (P0)
 
 **Trigger**: Founder mandate — run `millionco/react-doctor` on `/frontend/src`, score code, remove dead/unused components, lazy-load heavy imports (Three.js / face-api / rrweb), wire CI workflow that fails on score < 70.
