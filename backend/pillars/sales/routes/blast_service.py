@@ -34,10 +34,17 @@ async def send_lead_email(lead_id: str, request: Request):
     body = await request.json()
     use_template = bool(body.get("use_template", False))
     if use_template:
-        from services.aurem_outreach_templates import render_email_subject, render_email_html
-        subject = body.get("subject") or render_email_subject(lead)
+        from services.aurem_outreach_templates import (
+            render_email_subject, render_email_html, pick_subject_variant,
+        )
+        # iter 324q — track which A/B variant fired so we can correlate
+        # opens/replies later. `subject` may still be overridden via the
+        # request body (admin manual sends).
+        chosen_variant = pick_subject_variant(lead.get("lead_id", ""))
+        subject = body.get("subject") or render_email_subject(lead, variant=chosen_variant)
         html = body.get("html") or render_email_html(lead)
     else:
+        chosen_variant = None
         subject = body.get("subject", f"{lead['business_name']} — Get More Customers on Autopilot")
         html = body.get("html", "")
     to = body.get("to", lead.get("email", ""))
@@ -49,7 +56,7 @@ async def send_lead_email(lead_id: str, request: Request):
         r = resend.Emails.send({"from": "ORA <ora@aurem.live>", "to": [to], "subject": subject, "html": html or f"<p>Hi {lead['business_name']},</p><p>Follow up from AUREM Intelligence AI.</p>", "reply_to": "support@aurem.live"})
         email_id = r.get("id", str(r))
         now = datetime.now(timezone.utc).isoformat()
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "email", "to": to, "status": "sent", "email_id": email_id, "subject": subject, "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"status": "emailed", "updated_at": now}})
+        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "email", "to": to, "status": "sent", "email_id": email_id, "subject": subject, "subject_variant": chosen_variant, "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"status": "emailed", "updated_at": now}})
         return {"success": True, "email_id": email_id}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -183,13 +190,19 @@ async def execute_blast_for_lead(
 
     from services.aurem_outreach_templates import (
         render_whatsapp, render_sms, render_email_subject,
-        render_email_html, render_voice_script,
+        render_email_html, render_voice_script, pick_subject_variant,
     )
     phone = (lead.get("phone") or "").strip()
     email = (lead.get("email") or "").strip()
     results: Dict[str, Any] = {}
     history_entries = []
     now = datetime.now(timezone.utc).isoformat()
+
+    # iter 324q — pre-compute subject + variant ONCE per blast call so
+    # (a) we don't double-call render_email_subject, and (b) we log the
+    # exact variant that fired into outreach_history for later A/B analysis.
+    _subject_variant = pick_subject_variant(lead.get("lead_id", ""))
+    _email_subject = render_email_subject(lead, variant=_subject_variant)
 
     gates = ((lead.get("verification") or {}).get("channel_gating") or {}) if respect_gating else {}
 
@@ -217,13 +230,13 @@ async def execute_blast_for_lead(
             r = resend.Emails.send({
                 "from": "ORA <ora@aurem.live>",
                 "to": [email],
-                "subject": render_email_subject(lead),
+                "subject": _email_subject,
                 "html": render_email_html(lead),
                 "reply_to": "support@aurem.live",
             })
             eid = r.get("id", str(r))
-            results["email"] = {"success": True, "email_id": eid, "to": email}
-            history_entries.append({"type": "email", "to": email, "status": "sent", "email_id": eid, "subject": render_email_subject(lead), "template": "aurem_v1", "source": source, "timestamp": now})
+            results["email"] = {"success": True, "email_id": eid, "to": email, "subject_variant": _subject_variant}
+            history_entries.append({"type": "email", "to": email, "status": "sent", "email_id": eid, "subject": _email_subject, "subject_variant": _subject_variant, "template": "aurem_v1", "source": source, "timestamp": now})
         except Exception as e:
             results["email"] = {"success": False, "error": str(e), "to": email}
     elif email and not _gate_open("email"):

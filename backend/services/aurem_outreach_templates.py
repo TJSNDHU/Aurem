@@ -139,8 +139,14 @@ def build_variables(lead: Dict[str, Any]) -> Dict[str, Any]:
     """Extract the full variable set for any template, from a lead document."""
     name = lead.get("business_name", "there")
     category = lead.get("category", "local business")
-    location = lead.get("location", "")
-    city = _extract_city(location)
+    # iter 324q — Prefer the explicit `city` field (OSM admin-hunt sets it
+    # directly: "Brampton", "Toronto, ON" etc). Fall back to legacy
+    # `location` (Google Places set this) only when city is missing.
+    raw_city = (lead.get("city") or "").strip()
+    if raw_city:
+        city = _extract_city(raw_city) if "," in raw_city else raw_city
+    else:
+        city = _extract_city(lead.get("location", "") or "")
     review_count = _extract_review_count(lead)
     return {
         "business_name": name,
@@ -189,12 +195,106 @@ def render_sms(lead: Dict[str, Any]) -> str:
 
 
 # ─────────────────────── TEMPLATE 3: EMAIL ───────────────────────
-def render_email_subject(lead: Dict[str, Any]) -> str:
+# iter 324q — Subject-line redesign + A/B variants.
+#
+# Why: the previous subject template
+#   "{BusinessName} — N gaps found in your Google presence"
+# was specific but stiff. Every lead got the same shape, no A/B
+# data ever collected, no curiosity gap. Industry data on cold-
+# email subject lines: open rate is dominated by (a) recipient
+# name in subject, (b) one specific number, (c) open loop.
+#
+# Two new variants follow that template. They're paired deliberately
+# so we A/B-test two _different psychological hooks_ (forensic
+# finding vs loss frame), not two paraphrases of the same hook.
+#
+# Variant A — "Forensic finding" (matches user spec example):
+#     "Found {N} gaps hurting {BusinessName}'s Google ranking"
+#   Open-loop ("what gaps?") + names target + specific number.
+#
+# Variant B — "Loss frame, location-specific":
+#     "{BusinessName} — {K}+ {City} searches missing you"
+#   Loss aversion + concrete number + city = local relevance.
+#
+# Both stay under ~70 chars (Gmail truncation). Business names
+# longer than 30 chars are abbreviated to preserve the hook.
+#
+# Bucketing: deterministic by `lead_id` so the SAME lead always
+# receives the SAME variant on repeat sends (clean A/B data).
+
+
+def _short_business_name(name: str, max_len: int = 28) -> str:
+    """Truncate long business names mid-subject so the hook still fits."""
+    n = (name or "").strip()
+    if len(n) <= max_len:
+        return n
+    # Drop common suffixes that pad length without identity loss.
+    for suffix in (
+        " inc.", " inc", " ltd.", " ltd", " llc", " corp.", " corp",
+        " co.", " company", " group", " services", " service",
+    ):
+        if n.lower().endswith(suffix):
+            n = n[: -len(suffix)].rstrip(",. ")
+            if len(n) <= max_len:
+                return n
+    return n[: max_len - 1].rstrip() + "…"
+
+
+def _format_search_volume(n: int) -> str:
+    """8500 → '8.5K', 34000 → '34K', 500 → '500'."""
+    if n >= 10000:
+        return f"{n // 1000}K"
+    if n >= 1000:
+        return f"{n / 1000:.1f}".rstrip("0").rstrip(".") + "K"
+    return str(n)
+
+
+def pick_subject_variant(lead_id: str) -> str:
+    """Deterministic A/B bucketing by lead_id. Returns 'A' or 'B'.
+
+    Uses md5 over the full lead_id (not a sliced prefix) so uuid-style
+    ids with a fixed common prefix still split ~50/50.
+    """
+    if not lead_id:
+        return "A"
+    import hashlib
+    h = hashlib.md5(str(lead_id).encode("utf-8")).digest()
+    return "A" if (h[0] & 1) == 0 else "B"
+
+
+def render_email_subject_variant_a(lead: Dict[str, Any]) -> str:
+    """Forensic finding hook.
+    "Found 3 gaps hurting AtlasCare's Google ranking"
+    """
     v = build_variables(lead)
+    name = _short_business_name(v["business_name"])
+    return f"Found {v['opportunities_count']} gaps hurting {name}'s Google ranking"
+
+
+def render_email_subject_variant_b(lead: Dict[str, Any]) -> str:
+    """Loss-framed, location-specific hook.
+    "AtlasCare — 8.5K+ Brampton searches missing you"
+    """
+    v = build_variables(lead)
+    name = _short_business_name(v["business_name"], max_len=24)
     return (
-        f"{v['business_name']} — {v['opportunities_count']} gaps found in "
-        f"your Google presence"
+        f"{name} — {_format_search_volume(v['monthly_searches'])}+ "
+        f"{v['city']} searches missing you"
     )
+
+
+def render_email_subject(lead: Dict[str, Any], variant: str | None = None) -> str:
+    """Render the email subject for a lead.
+
+    `variant` accepts 'A', 'B', or None. When None, falls back to the
+    deterministic bucket from `pick_subject_variant(lead_id)` so the
+    same lead always sees the same variant on repeat sends.
+    """
+    if not variant:
+        variant = pick_subject_variant(lead.get("lead_id", ""))
+    if variant.upper() == "B":
+        return render_email_subject_variant_b(lead)
+    return render_email_subject_variant_a(lead)
 
 
 def render_email_html(lead: Dict[str, Any]) -> str:
@@ -288,13 +388,25 @@ def render_voice_script(lead: Dict[str, Any]) -> str:
 
 
 def render_all(lead: Dict[str, Any]) -> Dict[str, Any]:
-    """Returns all 4 rendered templates + the variable set used."""
+    """Returns all 4 rendered templates + the variable set used.
+
+    iter 324q — Email block now exposes both subject variants under
+    `email.subject_variants` (A/B map) and pre-picks one based on the
+    deterministic `lead_id` bucket in `email.subject_variant`. The
+    blast service should log `email.subject_variant` alongside each
+    send so we can correlate opens/replies per variant.
+    """
+    variant = pick_subject_variant(lead.get("lead_id", ""))
+    subj_a = render_email_subject_variant_a(lead)
+    subj_b = render_email_subject_variant_b(lead)
     return {
         "variables": build_variables(lead),
         "whatsapp": render_whatsapp(lead),
         "sms": render_sms(lead),
         "email": {
-            "subject": render_email_subject(lead),
+            "subject": subj_a if variant == "A" else subj_b,
+            "subject_variant": variant,
+            "subject_variants": {"A": subj_a, "B": subj_b},
             "html": render_email_html(lead),
         },
         "voice_script": render_voice_script(lead),

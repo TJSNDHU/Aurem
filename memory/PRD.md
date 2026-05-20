@@ -1,6 +1,51 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324q — OUTREACH SUBJECT REDESIGN + A/B VARIANTS (2026-05-20)**
+>
+> ## Shipped
+>
+> ### Two distinct subject variants (deliberately different psychological hooks, not paraphrases)
+> - **Variant A — Forensic finding**: `"Found 5 gaps hurting Babylon Bliss's Google ranking"` (51c). Names business, specific count, open loop "what gaps?".
+> - **Variant B — Loss frame, location-specific**: `"Babylon Bliss — 9.8K+ Mississauga searches missing you"` (54c). Loss aversion + concrete city + search volume.
+> - Old subject: `"X — N gaps found in your Google presence"` (same shape for every lead, no A/B data ever collected).
+>
+> ### `services/aurem_outreach_templates.py`
+> - New: `render_email_subject_variant_a/b`, `pick_subject_variant` (md5-based deterministic A/B bucketing — same lead always sees same variant), `_short_business_name` (strips Inc./Ltd./LLC suffixes, truncates with … if >28c), `_format_search_volume` (8500→"8.5K", 34000→"34K").
+> - **Bug fix**: `build_variables` was reading `lead["location"]` (Google Places legacy field) but OSM admin-hunt leads store the city in `lead["city"]`. Result: every OSM lead's monthly_searches defaulted to "your area" instead of real Brampton/Toronto numbers. Now reads city-first.
+> - `render_email_subject(lead, variant=None)` — public API stays backward compatible.
+> - `render_all(lead)` — exposes both variants under `email.subject_variants = {A, B}` and pre-picks one as `email.subject_variant`.
+>
+> ### `pillars/sales/routes/blast_service.py`
+> - Auto-blast hot path: pre-compute subject + variant ONCE per call (was rendering twice).
+> - Every `outreach_history` email entry now includes `subject_variant: 'A'|'B'` for later analytics.
+> - Manual admin send (`POST /leads/{id}/send-email`) also logs the variant.
+>
+> ### Tests — `tests/test_outreach_subject_variants.py`
+> - 10/10 pass: format spec compliance, length cap (≤70c for reasonable names), bucketing determinism (same id → same variant repeatable), even 40-60% A/B split across 2000 sample ids, long-name truncation, edge cases (empty, no city, etc.).
+>
+> ## Live preview verified
+> 10 real OSM admin-hunt leads from Mississauga rendered cleanly. Bucket split 5A/5B. All subjects 48-66 chars. Search-volume number ("9.8K+ Mississauga") populates correctly post-city-fix.
+>
+> ## Analytics query (after ~50 sends)
+> ```js
+> db.campaign_leads.aggregate([
+>   {$unwind: "$outreach_history"},
+>   {$match: {"outreach_history.type": "email",
+>             "outreach_history.subject_variant": {$exists: true}}},
+>   {$group: {_id: "$outreach_history.subject_variant",
+>             sent: {$sum: 1},
+>             replied: {$sum: {$cond: [{$eq: ["$outreach_history.replied", true]}, 1, 0]}}}}
+> ])
+> ```
+>
+> ## Outstanding
+> - User: redeploy preview → prod
+> - After ~100 sends, run analytics query above to pick the winner. Drop the loser, draft variant C from learnings.
+>
+> ---
+
+
 > **🟢 ITER 324p — WARM PROBER + AUTH DEPRECATION (2026-05-20)**
 >
 > ## Shipped
