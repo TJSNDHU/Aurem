@@ -1,0 +1,12 @@
+{
+  "ignore": {
+    "files": [
+      "public/**",
+      "build/**",
+      "node_modules/**",
+      "scripts/**",
+      "src/**/__archive/**",
+      "src/platform/_archive/**"
+    ]
+  }
+}

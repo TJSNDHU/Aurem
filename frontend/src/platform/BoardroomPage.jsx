@@ -92,16 +92,17 @@ const BoardroomPage = () => {
   };
 
   // Scroll to & pulse the agent card when navigated with #agent-<id>
+  const { hash } = location;
   useEffect(() => {
-    if (!location.hash || loading) return;
-    const id = decodeURIComponent(location.hash.slice(1));
+    if (!hash || loading) return;
+    const id = decodeURIComponent(hash.slice(1));
     const el = document.getElementById(id);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.classList.add('agent-card-pulse');
     const t = setTimeout(() => el.classList.remove('agent-card-pulse'), 1400);
     return () => clearTimeout(t);
-  }, [location.hash, loading, rollup]);
+  }, [hash, loading, rollup]);
 
   const runMeeting = async () => {
     setMeetingBusy(true);

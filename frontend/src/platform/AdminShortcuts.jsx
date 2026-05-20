@@ -101,11 +101,12 @@ export default function AdminShortcuts() {
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { pathname } = location;
 
   // Only activate on admin routes
   const isAdmin = useMemo(
-    () => location.pathname.startsWith('/admin') || location.pathname === '/dashboard' || location.pathname === '/leads',
-    [location.pathname],
+    () => pathname.startsWith('/admin') || pathname === '/dashboard' || pathname === '/leads',
+    [pathname],
   );
 
   const armG = useCallback(() => {

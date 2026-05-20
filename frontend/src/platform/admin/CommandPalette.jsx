@@ -71,11 +71,11 @@ export default function CommandPalette({ tabs = [], setActive }) {
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 30);
-    } else {
-      setQuery("");
-      setHighlight(0);
+      const t = setTimeout(() => inputRef.current?.focus(), 30);
+      return () => clearTimeout(t);
     }
+    setQuery("");
+    setHighlight(0);
   }, [open]);
 
   const localCommands = useMemo(() => {

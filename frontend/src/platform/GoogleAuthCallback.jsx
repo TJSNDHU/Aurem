@@ -14,6 +14,7 @@ const API_URL = BACKEND_URL;
 export default function GoogleAuthCallback() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hash } = location;
   const hasProcessed = useRef(false);
   const [error, setError] = useState('');
 
@@ -21,7 +22,6 @@ export default function GoogleAuthCallback() {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
 
-    const hash = location.hash;
     const match = hash.match(/session_id=([^&]+)/);
     if (!match) {
       setError('No session ID found. Please try logging in again.');
@@ -80,7 +80,7 @@ export default function GoogleAuthCallback() {
     };
 
     exchangeSession();
-  }, [location.hash, navigate]);
+  }, [hash, navigate]);
 
   if (error) {
     return (

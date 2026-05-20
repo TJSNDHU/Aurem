@@ -2,12 +2,8 @@ import React, { useEffect } from 'react';
 import { X, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function Day7UpsellModal({ isOpen, onClose, trial, onUpgrade }) {
-  if (!isOpen) return null;
-
-  const elapsed_days = Math.floor((Date.now() / 1000 - trial.created_at) / 86400);
-  const days_left = Math.max(0, (trial.trial_days_total || 14) - elapsed_days);
-
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
@@ -15,7 +11,12 @@ export default function Day7UpsellModal({ isOpen, onClose, trial, onUpgrade }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const elapsed_days = Math.floor((Date.now() / 1000 - trial.created_at) / 86400);
+  const days_left = Math.max(0, (trial.trial_days_total || 14) - elapsed_days);
 
   const tiers = [
     {

@@ -269,6 +269,7 @@ const AdminShell = () => {
 const AdminShellInner = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { pathname } = location;
   const token = getPlatformToken();
   const pillars = usePillarHealth();
 
@@ -290,10 +291,10 @@ const AdminShellInner = () => {
     // Pass 1: exact prefix match on item.to (longest first).
     const sortedItems = SECTIONS.flatMap(s => s.items.map(it => ({ ...it, sid: s.id })))
       .sort((a, b) => b.to.length - a.to.length);
-    const hit = sortedItems.find(it => location.pathname === it.to || location.pathname.startsWith(it.to + '/'));
+    const hit = sortedItems.find(it => pathname === it.to || pathname.startsWith(it.to + '/'));
     if (hit) return hit.sid;
     return SECTIONS[0].id;
-  }, [location.pathname]);
+  }, [pathname]);
 
   const ticker = useBoardroomTicker(token, true);
   const pulse  = usePulse(token, !collapsed);

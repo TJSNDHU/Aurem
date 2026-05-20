@@ -21,11 +21,13 @@ const FastBiometricLogin = ({ onSuccess, onFallbackToPassword }) => {
     if (savedEmail) {
       setEmail(savedEmail);
       // Auto-trigger biometric prompt
-      setTimeout(() => handleBiometricLogin(savedEmail), 500);
+      const t = setTimeout(() => handleBiometricLogin(savedEmail), 500);
+      return () => clearTimeout(t);
     } else {
       // No saved email, fallback to password
       onFallbackToPassword();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleBiometricLogin = useCallback(async (userEmail) => {

@@ -1,3 +1,33 @@
+## 2026-05-20 — iter 325 — react-doctor CI gate + frontend dead-code purge (P0)
+
+**Trigger**: Founder mandate — run `millionco/react-doctor` on `/frontend/src`, score code, remove dead/unused components, lazy-load heavy imports (Three.js / face-api / rrweb), wire CI workflow that fails on score < 70.
+
+**Built**:
+- `.github/workflows/react-doctor.yml` — runs on every frontend PR, fails CI when score < 70 (uses `--score` flag for clean parsing).
+- `frontend/react-doctor.config.json` — excludes `public/**` (auto-generated partytown), `build/**`, `node_modules/**`, `_archive/**`.
+- `frontend/package.json` — added `yarn react-doctor` script.
+
+**Frontend cuts**:
+- DELETED: `src/platform/RobotViewport.jsx` (dead code — `LiveCampaignPipeline` replaced it; never mounted in App.js).
+- `ForensicMinerHelix` (Three.js, ~600KB) now `React.lazy()` + `<Suspense>` inside `ShopifyAppManager`. Three.js bundle no longer loads for non-Shopify pages.
+- REMOVED from `package.json`: `face-api.js`, `rrweb`, `rrweb-player` — not imported anywhere in `src/`. Pure dead weight.
+
+**Error-level rule fixes** (took score from 48 → 53):
+- `Day7UpsellModal.jsx` — moved `useEffect` before conditional return (rules-of-hooks violation).
+- `FastBiometricLogin.jsx`, `AuremHomepage.jsx`, `CommandPalette.jsx`, `ORACommandConsole.jsx` — added missing `clearTimeout` / EventSource cleanup in effects.
+- `AccessibilityWrapper.jsx`, `AdminShortcuts.jsx`, `BoardroomPage.jsx`, `AdminShell.jsx`, `GoogleAuthCallback.jsx`, `customer/CustomerSettings.jsx`, `admin/OraAdminUnified.jsx` — destructured `location.{pathname,hash,search}` to fix `no-mutable-in-deps` (×7 errors).
+
+**Tests**: `backend/tests/test_react_doctor_setup.py` (6 cases — all passing). Confirms config exists, workflow gates at 70, dead deps removed, lazy-load wired.
+
+**Current score**: 53/100 (was 48). Remaining critical errors: 7 nested-component-definitions, 2 effect-cleanups. **CI currently fails on score gate** — intentional. Each future PR is forced to either fix issues or watch the score climb. 6827 warnings remain (mostly tailwind `w-N h-N → size-N` codemods that future iterations can sweep).
+
+**Files of reference**:
+- `/app/.github/workflows/react-doctor.yml`
+- `/app/frontend/react-doctor.config.json`
+- `/app/frontend/src/platform/ShopifyAppManager.jsx` (lazy import pattern)
+- `/app/backend/tests/test_react_doctor_setup.py`
+
+
 ## 2026-05 — iter 324h — Watchdog: emergency burnt-domains quarantine + ORA CTO claim audit
 
 **Trigger**: ORA CTO posted 12 "what's broken" claims. As watchdog, verified each against the actual codebase + DB state. Caught:

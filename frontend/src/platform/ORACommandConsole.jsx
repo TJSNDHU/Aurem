@@ -105,7 +105,10 @@ function useSSE(clientId) {
   const iid = useRef(0);
   useEffect(() => {
     if (!clientId) return;
+    let reconnectTimer = null;
+    let cancelled = false;
     const go = () => {
+      if (cancelled) return;
       const es = new EventSource(`${API}/api/admin/events/${clientId}`);
       esRef.current = es;
       es.onmessage = (e) => {
@@ -117,10 +120,17 @@ function useSSE(clientId) {
           setFeed((p) => [...p.slice(-80), { ...d, _k: ++iid.current }]);
         } catch {}
       };
-      es.onerror = () => { es.close(); setTimeout(go, 5000); };
+      es.onerror = () => {
+        es.close();
+        if (!cancelled) reconnectTimer = setTimeout(go, 5000);
+      };
     };
     go();
-    return () => esRef.current?.close();
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      esRef.current?.close();
+    };
   }, [clientId]);
   return { feed, clear: () => setFeed([]) };
 }

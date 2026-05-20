@@ -392,12 +392,16 @@ const AuremHomepage = () => {
       (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
       { threshold: 0.1 }
     );
+    const timeouts = [];
     document.querySelectorAll(".aurem-home .fade-up").forEach((el) => {
       obs.observe(el);
       // Also force-show after a brief moment so above-the-fold content is visible immediately.
-      setTimeout(() => el.classList.add("in"), 200);
+      timeouts.push(setTimeout(() => el.classList.add("in"), 200));
     });
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      timeouts.forEach(clearTimeout);
+    };
   }, []);
 
   // Live counter — try real platform stat, fallback to client increment

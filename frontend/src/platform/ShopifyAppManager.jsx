@@ -8,7 +8,7 @@
  * 4. Compliance — GDPR webhooks + ADMT disclosure
  * 5. Extensions — Theme extension code + deployment guide
  */
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
 import {
   ShoppingBag, Shield, Code, Check, Copy, RefreshCw,
   AlertTriangle, Loader2, ExternalLink, Eye, Lock, Zap,
@@ -17,7 +17,9 @@ import {
   Package, ArrowUpRight, Mic, Brain, Layers, Heart, Wrench,
   CreditCard, DollarSign, TrendingUp
 } from 'lucide-react';
-import ForensicMinerHelix from './ForensicMinerHelix';
+// Lazy-loaded — Three.js bundle (~600KB) only loads when the Pulse helix
+// view is actually rendered. Cuts initial JS shipped to non-Shopify pages.
+const ForensicMinerHelix = lazy(() => import('./ForensicMinerHelix'));
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
@@ -616,12 +618,20 @@ const ShopifyAppManager = ({ token }) => {
 
                 {/* 3D Copper Helix */}
                 {minerView === 'helix' && (
-                  <ForensicMinerHelix
+                  <Suspense fallback={
+                    <div data-testid="forensic-helix-loading" style={{
+                      minHeight: 460, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', color: '#7a7a7a', fontSize: 12,
+                      fontFamily: 'monospace', letterSpacing: '0.08em',
+                    }}>
+                      ⬡ Loading 3D forensic helix…
+                    </div>
+                  }><ForensicMinerHelix
                     stores={minerResults.stores || []}
                     outreachStatus={outreachQueue}
                     onQueueOutreach={queueOutreach}
                     queuingDomain={queuingDomain}
-                  />
+                  /></Suspense>
                 )}
 
                 {/* Store List */}

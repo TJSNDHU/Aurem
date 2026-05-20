@@ -120,6 +120,7 @@ function tabFromUrl(location) {
 export default function OraAdminUnified() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { search } = location;
   const gate = useAdminGate();
   const [active, setActive] = useState(() => tabFromUrl(location));
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -127,12 +128,12 @@ export default function OraAdminUnified() {
 
   // Keep URL in sync so refresh / share preserves the active tab.
   useEffect(() => {
-    const sp = new URLSearchParams(location.search);
+    const sp = new URLSearchParams(search);
     if (sp.get("tab") !== active) {
       sp.set("tab", active);
       navigate({ pathname: "/admin/ora", search: `?${sp.toString()}` }, { replace: true });
     }
-  }, [active, location.search, navigate]);
+  }, [active, search, navigate]);
 
   if (gate.loading) {
     return (

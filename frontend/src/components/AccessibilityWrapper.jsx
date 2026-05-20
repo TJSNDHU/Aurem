@@ -11,11 +11,12 @@ export function AccessibilityWrapper({ children }) {
   const mainRef = useRef(null);
 
   // Focus management: move focus to main content on route change
+  const { pathname } = location;
   useEffect(() => {
     if (mainRef.current) {
       mainRef.current.focus({ preventScroll: true });
     }
-  }, [location.pathname]);
+  }, [pathname]);
 
   return (
     <>

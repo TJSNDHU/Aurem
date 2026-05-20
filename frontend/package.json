@@ -51,7 +51,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
-    "face-api.js": "^0.22.2",
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",
     "http-proxy-middleware": "^3.0.5",
@@ -74,8 +73,6 @@
     "react-scripts": "5.0.1",
     "react-window": "^2.2.6",
     "recharts": "^3.8.0",
-    "rrweb": "^2.0.0-alpha.4",
-    "rrweb-player": "^1.0.0-alpha.4",
     "serve": "^14.2.6",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
@@ -88,7 +85,8 @@
     "start": "craco start",
     "dev": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "react-doctor": "npx -y react-doctor@latest ."
   },
   "browserslist": {
     "production": [

@@ -14,11 +14,12 @@ export default function CustomerSettings({ ctx, reload }) {
   const [pwMsg, setPwMsg] = useState('');
   const [saving, setSaving] = useState(false);
   const location = useLocation();
+  const { hash } = location;
 
   // Scroll to Pixel Install section if user arrived via hash (#pixel-install)
   // or via the "Add Pixel" CTA in the IdentityStrip.
   useEffect(() => {
-    const target = location.hash?.replace('#', '') || '';
+    const target = hash?.replace('#', '') || '';
     const id = target || 'pixel-install';
     const t = setTimeout(() => {
       const el = document.getElementById(id);
@@ -29,7 +30,7 @@ export default function CustomerSettings({ ctx, reload }) {
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [location.hash]);
+  }, [hash]);
 
   const changePassword = async () => {
     setPwMsg('');
