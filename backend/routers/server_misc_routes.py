@@ -412,7 +412,7 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
             import resend
             resend.api_key = RESEND_API_KEY
             # iter 282g — tenant-aware branding: AUREM hosts get the new
-            # branded template; other tenants (ReRoots etc.) keep their
+            # branded template; other tenants (AUREM etc.) keep their
             # existing branding.
             is_aurem = "aurem" in (origin or "").lower()
             if is_aurem:
@@ -443,8 +443,8 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
                     </p>
                 </div>
                 """
-                from_addr = "ReRoots <hello@reroots.ca>"
-                subject = "Reset your ReRoots password"
+                from_addr = "AUREM <hello@aurem.live>"
+                subject = "Reset your AUREM password"
             params = {
                 "from": from_addr,
                 "to": [email],
@@ -786,7 +786,7 @@ async def admin_ai_assistant(data: dict, request: Request):
         chat = LlmChat(
             api_key=llm_key,
             session_id="admin-assistant",
-            system_message="""You are a helpful AI assistant for ReRoots skincare e-commerce store administrators.
+            system_message="""You are a helpful AI assistant for AUREM skincare e-commerce store administrators.
 You help with: Managing products, inventory, orders, payments, settings, troubleshooting.
 Be concise, helpful, and friendly.""",
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")

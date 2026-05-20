@@ -117,8 +117,8 @@ export default function UsageBilling({ token, user }) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="usage-billing-loading">
         <div className="flex items-center gap-3 text-[#888]">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading billing data...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading billing data…</span>
         </div>
       </div>
     );
@@ -148,9 +148,9 @@ export default function UsageBilling({ token, user }) {
           <>
             {/* Stripe Placeholder Warning */}
             <div className="p-3.5 rounded-xl mb-4 flex items-center gap-3" style={{ background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.15)' }} data-testid="stripe-warning">
-              <AlertCircle className="w-5 h-5 text-[#FF6B6B] flex-shrink-0" />
+              <AlertCircle className="size-5 text-[#FF6B6B] flex-shrink-0" />
               <div>
-                <span className="text-xs font-bold text-[#FF6B6B]">Stripe: Test placeholder — payments not functional</span>
+                <span className="text-xs font-bold text-[#FF6B6B]">Stripe: Test placeholder, payments not functional</span>
                 <p className="text-[10px] text-[#888] mt-0.5">Add a real Stripe API key in Settings to enable live payment processing.</p>
               </div>
             </div>
@@ -159,8 +159,8 @@ export default function UsageBilling({ token, user }) {
             <div className="p-5 border border-[#FF6B00]/20 rounded-xl mb-6" style={{ background: 'rgba(212,163,115,0.03)' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: (currentTier?.color || '#FF6B00') + '15' }}>
-                    {currentTier ? <currentTier.icon className="w-6 h-6" style={{ color: currentTier.color }} /> : <Zap className="w-6 h-6 text-[#888]" />}
+                  <div className="size-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: (currentTier?.color || '#FF6B00') + '15' }}>
+                    {currentTier ? <currentTier.icon className="size-6" style={{ color: currentTier.color }} /> : <Zap className="size-6 text-[#888]" />}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export default function UsageBilling({ token, user }) {
                   <button onClick={() => setActiveTab('plans')} data-testid="upgrade-btn"
                     className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-[#1A3026] rounded-lg transition-all"
                     style={{ background: 'linear-gradient(135deg, #FF6B00, #CC5500)' }}>
-                    <ArrowUpRight className="w-3.5 h-3.5" /> Upgrade
+                    <ArrowUpRight className="size-3.5" /> Upgrade
                   </button>
                 )}
               </div>
@@ -213,7 +213,7 @@ export default function UsageBilling({ token, user }) {
                     return (
                       <div key={type} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Icon className="w-3.5 h-3.5 text-[#FF6B00]" />
+                          <Icon className="size-3.5 text-[#FF6B00]" />
                           <span className="text-[10px] text-[#888]">{type.replace(/_/g, ' ')}</span>
                         </div>
                         <span className="text-xs font-medium text-white">{count}</span>
@@ -228,7 +228,7 @@ export default function UsageBilling({ token, user }) {
 
             {/* Stripe Status */}
             <div className="p-4 border border-white/5 rounded-xl flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.02)' }}>
-              <CreditCard className="w-4 h-4 text-[#888]" />
+              <CreditCard className="size-4 text-[#888]" />
               <span className="text-xs text-[#888]">Payment provider: </span>
               <span className="text-xs font-medium text-[#f59e0b]">Stripe (Mock Mode)</span>
               <span className="text-[10px] text-[#666] ml-auto">Add your Stripe key in Settings &gt; API Keys to enable live payments</span>
@@ -252,7 +252,7 @@ export default function UsageBilling({ token, user }) {
                     </div>
                   )}
                   <div className="mb-4">
-                    <plan.icon className="w-8 h-8 mb-3" style={{ color: plan.color }} />
+                    <plan.icon className="size-8 mb-3" style={{ color: plan.color }} />
                     <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-2xl font-bold text-white">${plan.price}</span>
@@ -262,7 +262,7 @@ export default function UsageBilling({ token, user }) {
                   <ul className="space-y-2 mb-6">
                     {plan.features.map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs text-[#aaa]">
-                        <CheckCircle className="w-3.5 h-3.5 text-[#4ade80] mt-0.5 flex-shrink-0" />
+                        <CheckCircle className="size-3.5 text-[#4ade80] mt-0.5 flex-shrink-0" />
                         {f}
                       </li>
                     ))}

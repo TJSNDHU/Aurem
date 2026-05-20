@@ -22,8 +22,8 @@ const LegalHeader = () => (
   <header className="py-6 px-8 border-b border-white/5">
     <div className="max-w-4xl mx-auto flex items-center justify-between">
       <Link to="/" className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)' }}>
-          <Target className="w-4 h-4 text-[#050507]" />
+        <div className="size-8 rounded-md flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)' }}>
+          <Target className="size-4 text-[#050507]" />
         </div>
         <span className="text-sm tracking-[0.2em]" style={{ fontFamily: "'Cinzel', 'Playfair Display', serif" }}>AUREM</span>
       </Link>
@@ -76,7 +76,7 @@ export const LegalIndex = () => {
           data-testid="legal-index-title">
           Legal & Compliance
         </h1>
-        <p className="text-sm text-[#666] mb-10">Polaris Built Inc. — Governing policies for the AUREM AI Platform</p>
+        <p className="text-sm text-[#666] mb-10">Polaris Built Inc., Governing policies for the AUREM AI Platform</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {slugs.map(slug => {
@@ -95,11 +95,11 @@ export const LegalIndex = () => {
                 }}
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{
+                  <div className="size-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{
                     background: `${meta.color}10`,
                     border: `1px solid ${meta.color}20`,
                   }}>
-                    <Icon className="w-5 h-5" style={{ color: meta.color }} />
+                    <Icon className="size-5" style={{ color: meta.color }} />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold mb-1 group-hover:text-[#D4AF37] transition-colors" style={{ color: '#E8E6E1' }}>
@@ -110,7 +110,7 @@ export const LegalIndex = () => {
                     </p>
                     <div className="flex items-center gap-1 mt-2 text-[9px] text-[#444] group-hover:text-[#D4AF37] transition-colors">
                       <span>Read full policy</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
+                      <ExternalLink className="size-2.5" />
                     </div>
                   </div>
                 </div>
@@ -143,7 +143,7 @@ export const LegalDocument = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#050507' }}>
-        <div className="animate-spin w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full" />
+        <div className="animate-spin size-6 border-2 border-[#D4AF37] border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -166,7 +166,7 @@ export const LegalDocument = () => {
       <main className="max-w-3xl mx-auto px-8 py-12">
         <Link to="/legal" className="inline-flex items-center gap-1.5 text-[10px] text-[#555] hover:text-[#D4AF37] transition-colors mb-8 tracking-wider"
           data-testid="legal-back-link">
-          <ArrowLeft className="w-3 h-3" /> ALL POLICIES
+          <ArrowLeft className="size-3" /> ALL POLICIES
         </Link>
 
         <div className="mb-8">

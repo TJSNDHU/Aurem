@@ -35,20 +35,20 @@ const PhaseBadge = ({ active, verified, label }) => {
   if (verified) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-[#4ade80]/15 text-[#FF6B00]" data-testid={`badge-${label}`}>
-        <CheckCircle className="w-3 h-3" /> {label}
+        <CheckCircle className="size-3" /> {label}
       </span>
     );
   }
   if (active) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-[#D4B977]/15 text-[#B8942A]" data-testid={`badge-${label}`}>
-        <Clock className="w-3 h-3" /> {label}
+        <Clock className="size-3" /> {label}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-[#FF6B6B]/10 text-[#FF6B6B]" data-testid={`badge-${label}`}>
-      <AlertTriangle className="w-3 h-3" /> {label}
+      <AlertTriangle className="size-3" /> {label}
     </span>
   );
 };
@@ -86,7 +86,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
         {/* Site Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Globe className="w-3.5 h-3.5 text-[#D4AF37] flex-shrink-0" />
+            <Globe className="size-3.5 text-[#D4AF37] flex-shrink-0" />
             <span className="text-xs font-bold text-[#1A1A2E] truncate">{site.url}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -94,7 +94,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
             <PhaseBadge active={site.phase2_origin} verified={site.phase2_verified} label="ORIGIN" />
             {site.double_lock_status === 'verified' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-[#FF6B00]/15 text-[#FF6B00]">
-                <Lock className="w-3 h-3" /> DOUBLE-LOCKED
+                <Lock className="size-3" /> DOUBLE-LOCKED
               </span>
             )}
           </div>
@@ -106,7 +106,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
             <div className="text-xs font-bold text-[#1A1A2E]">{site.deployed}/{site.total_fixes}</div>
             <div className="text-[9px] text-[#888]">deployed</div>
           </div>
-          {expanded ? <ChevronDown className="w-3.5 h-3.5 text-[#888]" /> : <ChevronRight className="w-3.5 h-3.5 text-[#888]" />}
+          {expanded ? <ChevronDown className="size-3.5 text-[#888]" /> : <ChevronRight className="size-3.5 text-[#888]" />}
         </div>
       </button>
 
@@ -126,9 +126,9 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
           }}
         >
           {isDeploying ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting pixel on live site…</>
+            <><Loader2 className="size-3.5 animate-spin" /> Detecting pixel on live site…</>
           ) : (
-            <><Zap className="w-3.5 h-3.5" /> Detect &amp; Deploy Pixel ({site.total_fixes - site.deployed} fixes)</>
+            <><Zap className="size-3.5" /> Detect &amp; Deploy Pixel ({site.total_fixes - site.deployed} fixes)</>
           )}
         </button>
       )}
@@ -159,7 +159,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
           {/* Origin-Write Status */}
           <div className="p-3 rounded-lg" style={{ background: 'linear-gradient(135deg, #1C1712, #211D17)', border: '1px solid rgba(184,135,89,0.15)' }}>
             <div className="flex items-center gap-2 mb-2">
-              <Lock className="w-3.5 h-3.5 text-[#D4A574]" />
+              <Lock className="size-3.5 text-[#D4A574]" />
               <span className="text-[10px] font-bold tracking-[1.5px] text-[#D4A574] uppercase">Double-Lock Status</span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-[10px]">
@@ -191,7 +191,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
             {site.url_slug && (
               <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(184,135,89,0.1)' }}>
                 <div className="flex items-center gap-1.5">
-                  <Link2 className="w-3 h-3 text-[#6B5744]" />
+                  <Link2 className="size-3 text-[#6B5744]" />
                   <span className="text-[9px] text-[#6B5744] font-mono truncate">
                     /api/repair/origin/serve/{site.url_slug}/fixes.css
                   </span>
@@ -204,7 +204,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
           {hasPSI && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 mb-1">
-                <Eye className="w-3 h-3 text-[#888]" />
+                <Eye className="size-3 text-[#888]" />
                 <span className="text-[9px] font-bold tracking-[1px] text-[#888] uppercase">PageSpeed Insights</span>
               </div>
               {Object.entries(psi).map(([key, score]) => (
@@ -216,7 +216,7 @@ const SiteRow = ({ site, expanded, onToggle, onDeployPixel, deployingUrl }) => {
           {/* Last activity */}
           {site.last_activity && (
             <div className="text-[9px] text-[#aaa] flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5" />
+              <Clock className="size-2.5" />
               Last activity: {new Date(site.last_activity).toLocaleString()}
             </div>
           )}
@@ -376,8 +376,8 @@ const SiteHealthLeaderboard = ({ token }) => {
     return (
       <div className="flex-1 overflow-y-auto p-6" style={{ background: 'transparent' }}>
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 text-[#D4AF37] animate-spin" />
-          <span className="ml-3 text-sm text-[#888]">Loading site health data...</span>
+          <Loader2 className="size-6 text-[#D4AF37] animate-spin" />
+          <span className="ml-3 text-sm text-[#888]">Loading site health data…</span>
         </div>
       </div>
     );
@@ -410,7 +410,7 @@ const SiteHealthLeaderboard = ({ token }) => {
               style={{ background: 'rgba(255,107,0,0.12)', border: '1px solid rgba(255,107,0,0.3)', color: '#FF6B00' }}
               title="Live-verify pixel on every tracked site now"
             >
-              {heartbeatRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span className="text-sm">🫀</span>}
+              {heartbeatRunning ? <Loader2 className="size-3.5 animate-spin" /> : <span className="text-sm">🫀</span>}
               Heartbeat
             </button>
             <button
@@ -420,7 +420,7 @@ const SiteHealthLeaderboard = ({ token }) => {
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
               style={{ background: 'rgba(61,58,57,0.15)', border: '1px solid rgba(255,107,0,0.1)', color: '#FF6B00' }}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </button>
           </div>
@@ -469,15 +469,15 @@ const SiteHealthLeaderboard = ({ token }) => {
         {/* Legend */}
         <div className="flex items-center gap-4 mb-4 px-1">
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-[#4ade80]" />
+            <div className="size-2 rounded-full bg-[#4ade80]" />
             <span className="text-[9px] text-[#888]">Double-Locked</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-[#D4B977]" />
+            <div className="size-2 rounded-full bg-[#D4B977]" />
             <span className="text-[9px] text-[#888]">Origin Committed</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-[#FF6B6B]" />
+            <div className="size-2 rounded-full bg-[#FF6B6B]" />
             <span className="text-[9px] text-[#888]">Needs Attention</span>
           </div>
         </div>
@@ -485,7 +485,7 @@ const SiteHealthLeaderboard = ({ token }) => {
         {/* Site List */}
         {sites.length === 0 ? (
           <div className="text-center py-16">
-            <Activity className="w-12 h-12 text-[#D4AF37]/30 mx-auto mb-3" />
+            <Activity className="size-12 text-[#D4AF37]/30 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-[#1A1A2E] mb-1">No Sites Tracked Yet</h3>
             <p className="text-xs text-[#888]">Scan a URL in the ORA Repair Engine to start tracking site health</p>
           </div>

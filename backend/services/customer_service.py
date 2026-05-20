@@ -296,9 +296,9 @@ async def send_vip_notification(customer: dict, order: dict):
         
         # Email to customer
         customer_email = Mail(
-            from_email=("vip@reroots.ca", "ReRoots VIP"),
+            from_email=("vip@aurem.live", "AUREM VIP"),
             to_emails=customer.get("email"),
-            subject="⭐ You've unlocked ReRoots VIP Status!",
+            subject="⭐ You've unlocked AUREM VIP Status!",
             html_content=f"""
             <div style="font-family: Arial; max-width: 600px; margin: 0 auto; background: #fff;">
                 <div style="background: linear-gradient(135deg, #2D2A2E 0%, #3d393d 100%); padding: 30px; text-align: center;">
@@ -323,9 +323,9 @@ async def send_vip_notification(customer: dict, order: dict):
                         <li>Birthday surprise rewards</li>
                     </ul>
                     
-                    <p style="color: #666; margin-top: 25px;">Your dedicated team at ReRoots is here for you.<br>Reply to this email anytime.</p>
+                    <p style="color: #666; margin-top: 25px;">Your dedicated team at AUREM is here for you.<br>Reply to this email anytime.</p>
                     
-                    <p style="color: #2D2A2E; font-weight: bold; margin-top: 25px;">ReRoots Aesthetics Team 🌿</p>
+                    <p style="color: #2D2A2E; font-weight: bold; margin-top: 25px;">AUREM Aesthetics Team 🌿</p>
                 </div>
             </div>
             """
@@ -333,9 +333,9 @@ async def send_vip_notification(customer: dict, order: dict):
         sg.send(customer_email)
         
         # Internal alert
-        admin_email = os.environ.get("ADMIN_EMAIL", "support@reroots.ca")
+        admin_email = os.environ.get("ADMIN_EMAIL", "support@aurem.live")
         internal_alert = Mail(
-            from_email=("system@reroots.ca", "ReRoots System"),
+            from_email=("system@aurem.live", "AUREM System"),
             to_emails=admin_email,
             subject=f"⭐ New VIP Customer: {customer.get('name', 'Unknown')}",
             html_content=f"""
@@ -343,7 +343,7 @@ async def send_vip_notification(customer: dict, order: dict):
             <p>Email: {customer.get('email')}</p>
             <p>LTV: ${float(customer.get('ltv', 0)):.2f}</p>
             <p>WhatsApp: {'✅' if customer.get('whatsapp_opted_in') else '❌'}</p>
-            <a href="https://reroots.ca/admin/crm">View in CRM →</a>
+            <a href="https://aurem.live/admin/crm">View in CRM →</a>
             """
         )
         sg.send(internal_alert)

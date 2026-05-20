@@ -1,5 +1,5 @@
 """
-Content AI Service for Reroots
+Content AI Service for AUREM
 AI-powered content creation engine for marketing
 
 6 Content Types:
@@ -131,7 +131,7 @@ async def generate_content(
     
     # Build prompts based on content type
     prompts = {
-        "instagram_caption": f"""Create an Instagram caption for ReRoots Skincare.
+        "instagram_caption": f"""Create an Instagram caption for AUREM Skincare.
 
 Product: {inputs.get('product_name', 'AURA-GEN System')}
 Skin concern: {inputs.get('skin_concern', 'general skin health')}
@@ -144,7 +144,7 @@ Output format:
 
 Keep it authentic and avoid generic influencer language.""",
 
-        "instagram_story": f"""Create a 5-slide Instagram Story script for ReRoots.
+        "instagram_story": f"""Create a 5-slide Instagram Story script for AUREM.
 
 Topic: {inputs.get('topic', 'skin renewal journey')}
 Product focus: {inputs.get('product_focus', 'AURA-GEN System')}
@@ -158,7 +158,7 @@ SLIDE 5 (CTA): [under 15 words - action to take]
 
 Each slide must be under 15 words. No hashtags in story.""",
 
-        "product_description": f"""Write an SEO-optimized product description for ReRoots.
+        "product_description": f"""Write an SEO-optimized product description for AUREM.
 
 Product: {inputs.get('product_name', 'AURA-GEN TXA + PDRN Serum')}
 Key ingredients: {inputs.get('ingredients', 'PDRN, Tranexamic Acid, Argireline')}
@@ -172,7 +172,7 @@ Requirements:
 - Clinical but warm tone
 - SEO-friendly structure with clear sections""",
 
-        "whatsapp_broadcast": f"""Write a WhatsApp broadcast message for ReRoots.
+        "whatsapp_broadcast": f"""Write a WhatsApp broadcast message for AUREM.
 
 Campaign goal: {inputs.get('campaign_goal', 'new product launch')}
 Offer details: {inputs.get('offer_details', 'no specific offer')}
@@ -185,7 +185,7 @@ Requirements:
 - Not pushy or salesy
 - Feel like a message from a friend who happens to work in skincare""",
 
-        "blog_outline": f"""Create an 800-word blog post outline for ReRoots.
+        "blog_outline": f"""Create an 800-word blog post outline for AUREM.
 
 Topic: {inputs.get('topic', 'understanding skin aging')}
 Target keywords: {inputs.get('target_keywords', 'skin health, PDRN benefits')}
@@ -213,7 +213,7 @@ KEYWORD SUGGESTIONS: [5 related keywords to include]
 
 SEO NOTES: [brief optimization tips]""",
 
-        "email_subjects": f"""Generate 5 email subject line options for ReRoots.
+        "email_subjects": f"""Generate 5 email subject line options for AUREM.
 
 Email goal: {inputs.get('email_goal', 'drive engagement')}
 Target audience: {inputs.get('target_audience', 'existing customers')}
@@ -235,7 +235,7 @@ Make each option distinctly different in approach (curiosity, urgency, personal,
     
     prompt = prompts.get(content_type, prompts["instagram_caption"])
     
-    system_prompt = f"""You are the content strategist for ReRoots Aesthetics Inc., a clinical skincare brand.
+    system_prompt = f"""You are the content strategist for AUREM Aesthetics Inc., a clinical skincare brand.
 
 {BRAND_VOICE_RULES}
 
@@ -310,7 +310,7 @@ async def save_content(
             "approved_by": admin_email,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "approved",
-            "watermark": f"ReRoots Content | {content_type} | {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+            "watermark": f"AUREM Content | {content_type} | {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
         }
         
         result = await _db.reroots_content.insert_one(doc)

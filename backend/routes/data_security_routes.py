@@ -1,5 +1,5 @@
 """
-Data Security Routes for Reroots
+Data Security Routes for AUREM
 GDPR compliance, data retention, and security endpoints.
 
 Features:
@@ -250,7 +250,7 @@ async def get_data_retention_policy():
             "Right to data portability",
             "Right to object to processing"
         ],
-        "contact": "privacy@reroots.ca",
+        "contact": "privacy@aurem.live",
         "data_location": "Canada (MongoDB Atlas)",
         "encryption": "AES-256 for sensitive fields"
     }

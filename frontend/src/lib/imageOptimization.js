@@ -216,8 +216,8 @@ export const supportsAVIF = async () => {
  * @returns {Promise<object>} - Upload result with URLs
  */
 export const uploadToCloudinary = async (file, folder = 'reroots/products') => {
-  const API_URL = typeof window !== 'undefined' && window.location.hostname.includes('reroots.ca') 
-    ? 'https://reroots.ca' 
+  const API_URL = typeof window !== 'undefined' && window.location.hostname.includes('aurem.live') 
+    ? 'https://aurem.live' 
     : (process.env.REACT_APP_BACKEND_URL || window.location.origin);
   
   const formData = new FormData();

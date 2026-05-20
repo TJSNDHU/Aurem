@@ -159,7 +159,7 @@ export default function AdminDevConsole({ token, isAdmin }) {
           <span className="relative inline-flex">
             <Bug className="w-[18px] h-[18px]" style={{ color: GOLD }} />
             <span
-              className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+              className="absolute -top-1 -right-1 size-2.5 rounded-full"
               style={{ background: dotColor, boxShadow: `0 0 8px ${dotColor}` }}
             />
           </span>
@@ -188,7 +188,7 @@ export default function AdminDevConsole({ token, isAdmin }) {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${GOLD}22` }}>
             <div className="flex items-center gap-2">
-              <Bug className="w-4 h-4" style={{ color: GOLD }} />
+              <Bug className="size-4" style={{ color: GOLD }} />
               <div>
                 <div className="text-[11px] font-bold tracking-[2.5px] text-white/90">AUREM DEV CONSOLE</div>
                 <div className="text-[9px] text-white/45 tracking-[1px]">
@@ -199,14 +199,14 @@ export default function AdminDevConsole({ token, isAdmin }) {
             </div>
             <div className="flex items-center gap-1">
               <button onClick={fetchAll} title="Refresh"
-                className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-white/5 transition"
+                className="size-7 rounded-md flex items-center justify-center hover:bg-white/5 transition"
                 data-testid="dev-console-refresh">
-                <RefreshCw className={`w-3.5 h-3.5 text-white/60 ${busy ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`size-3.5 text-white/60 ${busy ? 'animate-spin' : ''}`} />
               </button>
               <button onClick={() => setOpen(false)} title="Close (Ctrl+Shift+D)"
-                className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-white/5 transition"
+                className="size-7 rounded-md flex items-center justify-center hover:bg-white/5 transition"
                 data-testid="dev-console-close">
-                <X className="w-4 h-4 text-white/70" />
+                <X className="size-4 text-white/70" />
               </button>
             </div>
           </div>
@@ -273,7 +273,7 @@ const Tab = ({ active, onClick, icon: Icon, label, badge, testid }) => (
       background: active ? `linear-gradient(135deg, ${GOLD}, ${GOLD}cc)` : 'transparent',
     }}
   >
-    <Icon className="w-3 h-3" />
+    <Icon className="size-3" />
     {label}
     {badge > 0 && (
       <span
@@ -295,7 +295,7 @@ const FooterLink = ({ href, label }) => (
     style={{ color: GOLD }}
   >
     {label}
-    <ExternalLink className="w-2.5 h-2.5" />
+    <ExternalLink className="size-2.5" />
   </a>
 );
 
@@ -329,7 +329,7 @@ const SentinelTab = ({ errors }) => {
             onClick={() => setExpanded(isOpen ? null : k)}
           >
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: '#ef4444' }} />
+              <AlertTriangle className="size-3 mt-0.5 flex-shrink-0" style={{ color: '#ef4444' }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[9px] font-black tracking-[1px] uppercase" style={{ color: GOLD }}>
@@ -362,7 +362,7 @@ const SentinelTab = ({ errors }) => {
                   </div>
                 )}
               </div>
-              {isOpen ? <ChevronUp className="w-3 h-3 text-white/40" /> : <ChevronDown className="w-3 h-3 text-white/40" />}
+              {isOpen ? <ChevronUp className="size-3 text-white/40" /> : <ChevronDown className="size-3 text-white/40" />}
             </div>
           </div>
         );
@@ -394,7 +394,7 @@ const PulseTab = ({ pulse }) => {
             className="flex items-center gap-2 px-2 py-1.5 rounded"
             style={{ background: c.passed ? 'rgba(34,197,94,0.04)' : 'rgba(239,68,68,0.06)' }}
           >
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.passed ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className={`size-1.5 rounded-full flex-shrink-0 ${c.passed ? 'bg-green-500' : 'bg-red-500'}`} />
             <span className="text-[10px] text-white/80 truncate flex-1">{c.label || c.id || c.path}</span>
             <span className="text-[9px] text-white/40 font-mono">{c.status_code || '—'}</span>
             <span className="text-[9px] text-white/40 font-mono">{c.latency_ms || '—'}ms</span>
@@ -416,7 +416,7 @@ const SuggestTab = ({ suggestions }) => {
         <div key={s.suggestion_id || s.id} className="rounded-md p-2"
           style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <div className="flex items-center gap-1.5 mb-1">
-            <Sparkles className="w-3 h-3" style={{ color: '#a78bfa' }} />
+            <Sparkles className="size-3" style={{ color: '#a78bfa' }} />
             <span className="text-[9px] font-bold tracking-[1px] uppercase" style={{ color: '#a78bfa' }}>
               {s.status || 'pending'}
             </span>
@@ -468,7 +468,7 @@ const ConsoleTab = ({ bump }) => { // eslint-disable-line no-unused-vars
 // ─────────────────────────────────────────────────────────────────────
 const EmptyState = ({ icon: Icon, title, hint }) => (
   <div className="flex flex-col items-center justify-center py-10 text-center">
-    <Icon className="w-8 h-8 mb-2" style={{ color: GOLD, opacity: 0.5 }} />
+    <Icon className="size-8 mb-2" style={{ color: GOLD, opacity: 0.5 }} />
     <div className="text-[11px] font-bold text-white/80">{title}</div>
     <div className="text-[9px] text-white/40 mt-1 max-w-[280px] leading-tight">{hint}</div>
   </div>
@@ -476,7 +476,7 @@ const EmptyState = ({ icon: Icon, title, hint }) => (
 
 const MiniStat = ({ label, value, color, icon: Icon }) => (
   <div className="rounded px-2 py-1.5 flex items-center gap-1.5" style={{ background: `${color}10` }}>
-    <Icon className="w-3 h-3" style={{ color }} />
+    <Icon className="size-3" style={{ color }} />
     <div className="flex flex-col">
       <span className="text-[8px] text-white/50 uppercase tracking-wider">{label}</span>
       <span className="text-[12px] font-black" style={{ color }}>{value}</span>

@@ -60,7 +60,7 @@ const TierCard = ({ offer, recommended, onSelect, loading, isSelected }) => {
       {isFree && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-[7px] font-bold tracking-[2px] px-3 py-1 rounded-full text-white"
           style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>
-          <Shield className="w-3 h-3" /> FREE SHIELD
+          <Shield className="size-3" /> FREE SHIELD
         </div>
       )}
       {recommended && !isFree && (
@@ -72,7 +72,7 @@ const TierCard = ({ offer, recommended, onSelect, loading, isSelected }) => {
 
       <div className="text-center mb-4">
         <div className="flex items-center justify-center gap-1.5 mb-0.5">
-          {isFree && <Shield className="w-4 h-4 text-[#22c55e]" />}
+          {isFree && <Shield className="size-4 text-[#22c55e]" />}
           <h3 className="text-sm font-bold text-[#1A1A2E]">{offer.name}</h3>
         </div>
         <div className="flex items-center justify-center gap-2">
@@ -118,7 +118,7 @@ const TierCard = ({ offer, recommended, onSelect, loading, isSelected }) => {
       <div className="space-y-1.5 mb-4">
         {offer.features?.map((f, i) => (
           <div key={i} className="flex items-center gap-2">
-            <CheckCircle className="w-3 h-3 text-[#4ade80] flex-shrink-0" />
+            <CheckCircle className="size-3 text-[#4ade80] flex-shrink-0" />
             <span className="text-[10px] text-[#666]">{f}</span>
           </div>
         ))}
@@ -143,7 +143,7 @@ const TierCard = ({ offer, recommended, onSelect, loading, isSelected }) => {
           : { background: 'rgba(61,58,57,0.15)', border: '1px solid rgba(255,107,0,0.12)', color: '#FF6B00' }
         }
       >
-        {loading && isSelected ? <Loader2 className="w-4 h-4 animate-spin" /> : isFree ? <Shield className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+        {loading && isSelected ? <Loader2 className="size-4 animate-spin" /> : isFree ? <Shield className="size-4" /> : <CreditCard className="size-4" />}
         {isFree ? (loading && isSelected ? 'Activating...' : 'Activate Free Shield') : isCommission ? (loading && isSelected ? 'Processing...' : 'Start Free — Pay Per Sale') : (loading && isSelected ? 'Processing...' : `Get ${offer.name}`)}
       </button>
     </div>
@@ -281,7 +281,7 @@ const IntelligenceHub = ({ token }) => {
         {/* ── Header ── */}
         <div className="mb-6" data-testid="intelligence-hub-header">
           <h1 className="text-xl font-bold text-[#1A1A2E] tracking-wider mb-1">Intelligence Hub</h1>
-          <p className="text-xs text-[#888]">Autonomous Executive — Forensic Pulse + AI Proposal + Dynamic Offers</p>
+          <p className="text-xs text-[#888]">Autonomous Executive, Forensic Pulse + AI Proposal + Dynamic Offers</p>
         </div>
 
         {/* ── URL Input ── */}
@@ -296,7 +296,7 @@ const IntelligenceHub = ({ token }) => {
             <button onClick={handleScan} disabled={scanning} data-testid="forensic-scan-btn"
               className="px-6 py-3 text-white rounded-lg font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-[#D4AF37]/20"
               style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)' }}>
-              {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+              {scanning ? <Loader2 className="size-4 animate-spin" /> : <Brain className="size-4" />}
               {scanning ? 'Profiling Business DNA...' : 'Forensic Pulse'}
             </button>
           </div>
@@ -304,7 +304,7 @@ const IntelligenceHub = ({ token }) => {
 
         {error && (
           <div className="mb-4 p-3 bg-red-50/80 border border-red-200/50 rounded-lg text-red-600 text-sm flex items-center gap-2" data-testid="intelligence-error">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />{error}
+            <AlertTriangle className="size-4 flex-shrink-0" />{error}
           </div>
         )}
 
@@ -317,8 +317,8 @@ const IntelligenceHub = ({ token }) => {
             <div className="p-5 rounded-2xl border border-[#D4AF37]/20 bg-gradient-to-br from-[#1C1712] to-[#211D17] mb-4">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4AF37, #B88759)' }}>
-                    <CatIcon className="w-6 h-6 text-white" />
+                  <div className="size-12 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4AF37, #B88759)' }}>
+                    <CatIcon className="size-6 text-white" />
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-white">{dnaProfile.business_name}</h2>
@@ -359,7 +359,7 @@ const IntelligenceHub = ({ token }) => {
             <div className="p-5 rounded-2xl border border-[#FF6B6B]/20 bg-white/50 backdrop-blur-sm mb-4" data-testid="revenue-leakage">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-[#FF6B6B]" />
+                  <DollarSign className="size-5 text-[#FF6B6B]" />
                   <h3 className="text-sm font-bold text-[#1A1A2E] tracking-wider">REVENUE LEAKAGE DETECTED</h3>
                 </div>
                 <div className="text-right">
@@ -389,8 +389,8 @@ const IntelligenceHub = ({ token }) => {
         {offers && (
           <div className="mb-6" data-testid="ai-proposal">
             <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-[#D4AF37]" />
-              <h3 className="text-sm font-bold text-[#1A1A2E] tracking-wider">AI PROPOSAL — FIX IT NOW</h3>
+              <Sparkles className="size-5 text-[#D4AF37]" />
+              <h3 className="text-sm font-bold text-[#1A1A2E] tracking-wider">AI PROPOSAL, FIX IT NOW</h3>
               {offers.trigger !== 'page_view' && (
                 <span className="text-[8px] px-2 py-0.5 rounded-full font-bold tracking-wider animate-pulse"
                   style={{ background: 'rgba(212,175,55,0.2)', color: '#D4AF37' }}>
@@ -413,7 +413,7 @@ const IntelligenceHub = ({ token }) => {
             </div>
 
             <p className="text-center text-[9px] text-[#888] mt-3">
-              <Lock className="w-2.5 h-2.5 inline mr-1" />
+              <Lock className="size-2.5 inline mr-1" />
               Secure payment via Stripe. All offers include a 30-day money-back guarantee.
             </p>
           </div>
@@ -422,14 +422,14 @@ const IntelligenceHub = ({ token }) => {
         {/* ═══ EMPTY STATE ═══ */}
         {!dnaProfile && !scanning && (
           <div className="text-center py-16" data-testid="intelligence-empty">
-            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(255,107,0,0.12))' }}>
-              <Brain className="w-8 h-8 text-[#D4AF37]" />
+            <div className="size-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(255,107,0,0.12))' }}>
+              <Brain className="size-8 text-[#D4AF37]" />
             </div>
             <h2 className="text-lg font-bold text-[#1A1A2E] mb-2">The Autonomous Executive</h2>
             <p className="text-sm text-[#888] max-w-lg mx-auto">
               Enter any business URL. ORA builds a <span className="font-bold text-[#D4AF37]">Business DNA Profile</span>,
               estimates revenue leakage, and generates a personalized
-              <span className="font-bold text-[#4ade80]"> AI Proposal</span> with dynamic pricing — all in seconds.
+              <span className="font-bold text-[#4ade80]"> AI Proposal</span> with dynamic pricing, all in seconds.
             </p>
           </div>
         )}

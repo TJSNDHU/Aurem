@@ -150,13 +150,13 @@ export default function OmnichannelHub({ token }) {
           className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-xs font-bold transition-all ${
             hubView === 'inbox' ? 'bg-white/80 text-[#1A1A2E] border border-b-0 border-[#FF6B00]/20' : 'text-[#888] hover:text-[#1A1A2E]'
           }`}>
-          <Inbox className="w-3.5 h-3.5" /> Unified Inbox
+          <Inbox className="size-3.5" /> Unified Inbox
         </button>
         <button onClick={() => setHubView('campaigns')} data-testid="hub-view-campaigns"
           className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-xs font-bold transition-all ${
             hubView === 'campaigns' ? 'bg-white/80 text-[#1A1A2E] border border-b-0 border-[#FF6B00]/20' : 'text-[#888] hover:text-[#1A1A2E]'
           }`}>
-          <Target className="w-3.5 h-3.5" /> Recovery Campaigns
+          <Target className="size-3.5" /> Recovery Campaigns
           {commStats?.total_sent > 0 && (
             <span className="px-1.5 py-0.5 text-[8px] font-bold bg-[#D4AF37]/10 text-[#D4AF37] rounded-full">{commStats.total_sent}</span>
           )}
@@ -179,7 +179,7 @@ export default function OmnichannelHub({ token }) {
                 return (
                   <div key={i} className="p-3 rounded-xl border border-white/30 bg-white/50 backdrop-blur-sm">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Icon className="w-3 h-3" style={{ color: s.color }} />
+                      <Icon className="size-3" style={{ color: s.color }} />
                       <span className="text-[7px] text-[#888] uppercase tracking-wider font-bold">{s.label}</span>
                     </div>
                     <div className="text-lg font-bold text-[#1A1A2E]">{s.value}</div>
@@ -192,7 +192,7 @@ export default function OmnichannelHub({ token }) {
           {/* Launch Campaign */}
           <div className="p-5 rounded-2xl border border-[#D4AF37]/15 bg-white/50 backdrop-blur-sm mb-5">
             <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-5 h-5 text-[#D4AF37]" />
+              <Zap className="size-5 text-[#D4AF37]" />
               <h3 className="text-sm font-bold text-[#1A1A2E] tracking-wider">LAUNCH RECOVERY CAMPAIGN</h3>
             </div>
             <p className="text-[10px] text-[#888] mb-4">
@@ -255,7 +255,7 @@ export default function OmnichannelHub({ token }) {
               <button onClick={handleLaunchCampaign} disabled={sending} data-testid="launch-campaign-btn"
                 className="px-6 py-2.5 rounded-lg font-bold text-sm text-white transition-all disabled:opacity-50 flex items-center gap-2"
                 style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)' }}>
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 {sending ? 'Sending...' : 'Launch Campaign'}
               </button>
             </div>
@@ -265,7 +265,7 @@ export default function OmnichannelHub({ token }) {
           {sendResult && !sendResult.error && (
             <div className="p-4 rounded-xl border border-[#4ade80]/20 bg-[#4ade80]/5 mb-5" data-testid="campaign-result">
               <div className="flex items-center gap-2 mb-2">
-                <CheckCheck className="w-4 h-4 text-[#4ade80]" />
+                <CheckCheck className="size-4 text-[#4ade80]" />
                 <span className="text-sm font-bold text-[#FF6B00]">Campaign Launched</span>
               </div>
               <div className="grid grid-cols-4 gap-3 text-center">
@@ -286,17 +286,17 @@ export default function OmnichannelHub({ token }) {
           <div className="rounded-xl border border-white/30 bg-white/40 backdrop-blur-sm overflow-hidden mb-5">
             <div className="px-3 py-2 border-b border-white/20 flex items-center justify-between">
               <span className="text-[9px] text-[#888] uppercase tracking-wider font-bold flex items-center gap-2">
-                <BarChart3 className="w-3 h-3" /> Campaign History
+                <BarChart3 className="size-3" /> Campaign History
               </span>
               <button onClick={fetchCampaigns} className="text-[#888] hover:text-[#D4AF37] transition-colors">
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="size-3" />
               </button>
             </div>
             <div className="divide-y divide-white/10">
               {campaigns.length > 0 ? campaigns.map(c => (
                 <div key={c.campaign_id} className="px-3 py-2.5 flex items-center justify-between hover:bg-white/30 transition-all">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{
+                    <div className="size-2 rounded-full" style={{
                       background: c.channel === 'email' ? '#3b82f6' : c.channel === 'whatsapp' ? '#25D366' : '#f59e0b'
                     }} />
                     <span className="text-xs font-bold text-[#1A1A2E]">{c.name}</span>
@@ -319,13 +319,13 @@ export default function OmnichannelHub({ token }) {
           {sentMessages.length > 0 && (
             <div className="rounded-xl border border-white/30 bg-white/40 backdrop-blur-sm overflow-hidden">
               <div className="px-3 py-2 border-b border-white/20 text-[9px] text-[#888] uppercase tracking-wider font-bold flex items-center gap-2">
-                <Send className="w-3 h-3" /> Recent Messages
+                <Send className="size-3" /> Recent Messages
               </div>
               <div className="max-h-[250px] overflow-y-auto divide-y divide-white/10">
                 {sentMessages.slice(0, 10).map(m => (
                   <div key={m.message_id} className="px-3 py-2 flex items-center justify-between text-[10px]">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{
+                      <div className="size-2 rounded-full" style={{
                         background: m.delivery_status === 'delivered' ? '#4ade80' : '#ef4444'
                       }} />
                       <span className="text-[#1A1A2E] font-bold">{m.customer_email}</span>
@@ -355,14 +355,14 @@ export default function OmnichannelHub({ token }) {
                 </span>
               )}
               <button data-testid="new-conversation-btn" onClick={() => { /* Start new conversation placeholder */ }} className="p-1.5 text-[#555] hover:text-[#D4AF37] transition-colors">
-                <Plus className="w-4 h-4" />
+                <Plus className="size-4" />
               </button>
             </div>
           </div>
 
           {/* Search */}
           <div className="relative mb-3">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#555]" />
+            <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#555]" />
             <input
               type="text"
               placeholder="Search conversations..."
@@ -418,14 +418,14 @@ export default function OmnichannelHub({ token }) {
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="relative flex-shrink-0">
-                        <div className="w-9 h-9 rounded-full bg-[#1A1A1A] flex items-center justify-center text-[11px] font-semibold text-[#1A1A2E]">
+                        <div className="size-9 rounded-full bg-[#1A1A1A] flex items-center justify-center text-[11px] font-semibold text-[#1A1A2E]">
                           {conv.contact_name.split(' ').map(n => n[0]).join('')}
                         </div>
                         <div
-                          className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                          className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full flex items-center justify-center"
                           style={{ backgroundColor: channelCfg.color }}
                         >
-                          <ChannelIcon className="w-2.5 h-2.5 text-white" />
+                          <ChannelIcon className="size-2.5 text-white" />
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -440,7 +440,7 @@ export default function OmnichannelHub({ token }) {
                         </p>
                       </div>
                       {conv.unread && (
-                        <div className="w-2 h-2 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
+                        <div className="size-2 rounded-full bg-[#D4AF37] mt-1.5 flex-shrink-0" />
                       )}
                     </div>
                   </div>
@@ -449,7 +449,7 @@ export default function OmnichannelHub({ token }) {
             </div>
           ) : (
             <div className="p-8 text-center">
-              <Inbox className="w-6 h-6 text-[#333] mx-auto mb-2" />
+              <Inbox className="size-6 text-[#333] mx-auto mb-2" />
               <p className="text-[11px] text-[#555]">No conversations found</p>
               <EmptyInbox />
             </div>
@@ -463,7 +463,7 @@ export default function OmnichannelHub({ token }) {
           {/* Conversation Header */}
           <div className="px-5 py-3 border-b border-[#FF6B00]/20 flex items-center justify-between bg-white/80 backdrop-blur-sm">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-[#1A1A1A] flex items-center justify-center text-[11px] font-semibold text-[#1A1A2E]">
+              <div className="size-9 rounded-full bg-[#1A1A1A] flex items-center justify-center text-[11px] font-semibold text-[#1A1A2E]">
                 {selectedConv.contact_name.split(' ').map(n => n[0]).join('')}
               </div>
               <div>
@@ -481,10 +481,10 @@ export default function OmnichannelHub({ token }) {
                 onClick={() => handleToggleStar(selectedConv.id)}
                 className={`p-2 rounded-lg transition-colors ${selectedConv.starred ? 'text-[#D4AF37]' : 'text-[#555] hover:text-[#D4AF37]'}`}
               >
-                <Star className={`w-4 h-4 ${selectedConv.starred ? 'fill-current' : ''}`} />
+                <Star className={`size-4 ${selectedConv.starred ? 'fill-current' : ''}`} />
               </button>
               <button onClick={() => { /* Archive conversation */ }} className="p-2 text-[#555] hover:text-[#555] rounded-lg transition-colors" data-testid="archive-conversation-btn">
-                <Archive className="w-4 h-4" />
+                <Archive className="size-4" />
               </button>
             </div>
           </div>
@@ -501,7 +501,7 @@ export default function OmnichannelHub({ token }) {
                   <p className="text-xs leading-relaxed">{msg.text}</p>
                   <div className={`flex items-center gap-1 mt-1 ${msg.from === 'agent' ? 'justify-end' : ''}`}>
                     <span className="text-[9px] text-[#555]">{msg.time}</span>
-                    {msg.from === 'agent' && <CheckCheck className="w-3 h-3 text-[#D4AF37]" />}
+                    {msg.from === 'agent' && <CheckCheck className="size-3 text-[#D4AF37]" />}
                   </div>
                 </div>
               </div>
@@ -528,7 +528,7 @@ export default function OmnichannelHub({ token }) {
                 data-testid="send-reply-btn"
                 className="p-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-xl text-[#050505] hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                <Send className="w-4 h-4" />
+                <Send className="size-4" />
               </button>
             </div>
           </div>
@@ -536,7 +536,7 @@ export default function OmnichannelHub({ token }) {
       ) : (
         <div className="flex-1 flex items-center justify-center" data-testid="no-conversation-selected">
           <div className="text-center">
-            <Inbox className="w-12 h-12 text-[#222] mx-auto mb-4" />
+            <Inbox className="size-12 text-[#222] mx-auto mb-4" />
             <h3 className="text-sm text-[#555] mb-1">Select a conversation</h3>
             <p className="text-[11px] text-[#444]">Choose from your unified inbox to start responding</p>
           </div>

@@ -103,7 +103,7 @@ class SequenceEmailRequest(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 EMAIL_PROMPTS = {
-    "promo": """Write a promotional email for ReRoots biotech skincare.
+    "promo": """Write a promotional email for AUREM biotech skincare.
 Product/Offer: {product}
 Discount: {discount}
 Target Audience: {audience}
@@ -115,7 +115,7 @@ Requirements:
 - 150-200 words max
 - Luxury biotech voice""",
 
-    "announcement": """Write an announcement email for ReRoots.
+    "announcement": """Write an announcement email for AUREM.
 Announcement: {announcement}
 Key Details: {details}
 
@@ -125,7 +125,7 @@ Requirements:
 - One main message, one CTA
 - 100-150 words max""",
 
-    "followup": """Write a follow-up email for a ReRoots customer.
+    "followup": """Write a follow-up email for a AUREM customer.
 Previous Interaction: {interaction}
 Goal: {goal}
 
@@ -135,7 +135,7 @@ Requirements:
 - Warm and personal tone
 - 100-150 words max""",
 
-    "newsletter": """Write a newsletter email for ReRoots subscribers.
+    "newsletter": """Write a newsletter email for AUREM subscribers.
 Topic: {topic}
 Featured Products: {products}
 Tip/Education: {tip}
@@ -156,11 +156,11 @@ Requirements:
 - Clear CTA to purchase
 - 80-120 words max""",
 
-    "custom": """Write an email for ReRoots based on:
+    "custom": """Write an email for AUREM based on:
 {custom_prompt}
 
 Requirements:
-- Match ReRoots luxury biotech voice
+- Match AUREM luxury biotech voice
 - Clear single purpose
 - One CTA
 - Professional but warm"""
@@ -208,7 +208,7 @@ async def generate_ai_email(request: GenerateEmailRequest):
             body_content = f"""
             <p>Dear valued customer,</p>
             <p>{context.get('announcement', 'We have exciting news to share with you.')}</p>
-            <p>Discover the latest from ReRoots biotech skincare.</p>
+            <p>Discover the latest from AUREM biotech skincare.</p>
             """
         else:
             body_content = body_result.get("output", "")
@@ -230,19 +230,19 @@ async def generate_ai_email(request: GenerateEmailRequest):
             output = subject_result.get("output", "")
             import re
             matches = re.findall(r'["\']([^"\']+)["\']', output)
-            subject_lines = matches[:5] if matches else ["Your ReRoots Update"]
+            subject_lines = matches[:5] if matches else ["Your AUREM Update"]
         else:
             subject_lines = [
                 "Something special awaits",
                 "Your skin deserves this",
-                "ReRoots: A moment for you",
+                "AUREM: A moment for you",
                 "Unlock your skin's potential",
                 "The science of beautiful skin"
             ]
         
         # Generate full HTML preview
         cta_text = context.get("cta_text", "SHOP NOW")
-        cta_link = context.get("cta_link", "https://reroots.ca/app")
+        cta_link = context.get("cta_link", "https://aurem.live/app")
         title = context.get("title", "")
         
         preview_html = base_template(

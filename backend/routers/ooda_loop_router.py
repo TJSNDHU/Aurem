@@ -1,5 +1,5 @@
 """
-ReRoots AI OODA Loop Automation
+AUREM AI OODA Loop Automation
 Observe-Orient-Decide-Act cycle for continuous business intelligence
 """
 
@@ -175,7 +175,7 @@ async def execute_orient_phase(orientations: List[str], observed_data: Dict, con
         chat = LlmChat(
             api_key=api_key,
             session_id=f"ooda_orient_{secrets.token_hex(6)}",
-            system_message="""You are a business intelligence analyst for ReRoots skincare.
+            system_message="""You are a business intelligence analyst for AUREM skincare.
 Analyze the observed data and provide insights.
 Focus on: trends, anomalies, comparisons to baselines, and actionable patterns.
 Respond in JSON:
@@ -226,7 +226,7 @@ async def execute_decide_phase(decisions: List[str], analysis: Dict, context: Di
         chat = LlmChat(
             api_key=api_key,
             session_id=f"ooda_decide_{secrets.token_hex(6)}",
-            system_message="""You are a business decision maker for ReRoots skincare.
+            system_message="""You are a business decision maker for AUREM skincare.
 Based on the analysis, decide on the best actions to take.
 Prioritize by impact and urgency.
 Respond in JSON:

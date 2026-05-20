@@ -4,7 +4,7 @@ Admin Action AI API Routes
 REST API endpoints for the Admin Action AI.
 Mounted at /api/admin/ai/action (separate from existing db_query_routes)
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import logging

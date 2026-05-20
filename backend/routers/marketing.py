@@ -24,7 +24,7 @@ import jwt
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/marketing", tags=["marketing"])
 
-FROM_EMAIL = "ReRoots <hello@reroots.ca>"
+FROM_EMAIL = "AUREM <hello@aurem.live>"
 
 
 # ── REQUEST SCHEMA ────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ def build_html(body_text: str, subject: str, discount_code: str = "") -> str:
           <p style="font-family:'Gill Sans',sans-serif;font-size:10px;letter-spacing:0.35em;
               text-transform:uppercase;color:#8A6B38;margin:0 0 8px;">Biotech Skincare Canada</p>
           <h1 style="font-family:Georgia,serif;font-size:34px;font-weight:300;
-              color:#E2C98A;margin:0;letter-spacing:0.04em;">ReRoots</h1>
+              color:#E2C98A;margin:0;letter-spacing:0.04em;">AUREM</h1>
         </td></tr>
 
         <!-- Subject -->
@@ -178,7 +178,7 @@ def build_html(body_text: str, subject: str, discount_code: str = "") -> str:
 
         <!-- CTA -->
         <tr><td style="padding:24px 40px 32px;text-align:center;">
-          <a href="https://reroots.ca/shop"
+          <a href="https://aurem.live/shop"
             style="display:inline-block;background:linear-gradient(135deg,#8A6B38,#C9A86E);
             color:#060608;text-decoration:none;font-family:'Gill Sans',sans-serif;
             font-size:11px;letter-spacing:0.22em;text-transform:uppercase;
@@ -191,10 +191,10 @@ def build_html(body_text: str, subject: str, discount_code: str = "") -> str:
         <tr><td style="padding:20px 40px 28px;border-top:0.5px solid rgba(255,255,255,0.05);
             text-align:center;">
           <p style="font-family:'Gill Sans',sans-serif;font-size:10px;color:#524D45;
-              letter-spacing:0.08em;margin:0 0 6px;">reroots.ca · Canadian Biotech Skincare</p>
+              letter-spacing:0.08em;margin:0 0 6px;">aurem.live · Canadian Biotech Skincare</p>
           <p style="font-family:'Gill Sans',sans-serif;font-size:9px;color:#3a3530;margin:0;">
-            You received this because you opted in to ReRoots member offers.
-            <a href="https://reroots.ca/unsubscribe"
+            You received this because you opted in to AUREM member offers.
+            <a href="https://aurem.live/unsubscribe"
               style="color:#5C5548;text-decoration:underline;">Unsubscribe</a>
           </p>
         </td></tr>

@@ -48,7 +48,7 @@ export default function SuperAdminDashboard({ token }) {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="admin-loading">
-        <RefreshCw className="w-5 h-5 animate-spin text-[#888]" />
+        <RefreshCw className="size-5 animate-spin text-[#888]" />
       </div>
     );
   }
@@ -78,7 +78,7 @@ export default function SuperAdminDashboard({ token }) {
           ].map((kpi, i) => (
             <div key={i} className="p-4 border border-white/5 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
               <div className="flex items-center gap-2 mb-2">
-                <kpi.icon className="w-4 h-4" style={{ color: kpi.color }} />
+                <kpi.icon className="size-4" style={{ color: kpi.color }} />
                 <span className="text-[10px] text-[#888] uppercase tracking-wider">{kpi.label}</span>
               </div>
               <span className="text-2xl font-bold text-white">{kpi.value}</span>
@@ -96,7 +96,7 @@ export default function SuperAdminDashboard({ token }) {
               }`}>{f === 'all' ? 'All' : f === 'churn' ? 'Churn Risk' : f === 'upsell' ? 'Upsell' : 'Active'}</button>
           ))}
           <div className="ml-auto relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#666]" />
+            <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#666]" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tenants..."
               className="pl-8 pr-3 py-1.5 text-[10px] bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-[#555] focus:outline-none focus:border-[#FF6B00]/30 w-48" />
           </div>

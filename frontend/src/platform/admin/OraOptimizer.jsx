@@ -118,7 +118,7 @@ export default function OraOptimizer() {
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>ORA Optimizer</h1>
           </div>
           <p style={{ color: TEXT_DIM, fontSize: 13, marginTop: 6 }}>
-            LLM budget watchdog — token spend, cache health & spend-cut recommendations.
+            LLM budget watchdog, token spend, cache health & spend-cut recommendations.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

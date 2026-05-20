@@ -220,7 +220,7 @@ export default function ForensicMinerHelix({ stores, outreachStatus, onQueueOutr
       <div className="absolute top-3 left-3 z-10 flex gap-3">
         {[{ c: '#ef4444', l: '0-40' }, { c: '#f59e0b', l: '41-70' }, { c: '#22c55e', l: '71-100' }].map(({ c, l }) => (
           <div key={l} className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full" style={{ background: c }} />
+            <div className="size-2 rounded-full" style={{ background: c }} />
             <span className="text-[9px] font-bold" style={{ color: '#888' }}>{l}</span>
           </div>
         ))}

@@ -11,7 +11,7 @@ Features:
 
 Requires TELNYX_API_KEY for real provisioning (mocks without it).
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -224,7 +224,7 @@ async def texml_inbound_webhook(request: Request):
         texml = generate_texml_response(
             caller_country=caller_country,
             voice_agent_ws_url=voice_ws_url,
-            brand_name="Reroots"
+            brand_name="AUREM"
         )
         
         return Response(content=texml, media_type="application/xml")
@@ -235,7 +235,7 @@ async def texml_inbound_webhook(request: Request):
         # Return fallback English greeting
         fallback_texml = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="Polly.Joanna">Hello! I'm the Reroots AI assistant. How can I help you with your skincare today?</Say>
+    <Say voice="Polly.Joanna">Hello! I'm the AUREM AI assistant. How can I help you with your skincare today?</Say>
     <Hangup />
 </Response>"""
         

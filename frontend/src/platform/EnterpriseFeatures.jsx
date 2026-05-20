@@ -26,7 +26,7 @@ function Badge({ children, color }) {
 
 function StatusDot({ status }) {
   const colors = { active: '#22c55e', invited: '#eab308', suspended: '#ef4444' };
-  return <span className="inline-block w-2 h-2 rounded-full" style={{ background: colors[status] || '#888' }} />;
+  return <span className="inline-block size-2 rounded-full" style={{ background: colors[status] || '#888' }} />;
 }
 
 export default function EnterpriseFeatures({ token, user }) {
@@ -151,7 +151,7 @@ export default function EnterpriseFeatures({ token, user }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-text)' }}>Enterprise</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--aurem-text-secondary)' }}>Phase F — Team, audit, branding & compliance</p>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--aurem-text-secondary)' }}>Phase F, Team, audit, branding & compliance</p>
         </div>
         <button onClick={() => { fetchTeam(); fetchAudit(); fetchWhitelabel(); }} disabled={loading} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all" style={{ background: '#FF6B0018', color: '#FF6B00' }} data-testid="refresh-enterprise">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -209,7 +209,7 @@ export default function EnterpriseFeatures({ token, user }) {
               {team.map(m => (
                 <div key={m.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-black/[0.02] transition-colors" data-testid={`team-member-${m.id}`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: ROLE_COLORS[m.role] || '#888' }}>
+                    <div className="size-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: ROLE_COLORS[m.role] || '#888' }}>
                       {(m.first_name?.[0] || m.email?.[0] || '?').toUpperCase()}
                     </div>
                     <div>
@@ -303,14 +303,14 @@ export default function EnterpriseFeatures({ token, user }) {
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--aurem-text-secondary)' }}>Primary Color</label>
               <div className="flex items-center gap-2">
-                <input type="color" value={wlForm.primary_color || '#FF6B00'} onChange={e => setWlForm(p => ({ ...p, primary_color: e.target.value }))} className="w-8 h-8 rounded cursor-pointer" data-testid="wl-primary-color" />
+                <input type="color" value={wlForm.primary_color || '#FF6B00'} onChange={e => setWlForm(p => ({ ...p, primary_color: e.target.value }))} className="size-8 rounded cursor-pointer" data-testid="wl-primary-color" />
                 <span className="text-xs font-mono" style={{ color: 'var(--aurem-text-secondary)' }}>{wlForm.primary_color || '#FF6B00'}</span>
               </div>
             </div>
             <div>
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--aurem-text-secondary)' }}>Accent Color</label>
               <div className="flex items-center gap-2">
-                <input type="color" value={wlForm.accent_color || '#D4AF37'} onChange={e => setWlForm(p => ({ ...p, accent_color: e.target.value }))} className="w-8 h-8 rounded cursor-pointer" data-testid="wl-accent-color" />
+                <input type="color" value={wlForm.accent_color || '#D4AF37'} onChange={e => setWlForm(p => ({ ...p, accent_color: e.target.value }))} className="size-8 rounded cursor-pointer" data-testid="wl-accent-color" />
                 <span className="text-xs font-mono" style={{ color: 'var(--aurem-text-secondary)' }}>{wlForm.accent_color || '#D4AF37'}</span>
               </div>
             </div>
@@ -335,7 +335,7 @@ export default function EnterpriseFeatures({ token, user }) {
             ].map(item => (
               <div key={item.resource} className="aurem-glass-card p-4 rounded-2xl flex items-center justify-between" data-testid={`export-${item.resource}`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#FF6B0018' }}>
+                  <div className="size-9 rounded-lg flex items-center justify-center" style={{ background: '#FF6B0018' }}>
                     <item.icon size={16} style={{ color: '#FF6B00' }} />
                   </div>
                   <div>

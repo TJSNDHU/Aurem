@@ -100,7 +100,7 @@ export default function UniversalConnector({ token }) {
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-text)' }}>Universal Connector</h1>
           <p className="text-xs mt-1" style={{ color: 'var(--aurem-text-secondary)' }}>
-            Platform-agnostic commerce layer — connect any storefront, POS, or manual operation
+            Platform-agnostic commerce layer, connect any storefront, POS, or manual operation
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -185,7 +185,7 @@ export default function UniversalConnector({ token }) {
                 const badge = STATUS_BADGE[p.status] || STATUS_BADGE.scaffold;
                 return (
                   <div key={p.type} className="flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02]" style={{ background: `${clr}08`, border: `1px solid ${clr}20` }} data-testid={`platform-${p.type}`}>
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${clr}18` }}>
+                    <div className="size-9 rounded-lg flex items-center justify-center" style={{ background: `${clr}18` }}>
                       <Icon size={16} style={{ color: clr }} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -218,7 +218,7 @@ export default function UniversalConnector({ token }) {
               const clr = PLATFORM_COLORS[c.platform_type] || '#888';
               return (
                 <div key={c.id} className="aurem-glass-card p-4 rounded-2xl flex items-center gap-4" data-testid={`connection-${c.id}`}>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${clr}18` }}>
+                  <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: `${clr}18` }}>
                     <Icon size={18} style={{ color: clr }} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -308,7 +308,7 @@ export default function UniversalConnector({ token }) {
         <div className="space-y-5">
           <div className="aurem-glass-card p-6 rounded-2xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,91,214,0.12)' }}>
+              <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,91,214,0.12)' }}>
                 <Radio size={18} style={{ color: '#8B5CF6' }} />
               </div>
               <div>

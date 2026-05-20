@@ -1,5 +1,5 @@
 """
-Proactive AI Outreach System for Reroots
+Proactive AI Outreach System for AUREM
 Automated follow-ups and proactive customer engagement.
 
 Features:
@@ -382,11 +382,11 @@ I'd love to hear about your experience so far. Have you noticed any changes? Any
 
 If you're ready for a refill or want to try something new, I'm happy to recommend products based on your results.
 
-Just reply to this email or chat with me anytime at reroots.ca.
+Just reply to this email or chat with me anytime at aurem.live.
 
 Cheers,
 {ai_name}
-Reroots Aesthetics"""
+AUREM Aesthetics"""
     },
     
     "weather_alert": {
@@ -400,11 +400,11 @@ Questions about your routine? Just reply — I'm here to help! 💛
 
 {weather_message}
 
-Have questions about adjusting your routine for the weather? Just reply to this email or chat with me at reroots.ca.
+Have questions about adjusting your routine for the weather? Just reply to this email or chat with me at aurem.live.
 
 Cheers,
 {ai_name}
-Reroots Aesthetics"""
+AUREM Aesthetics"""
     },
     
     "abandoned_browse": {
@@ -432,11 +432,11 @@ If you have any questions about:
 • How to build an effective routine
 • Ingredients and their benefits
 
-Just reply to this email or chat with me at reroots.ca — I'm happy to help you figure out the perfect fit.
+Just reply to this email or chat with me at aurem.live — I'm happy to help you figure out the perfect fit.
 
 Cheers,
 {ai_name}
-Reroots Aesthetics"""
+AUREM Aesthetics"""
     },
     
     "restock_reminder": {
@@ -461,7 +461,7 @@ Or if you're curious about trying something new, I'm happy to recommend products
 Let me know if you need anything!
 
 {ai_name}
-Reroots Aesthetics"""
+AUREM Aesthetics"""
     }
 }
 
@@ -501,7 +501,7 @@ async def send_outreach_message(
     # Build variables
     vars_dict = {
         "name": customer_name or "there",
-        "ai_name": "Reroots AI",
+        "ai_name": "AUREM AI",
         **(variables or {})
     }
     
@@ -518,7 +518,7 @@ async def send_outreach_message(
             if customer_language and customer_language.lower() not in ["en", "en-us", "en-gb", "en-ca"]:
                 try:
                     from utils.language import translate_ai_response
-                    message = await translate_ai_response(message, customer_language, "Reroots")
+                    message = await translate_ai_response(message, customer_language, "AUREM")
                     logger.info(f"[PROACTIVE] Translated WhatsApp to {customer_language}")
                 except Exception as te:
                     logger.warning(f"[PROACTIVE] Translation failed, using English: {te}")
@@ -553,8 +553,8 @@ async def send_outreach_message(
             if customer_language and customer_language.lower() not in ["en", "en-us", "en-gb", "en-ca"]:
                 try:
                     from utils.language import translate_ai_response
-                    subject = await translate_ai_response(subject, customer_language, "Reroots")
-                    body = await translate_ai_response(body, customer_language, "Reroots")
+                    subject = await translate_ai_response(subject, customer_language, "AUREM")
+                    body = await translate_ai_response(body, customer_language, "AUREM")
                     logger.info(f"[PROACTIVE] Translated email to {customer_language}")
                 except Exception as te:
                     logger.warning(f"[PROACTIVE] Email translation failed, using English: {te}")
@@ -562,13 +562,13 @@ async def send_outreach_message(
             # Convert to HTML
             html_body = f"""
             <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <img src="https://reroots.ca/reroots-logo.jpg" alt="Reroots" style="width: 120px; margin-bottom: 20px;">
+                <img src="https://aurem.live/reroots-logo.jpg" alt="AUREM" style="width: 120px; margin-bottom: 20px;">
                 <div style="line-height: 1.6; color: #333;">
                     {body.replace(chr(10), '<br>')}
                 </div>
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #999; font-size: 12px;">
-                    Reroots Aesthetics Inc. | Mississauga, ON<br>
-                    <a href="https://reroots.ca/unsubscribe?email={customer_email}" style="color: #999;">Unsubscribe</a>
+                    AUREM Aesthetics Inc. | Mississauga, ON<br>
+                    <a href="https://aurem.live/unsubscribe?email={customer_email}" style="color: #999;">Unsubscribe</a>
                 </div>
             </div>
             """
@@ -577,8 +577,8 @@ async def send_outreach_message(
                 to_email=customer_email,
                 subject=subject,
                 html_content=html_body,
-                from_email="hello@reroots.ca",
-                from_name="Reroots AI"
+                from_email="hello@aurem.live",
+                from_name="AUREM AI"
             )
             
             results["channels"].append({

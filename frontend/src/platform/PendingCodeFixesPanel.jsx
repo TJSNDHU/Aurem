@@ -173,7 +173,7 @@ export default function PendingCodeFixesPanel() {
       {/* Fix list */}
       {fixes.length === 0 ? (
         <div data-testid="fixes-empty" style={{ padding: 20, textAlign: "center", color: "#8A8070", fontSize: 12, border: "1px dashed rgba(212,175,55,0.14)", borderRadius: 10 }}>
-          Koi pending code fix nahi hai — Autonomous Repair Engine idle hai ya Tier 1/2 fixes se sab ho gaya.
+          Koi pending code fix nahi hai, Autonomous Repair Engine idle hai ya Tier 1/2 fixes se sab ho gaya.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>

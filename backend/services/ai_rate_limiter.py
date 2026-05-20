@@ -1,5 +1,5 @@
 """
-AI Rate Limiter for Reroots
+AI Rate Limiter for AUREM
 Enhanced rate limiting specifically for AI chat endpoints.
 
 Features:

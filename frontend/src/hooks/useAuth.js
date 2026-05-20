@@ -1,12 +1,12 @@
 // src/hooks/useAuth.js
 // ─────────────────────────────────────────────────────────
-// Drop-in auth hook for ReRoots admin
+// Drop-in auth hook for AUREM admin
 // Handles login, logout, role checks, route protection
 // ─────────────────────────────────────────────────────────
 
 import { useState, useEffect, createContext, useContext } from 'react';
 
-const API = (typeof window !== 'undefined' && window.location.hostname.includes('reroots.ca') ? 'https://reroots.ca' : process.env.REACT_APP_BACKEND_URL) + '/api';
+const API = (typeof window !== 'undefined' && window.location.hostname.includes('aurem.live') ? 'https://aurem.live' : process.env.REACT_APP_BACKEND_URL) + '/api';
 
 const AuthContext = createContext(null);
 
@@ -121,7 +121,7 @@ export function ProtectedRoute({ section, children }) {
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#FDF9F9' }}>
       <div style={{ fontFamily:'Georgia,serif', color:'#C4BAC0', letterSpacing:'0.3em', fontSize:'0.75rem' }}>
-        LOADING...
+        LOADING…
       </div>
     </div>
   );

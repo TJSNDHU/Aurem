@@ -115,7 +115,7 @@ export default function NegotiationDashboard({ token }) {
             whileTap={{ scale: 0.96 }}
             data-testid="neg-start-btn"
           >
-            {starting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Handshake className="w-3 h-3" />}
+            {starting ? <Loader2 className="size-3 animate-spin" /> : <Handshake className="size-3" />}
             Start
           </motion.button>
         </div>
@@ -124,15 +124,15 @@ export default function NegotiationDashboard({ token }) {
       {/* Sessions List */}
       <div className="aurem-glass-card overflow-hidden" data-testid="negotiation-sessions">
         <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(212,163,115,0.03)' }}>
-          <DollarSign className="w-4 h-4" style={{ color: '#FF6B00' }} />
+          <DollarSign className="size-4" style={{ color: '#FF6B00' }} />
           <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Negotiation Sessions</span>
           <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{sessions.length} sessions</span>
         </div>
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} /></div>
+          <div className="flex justify-center py-12"><Loader2 className="size-5 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} /></div>
         ) : sessions.length === 0 ? (
           <div className="flex flex-col items-center py-12">
-            <Handshake className="w-8 h-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
+            <Handshake className="size-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
             <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>No negotiation sessions yet</p>
           </div>
         ) : (
@@ -147,7 +147,7 @@ export default function NegotiationDashboard({ token }) {
                     data-testid={`session-${session.session_id}`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full" style={{ background: statusColor(session.status) }} />
+                      <div className="size-2 rounded-full" style={{ background: statusColor(session.status) }} />
                       <span className="text-xs font-mono font-medium" style={{ color: 'var(--aurem-heading)' }}>{session.session_id}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${statusColor(session.status)}15`, color: statusColor(session.status) }}>
                         {session.status}
@@ -160,7 +160,7 @@ export default function NegotiationDashboard({ token }) {
                           {session.final_discount_pct}% off
                         </span>
                       )}
-                      <span className="ml-auto">{isExp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}</span>
+                      <span className="ml-auto">{isExp ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}</span>
                     </div>
                   </div>
                   {isExp && (
@@ -169,7 +169,7 @@ export default function NegotiationDashboard({ token }) {
                         <div key={ri} className="flex items-center gap-3 py-2 border-b" style={{ borderColor: 'rgba(255,107,0,0.04)' }}>
                           <span className="text-[10px] font-bold w-8" style={{ color: 'var(--aurem-body-secondary)' }}>R{round.round}</span>
                           <span className="text-[10px]" style={{ color: '#3B82F6' }}>Buyer: {round.buyer_proposed}%</span>
-                          <ArrowRight className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                          <ArrowRight className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                           <span className="text-[10px]" style={{ color: '#FF6B00' }}>Seller: {round.seller_max}%</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded" style={{
                             background: round.decision === 'accepted' ? 'rgba(34,197,94,0.1)' : round.decision === 'counter' ? 'rgba(234,179,8,0.1)' : 'rgba(239,68,68,0.1)',
@@ -191,7 +191,7 @@ export default function NegotiationDashboard({ token }) {
                               <button onClick={() => sendCounter(session.session_id, countering.discount)}
                                 className="px-2 py-1 rounded text-[10px] font-bold"
                                 style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}
-                              ><Send className="w-3 h-3 inline" /> Send</button>
+                              ><Send className="size-3 inline" /> Send</button>
                             </>
                           ) : (
                             <button onClick={() => setCountering({ session: session.session_id, discount: 0 })}

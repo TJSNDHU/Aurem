@@ -84,7 +84,7 @@ export default function ApplePayCheckout({ plan = 'starter', onComplete }) {
           style={{accentColor:'#4ADE80'}}
           data-testid={`applepay-annual-checkbox-${plan}`}
         />
-        Annual — 20% off
+        Annual, 20% off
       </label>
       <br/>
       <button

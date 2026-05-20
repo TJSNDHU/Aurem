@@ -43,7 +43,7 @@ async def _resolve_tenant_by_api_key(db, api_key: str) -> Optional[Dict[str, Any
     if not api_key:
         return None
     try:
-        # Try plaintext first (ReRoots-style legacy keys)
+        # Try plaintext first (AUREM-style legacy keys)
         plaintext = await db.api_keys.find_one(
             {"key": api_key, "is_active": True},
             {"_id": 0, "tenant_id": 1, "owner_email": 1, "business_name": 1, "business_id": 1, "permissions": 1, "created_at": 1, "last_used": 1},

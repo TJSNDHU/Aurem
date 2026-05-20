@@ -345,7 +345,7 @@ function OverwatchDashboard({ authToken }) {
       <div className="ow-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <StyleInjector />
         <div style={{ color: '#D4AF37', fontSize: 12, letterSpacing: '0.2em', animation: 'ow-pulse 1.5s ease-in-out infinite' }}>
-          INITIALIZING OVERWATCH...
+          INITIALIZING OVERWATCH…
         </div>
       </div>
     );
@@ -693,7 +693,7 @@ function OverwatchDashboard({ authToken }) {
                     Awaiting Sovereign Handshake
                   </div>
                   <div style={{ fontSize: 'clamp(8px, 1.5vw, 9px)', color: '#3A3448', fontFamily: "'JetBrains Mono', monospace" }}>
-                    Scanning for loose wires...
+                    Scanning for loose wires…
                   </div>
                   {/* Simulated Audit Button */}
                   <button
@@ -718,7 +718,7 @@ function OverwatchDashboard({ authToken }) {
                 </div>
               </div>
             ) : (
-              /* ACTIVE MODE — Score Ring + Severity Breakdown */
+              /* ACTIVE MODE, Score Ring + Severity Breakdown */
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'clamp(12px, 3vw, 20px)', alignItems: 'center' }}>
                 {/* Score Circle */}
                 <div style={{ textAlign: 'center' }}>

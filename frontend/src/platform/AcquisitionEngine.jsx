@@ -48,7 +48,7 @@ function CopyButton({ text, label, variant = 'gold' }) {
   const colors = variant === 'gold' ? 'text-[#D4AF37] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20' : 'text-[#888] bg-white/50 hover:bg-[#1A1A1A]';
   return (
     <button onClick={handleCopy} className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium rounded-md transition-colors ${colors}`}>
-      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
       {copied ? 'Copied!' : label || 'Copy'}
     </button>
   );
@@ -57,7 +57,7 @@ function CopyButton({ text, label, variant = 'gold' }) {
 function StepCard({ number, title, description, children, total = 4 }) {
   return (
     <div className="relative pl-10 pb-6">
-      <div className="absolute left-0 top-0 w-7 h-7 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center text-[11px] font-bold text-[#D4AF37]">{number}</div>
+      <div className="absolute left-0 top-0 size-7 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center text-[11px] font-bold text-[#D4AF37]">{number}</div>
       {number < total && <div className="absolute left-[13px] top-8 w-[1px] h-[calc(100%-32px)] bg-[#1A1A1A]" />}
       <div>
         <h4 className="text-xs font-medium text-[#1A1A2E] mb-1">{title}</h4>
@@ -221,10 +221,10 @@ function Tier5VoiceAgent({ token, config }) {
     <div className="bg-white/80 backdrop-blur-sm border-2 border-[#D4AF37]/40 rounded-xl overflow-hidden shadow-[0_0_40px_rgba(212,175,55,0.08)]" data-testid="tier-5-voice">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-5 text-left hover:bg-white/40 transition-colors">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 flex items-center justify-center relative border border-[#D4AF37]/30">
-            <Phone className="w-7 h-7 text-[#D4AF37]" />
-            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#4ade80] rounded-full flex items-center justify-center border-2 border-[#0A0A0A]">
-              <Sparkles className="w-2.5 h-2.5 text-[#050505]" />
+          <div className="size-14 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 flex items-center justify-center relative border border-[#D4AF37]/30">
+            <Phone className="size-7 text-[#D4AF37]" />
+            <div className="absolute -top-1.5 -right-1.5 size-5 bg-[#4ade80] rounded-full flex items-center justify-center border-2 border-[#0A0A0A]">
+              <Sparkles className="size-2.5 text-[#050505]" />
             </div>
           </div>
           <div>
@@ -234,10 +234,10 @@ function Tier5VoiceAgent({ token, config }) {
               <span className="px-2 py-0.5 text-[9px] font-bold text-[#4ade80] bg-[#4ade80]/10 rounded-full">$0</span>
               <span className="px-2 py-0.5 text-[9px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 rounded-full animate-pulse">NEW</span>
             </div>
-            <p className="text-[11px] text-[#888]">Real-time AI voice conversations — customers talk, AI responds instantly. Zero API fees.</p>
+            <p className="text-[11px] text-[#888]">Real-time AI voice conversations, customers talk, AI responds instantly. Zero API fees.</p>
           </div>
         </div>
-        {expanded ? <ChevronDown className="w-4 h-4 text-[#D4AF37]" /> : <ChevronRight className="w-4 h-4 text-[#D4AF37]" />}
+        {expanded ? <ChevronDown className="size-4 text-[#D4AF37]" /> : <ChevronRight className="size-4 text-[#D4AF37]" />}
       </button>
 
       {expanded && (
@@ -250,7 +250,7 @@ function Tier5VoiceAgent({ token, config }) {
               { id: '5c', label: 'Premium (AUREM Voice)', icon: Phone, color: '#a855f7', badge: 'PRO' },
             ].map(t => (
               <button key={t.id} onClick={() => setSubTier(t.id)} data-testid={`voice-tier-${t.id}`} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] transition-all border ${subTier === t.id ? 'border-[#FF6B00]/40 bg-[#FF6B00]/15 text-white' : 'border-transparent text-white/50 hover:text-white/70'}`}>
-                <t.icon className="w-3.5 h-3.5" style={{ color: t.color }} />
+                <t.icon className="size-3.5" style={{ color: t.color }} />
                 {t.label}
                 <span className="text-[8px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${t.color}15`, color: t.color }}>{t.badge}</span>
               </button>
@@ -273,14 +273,14 @@ function Tier5VoiceAgent({ token, config }) {
                   ].map((step, idx) => (
                     <React.Fragment key={idx}>
                       <div className="flex-1 text-center">
-                        <div className="w-11 h-11 rounded-xl mx-auto mb-1.5 flex items-center justify-center" style={{ backgroundColor: `${step.color}10`, border: `1px solid ${step.color}25` }}>
-                          <step.icon className="w-5 h-5" style={{ color: step.color }} />
+                        <div className="size-11 rounded-xl mx-auto mb-1.5 flex items-center justify-center" style={{ backgroundColor: `${step.color}10`, border: `1px solid ${step.color}25` }}>
+                          <step.icon className="size-5" style={{ color: step.color }} />
                         </div>
                         <p className="text-[10px] font-medium text-[#1A1A2E]">{step.label}</p>
                         <p className="text-[8px] text-[#555]">{step.sub}</p>
                         {step.time && <p className="text-[8px] font-mono text-[#D4AF37] mt-0.5">{step.time}</p>}
                       </div>
-                      {idx < 4 && <ArrowRight className="w-3.5 h-3.5 text-[#333] flex-shrink-0 mx-1" />}
+                      {idx < 4 && <ArrowRight className="size-3.5 text-[#333] flex-shrink-0 mx-1" />}
                     </React.Fragment>
                   ))}
                 </div>
@@ -307,18 +307,18 @@ function Tier5VoiceAgent({ token, config }) {
                 {/* Call Header */}
                 <div className="flex items-center justify-between p-4 border-b border-[#FF6B00]/20">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-[#4ade80] animate-pulse' : 'bg-white/30'}`} />
+                    <div className={`size-3 rounded-full ${isCallActive ? 'bg-[#4ade80] animate-pulse' : 'bg-white/30'}`} />
                     <span className="text-xs font-medium text-white">{isCallActive ? 'Call Active' : 'Ready to Call'}</span>
                     {isCallActive && <span className="text-[10px] font-mono text-[#FF6B00]">{formatDuration(callDuration)}</span>}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 text-[9px] text-white/50">
-                      {isListening && <span className="flex items-center gap-1 text-[#4ade80]"><Mic className="w-3 h-3" /> Listening</span>}
-                      {isSpeaking && <span className="flex items-center gap-1 text-[#FF6B00]"><Volume2 className="w-3 h-3" /> Speaking</span>}
+                      {isListening && <span className="flex items-center gap-1 text-[#4ade80]"><Mic className="size-3" /> Listening</span>}
+                      {isSpeaking && <span className="flex items-center gap-1 text-[#FF6B00]"><Volume2 className="size-3" /> Speaking</span>}
                     </div>
                     {isCallActive && (
-                      <button onClick={endCall} data-testid="cancel-voice-call" className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all" title="Cancel Call">
-                        <X className="w-4 h-4" />
+                      <button onClick={endCall} data-testid="cancel-voice-call" className="size-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-red-500/20 text-white/60 hover:text-red-400 transition-all" title="Cancel Call">
+                        <X className="size-4" />
                       </button>
                     )}
                   </div>
@@ -326,11 +326,11 @@ function Tier5VoiceAgent({ token, config }) {
 
                 {/* Voice Visualization */}
                 <div className="p-6 flex flex-col items-center">
-                  <div className="w-28 h-28 rounded-full flex items-center justify-center mb-4 relative" style={{
+                  <div className="size-28 rounded-full flex items-center justify-center mb-4 relative" style={{
                     background: isCallActive ? 'radial-gradient(circle, rgba(212,175,55,0.15) 0%, transparent 70%)' : 'radial-gradient(circle, rgba(85,85,85,0.1) 0%, transparent 70%)'
                   }}>
-                    <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isCallActive ? 'bg-[#FF6B00]/10 border-2 border-[#FF6B00]/40' : 'bg-white/10 border-2 border-white/20'}`}>
-                      {isSpeaking ? <Volume2 className="w-8 h-8 text-[#FF6B00]" /> : isListening ? <Mic className="w-8 h-8 text-[#4ade80]" /> : <Phone className="w-8 h-8 text-white/65" />}
+                    <div className={`size-20 rounded-full flex items-center justify-center transition-all ${isCallActive ? 'bg-[#FF6B00]/10 border-2 border-[#FF6B00]/40' : 'bg-white/10 border-2 border-white/20'}`}>
+                      {isSpeaking ? <Volume2 className="size-8 text-[#FF6B00]" /> : isListening ? <Mic className="size-8 text-[#4ade80]" /> : <Phone className="size-8 text-white/65" />}
                     </div>
                     {isCallActive && (isSpeaking || isListening) && (
                       <div className="absolute inset-0 rounded-full border-2 animate-ping" style={{ borderColor: isSpeaking ? '#FF6B0040' : '#4ade8040' }} />
@@ -347,7 +347,7 @@ function Tier5VoiceAgent({ token, config }) {
                   <div className="mx-4 mb-4 max-h-48 overflow-y-auto rounded-lg bg-white/10 border border-white/10 p-3 space-y-2">
                     {transcript.map((msg, i) => (
                       <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                        {msg.role === 'agent' && <div className="w-6 h-6 rounded-full bg-[#FF6B00]/15 flex items-center justify-center flex-shrink-0"><Sparkles className="w-3 h-3 text-[#FF6B00]" /></div>}
+                        {msg.role === 'agent' && <div className="size-6 rounded-full bg-[#FF6B00]/15 flex items-center justify-center flex-shrink-0"><Sparkles className="size-3 text-[#FF6B00]" /></div>}
                         <p className={`text-[11px] leading-relaxed max-w-[80%] px-3 py-2 rounded-xl ${msg.role === 'user' ? 'bg-white/15 text-white' : 'bg-[#FF6B00]/10 text-white/80 border border-[#FF6B00]/15'}`}>{msg.text}</p>
                       </div>
                     ))}
@@ -358,12 +358,12 @@ function Tier5VoiceAgent({ token, config }) {
                 <div className="flex items-center justify-center gap-4 p-4 border-t border-white/10">
                   {!isCallActive ? (
                     <button onClick={startCall} data-testid="start-voice-call" className="flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-[#FF6B00] to-[#B38659] rounded-full text-[#1A3026] text-sm font-semibold hover:opacity-90 transition-opacity shadow-[0_0_20px_rgba(212,163,115,0.3)]">
-                      <Phone className="w-4 h-4" />
+                      <Phone className="size-4" />
                       Talk to AI Agent
                     </button>
                   ) : (
                     <button onClick={endCall} data-testid="end-voice-call" className="flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-[#ef4444] to-[#dc2626] rounded-full text-white text-sm font-semibold hover:opacity-90 transition-opacity">
-                      <PhoneOff className="w-4 h-4" />
+                      <PhoneOff className="size-4" />
                       End Call
                     </button>
                   )}
@@ -419,13 +419,13 @@ function Tier5VoiceAgent({ token, config }) {
                     { component: 'The Glue', tool: 'Pipecat / LiveKit Agents', why: 'Open-source framework that joins the steps with zero buffering.', time: 'Real-time', color: '#a855f7' },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-white/80 backdrop-blur-sm rounded-lg border border-[#FF6B00]/20">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}10` }}>
+                      <div className="size-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}10` }}>
                         <span className="text-[11px] font-bold" style={{ color: item.color }}>{item.time}</span>
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-[#888]">{item.component}</span>
-                          <ArrowRight className="w-3 h-3 text-[#333]" />
+                          <ArrowRight className="size-3 text-[#333]" />
                           <span className="text-[11px] font-medium text-[#1A1A2E]">{item.tool}</span>
                         </div>
                         <p className="text-[9px] text-[#555]">{item.why}</p>
@@ -456,7 +456,7 @@ function Tier5VoiceAgent({ token, config }) {
 
               {/* Generate Script Button */}
               <button onClick={loadSelfHostedScript} disabled={loadingScript} data-testid="generate-voice-script-btn" className="w-full px-4 py-3 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#3b82f6] to-[#1d4ed8] rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2 mb-4">
-                {loadingScript ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Code className="w-3.5 h-3.5" /> Generate Pipecat Starter Code</>}
+                {loadingScript ? <><RefreshCw className="size-3.5 animate-spin" /> Generating…</> : <><Code className="size-3.5" /> Generate Pipecat Starter Code</>}
               </button>
 
               {selfHostedScript && (
@@ -489,16 +489,16 @@ function Tier5VoiceAgent({ token, config }) {
                   { name: 'Real Phone Lines', desc: 'Inbound + outbound via SIP', color: '#D4AF37' },
                 ].map((api, i) => (
                   <div key={i} className="p-4 bg-white/60 rounded-xl border border-[#FF6B00]/20 text-center relative">
-                    <Lock className="w-3 h-3 text-[#a855f7] absolute top-2 right-2" />
-                    <Phone className="w-6 h-6 mx-auto mb-2" style={{ color: api.color }} />
+                    <Lock className="size-3 text-[#a855f7] absolute top-2 right-2" />
+                    <Phone className="size-6 mx-auto mb-2" style={{ color: api.color }} />
                     <p className="text-[11px] font-medium text-[#1A1A2E]">{api.name}</p>
                     <p className="text-[9px] text-[#555]">{api.desc}</p>
                   </div>
                 ))}
               </div>
               <div className="p-4 bg-gradient-to-br from-[#a855f7]/5 to-transparent border border-[#a855f7]/20 rounded-xl text-center">
-                <Lock className="w-6 h-6 text-[#a855f7] mx-auto mb-2" />
-                <p className="text-xs font-medium text-[#1A1A2E] mb-1">Premium Voice — Enterprise Plan</p>
+                <Lock className="size-6 text-[#a855f7] mx-auto mb-2" />
+                <p className="text-xs font-medium text-[#1A1A2E] mb-1">Premium Voice, Enterprise Plan</p>
                 <p className="text-[10px] text-[#888] mb-3">Real phone calls, voice cloning, SIP trunks, unlimited minutes</p>
                 <button data-testid="upgrade-voice-btn" onClick={() => alert('Contact sales to upgrade your voice plan.')} className="px-6 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-[#a855f7] to-[#7c3aed] rounded-lg hover:opacity-90">
                   Upgrade to Enterprise
@@ -523,7 +523,7 @@ function Tier1Basic({ config, setupData, setSetupData, onSaveSetup, saving, isCo
     <div className="bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl overflow-hidden" data-testid="tier-1-basic">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-5 text-left hover:bg-white/40 transition-colors">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#4ade80]/10 flex items-center justify-center"><Zap className="w-6 h-6 text-[#4ade80]" /></div>
+          <div className="size-12 rounded-xl bg-[#4ade80]/10 flex items-center justify-center"><Zap className="size-6 text-[#4ade80]" /></div>
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h3 className="text-sm font-medium text-[#1A1A2E]">Basic DIY</h3>
@@ -534,8 +534,8 @@ function Tier1Basic({ config, setupData, setSetupData, onSaveSetup, saving, isCo
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isConfigured && <span className="px-2 py-0.5 text-[9px] text-[#4ade80] bg-[#4ade80]/10 rounded-full flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Active</span>}
-          {expanded ? <ChevronDown className="w-4 h-4 text-[#555]" /> : <ChevronRight className="w-4 h-4 text-[#555]" />}
+          {isConfigured && <span className="px-2 py-0.5 text-[9px] text-[#4ade80] bg-[#4ade80]/10 rounded-full flex items-center gap-1"><CheckCircle className="size-3" /> Active</span>}
+          {expanded ? <ChevronDown className="size-4 text-[#555]" /> : <ChevronRight className="size-4 text-[#555]" />}
         </div>
       </button>
       {expanded && (
@@ -547,7 +547,7 @@ function Tier1Basic({ config, setupData, setSetupData, onSaveSetup, saving, isCo
                   <span key={i} className="px-2 py-1 text-[10px] bg-white/50 text-[#1A1A2E] rounded border border-[#FF6B00]/15">{f}</span>
                 ))}
               </div>
-              <a href="https://forms.google.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[10px] text-[#D4AF37] hover:underline"><ExternalLink className="w-3 h-3" /> Open Google Forms</a>
+              <a href="https://forms.google.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[10px] text-[#D4AF37] hover:underline"><ExternalLink className="size-3" /> Open Google Forms</a>
             </div>
           </StepCard>
           <StepCard number={2} title="Connect to Google Sheets" description="In Google Form, click Responses tab → Sheets icon. Creates a live spreadsheet.">
@@ -571,7 +571,7 @@ function Tier1Basic({ config, setupData, setSetupData, onSaveSetup, saving, isCo
           <StepCard number={4} title="Share Click-to-Chat Link" description="Copy and share on your website, social media, or email signature." total={4}>
             {waLink ? (
               <div className="p-3 bg-white/60 rounded-lg border border-[#FF6B00]/20">
-                <div className="flex items-center justify-between mb-2"><span className="text-[10px] text-[#25D366] flex items-center gap-1"><MessageCircle className="w-3 h-3" /> WhatsApp Click-to-Chat</span><CopyButton text={waLink} label="Copy Link" /></div>
+                <div className="flex items-center justify-between mb-2"><span className="text-[10px] text-[#25D366] flex items-center gap-1"><MessageCircle className="size-3" /> WhatsApp Click-to-Chat</span><CopyButton text={waLink} label="Copy Link" /></div>
                 <code className="block text-[10px] font-mono text-[#888] break-all">{waLink}</code>
               </div>
             ) : <p className="text-[10px] text-[#555] italic">Enter WhatsApp number above to generate link.</p>}
@@ -635,11 +635,11 @@ function Tier3Extension({ token }) {
   };
 
   const sourceIcon = (source) => {
-    if (source?.includes('linkedin')) return <Linkedin className="w-3 h-3 text-[#0A66C2]" />;
-    if (source?.includes('facebook')) return <Facebook className="w-3 h-3 text-[#1877F2]" />;
-    if (source?.includes('instagram')) return <Instagram className="w-3 h-3 text-[#E4405F]" />;
-    if (source?.includes('twitter') || source?.includes('x_')) return <Twitter className="w-3 h-3 text-[#999]" />;
-    return <Globe className="w-3 h-3 text-[#D4AF37]" />;
+    if (source?.includes('linkedin')) return <Linkedin className="size-3 text-[#0A66C2]" />;
+    if (source?.includes('facebook')) return <Facebook className="size-3 text-[#1877F2]" />;
+    if (source?.includes('instagram')) return <Instagram className="size-3 text-[#E4405F]" />;
+    if (source?.includes('twitter') || source?.includes('x_')) return <Twitter className="size-3 text-[#999]" />;
+    return <Globe className="size-3 text-[#D4AF37]" />;
   };
 
   const statusColors = { new: '#D4AF37', contacted: '#3b82f6', converted: '#4ade80', lost: '#ef4444' };
@@ -648,13 +648,13 @@ function Tier3Extension({ token }) {
     <div className="bg-white/80 backdrop-blur-sm border border-[#D4AF37]/20 rounded-xl overflow-hidden" data-testid="tier-3-extension">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-5 text-left hover:bg-white/40 transition-colors">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center relative"><Chrome className="w-6 h-6 text-[#D4AF37]" /><div className="absolute -top-1 -right-1 w-4 h-4 bg-[#D4AF37] rounded-full flex items-center justify-center"><Sparkles className="w-2.5 h-2.5 text-[#050505]" /></div></div>
+          <div className="size-12 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center relative"><Chrome className="size-6 text-[#D4AF37]" /><div className="absolute -top-1 -right-1 size-4 bg-[#D4AF37] rounded-full flex items-center justify-center"><Sparkles className="size-2.5 text-[#050505]" /></div></div>
           <div>
             <div className="flex items-center gap-3 mb-1"><h3 className="text-sm font-medium text-[#1A1A2E]">AUREM Browser Extension</h3><TierBadge tier={3} label="ONE-CLICK" color="#D4AF37" /><span className="px-2 py-0.5 text-[9px] font-bold text-[#4ade80] bg-[#4ade80]/10 rounded-full">READY</span></div>
-            <p className="text-[11px] text-[#888]">Scrape leads from LinkedIn, social media & any webpage — auto-sync to dashboard</p>
+            <p className="text-[11px] text-[#888]">Scrape leads from LinkedIn, social media & any webpage, auto-sync to dashboard</p>
           </div>
         </div>
-        {expanded ? <ChevronDown className="w-4 h-4 text-[#555]" /> : <ChevronRight className="w-4 h-4 text-[#555]" />}
+        {expanded ? <ChevronDown className="size-4 text-[#555]" /> : <ChevronRight className="size-4 text-[#555]" />}
       </button>
 
       {expanded && (
@@ -668,7 +668,7 @@ function Tier3Extension({ token }) {
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveSection(tab.id)} data-testid={`ext-tab-${tab.id}`}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-colors ${activeSection === tab.id ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20' : 'text-[#666] hover:text-[#555]'}`}>
-                <tab.icon className="w-3 h-3" />{tab.label}
+                <tab.icon className="size-3" />{tab.label}
               </button>
             ))}
           </div>
@@ -677,11 +677,11 @@ function Tier3Extension({ token }) {
           {activeSection === 'download' && (
             <div className="px-5 pb-5 space-y-4">
               <div className="p-4 bg-white/60 rounded-xl border border-[#FF6B00]/20">
-                <h4 className="text-xs font-medium text-[#1A1A2E] mb-3">Quick Setup — 2 minutes</h4>
+                <h4 className="text-xs font-medium text-[#1A1A2E] mb-3">Quick Setup, 2 minutes</h4>
                 <div className="space-y-3">
                   <StepCard number={1} title="Download Extension" description="Click below to download the AUREM Lead Scraper extension package (.zip)" total={3}>
                     <button onClick={handleDownload} data-testid="download-extension-btn" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg text-[#050505] text-xs font-semibold hover:opacity-90">
-                      <Chrome className="w-3.5 h-3.5" /> Download Extension
+                      <Chrome className="size-3.5" /> Download Extension
                     </button>
                   </StepCard>
                   <StepCard number={2} title="Load in Chrome" description="Open chrome://extensions → Enable Developer Mode → Drag & drop the extracted folder" total={3} />
@@ -693,7 +693,7 @@ function Tier3Extension({ token }) {
               <div className="grid grid-cols-2 gap-2">
                 {SOCIAL_CHANNELS.map(ch => (
                   <div key={ch.id} className="p-2.5 bg-white/60 rounded-lg border border-[#FF6B00]/20 flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: `${ch.color}12` }}><ch.icon className="w-3.5 h-3.5" style={{ color: ch.color }} /></div>
+                    <div className="size-7 rounded-md flex items-center justify-center" style={{ backgroundColor: `${ch.color}12` }}><ch.icon className="size-3.5" style={{ color: ch.color }} /></div>
                     <div><p className="text-[10px] font-medium text-[#1A1A2E]">{ch.name}</p><p className="text-[9px] text-[#555] leading-tight">{ch.desc}</p></div>
                   </div>
                 ))}
@@ -710,11 +710,11 @@ function Tier3Extension({ token }) {
                   <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchLeads()}
                     placeholder="Search leads by name, email, company..." data-testid="ext-leads-search"
                     className="w-full px-3 py-2 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50 pl-8" />
-                  <Target className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[#555]" />
+                  <Target className="absolute left-2.5 top-2.5 size-3.5 text-[#555]" />
                 </div>
-                <button onClick={fetchLeads} data-testid="ext-leads-refresh" className="p-2 rounded-lg bg-white/50 border border-[#FF6B00]/15 text-[#888] hover:text-[#1A1A2E]"><RefreshCw className={`w-3.5 h-3.5 ${loadingLeads ? 'animate-spin' : ''}`} /></button>
+                <button onClick={fetchLeads} data-testid="ext-leads-refresh" className="p-2 rounded-lg bg-white/50 border border-[#FF6B00]/15 text-[#888] hover:text-[#1A1A2E]"><RefreshCw className={`size-3.5 ${loadingLeads ? 'animate-spin' : ''}`} /></button>
                 <button onClick={handleExportCSV} data-testid="ext-leads-export" className="flex items-center gap-1.5 px-3 py-2 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-[10px] font-medium text-[#888] hover:text-[#1A1A2E]">
-                  <ExternalLink className="w-3 h-3" /> CSV
+                  <ExternalLink className="size-3" /> CSV
                 </button>
               </div>
 
@@ -723,7 +723,7 @@ function Tier3Extension({ token }) {
                 <div className="bg-white/60 rounded-xl border border-[#FF6B00]/20 divide-y divide-[#111] max-h-[400px] overflow-auto">
                   {leads.map((lead) => (
                     <div key={lead.lead_id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/80 backdrop-blur-sm group" data-testid={`ext-lead-${lead.lead_id}`}>
-                      <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-[11px] font-bold text-[#D4AF37]">
+                      <div className="size-8 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-[11px] font-bold text-[#D4AF37]">
                         {(lead.name || '?')[0].toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -747,7 +747,7 @@ function Tier3Extension({ token }) {
                           <option value="converted">Converted</option>
                           <option value="lost">Lost</option>
                         </select>
-                        <button onClick={() => handleDeleteLead(lead.lead_id)} className="p-1 rounded text-[#555] hover:text-[#ef4444]"><Trash2 className="w-3 h-3" /></button>
+                        <button onClick={() => handleDeleteLead(lead.lead_id)} className="p-1 rounded text-[#555] hover:text-[#ef4444]"><Trash2 className="size-3" /></button>
                       </div>
                       <span className="px-1.5 py-0.5 text-[8px] font-medium rounded" style={{ backgroundColor: `${statusColors[lead.status] || '#D4AF37'}12`, color: statusColors[lead.status] || '#D4AF37' }}>
                         {lead.status || 'new'}
@@ -757,7 +757,7 @@ function Tier3Extension({ token }) {
                 </div>
               ) : (
                 <div className="p-10 bg-white/60 rounded-xl border border-[#FF6B00]/20 text-center">
-                  <Chrome className="w-8 h-8 text-[#333] mx-auto mb-3" />
+                  <Chrome className="size-8 text-[#333] mx-auto mb-3" />
                   <p className="text-xs text-[#555] mb-1">No leads scraped yet</p>
                   <p className="text-[10px] text-[#444]">Install the extension and start scraping LinkedIn, social profiles & websites</p>
                 </div>
@@ -821,7 +821,7 @@ function Tier3Extension({ token }) {
                 </>
               ) : (
                 <div className="p-8 bg-white/60 rounded-xl border border-[#FF6B00]/20 text-center">
-                  <BarChart3 className="w-8 h-8 text-[#333] mx-auto mb-2" />
+                  <BarChart3 className="size-8 text-[#333] mx-auto mb-2" />
                   <p className="text-xs text-[#555]">Analytics will appear as leads are scraped</p>
                 </div>
               )}
@@ -839,18 +839,18 @@ function Tier4Premium() {
     <div className="bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl overflow-hidden opacity-80" data-testid="tier-4-premium">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-5 text-left hover:bg-white/40 transition-colors">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#a855f7]/10 flex items-center justify-center"><Lock className="w-6 h-6 text-[#a855f7]" /></div>
+          <div className="size-12 rounded-xl bg-[#a855f7]/10 flex items-center justify-center"><Lock className="size-6 text-[#a855f7]" /></div>
           <div>
             <div className="flex items-center gap-3 mb-1"><h3 className="text-sm font-medium text-[#1A1A2E]">Premium API Integrations</h3><TierBadge tier={4} label="UNLIMITED" color="#a855f7" /></div>
-            <p className="text-[11px] text-[#888]">Twilio, SendGrid, Meta Business API — no limits, no manual setup</p>
+            <p className="text-[11px] text-[#888]">Twilio, SendGrid, Meta Business API, no limits, no manual setup</p>
           </div>
         </div>
-        {expanded ? <ChevronDown className="w-4 h-4 text-[#555]" /> : <ChevronRight className="w-4 h-4 text-[#555]" />}
+        {expanded ? <ChevronDown className="size-4 text-[#555]" /> : <ChevronRight className="size-4 text-[#555]" />}
       </button>
       {expanded && (
         <div className="p-5 border-t border-[#FF6B00]/20">
           <div className="p-4 bg-gradient-to-br from-[#a855f7]/5 to-transparent border border-[#a855f7]/20 rounded-xl text-center">
-            <Lock className="w-6 h-6 text-[#a855f7] mx-auto mb-2" />
+            <Lock className="size-6 text-[#a855f7] mx-auto mb-2" />
             <p className="text-xs font-medium text-[#1A1A2E] mb-1">Enterprise Plan</p>
             <p className="text-[10px] text-[#888] mb-3">Unlimited API calls, zero setup, priority support</p>
             <button data-testid="upgrade-premium-btn" onClick={() => alert('Contact sales to upgrade to premium.')} className="px-6 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-[#a855f7] to-[#7c3aed] rounded-lg hover:opacity-90">Upgrade</button>
@@ -910,7 +910,7 @@ export default function AcquisitionEngine({ token, user }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="acquisition-engine-loading">
-      <div className="flex items-center gap-3 text-[#666]"><RefreshCw className="w-5 h-5 animate-spin" /><span className="text-sm">Loading Acquisition Engine...</span></div>
+      <div className="flex items-center gap-3 text-[#666]"><RefreshCw className="size-5 animate-spin" /><span className="text-sm">Loading Acquisition Engine…</span></div>
     </div>
   );
 
@@ -921,9 +921,9 @@ export default function AcquisitionEngine({ token, user }) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-xl font-semibold text-[#e2c97e] tracking-wider mb-1">Acquisition Engine</h1>
-            <p className="text-xs text-[#888]">Zero-cost customer acquisition across every channel — your accounts, our automation</p>
+            <p className="text-xs text-[#888]">Zero-cost customer acquisition across every channel, your accounts, our automation</p>
           </div>
-          <button onClick={() => isConfigured ? setShowCreateCampaign(true) : setActiveTab('channels')} data-testid="create-campaign-btn" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg text-[#050505] text-xs font-semibold hover:opacity-90"><Plus className="w-3.5 h-3.5" /> New Campaign</button>
+          <button onClick={() => isConfigured ? setShowCreateCampaign(true) : setActiveTab('channels')} data-testid="create-campaign-btn" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg text-[#050505] text-xs font-semibold hover:opacity-90"><Plus className="size-3.5" /> New Campaign</button>
         </div>
 
         {/* Tabs */}
@@ -936,7 +936,7 @@ export default function AcquisitionEngine({ token, user }) {
             { id: 'templates', label: 'Templates', icon: Mail },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} data-testid={`acq-tab-${tab.id}`} className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs transition-all ${activeTab === tab.id ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30' : 'text-[#666] hover:text-[#555]'}`}>
-              <tab.icon className="w-3.5 h-3.5" />{tab.label}
+              <tab.icon className="size-3.5" />{tab.label}
             </button>
           ))}
         </div>
@@ -955,11 +955,11 @@ export default function AcquisitionEngine({ token, user }) {
                 ].map((s, i) => (
                   <React.Fragment key={i}>
                     <div className="flex-1 text-center">
-                      <div className="w-14 h-14 rounded-2xl mx-auto mb-2 flex items-center justify-center" style={{ backgroundColor: `${s.color}12` }}><s.icon className="w-6 h-6" style={{ color: s.color }} /></div>
+                      <div className="size-14 rounded-2xl mx-auto mb-2 flex items-center justify-center" style={{ backgroundColor: `${s.color}12` }}><s.icon className="size-6" style={{ color: s.color }} /></div>
                       <div className="text-2xl font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
                       <div className="text-[11px] font-medium text-[#1A1A2E] mt-0.5">{s.stage}</div>
                     </div>
-                    {i < 3 && <div className="flex items-center px-2"><div className="w-10 h-[1px] bg-[#333]" /><ChevronRight className="w-4 h-4 text-[#333]" /></div>}
+                    {i < 3 && <div className="flex items-center px-2"><div className="w-10 h-[1px] bg-[#333]" /><ChevronRight className="size-4 text-[#333]" /></div>}
                   </React.Fragment>
                 ))}
               </div>
@@ -975,7 +975,7 @@ export default function AcquisitionEngine({ token, user }) {
                 { tier: 5, name: 'Voice Agent', status: 'LIVE', color: '#D4AF37', icon: Phone, desc: 'Talk to AI' },
               ].map(t => (
                 <button key={t.tier} onClick={() => setActiveTab('channels')} className={`p-4 bg-white/80 backdrop-blur-sm rounded-xl text-left hover:border-[#D4AF37]/20 transition-colors group ${t.tier === 5 ? 'border-2 border-[#D4AF37]/30 shadow-[0_0_15px_rgba(212,175,55,0.05)]' : 'border border-[#FF6B00]/20'}`}>
-                  <t.icon className="w-5 h-5 mb-2" style={{ color: t.color }} />
+                  <t.icon className="size-5 mb-2" style={{ color: t.color }} />
                   <p className="text-xs font-medium text-[#1A1A2E] mb-0.5">{t.name}</p>
                   <p className="text-[9px] text-[#555] mb-2">{t.desc}</p>
                   <span className="px-2 py-0.5 text-[9px] rounded-full" style={{ backgroundColor: `${t.color}12`, color: t.color }}>{t.status}</span>
@@ -1012,13 +1012,13 @@ export default function AcquisitionEngine({ token, user }) {
                   <div key={c.id} data-testid={`campaign-${c.id}`} className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${c.status === 'active' ? 'bg-[#4ade80]/10' : 'bg-[#555]/10'}`}><Rocket className={`w-5 h-5 ${c.status === 'active' ? 'text-[#4ade80]' : 'text-[#555]'}`} /></div>
+                        <div className={`size-10 rounded-lg flex items-center justify-center ${c.status === 'active' ? 'bg-[#4ade80]/10' : 'bg-[#555]/10'}`}><Rocket className={`size-5 ${c.status === 'active' ? 'text-[#4ade80]' : 'text-[#555]'}`} /></div>
                         <div><h3 className="text-sm font-medium text-[#1A1A2E]">{c.name}</h3><div className="flex items-center gap-2 mt-0.5">{c.auto_email && <span className="text-[9px] px-1.5 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded">Email</span>}{c.auto_whatsapp && <span className="text-[9px] px-1.5 py-0.5 bg-[#25D366]/10 text-[#25D366] rounded">WhatsApp</span>}</div></div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${c.status === 'active' ? 'bg-[#4ade80]/10 text-[#4ade80]' : 'bg-[#555]/10 text-[#555]'}`}>{c.status === 'active' ? 'Live' : 'Paused'}</span>
-                        <button onClick={() => handleToggle(c.id, c.status)} className="p-1.5 rounded-md text-[#888] hover:text-[#1A1A2E]">{c.status === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}</button>
-                        <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded-md text-[#555] hover:text-[#ef4444]"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleToggle(c.id, c.status)} className="p-1.5 rounded-md text-[#888] hover:text-[#1A1A2E]">{c.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</button>
+                        <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded-md text-[#555] hover:text-[#ef4444]"><Trash2 className="size-3.5" /></button>
                       </div>
                     </div>
                     <div className="grid grid-cols-4 gap-3 mb-4">
@@ -1029,8 +1029,8 @@ export default function AcquisitionEngine({ token, user }) {
                     <div className="p-3 bg-white/60 rounded-lg">
                       <div className="flex items-center justify-between mb-1.5"><span className="text-[10px] text-[#555]">FORM LINK</span>
                         <div className="flex gap-1">
-                          <button onClick={() => copyText(formUrl,`u-${c.id}`)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-[#D4AF37] bg-[#D4AF37]/10 rounded">{copied===`u-${c.id}` ? <Check className="w-3 h-3"/> : <Copy className="w-3 h-3"/>} URL</button>
-                          <button onClick={() => copyText(embedCode,`e-${c.id}`)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-[#888] bg-white/50 rounded">{copied===`e-${c.id}` ? <Check className="w-3 h-3"/> : <Code className="w-3 h-3"/>} Embed</button>
+                          <button onClick={() => copyText(formUrl,`u-${c.id}`)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-[#D4AF37] bg-[#D4AF37]/10 rounded">{copied===`u-${c.id}` ? <Check className="size-3"/> : <Copy className="size-3"/>} URL</button>
+                          <button onClick={() => copyText(embedCode,`e-${c.id}`)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-[#888] bg-white/50 rounded">{copied===`e-${c.id}` ? <Check className="size-3"/> : <Code className="size-3"/>} Embed</button>
                         </div>
                       </div>
                       <code className="block text-[10px] font-mono text-[#888] truncate">{formUrl}</code>
@@ -1041,7 +1041,7 @@ export default function AcquisitionEngine({ token, user }) {
             </div>
           ) : (
             <div className="p-16 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl text-center">
-              <Rocket className="w-10 h-10 text-[#333] mx-auto mb-4" /><h3 className="text-sm font-medium text-[#1A1A2E] mb-2">No campaigns yet</h3>
+              <Rocket className="size-10 text-[#333] mx-auto mb-4" /><h3 className="text-sm font-medium text-[#1A1A2E] mb-2">No campaigns yet</h3>
               <button onClick={() => isConfigured ? setShowCreateCampaign(true) : setActiveTab('channels')} className="px-5 py-2.5 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90">{isConfigured ? 'Create Campaign' : 'Setup First'}</button>
             </div>
           )
@@ -1055,12 +1055,12 @@ export default function AcquisitionEngine({ token, user }) {
               <div className="divide-y divide-[#141414]">
                 {leads.map((l,i) => (
                   <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-white/40">
-                    <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[10px] font-semibold text-[#D4AF37]">{(l.name||'L')[0].toUpperCase()}</div><div><p className="text-xs text-[#1A1A2E]">{l.name}</p><p className="text-[10px] text-[#888]">{l.email}</p></div></div>
-                    <div className="flex items-center gap-3">{l.concern && <span className="px-2 py-0.5 text-[9px] bg-[#D4AF37]/10 text-[#D4AF37] rounded">{l.concern}</span>}<div className="flex gap-1">{l.email_sent && <Mail className="w-3 h-3 text-[#3b82f6]"/>}{l.wa_clicked && <MessageCircle className="w-3 h-3 text-[#25D366]"/>}</div></div>
+                    <div className="flex items-center gap-3"><div className="size-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[10px] font-semibold text-[#D4AF37]">{(l.name||'L')[0].toUpperCase()}</div><div><p className="text-xs text-[#1A1A2E]">{l.name}</p><p className="text-[10px] text-[#888]">{l.email}</p></div></div>
+                    <div className="flex items-center gap-3">{l.concern && <span className="px-2 py-0.5 text-[9px] bg-[#D4AF37]/10 text-[#D4AF37] rounded">{l.concern}</span>}<div className="flex gap-1">{l.email_sent && <Mail className="size-3 text-[#3b82f6]"/>}{l.wa_clicked && <MessageCircle className="size-3 text-[#25D366]"/>}</div></div>
                   </div>
                 ))}
               </div>
-            ) : <div className="p-10 text-center"><Users className="w-8 h-8 text-[#333] mx-auto mb-3"/><p className="text-sm text-[#555]">No leads yet</p></div>}
+            ) : <div className="p-10 text-center"><Users className="size-8 text-[#333] mx-auto mb-3"/><p className="text-sm text-[#555]">No leads yet</p></div>}
           </div>
         )}
 
@@ -1084,7 +1084,7 @@ export default function AcquisitionEngine({ token, user }) {
       {showCreateCampaign && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[10000]">
           <div className="bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-5 border-b border-[#FF6B00]/20"><h3 className="text-sm font-medium text-[#1A1A2E]">New Campaign</h3><button onClick={() => setShowCreateCampaign(false)} className="text-[#555] hover:text-[#555]"><X className="w-5 h-5"/></button></div>
+            <div className="flex items-center justify-between p-5 border-b border-[#FF6B00]/20"><h3 className="text-sm font-medium text-[#1A1A2E]">New Campaign</h3><button onClick={() => setShowCreateCampaign(false)} className="text-[#555] hover:text-[#555]"><X className="size-5"/></button></div>
             <div className="flex-1 overflow-auto p-5 space-y-4">
               <div><label className="block text-[10px] text-[#888] mb-1.5 tracking-wider">CAMPAIGN NAME</label><input type="text" value={campaignForm.name} onChange={e => setCampaignForm({...campaignForm, name: e.target.value})} placeholder="Summer Launch" data-testid="campaign-name-input" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50"/></div>
               <div><label className="block text-[10px] text-[#888] mb-1.5 tracking-wider">EMAIL TEMPLATE</label>

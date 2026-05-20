@@ -53,7 +53,7 @@ const CircuitBreakerCard = ({ breaker, onReset }) => {
         fontWeight: 600,
         textTransform: 'uppercase'
       }}>
-        <StateIcon className="w-3 h-3" />
+        <StateIcon className="size-3" />
         {breaker.state.replace('_', ' ')}
       </div>
 
@@ -111,16 +111,16 @@ const CircuitBreakerCard = ({ breaker, onReset }) => {
         marginBottom: 12
       }}>
         <div style={{display: 'flex', alignItems: 'center', gap: 4}}>
-          <Activity className="w-3 h-3" />
+          <Activity className="size-3" />
           {breaker.stats?.total_calls || 0} calls
         </div>
         <div style={{display: 'flex', alignItems: 'center', gap: 4}}>
-          <XCircle className="w-3 h-3" />
+          <XCircle className="size-3" />
           {breaker.stats?.total_failures || 0} failures
         </div>
         {breaker.stats?.total_blocks > 0 && (
           <div style={{display: 'flex', alignItems: 'center', gap: 4, color: '#F88'}}>
-            <AlertTriangle className="w-3 h-3" />
+            <AlertTriangle className="size-3" />
             {breaker.stats?.total_blocks} blocked
           </div>
         )}
@@ -170,7 +170,7 @@ const CircuitBreakerCard = ({ breaker, onReset }) => {
             gap: 6
           }}
         >
-          <RotateCcw className="w-3 h-3" />
+          <RotateCcw className="size-3" />
           Reset Circuit
         </button>
       )}
@@ -244,8 +244,8 @@ const CircuitBreakerDashboard = ({ token }) => {
   if (loading) {
     return (
       <div style={{padding: 24, textAlign: 'center', color: '#666'}}>
-        <Activity className="w-8 h-8 mx-auto mb-4 animate-pulse" />
-        Loading circuit breakers...
+        <Activity className="size-8 mx-auto mb-4 animate-pulse" />
+        Loading circuit breakers…
       </div>
     );
   }
@@ -294,7 +294,7 @@ const CircuitBreakerDashboard = ({ token }) => {
                 opacity: resetting === 'all' ? 0.6 : 1
               }}
             >
-              <RotateCcw className={`w-4 h-4 ${resetting === 'all' ? 'animate-spin' : ''}`} />
+              <RotateCcw className={`size-4 ${resetting === 'all' ? 'animate-spin' : ''}`} />
               Reset All
             </button>
           )}
@@ -312,9 +312,9 @@ const CircuitBreakerDashboard = ({ token }) => {
             gap: 10
           }}>
             {openCount > 0 ? (
-              <AlertTriangle className="w-5 h-5 text-[#F44]" />
+              <AlertTriangle className="size-5 text-[#F44]" />
             ) : (
-              <CheckCircle className="w-5 h-5 text-[#4A4]" />
+              <CheckCircle className="size-5 text-[#4A4]" />
             )}
             <div>
               <div style={{fontSize: 20, fontWeight: 700, color: openCount > 0 ? '#F44' : '#4A4'}}>
@@ -335,7 +335,7 @@ const CircuitBreakerDashboard = ({ token }) => {
             alignItems: 'center',
             gap: 10
           }}>
-            <Zap className="w-5 h-5 text-[#D4AF37]" />
+            <Zap className="size-5 text-[#D4AF37]" />
             <div>
               <div style={{fontSize: 20, fontWeight: 700, color: '#F4F4F4'}}>
                 {breakers.total_breakers}

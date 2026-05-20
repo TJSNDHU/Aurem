@@ -90,8 +90,8 @@ export default function AuditWidget() {
       <div data-testid="audit-widget-empty" style={shellStyle}>
         <Header />
         <div style={{ padding: "8px 0", color: COLORS.textD, fontSize: 13, lineHeight: 1.55 }}>
-          AUREM ne abhi tak tumhari website scan nahi ki. Enter your URL — Performance, SEO,
-          aur estimated Google Ads waste — 60 seconds me.
+          AUREM ne abhi tak tumhari website scan nahi ki. Enter your URL, Performance, SEO,
+          aur estimated Google Ads waste, 60 seconds me.
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <input
@@ -170,7 +170,7 @@ export default function AuditWidget() {
           <a href="/billing?addon=audit_pro" data-testid="audit-upgrade-link"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: 12,
               color: COLORS.accent, textDecoration: "none", fontWeight: 600 }}>
-            <Sparkles size={13} /> Unlock Ads Optimisation Pro — $49/mo →
+            <Sparkles size={13} /> Unlock Ads Optimisation Pro, $49/mo →
           </a>
         </div>
       )}

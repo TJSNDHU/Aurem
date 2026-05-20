@@ -62,7 +62,7 @@ export default function SentinelAnomalyDashboard({ token }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center">
-      <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+      <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
     </div>
   );
 
@@ -91,11 +91,11 @@ export default function SentinelAnomalyDashboard({ token }) {
               style={{ background: 'linear-gradient(135deg, #FF6B00, #CC5500)', color: '#0A0A00' }}
               data-testid="anomaly-scan-btn"
             >
-              {scanning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shield className="w-3 h-3" />}
+              {scanning ? <Loader2 className="size-3 animate-spin" /> : <Shield className="size-3" />}
               Run Scan
             </button>
             <button onClick={fetchData} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-              <RefreshCw className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+              <RefreshCw className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
             </button>
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function SentinelAnomalyDashboard({ token }) {
             ].map(card => (
               <MotionCard key={card.label} variant={cardVariant} className="aurem-glass-card p-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <card.icon className="w-4 h-4" style={{ color: card.color }} />
+                  <card.icon className="size-4" style={{ color: card.color }} />
                   <span className="text-lg font-bold" style={{ color: card.color }}>{card.value}</span>
                 </div>
                 <div className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>{card.label}</div>
@@ -125,9 +125,9 @@ export default function SentinelAnomalyDashboard({ token }) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 {scanResult.has_critical ? (
-                  <AlertTriangle className="w-5 h-5" style={{ color: '#EF4444' }} />
+                  <AlertTriangle className="size-5" style={{ color: '#EF4444' }} />
                 ) : (
-                  <CheckCircle className="w-5 h-5" style={{ color: '#22C55E' }} />
+                  <CheckCircle className="size-5" style={{ color: '#22C55E' }} />
                 )}
                 <span className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>
                   {scanResult.has_critical ? 'Anomaly Detected' : 'All Clear'}
@@ -154,7 +154,7 @@ export default function SentinelAnomalyDashboard({ token }) {
                   <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 * i }}
                     className="p-3 rounded-lg" style={{ background: a.anomaly ? 'rgba(239,68,68,0.04)' : 'rgba(255,107,0,0.03)' }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Icon className="w-4 h-4" style={{ color: a.anomaly ? '#EF4444' : '#22C55E' }} />
+                      <Icon className="size-4" style={{ color: a.anomaly ? '#EF4444' : '#22C55E' }} />
                       <span className="text-xs font-bold capitalize" style={{ color: 'var(--aurem-heading)' }}>
                         {a.metric.replace(/_/g, ' ')}
                       </span>
@@ -176,13 +176,13 @@ export default function SentinelAnomalyDashboard({ token }) {
         {history.length > 1 && (
           <div className="aurem-glass-card overflow-hidden" data-testid="anomaly-history">
             <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)' }}>
-              <Activity className="w-4 h-4" style={{ color: '#3B82F6' }} />
+              <Activity className="size-4" style={{ color: '#3B82F6' }} />
               <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Scan History</span>
             </div>
             <div className="max-h-[200px] overflow-y-auto aurem-scroll">
               {history.map((h, i) => (
                 <div key={i} className="px-5 py-2 border-b flex items-center gap-3" style={{ borderColor: 'rgba(255,107,0,0.05)' }}>
-                  <div className="w-2 h-2 rounded-full" style={{ background: h.has_critical ? '#EF4444' : '#22C55E' }} />
+                  <div className="size-2 rounded-full" style={{ background: h.has_critical ? '#EF4444' : '#22C55E' }} />
                   <span className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                     Score {h.max_score}/10 | {h.triggered_count} triggered
                   </span>

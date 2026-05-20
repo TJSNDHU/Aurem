@@ -7,7 +7,7 @@ server.py contains ~1,288 routes across 113 API prefixes.
 55+ routes in server.py have NO frontend callers (legacy from pre-AUREM app).
 
 ## Safe to Remove (Legacy App Routes — Not Used by AUREM)
-These are from the original reroots.ca skincare app. None are called by AUREM frontend.
+These are from the original aurem.live skincare app. None are called by AUREM frontend.
 
 | Prefix | Routes | Type |
 |--------|--------|------|

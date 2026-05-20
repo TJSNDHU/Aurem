@@ -44,7 +44,7 @@ export default function DeepScoutDashboard({ token }) {
         <div className="aurem-glass-card p-4 mb-6">
           <div className="flex gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
               <input
                 type="text"
                 value={query}
@@ -63,7 +63,7 @@ export default function DeepScoutDashboard({ token }) {
               style={{ background: 'linear-gradient(135deg, #FF6B00, #CC5500)', color: '#0A0A00' }}
               data-testid="deep-scout-search-btn"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+              {loading ? <Loader2 className="size-4 animate-spin" /> : 'Search'}
             </button>
           </div>
           <div className="text-[10px] mt-2" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -77,7 +77,7 @@ export default function DeepScoutDashboard({ token }) {
             {result.skipped ? (
               <div className="aurem-glass-card p-4">
                 <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4" style={{ color: '#EAB308' }} />
+                  <Search className="size-4" style={{ color: '#EAB308' }} />
                   <span className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>Simple Query Mode</span>
                 </div>
                 <p className="text-xs mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -89,7 +89,7 @@ export default function DeepScoutDashboard({ token }) {
                 {/* Summary */}
                 <div className="aurem-glass-card p-4" data-testid="deep-scout-result">
                   <div className="flex items-center gap-3 mb-3">
-                    <Layers className="w-5 h-5" style={{ color: '#FF6B00' }} />
+                    <Layers className="size-5" style={{ color: '#FF6B00' }} />
                     <div>
                       <div className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>
                         {result.steps_taken} step{result.steps_taken !== 1 ? 's' : ''} completed
@@ -117,12 +117,12 @@ export default function DeepScoutDashboard({ token }) {
                   <motion.div key={i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * i }}
                     className="aurem-glass-card p-4" data-testid={`deep-scout-step-${i}`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{
+                      <div className="size-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{
                         background: step.is_complete ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
                         color: step.is_complete ? '#22C55E' : '#EAB308',
                       }}>{step.step}</div>
                       <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Step {step.step}</span>
-                      {step.is_complete && <CheckCircle className="w-3 h-3 ml-auto" style={{ color: '#22C55E' }} />}
+                      {step.is_complete && <CheckCircle className="size-3 ml-auto" style={{ color: '#22C55E' }} />}
                       <span className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                         {step.findings?.length || 0} findings | {step.coverage_pct}%
                       </span>

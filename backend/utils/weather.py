@@ -1,5 +1,5 @@
 """
-Weather Utility for Reroots Skincare
+Weather Utility for AUREM Skincare
 Provides skincare-relevant weather data using Open-Meteo (free, no API key).
 Replaced OpenWeatherMap — $0 cost.
 """

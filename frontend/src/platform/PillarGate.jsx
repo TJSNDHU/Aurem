@@ -127,7 +127,7 @@ const PillarAuthState = () => (
 );
 
 /**
- * PillarGate — wrap any admin section.
+ * PillarGate, wrap any admin section.
  *   <PillarGate pillar="P3"><MyOutreachPage/></PillarGate>
  */
 const PillarGate = ({ pillar, children, allowYellow = true }) => {
@@ -135,7 +135,7 @@ const PillarGate = ({ pillar, children, allowYellow = true }) => {
   const status = pillars[pillar] || 'loading';
 
   if (status === 'loading') return <PillarSkeleton />;
-  // iter 282al-29 — stale JWT (401/403) is NOT infra degradation
+  // iter 282al-29, stale JWT (401/403) is NOT infra degradation
   if (status === 'auth')    return <PillarAuthState />;
   if (status === 'red')     return <PillarErrorState pillar={pillar} />;
   if (status === 'yellow' && !allowYellow) return <PillarErrorState pillar={pillar} />;

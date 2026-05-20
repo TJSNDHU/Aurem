@@ -1,5 +1,5 @@
 """
-Data Masking Utilities for Reroots
+Data Masking Utilities for AUREM
 Provides masking functions for sensitive data in admin views.
 Real data is stored in DB - only masked on display.
 """

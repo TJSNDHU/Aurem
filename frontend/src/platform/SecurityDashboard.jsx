@@ -4,6 +4,14 @@ import { motion, StaggerGrid, MotionCard, cardVariant } from './motion-system';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
+// Module-level — extracted from SecurityDashboard so it doesn't get
+// re-allocated every render (react-doctor: no-nested-component-definition).
+const StatusIcon = ({ status }) => {
+  if (status === 'PASS') return <CheckCircle className="size-4" style={{ color: '#22C55E' }} />;
+  if (status === 'FAIL') return <XCircle className="size-4" style={{ color: '#EF4444' }} />;
+  return <AlertTriangle className="size-4" style={{ color: '#EAB308' }} />;
+};
+
 export default function SecurityDashboard({ token }) {
   const [asvsResult, setAsvsResult] = useState(null);
   const [agenticResult, setAgenticResult] = useState(null);
@@ -40,12 +48,6 @@ export default function SecurityDashboard({ token }) {
     } catch (e) { console.error(e); }
     setScanning(null);
     fetchData();
-  };
-
-  const StatusIcon = ({ status }) => {
-    if (status === 'PASS') return <CheckCircle className="w-4 h-4" style={{ color: '#22C55E' }} />;
-    if (status === 'FAIL') return <XCircle className="w-4 h-4" style={{ color: '#EF4444' }} />;
-    return <AlertTriangle className="w-4 h-4" style={{ color: '#EAB308' }} />;
   };
 
   return (
@@ -92,8 +94,8 @@ export default function SecurityDashboard({ token }) {
             data-testid={`run-${type}-btn`}
           >
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
-                {scanning === type ? <Loader2 className="w-4 h-4 animate-spin" style={{ color }} /> : <Icon className="w-4 h-4" style={{ color }} />}
+              <div className="size-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
+                {scanning === type ? <Loader2 className="size-4 animate-spin" style={{ color }} /> : <Icon className="size-4" style={{ color }} />}
               </div>
               <div className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>{label}</div>
             </div>
@@ -107,7 +109,7 @@ export default function SecurityDashboard({ token }) {
         {/* ASVS Results */}
         <div className="aurem-glass-card overflow-hidden" data-testid="asvs-results">
           <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(34,197,94,0.03)' }}>
-            <Shield className="w-4 h-4" style={{ color: '#22C55E' }} />
+            <Shield className="size-4" style={{ color: '#22C55E' }} />
             <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>ASVS L1 Compliance</span>
             {asvsResult && (
               <span className="text-[10px] ml-auto px-2 py-0.5 rounded-full" style={{
@@ -118,7 +120,7 @@ export default function SecurityDashboard({ token }) {
           </div>
           {!asvsResult ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Shield className="w-8 h-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
+              <Shield className="size-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
               <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Run ASVS audit to see results</p>
             </div>
           ) : (
@@ -145,7 +147,7 @@ export default function SecurityDashboard({ token }) {
         {/* Agentic AI Results */}
         <div className="aurem-glass-card overflow-hidden" data-testid="agentic-results">
           <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(139,92,246,0.03)' }}>
-            <Cpu className="w-4 h-4" style={{ color: '#8B5CF6' }} />
+            <Cpu className="size-4" style={{ color: '#8B5CF6' }} />
             <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>OWASP Agentic AI Top 10</span>
             {agenticResult && (
               <span className="text-[10px] ml-auto px-2 py-0.5 rounded-full" style={{
@@ -156,7 +158,7 @@ export default function SecurityDashboard({ token }) {
           </div>
           {!agenticResult ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Cpu className="w-8 h-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
+              <Cpu className="size-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
               <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Run Agentic AI audit to see results</p>
             </div>
           ) : (
@@ -185,7 +187,7 @@ export default function SecurityDashboard({ token }) {
       {scanResult && (
         <div className="aurem-glass-card mt-6 overflow-hidden" data-testid="full-scan-results">
           <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(59,130,246,0.03)' }}>
-            <Code className="w-4 h-4" style={{ color: '#3B82F6' }} />
+            <Code className="size-4" style={{ color: '#3B82F6' }} />
             <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Full Codebase Scan</span>
             <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{scanResult.scanned} files</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full" style={{
@@ -199,7 +201,7 @@ export default function SecurityDashboard({ token }) {
                 <div className="text-[10px] font-bold mb-2" style={{ color: '#EF4444' }}>CRITICAL ({scanResult.criticals.length})</div>
                 {scanResult.criticals.slice(0, 10).map((c, i) => (
                   <div key={i} className="text-[10px] flex items-center gap-2 py-1">
-                    <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: '#EF4444' }} />
+                    <XCircle className="size-3 flex-shrink-0" style={{ color: '#EF4444' }} />
                     <span style={{ color: 'var(--aurem-heading)' }}>{c.file}:{c.line}</span>
                     <span style={{ color: 'var(--aurem-body-secondary)' }}>{c.pattern}</span>
                   </div>
@@ -211,7 +213,7 @@ export default function SecurityDashboard({ token }) {
                 <div className="text-[10px] font-bold mb-2" style={{ color: '#EAB308' }}>WARNINGS ({scanResult.warnings.length})</div>
                 {scanResult.warnings.slice(0, 10).map((w, i) => (
                   <div key={i} className="text-[10px] flex items-center gap-2 py-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" style={{ color: '#EAB308' }} />
+                    <AlertTriangle className="size-3 flex-shrink-0" style={{ color: '#EAB308' }} />
                     <span style={{ color: 'var(--aurem-heading)' }}>{w.file}:{w.line}</span>
                     <span style={{ color: 'var(--aurem-body-secondary)' }}>{w.pattern}</span>
                   </div>
@@ -220,7 +222,7 @@ export default function SecurityDashboard({ token }) {
             )}
             {(scanResult.criticals?.length === 0 && scanResult.warnings?.length === 0) && (
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" style={{ color: '#22C55E' }} />
+                <CheckCircle className="size-4" style={{ color: '#22C55E' }} />
                 <span className="text-xs" style={{ color: '#22C55E' }}>Codebase is clean.</span>
               </div>
             )}
@@ -296,12 +298,12 @@ function PentAGISection({ token, headers }) {
       style={{ background: 'var(--aurem-card-bg, rgba(20,18,22,0.6))', border: '1px solid rgba(239,68,68,0.1)' }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
-            <Shield className="w-4 h-4" style={{ color: '#ef4444' }} />
+          <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
+            <Shield className="size-4" style={{ color: '#ef4444' }} />
           </div>
           <div>
             <h3 className="text-sm font-black" style={{ color: 'var(--aurem-heading, #F5F5F5)' }}>PentAGI Full Pentest</h3>
-            <p className="text-[9px]" style={{ color: 'var(--aurem-text-secondary, #888)' }}>Autonomous AI penetration testing — Enterprise only</p>
+            <p className="text-[9px]" style={{ color: 'var(--aurem-text-secondary, #888)' }}>Autonomous AI penetration testing, Enterprise only</p>
           </div>
         </div>
         <span className="text-[9px] font-bold px-2.5 py-1 rounded-full" data-testid="pentagi-status"
@@ -342,7 +344,7 @@ function PentAGISection({ token, headers }) {
       <button onClick={runPentest} disabled={running || !target.trim()} data-testid="run-pentest-btn"
         className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40"
         style={{ background: running ? 'rgba(128,128,128,0.2)' : 'rgba(239,68,68,0.9)', color: running ? '#888' : '#fff' }}>
-        {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
+        {running ? <Loader2 className="size-3.5 animate-spin" /> : <Shield className="size-3.5" />}
         {running ? 'Starting PentAGI...' : 'Launch Pentest'}
       </button>
 
@@ -353,7 +355,7 @@ function PentAGISection({ token, headers }) {
         <div className="rounded-xl p-4 space-y-2" data-testid="pentest-result"
           style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" style={{ color: result.status === 'running' ? '#D4AF37' : '#22c55e' }} />
+            <CheckCircle className="size-4" style={{ color: result.status === 'running' ? '#D4AF37' : '#22c55e' }} />
             <span className="text-xs font-bold" style={{ color: result.status === 'running' ? '#D4AF37' : '#22c55e' }}>
               {result.status === 'running' ? 'PENTEST RUNNING' : result.status?.toUpperCase()}
             </span>
@@ -373,7 +375,7 @@ function PentAGISection({ token, headers }) {
           {history.map((pt, i) => (
             <div key={i} className="flex items-center justify-between py-1.5" style={{ borderBottom: '1px solid rgba(128,128,128,0.08)' }}>
               <div className="flex items-center gap-2">
-                <Shield className="w-3 h-3" style={{ color: pt.status === 'completed' ? '#22c55e' : pt.status === 'running' ? '#D4AF37' : '#ef4444' }} />
+                <Shield className="size-3" style={{ color: pt.status === 'completed' ? '#22c55e' : pt.status === 'running' ? '#D4AF37' : '#ef4444' }} />
                 <span className="text-[10px]" style={{ color: 'var(--aurem-text, #ccc)' }}>{pt.target}</span>
                 <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: '#888' }}>{pt.scan_type}</span>
               </div>

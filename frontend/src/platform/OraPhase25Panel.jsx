@@ -55,7 +55,7 @@ const Stat = ({ icon: Icon, label, value, tone = "default", testid }) => {
       className={`rounded-lg border px-3 py-2 bg-zinc-950/60 ${toneCls}`}
     >
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-500">
-        {Icon ? <Icon className="w-3 h-3" /> : null}
+        {Icon ? <Icon className="size-3" /> : null}
         {label}
       </div>
       <div className="text-xl font-semibold">{value}</div>
@@ -181,7 +181,7 @@ const OraPhase25Panel = () => {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Sparkles className="size-4 text-amber-400" />
             <h3 className="text-base font-semibold text-zinc-100">
               ORA Sovereign Customer Handler
             </h3>
@@ -202,9 +202,9 @@ const OraPhase25Panel = () => {
             className="text-[12px] px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black flex items-center gap-1 disabled:opacity-40"
           >
             {busy === "scan" ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="size-3.5 animate-spin" />
             ) : (
-              <Sparkles className="w-3.5 h-3.5" />
+              <Sparkles className="size-3.5" />
             )}
             Scan now
           </button>
@@ -215,9 +215,9 @@ const OraPhase25Panel = () => {
             className="text-[12px] px-3 py-1.5 rounded bg-zinc-900 border border-zinc-700 hover:border-zinc-500 text-zinc-200 flex items-center gap-1 disabled:opacity-40"
           >
             {loading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="size-3.5 animate-spin" />
             ) : (
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="size-3.5" />
             )}
             Refresh
           </button>
@@ -235,7 +235,7 @@ const OraPhase25Panel = () => {
         {/* Retention column */}
         <div data-testid="ora-25-retention-col" className="rounded-xl border border-zinc-800 bg-black/40 p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Heart className="w-3.5 h-3.5 text-amber-400" />
+            <Heart className="size-3.5 text-amber-400" />
             <span className="text-[12px] uppercase tracking-wider text-zinc-300">Retention</span>
           </div>
           {retention.length === 0 && (
@@ -262,7 +262,7 @@ const OraPhase25Panel = () => {
                   data-testid={`ora-25-retention-send-${i}`}
                   className="text-[11px] px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-black font-medium flex items-center gap-1 disabled:opacity-40"
                 >
-                  <Send className="w-3 h-3" /> Send
+                  <Send className="size-3" /> Send
                 </button>
               </div>
               <div className="mt-1 text-[11px] text-zinc-400 line-clamp-2">{it.suggested_msg}</div>
@@ -273,7 +273,7 @@ const OraPhase25Panel = () => {
         {/* Upsell column */}
         <div data-testid="ora-25-upsell-col" className="rounded-xl border border-zinc-800 bg-black/40 p-3">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+            <TrendingUp className="size-3.5 text-emerald-400" />
             <span className="text-[12px] uppercase tracking-wider text-zinc-300">Upsell</span>
           </div>
           {upsell.length === 0 && (
@@ -300,7 +300,7 @@ const OraPhase25Panel = () => {
                   data-testid={`ora-25-upsell-send-${i}`}
                   className="text-[11px] px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-black font-medium flex items-center gap-1 disabled:opacity-40"
                 >
-                  <Send className="w-3 h-3" /> Send
+                  <Send className="size-3" /> Send
                 </button>
               </div>
               <div className="mt-1 text-[11px] text-zinc-400 line-clamp-2">{it.suggested_msg}</div>
@@ -312,7 +312,7 @@ const OraPhase25Panel = () => {
         <div className="space-y-3">
           <div data-testid="ora-25-nbas-col" className="rounded-xl border border-zinc-800 bg-black/40 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <Sparkles className="size-3.5 text-amber-400" />
               <span className="text-[12px] uppercase tracking-wider text-zinc-300">ORA Recommends</span>
             </div>
             {nbas.length === 0 && (
@@ -338,7 +338,7 @@ const OraPhase25Panel = () => {
 
           <div data-testid="ora-25-policy-col" className="rounded-xl border border-zinc-800 bg-black/40 p-3">
             <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-3.5 h-3.5 text-blue-400" />
+              <Shield className="size-3.5 text-blue-400" />
               <span className="text-[12px] uppercase tracking-wider text-zinc-300">Policy Log</span>
             </div>
             {policy.length === 0 && (
@@ -353,9 +353,9 @@ const OraPhase25Panel = () => {
                 className="flex items-start gap-2 text-[11px] mb-1"
               >
                 {p.allowed ? (
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
+                  <CheckCircle2 className="size-3 text-emerald-400 mt-0.5 shrink-0" />
                 ) : (
-                  <AlertOctagon className="w-3 h-3 text-rose-400 mt-0.5 shrink-0" />
+                  <AlertOctagon className="size-3 text-rose-400 mt-0.5 shrink-0" />
                 )}
                 <span className="text-zinc-400">
                   <span className="text-zinc-200">{p.action_kind}</span> →{" "}

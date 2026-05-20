@@ -60,7 +60,7 @@ export default function TrainingDashboard({ token }) {
           <p className="text-xs text-[#888]">Feed ORA your business knowledge. The smarter it gets, the more money it makes.</p>
         </div>
         <button onClick={fetchOverview} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#FF6B00] border border-[rgba(255,107,0,0.12)] hover:bg-[rgba(45,122,74,0.05)] transition-colors" data-testid="refresh-training">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          <RefreshCw className="size-3.5" /> Refresh
         </button>
       </header>
 
@@ -70,7 +70,7 @@ export default function TrainingDashboard({ token }) {
           {statCards.map((s, i) => (
             <div key={i} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)' }} data-testid={`stat-${s.label.toLowerCase().replace(/\s/g,'-')}`}>
               <div className="flex items-center gap-2 mb-2">
-                <s.icon className="w-4 h-4" style={{ color: s.color }} />
+                <s.icon className="size-4" style={{ color: s.color }} />
                 <span className="text-[10px] font-semibold tracking-wider text-[#888] uppercase">{s.label}</span>
               </div>
               <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
@@ -92,7 +92,7 @@ export default function TrainingDashboard({ token }) {
                 : 'text-[#888] hover:text-[#555]'
             }`}
           >
-            <tab.icon className="w-3.5 h-3.5" />
+            <tab.icon className="size-3.5" />
             {tab.label}
           </button>
         ))}
@@ -229,8 +229,8 @@ function KnowledgeTab({ token, onUpdate }) {
       <div className="mb-4 p-4 rounded-xl" style={{ background: 'rgba(255,107,0,0.04)', border: '1px solid rgba(61,58,57,0.3)' }} data-testid="knowledge-sync-panel">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(61,58,57,0.25)' }}>
-              <Database className="w-4.5 h-4.5 text-[#FF6B00]" />
+            <div className="size-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(61,58,57,0.25)' }}>
+              <Database className="size-4.5 text-[#FF6B00]" />
             </div>
             <div>
               <h3 className="text-xs font-bold text-[#1A1A2E] tracking-wide">ORA Knowledge Sync</h3>
@@ -254,13 +254,13 @@ function KnowledgeTab({ token, onUpdate }) {
               color: syncing ? '#FF6B00' : '#fff',
             }}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Force Sync'}
           </button>
         </div>
         {syncResult && (
           <div className={`mt-3 p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${syncResult.success ? 'bg-[rgba(61,58,57,0.15)] text-[#FF6B00]' : 'bg-red-50 text-red-600'}`} data-testid="sync-result">
-            {syncResult.success ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+            {syncResult.success ? <CheckCircle2 className="size-3.5" /> : <AlertCircle className="size-3.5" />}
             {syncResult.message}
           </div>
         )}
@@ -269,15 +269,15 @@ function KnowledgeTab({ token, onUpdate }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-[#1A1A2E]">Knowledge Base</h2>
-          <p className="text-[11px] text-[#888]">Feed ORA your business data — FAQs, product info, sales playbooks, objection scripts</p>
+          <p className="text-[11px] text-[#888]">Feed ORA your business data, FAQs, product info, sales playbooks, objection scripts</p>
         </div>
         <div className="flex gap-2">
           <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#FF6B00] border border-[rgba(255,107,0,0.12)] hover:bg-[rgba(45,122,74,0.05)] cursor-pointer transition-colors" data-testid="upload-file-btn">
-            <Upload className="w-3.5 h-3.5" /> Upload File
+            <Upload className="size-3.5" /> Upload File
             <input type="file" accept=".txt,.md,.csv,.json" onChange={uploadFile} className="hidden" />
           </label>
           <button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-colors" style={{ background: '#FF6B00' }} data-testid="add-knowledge-btn">
-            <Plus className="w-3.5 h-3.5" /> Add Knowledge
+            <Plus className="size-3.5" /> Add Knowledge
           </button>
         </div>
       </div>
@@ -318,10 +318,10 @@ function KnowledgeTab({ token, onUpdate }) {
 
       {/* Knowledge List */}
       {loading ? (
-        <div className="text-center py-8 text-[#888] text-sm">Loading knowledge base...</div>
+        <div className="text-center py-8 text-[#888] text-sm">Loading knowledge base…</div>
       ) : items.length === 0 ? (
         <div className="text-center py-12 rounded-xl" style={{ background: 'rgba(255,255,255,0.5)', border: '1px dashed rgba(0,0,0,0.1)' }} data-testid="empty-knowledge">
-          <Database className="w-8 h-8 mx-auto mb-3 text-[#ccc]" />
+          <Database className="size-8 mx-auto mb-3 text-[#ccc]" />
           <p className="text-sm font-medium text-[#888]">No knowledge indexed yet</p>
           <p className="text-xs text-[#aaa] mt-1">Upload files or add knowledge manually to train ORA</p>
         </div>
@@ -329,18 +329,18 @@ function KnowledgeTab({ token, onUpdate }) {
         <div className="space-y-2">
           {items.map((item, i) => (
             <div key={item.id || i} className="flex items-start gap-3 p-3 rounded-xl group hover:shadow-sm transition-shadow" style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.04)' }} data-testid={`knowledge-item-${i}`}>
-              <FileText className="w-4 h-4 mt-0.5 text-[#888] shrink-0" />
+              <FileText className="size-4 mt-0.5 text-[#888] shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[#1A1A2E] truncate">{item.title}</span>
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ color: catColor(item.category), background: `${catColor(item.category)}15` }}>{item.category}</span>
-                  {item.indexed && <CheckCircle2 className="w-3 h-3 text-[#FF6B00]" />}
+                  {item.indexed && <CheckCircle2 className="size-3 text-[#FF6B00]" />}
                 </div>
                 <p className="text-[11px] text-[#888] mt-0.5 line-clamp-2">{item.summary || item.content?.substring(0, 150)}</p>
                 <span className="text-[10px] text-[#aaa] mt-1 block">{item.char_count?.toLocaleString()} chars</span>
               </div>
               <button onClick={() => deleteItem(item.id)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-[#ccc] hover:text-red-500 hover:bg-red-50 transition-all" data-testid={`delete-knowledge-${i}`}>
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="size-3.5" />
               </button>
             </div>
           ))}
@@ -382,7 +382,7 @@ function AutoTuneAnalyticsTab({ token }) {
 
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
 
-  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading analytics...</div>;
+  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading analytics…</div>;
   if (!data) return <div className="text-center py-8 text-[#888]">Failed to load analytics</div>;
 
   const { profile_usage, confidence_stats, learning, total_queries, timeline } = data;
@@ -406,7 +406,7 @@ function AutoTuneAnalyticsTab({ token }) {
       {/* Card 4 — Learning Velocity (Hero) */}
       <div className="mb-4 p-5 rounded-xl" style={{ background: 'linear-gradient(135deg, #1C1712, #211D17)', border: '1px solid rgba(184,135,89,0.15)' }} data-testid="learning-velocity-card">
         <div className="flex items-center gap-2 mb-2">
-          <TrendingUp className="w-4 h-4 text-[#D4A574]" />
+          <TrendingUp className="size-4 text-[#D4A574]" />
           <span className="text-[10px] font-bold tracking-[1.5px] text-[#D4A574] uppercase">Learning Velocity</span>
         </div>
         <div className="flex items-end gap-3">
@@ -495,7 +495,7 @@ function AutoTuneAnalyticsTab({ token }) {
               <tr key={ctx} className="border-t border-[rgba(0,0,0,0.04)]">
                 <td className="py-2">
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: PROFILE_COLORS[ctx] || '#888' }} />
+                    <span className="size-2 rounded-full" style={{ background: PROFILE_COLORS[ctx] || '#888' }} />
                     <span className="font-bold text-[#1A1A2E]">{ctx}</span>
                   </span>
                 </td>
@@ -557,16 +557,16 @@ function AutoTuneAnalyticsTab({ token }) {
       {/* Feedback summary */}
       <div className="p-4 rounded-xl" style={{ background: 'rgba(255,107,0,0.04)', border: '1px solid rgba(61,58,57,0.25)' }}>
         <div className="flex items-center gap-2 mb-2">
-          <Activity className="w-4 h-4 text-[#FF6B00]" />
+          <Activity className="size-4 text-[#FF6B00]" />
           <span className="text-xs font-bold text-[#FF6B00]">Feedback Loop</span>
         </div>
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
-            <ThumbsUp className="w-3.5 h-3.5 text-[#FF6B00]" />
+            <ThumbsUp className="size-3.5 text-[#FF6B00]" />
             <span className="text-xs font-bold text-[#FF6B00]">{learning.thumbs_up}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <ThumbsDown className="w-3.5 h-3.5 text-[#FF6B6B]" />
+            <ThumbsDown className="size-3.5 text-[#FF6B6B]" />
             <span className="text-xs font-bold text-[#FF6B6B]">{learning.thumbs_down}</span>
           </div>
           <span className="text-[10px] text-[#888]">Total: {learning.total_feedback} ratings</span>
@@ -595,7 +595,7 @@ function AutoTuneTab({ token }) {
     })();
   }, [headers]);
 
-  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading AutoTune data...</div>;
+  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading AutoTune data…</div>;
   if (!data) return <div className="text-center py-8 text-[#888]">Failed to load AutoTune data</div>;
 
   const contexts = Object.keys(data.base_profiles || {});
@@ -649,7 +649,7 @@ function AutoTuneTab({ token }) {
           <div className="space-y-2">
             {data.learned_contexts.map((ctx, i) => (
               <div key={i} className="p-3 rounded-xl flex items-center gap-3" style={{ background: 'rgba(255,107,0,0.04)', border: '1px solid rgba(61,58,57,0.25)' }}>
-                <ArrowUpRight className="w-4 h-4 text-[#FF6B00]" />
+                <ArrowUpRight className="size-4 text-[#FF6B00]" />
                 <div className="flex-1">
                   <span className="text-xs font-bold text-[#FF6B00]">{ctx.context}</span>
                   <span className="text-[10px] text-[#888] ml-2">Samples: {ctx.sample_count || 0}</span>
@@ -662,7 +662,7 @@ function AutoTuneTab({ token }) {
 
       <div className="mt-6 p-4 rounded-xl" style={{ background: 'rgba(212,163,115,0.08)', border: '1px solid rgba(212,163,115,0.15)' }}>
         <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-[#FF6B00] mt-0.5 shrink-0" />
+          <AlertCircle className="size-4 text-[#FF6B00] mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-medium text-[#1A1A2E]">How to train AutoTune faster</p>
             <p className="text-[11px] text-[#888] mt-1">Rate ORA responses using the thumbs up/down buttons in ORA Chat. Each rating teaches the system which LLM parameters work best for different conversation types (sales, analytics, creative, support).</p>
@@ -702,7 +702,7 @@ function AgentLearningTab({ token }) {
     finally { setTriggering(false); }
   };
 
-  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading agent data...</div>;
+  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading agent data…</div>;
   if (!data) return <div className="text-center py-8 text-[#888]">Failed to load agent data</div>;
 
   const skillColor = (level) => {
@@ -716,10 +716,10 @@ function AgentLearningTab({ token }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-[#1A1A2E]">Agent-to-Agent Learning</h2>
-          <p className="text-[11px] text-[#888]">Your 5 AI agents cross-train each other — sharing skills and knowledge</p>
+          <p className="text-[11px] text-[#888]">Your 5 AI agents cross-train each other, sharing skills and knowledge</p>
         </div>
         <button onClick={triggerLearning} disabled={triggering} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ background: '#FF6B00' }} data-testid="trigger-learning-btn">
-          <RefreshCw className={`w-3.5 h-3.5 ${triggering ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`size-3.5 ${triggering ? 'animate-spin' : ''}`} />
           {triggering ? 'Learning...' : 'Trigger Daily Learning'}
         </button>
       </div>
@@ -739,7 +739,7 @@ function AgentLearningTab({ token }) {
       <div className="space-y-2">
         {(data.agents || []).map((agent) => (
           <div key={agent.id} className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.04)' }} data-testid={`agent-${agent.id}`}>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: skillColor(agent.skill_level) }}>
+            <div className="size-10 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: skillColor(agent.skill_level) }}>
               {agent.skill_level}
             </div>
             <div className="flex-1">
@@ -751,7 +751,7 @@ function AgentLearningTab({ token }) {
                 <div className="h-full rounded-full transition-all duration-700" style={{ width: `${agent.skill_level}%`, background: skillColor(agent.skill_level) }} />
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-[#ccc]" />
+            <ChevronRight className="size-4 text-[#ccc]" />
           </div>
         ))}
       </div>
@@ -787,7 +787,7 @@ function VoiceTab({ token }) {
     })();
   }, [headers]);
 
-  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading voice data...</div>;
+  if (loading) return <div className="text-center py-8 text-[#888] text-sm">Loading voice data…</div>;
 
   return (
     <div data-testid="voice-tab">
@@ -798,7 +798,7 @@ function VoiceTab({ token }) {
 
       {(data?.profiles || []).length === 0 ? (
         <div className="text-center py-12 rounded-xl" style={{ background: 'rgba(255,255,255,0.5)', border: '1px dashed rgba(0,0,0,0.1)' }} data-testid="empty-voice">
-          <Mic className="w-8 h-8 mx-auto mb-3 text-[#ccc]" />
+          <Mic className="size-8 mx-auto mb-3 text-[#ccc]" />
           <p className="text-sm font-medium text-[#888]">No voice profiles yet</p>
           <p className="text-xs text-[#aaa] mt-1">Go to Voice Sales Agent to record training samples</p>
           <p className="text-[10px] text-[#bbb] mt-3">The V2V engine currently uses OpenAI TTS (alloy voice) by default</p>
@@ -807,7 +807,7 @@ function VoiceTab({ token }) {
         <div className="space-y-2">
           {data.profiles.map((p, i) => (
             <div key={i} className="flex items-center gap-3 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.04)' }} data-testid={`voice-profile-${i}`}>
-              <Mic className="w-5 h-5 text-[#6366f1]" />
+              <Mic className="size-5 text-[#6366f1]" />
               <div className="flex-1">
                 <div className="text-sm font-medium text-[#1A1A2E]">{p.name || p.profile_id}</div>
                 <div className="text-[11px] text-[#888]">{p.samples?.length || 0} samples recorded</div>

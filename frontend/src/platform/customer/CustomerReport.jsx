@@ -57,7 +57,7 @@ export default function CustomerReport({ ctx }) {
         ) : reports.length === 0 ? (
           <div style={{padding:'30px 20px',textAlign:'center'}}>
             <FileText size={36} color="#8A8070" style={{margin:'0 auto 12px',opacity:0.4}}/>
-            <p style={{fontSize:13,color:'#8A8070'}}>No reports yet. Your first report arrives on the 1st of next month — or click "Generate Now" for a preview.</p>
+            <p style={{fontSize:13,color:'#8A8070'}}>No reports yet. Your first report arrives on the 1st of next month, or click "Generate Now" for a preview.</p>
           </div>
         ) : (
           <ul style={{margin:0,padding:0,listStyle:'none'}}>

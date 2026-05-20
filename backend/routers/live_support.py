@@ -284,10 +284,10 @@ async def ai_chat_support(request: Request):
             raise HTTPException(status_code=400, detail="Message required")
         
         # Build conversation context
-        system_prompt = """You are ReRoots AI Support Assistant for a biotech skincare e-commerce store.
+        system_prompt = """You are AUREM AI Support Assistant for a biotech skincare e-commerce store.
 
 STORE INFO:
-- ReRoots sells Korean biotech skincare (AURA-GEN series)
+- AUREM sells Korean biotech skincare (AURA-GEN series)
 - Products: TXA+PDRN Serum ($89.99), Accelerator Cream ($74.99), Recovery Complex ($99.99)
 - Free shipping on orders over $50 CAD
 - 30-day return policy for unopened products
@@ -328,8 +328,8 @@ RULES:
                         headers={
                             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                             "Content-Type": "application/json",
-                            "HTTP-Referer": "https://reroots.ca",
-                            "X-Title": "ReRoots AI Support"
+                            "HTTP-Referer": "https://aurem.live",
+                            "X-Title": "AUREM AI Support"
                         },
                         json={
                             "model": "meta-llama/llama-3.3-70b-instruct:free",
@@ -589,8 +589,8 @@ Keep it under 100 words. Be practical and direct."""
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://reroots.ca",
-                    "X-Title": "ReRoots Support AI"
+                    "HTTP-Referer": "https://aurem.live",
+                    "X-Title": "AUREM Support AI"
                 },
                 json={
                     "model": "meta-llama/llama-3.3-70b-instruct:free",

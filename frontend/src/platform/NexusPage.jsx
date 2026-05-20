@@ -118,7 +118,7 @@ const NexusPage = ({ token }) => {
     return (
       <div className="flex-1 flex items-center justify-center" style={{ background: '#080c10' }}>
         <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2, repeat: Infinity }}>
-          <Link2 className="w-8 h-8 text-emerald-500 mx-auto mb-3" />
+          <Link2 className="size-8 text-emerald-500 mx-auto mb-3" />
           <p className="text-xs text-gray-500 tracking-[3px] uppercase">Loading Nexus</p>
         </motion.div>
       </div>
@@ -131,13 +131,13 @@ const NexusPage = ({ token }) => {
         {/* Header */}
         <div className="flex items-center justify-between" data-testid="nexus-header">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            <div className="size-9 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #059669, #10b981)', boxShadow: '0 0 24px rgba(16,185,129,0.3)' }}>
-              <Zap className="w-4 h-4 text-white" />
+              <Zap className="size-4 text-white" />
             </div>
             <div>
               <h1 className="text-lg font-bold text-white tracking-wide">NEXUS</h1>
-              <p className="text-[10px] text-gray-500 tracking-[2px] uppercase">Integration Hub — Connect Your Stack</p>
+              <p className="text-[10px] text-gray-500 tracking-[2px] uppercase">Integration Hub, Connect Your Stack</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -188,8 +188,8 @@ const NexusPage = ({ token }) => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${catColor}15` }}>
-                        <Icon className="w-4 h-4" style={{ color: catColor }} />
+                      <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${catColor}15` }}>
+                        <Icon className="size-4" style={{ color: catColor }} />
                       </div>
                       <div>
                         <div className="text-sm font-bold text-white">{c.name}</div>
@@ -199,7 +199,7 @@ const NexusPage = ({ token }) => {
                     {isConnected ? (
                       <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-400 px-2 py-0.5 rounded-full"
                         style={{ background: 'rgba(16,185,129,0.1)' }}>
-                        <CheckCircle className="w-3 h-3" /> LIVE
+                        <CheckCircle className="size-3" /> LIVE
                       </span>
                     ) : (
                       <span className="text-[9px] text-gray-600 px-2 py-0.5 rounded-full"
@@ -223,7 +223,7 @@ const NexusPage = ({ token }) => {
                         onClick={() => handleDisconnect(c.id)}
                         data-testid={`disconnect-${c.id}`}
                       >
-                        <XCircle className="w-3 h-3 mr-1" /> Disconnect
+                        <XCircle className="size-3 mr-1" /> Disconnect
                       </Button>
                     </div>
                   ) : (
@@ -235,9 +235,9 @@ const NexusPage = ({ token }) => {
                       data-testid={`connect-${c.id}`}
                     >
                       {c.method === 'oauth' ? (
-                        <><Shield className="w-3 h-3 mr-1.5" /> Sync Account</>
+                        <><Shield className="size-3 mr-1.5" /> Sync Account</>
                       ) : (
-                        <><Zap className="w-3 h-3 mr-1.5" /> Add Key</>
+                        <><Zap className="size-3 mr-1.5" /> Add Key</>
                       )}
                     </Button>
                   )}
@@ -270,11 +270,11 @@ const NexusPage = ({ token }) => {
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-emerald-500" />
+                  <Shield className="size-5 text-emerald-500" />
                   <h2 className="text-sm font-bold text-white">{activeModal.name}</h2>
                 </div>
                 <button onClick={() => setActiveModal(null)} className="text-gray-500 hover:text-white">
-                  <X className="w-4 h-4" />
+                  <X className="size-4" />
                 </button>
               </div>
 
@@ -312,7 +312,7 @@ const NexusPage = ({ token }) => {
                           onClick={() => setShowValues(p => ({ ...p, [field]: !p[field] }))}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                         >
-                          {showValues[field] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {showValues[field] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                         </button>
                       </div>
                     </div>
@@ -324,7 +324,7 @@ const NexusPage = ({ token }) => {
                     disabled={saving || Object.values(formData).every(v => !v)}
                     data-testid="save-key-btn"
                   >
-                    {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <Shield className="w-3 h-3 mr-1.5" />}
+                    {saving ? <Loader2 className="size-3 animate-spin mr-1.5" /> : <Shield className="size-3 mr-1.5" />}
                     {saving ? 'Encrypting...' : 'Encrypt & Store'}
                   </Button>
                 </div>

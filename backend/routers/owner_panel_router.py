@@ -1,5 +1,5 @@
 """
-ReRoots AI Owner Panel
+AUREM AI Owner Panel
 Master control panel for managing API credentials, subscribers, and platform settings
 """
 

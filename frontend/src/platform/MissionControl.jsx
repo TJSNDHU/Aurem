@@ -202,11 +202,11 @@ const MissionControl = ({ onNavigate, token }) => {
         {/* Header */}
         <div className="mb-6" style={{ animation: 'auremFadeSlideDown 0.5s ease both' }}>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{
               background: `linear-gradient(135deg, ${COPPER}, #B38659)`,
               boxShadow: `0 4px 12px rgba(212,163,115,0.2)`,
             }}>
-              <Rocket className="w-5 h-5" style={{ color: 'var(--aurem-heading)' }} />
+              <Rocket className="size-5" style={{ color: 'var(--aurem-heading)' }} />
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-wider" style={{ fontFamily: "'Montserrat', sans-serif", color: 'var(--aurem-heading)' }}>
@@ -226,7 +226,7 @@ const MissionControl = ({ onNavigate, token }) => {
             { label: 'System Health', value: '100%', icon: Shield, color: '#16a34a' },
           ].map((s, i) => (
             <div key={i} className="aurem-glass-card p-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${s.color}12` }}>
+              <div className="size-9 rounded-lg flex items-center justify-center" style={{ background: `${s.color}12` }}>
                 <s.icon size={18} color={s.color} />
               </div>
               <div>
@@ -254,7 +254,7 @@ const MissionControl = ({ onNavigate, token }) => {
                     style={{ animation: `auremFadeSlideIn 0.3s ease both ${i * 0.05}s` }}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110" style={{ background: `${f.color}12` }}>
+                      <div className="size-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110" style={{ background: `${f.color}12` }}>
                         <f.icon size={20} color={f.color} />
                       </div>
                       <div className="flex-1 min-w-0">

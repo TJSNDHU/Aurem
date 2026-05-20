@@ -41,12 +41,12 @@ class SentinelErrorBoundary extends React.Component {
       return (
         <div className="flex items-center justify-center min-h-[200px] p-8" data-testid="sentinel-error-boundary">
           <div className="text-center max-w-md">
-            <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
+            <div className="size-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
               background: 'rgba(255,107,0,0.08)',
               border: '1px solid rgba(255,107,0,0.15)',
               animation: 'pulse 2s ease-in-out infinite',
             }}>
-              <Shield className="w-7 h-7 text-[#FF6B00]" />
+              <Shield className="size-7 text-[#FF6B00]" />
             </div>
             <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--aurem-heading)', fontFamily: 'Cinzel, Georgia, serif' }}>
               {this.state.retryCount < 3
@@ -60,8 +60,8 @@ class SentinelErrorBoundary extends React.Component {
             </p>
             {this.state.retryCount < 3 ? (
               <div className="flex items-center justify-center gap-2 text-[#FF6B00]">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span className="text-xs font-medium">Auto-repairing...</span>
+                <RefreshCw className="size-4 animate-spin" />
+                <span className="text-xs font-medium">Auto-repairing…</span>
               </div>
             ) : (
               <button
@@ -74,7 +74,7 @@ class SentinelErrorBoundary extends React.Component {
                   boxShadow: '0 4px 16px rgba(255,107,0,0.2)',
                 }}
               >
-                <RefreshCw className="w-3.5 h-3.5 inline mr-2" />
+                <RefreshCw className="size-3.5 inline mr-2" />
                 RESET MODULE
               </button>
             )}

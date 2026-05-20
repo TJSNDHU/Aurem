@@ -88,7 +88,7 @@ const PanicSettings = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Shield className="w-8 h-8 text-pink-600" />
+            <Shield className="size-8 text-pink-600" />
             <h1 className="text-3xl font-bold text-gray-900">Panic Button Configuration</h1>
           </div>
           <p className="text-gray-600">
@@ -105,7 +105,7 @@ const PanicSettings = () => {
                 type="checkbox"
                 checked={config.enabled}
                 onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
-                className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                className="size-5 text-pink-600 rounded focus:ring-pink-500"
               />
               <span className="text-lg font-semibold text-gray-900">
                 Enable Panic Button
@@ -125,7 +125,7 @@ const PanicSettings = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Mail className="w-4 h-4 inline mr-2" />
+                      <Mail className="size-4 inline mr-2" />
                       Alert Email
                     </label>
                     <input
@@ -139,7 +139,7 @@ const PanicSettings = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Phone className="w-4 h-4 inline mr-2" />
+                      <Phone className="size-4 inline mr-2" />
                       Alert Phone (SMS)
                     </label>
                     <input
@@ -159,7 +159,7 @@ const PanicSettings = () => {
               {/* Sensitivity */}
               <div className="mb-6 pb-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  <Sliders className="w-5 h-5 inline mr-2" />
+                  <Sliders className="size-5 inline mr-2" />
                   Sensitivity
                 </h3>
                 
@@ -236,9 +236,9 @@ const PanicSettings = () => {
                       type="checkbox"
                       checked={config.alert_channels.includes('email')}
                       onChange={() => toggleChannel('email')}
-                      className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                      className="size-5 text-pink-600 rounded focus:ring-pink-500"
                     />
-                    <Mail className="w-5 h-5 text-gray-400" />
+                    <Mail className="size-5 text-gray-400" />
                     <span className="text-gray-700">Email Alerts</span>
                   </label>
 
@@ -247,9 +247,9 @@ const PanicSettings = () => {
                       type="checkbox"
                       checked={config.alert_channels.includes('sms')}
                       onChange={() => toggleChannel('sms')}
-                      className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                      className="size-5 text-pink-600 rounded focus:ring-pink-500"
                     />
-                    <Phone className="w-5 h-5 text-gray-400" />
+                    <Phone className="size-5 text-gray-400" />
                     <span className="text-gray-700">SMS Alerts</span>
                     <span className="text-xs text-gray-500">(Requires Twilio)</span>
                   </label>
@@ -259,9 +259,9 @@ const PanicSettings = () => {
                       type="checkbox"
                       checked={config.alert_channels.includes('webhook')}
                       onChange={() => toggleChannel('webhook')}
-                      className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                      className="size-5 text-pink-600 rounded focus:ring-pink-500"
                     />
-                    <Globe className="w-5 h-5 text-gray-400" />
+                    <Globe className="size-5 text-gray-400" />
                     <span className="text-gray-700">Webhook (Slack/Discord)</span>
                   </label>
                 </div>
@@ -274,7 +274,7 @@ const PanicSettings = () => {
                     type="checkbox"
                     checked={config.auto_pause_ai}
                     onChange={(e) => setConfig({ ...config, auto_pause_ai: e.target.checked })}
-                    className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                    className="size-5 text-pink-600 rounded focus:ring-pink-500"
                   />
                   <span className="text-gray-700 font-medium">
                     Auto-pause ORA when panic triggered
@@ -308,7 +308,7 @@ const PanicSettings = () => {
         {/* Info Box */}
         <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
           <div className="flex gap-3">
-            <AlertTriangle className="w-5 h-5 text-pink-600 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="size-5 text-pink-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-pink-900">
               <p className="font-semibold mb-1">How the Panic Button works:</p>
               <ul className="list-disc list-inside space-y-1 text-pink-800">

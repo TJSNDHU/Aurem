@@ -1492,6 +1492,7 @@ def register_all_routers(app, db):
         ("routers.ora_repair_engine", "ORA Repair Engine", None),
         ("routers.ai_repair_router", "AI Repair", None),
         ("routers.customer_pipeline_router", "Customer Pipeline", None),
+        ("routers.seo_funnel_router", "SEO Funnel (public revenue)", None),
         ("routers.intelligence_router", "Intelligence", None),
         ("routers.voice_sales_agent", "Voice Sales Agent", None),
         ("routers.invisible_coach", "Invisible Coach", None),
@@ -1887,7 +1888,7 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] DB Index builder setup failed: {e}")
 
-    # Assign Business ID to existing Reroots tenant if missing
+    # Assign Business ID to existing AUREM tenant if missing
     try:
         if db is not None:
             import asyncio as _bid_asyncio
@@ -1897,12 +1898,12 @@ def register_all_routers(app, db):
                     reroots = await db.users.find_one({"email": "pawandeep19may1985@gmail.com"}, {"_id": 0})
                     if reroots and not reroots.get("business_id"):
                         bid = await ensure_business_id(reroots)
-                        logger.info(f"[REGISTRY] Assigned Business ID {bid} to Reroots tenant")
+                        logger.info(f"[REGISTRY] Assigned Business ID {bid} to AUREM tenant")
                 except Exception as ex:
-                    logger.warning(f"[REGISTRY] Reroots BID assignment: {ex}")
+                    logger.warning(f"[REGISTRY] AUREM BID assignment: {ex}")
             _bid_asyncio.get_event_loop().create_task(_assign_reroots_bid())
     except Exception as e:
-        logger.warning(f"[REGISTRY] Reroots BID startup: {e}")
+        logger.warning(f"[REGISTRY] AUREM BID startup: {e}")
 
     # ═══════════════════════════════════════════
     # SECTION 6: APScheduler (Bug Engine)

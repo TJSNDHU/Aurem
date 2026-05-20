@@ -87,7 +87,7 @@ export default function AdminCommandHub({ token }) {
             AUREM Command Hub
           </h1>
           <p style={{ fontSize: 12, color: '#8A8070', marginTop: 4 }}>
-            Unified platform control. Services, voice, pipeline, campaigns — one window.
+            Unified platform control. Services, voice, pipeline, campaigns, one window.
           </p>
         </div>
         {/* iter 285 — canonical cockpit link (merge duplicate surfaces) */}
@@ -275,7 +275,7 @@ function CampaignsTab({ token }) {
     <div style={STYLES.card}>
       <h3 style={{ color: '#D4AF37' }}>Campaigns</h3>
       <p style={{ color: '#8A8070', fontSize: 13 }}>
-        Drip, outreach, hot-lead campaigns — consolidated.
+        Drip, outreach, hot-lead campaigns, consolidated.
       </p>
       <div style={{ padding: 24, marginTop: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px dashed rgba(212,175,55,0.2)' }}>
         <a href="/dashboard#campaign-dashboard" style={{ color: '#D4AF37' }}>→ Open legacy Campaign Dashboard</a>

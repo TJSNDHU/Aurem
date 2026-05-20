@@ -168,7 +168,7 @@ async def get_system_status(user = Depends(get_current_user)):
 async def force_sync(user = Depends(get_current_user)):
     """
     Force global sync - run all health checks and sync operations
-    Based on Reroots sync button pattern
+    Based on AUREM sync button pattern
     """
     results = {}
     errors = []

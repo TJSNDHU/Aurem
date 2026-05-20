@@ -84,7 +84,7 @@ export default function OpenClawDashboard({ token, tenantId }) {
         <button onClick={fetchAll} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02]"
           style={{ background: 'rgba(61,58,57,0.25)', color: 'var(--aurem-heading)' }}
           data-testid="openclaw-refresh-btn">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 
@@ -101,14 +101,14 @@ export default function OpenClawDashboard({ token, tenantId }) {
             }}
             data-testid={`tab-${id}`}
           >
-            <Icon className="w-3.5 h-3.5" /> {label}
+            <Icon className="size-3.5" /> {label}
           </button>
         ))}
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+          <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
         </div>
       ) : (
         <>
@@ -117,7 +117,7 @@ export default function OpenClawDashboard({ token, tenantId }) {
             <div className="aurem-glass-card p-6" data-testid="persona-section">
               <div className="flex items-center justify-between mb-4">
                 <div className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>
-                  ORA Personality Profile — SOUL.md
+                  ORA Personality Profile, SOUL.md
                 </div>
                 <button onClick={() => editPersona ? savePersona() : setEditPersona(true)}
                   disabled={saving}
@@ -125,7 +125,7 @@ export default function OpenClawDashboard({ token, tenantId }) {
                   style={{ background: 'rgba(212,163,115,0.15)', color: '#FF6B00' }}
                   data-testid="persona-edit-btn"
                 >
-                  {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : editPersona ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                  {saving ? <Loader2 className="size-3 animate-spin" /> : editPersona ? <Save className="size-3" /> : <Edit3 className="size-3" />}
                   {editPersona ? 'Save' : 'Edit'}
                 </button>
               </div>
@@ -280,10 +280,10 @@ export default function OpenClawDashboard({ token, tenantId }) {
           {tab === 'heartbeat' && heartbeat && (
             <div className="aurem-glass-card p-6" data-testid="heartbeat-section">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                <div className="size-16 rounded-2xl flex items-center justify-center" style={{
                   background: heartbeat.health_score >= 70 ? 'rgba(34,197,94,0.15)' : heartbeat.health_score >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
                 }}>
-                  <Heart className="w-8 h-8" style={{
+                  <Heart className="size-8" style={{
                     color: heartbeat.health_score >= 70 ? '#22C55E' : heartbeat.health_score >= 40 ? '#EAB308' : '#EF4444',
                     animation: 'pulse 1.5s infinite',
                   }} />
@@ -365,7 +365,7 @@ export default function OpenClawDashboard({ token, tenantId }) {
             <div data-testid="whitelabel-section">
               <div className="aurem-glass-card p-6 mb-4">
                 <div className="flex items-center gap-3 mb-4">
-                  <Palette className="w-5 h-5" style={{ color: '#8B5CF6' }} />
+                  <Palette className="size-5" style={{ color: '#8B5CF6' }} />
                   <div className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>White-Label Command Center</div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
                     Enterprise Only
@@ -384,7 +384,7 @@ export default function OpenClawDashboard({ token, tenantId }) {
                       <label className="text-[10px] font-medium block mb-1" style={{ color: 'var(--aurem-body-secondary)' }}>{label}</label>
                       <div className="flex items-center gap-2">
                         {key.includes('color') && branding[key] && (
-                          <div className="w-5 h-5 rounded" style={{ background: branding[key], border: '1px solid rgba(255,255,255,0.1)' }} />
+                          <div className="size-5 rounded" style={{ background: branding[key], border: '1px solid rgba(255,255,255,0.1)' }} />
                         )}
                         <div className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>{branding[key] || '(not set)'}</div>
                       </div>

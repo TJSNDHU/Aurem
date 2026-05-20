@@ -90,7 +90,7 @@ class ProductBase(BaseModel):
     # SEO & Google Merchant Fields
     gtin: Optional[str] = None  # Global Trade Item Number (UPC, EAN, ISBN)
     mpn: Optional[str] = None  # Manufacturer Part Number
-    brand: str = "ReRoots"
+    brand: str = "AUREM"
     seo_title: Optional[str] = None  # Custom SEO title
     seo_description: Optional[str] = None  # Custom meta description
     google_product_category: Optional[str] = (
@@ -637,7 +637,7 @@ class ScienceSection(BaseModel):
 
 
 class NewsletterSection(BaseModel):
-    title: str = "Join the ReRoots Community"
+    title: str = "Join the AUREM Community"
     description: str = (
         "Get exclusive access to new products, skincare tips, and special offers."
     )
@@ -648,9 +648,9 @@ class FooterContent(BaseModel):
     brand_description: str = (
         "Biotech skincare rooted in science. We combine cutting-edge ingredients like PDRN with natural extracts for visible results."
     )
-    instagram_url: str = "https://instagram.com/reroots.ca"
+    instagram_url: str = "https://instagram.com/aurem.live"
     facebook_url: str = "https://facebook.com"
-    support_email: str = "support@reroots.ca"
+    support_email: str = "support@aurem.live"
 
 
 class SiteContent(BaseModel):
@@ -721,7 +721,7 @@ class ShippingPolicyContent(BaseModel):
 
     # Shipping Times Section
     shipping_intro: str = (
-        "ReRoots ships premium skincare products from our facility in Canada to customers worldwide. All orders are carefully packaged to ensure your products arrive in perfect condition."
+        "AUREM ships premium skincare products from our facility in Canada to customers worldwide. All orders are carefully packaged to ensure your products arrive in perfect condition."
     )
 
     # Regional Shipping Times
@@ -833,13 +833,13 @@ Many countries offer duty-free import below certain values. Our system automatic
     contact_content: str = (
         "Our customer service team is available to assist with any shipping or returns questions."
     )
-    contact_email: str = "support@reroots.ca"
+    contact_email: str = "support@aurem.live"
     contact_phone: str = "+1 (226) 501-7777"
     contact_hours: str = "Monday - Friday: 9AM - 6PM EST"
 
     # INCI Information Section
     inci_title: str = "International Ingredient Compliance"
-    inci_content: str = """All ReRoots products are labeled with INCI (International Nomenclature Cosmetic Ingredient) names to comply with global cosmetic regulations.
+    inci_content: str = """All AUREM products are labeled with INCI (International Nomenclature Cosmetic Ingredient) names to comply with global cosmetic regulations.
 
 **What is INCI?**
 INCI is a standardized international naming system for cosmetic ingredients, recognized by regulatory bodies worldwide including Health Canada, the FDA (USA), and EU Cosmetics Regulation.
@@ -926,14 +926,14 @@ class PaymentSettings(BaseModel):
     direct_card: DirectCardSettings = Field(default_factory=DirectCardSettings)
     # E-Transfer (Canada)
     etransfer_enabled: bool = True
-    etransfer_email: str = "admin@reroots.ca"
+    etransfer_email: str = "admin@aurem.live"
     etransfer_phone: str = ""
     etransfer_instructions: str = (
         "Send e-Transfer to our email. Include order number in message."
     )
     # PayPal Manual Payment
     paypal_manual_enabled: bool = False
-    paypal_email: str = "admin@reroots.ca"
+    paypal_email: str = "admin@aurem.live"
     paypal_link_url: str = ""  # PayPal.me or NCP payment link for direct redirect
     paypal_instructions: str = "Send as 'Friends & Family' to avoid fees. Include order number."
     # Paytm (India)
@@ -984,10 +984,10 @@ class LiveChatSettings(BaseModel):
     chat_mode: str = "ai_first"  # ai_first, manual, or hybrid
     ai_model: str = "gpt-4o"  # AI model for auto-responses
     ai_enabled: bool = True  # Enable AI auto-responses
-    notification_email: str = "admin@reroots.ca"  # Where to send chat notifications
-    welcome_message: str = "Hi! Welcome to ReRoots. How can we help you today?"
+    notification_email: str = "admin@aurem.live"  # Where to send chat notifications
+    welcome_message: str = "Hi! Welcome to AUREM. How can we help you today?"
     ai_greeting: str = (
-        "Hello! I'm your ReRoots assistant. I can help you with product questions, orders, and more. How can I assist you?"
+        "Hello! I'm your AUREM assistant. I can help you with product questions, orders, and more. How can I assist you?"
     )
     business_hours: str = "Mon-Fri 9AM-6PM EST"
     offline_message: str = (
@@ -1000,7 +1000,7 @@ class LiveChatSettings(BaseModel):
 
 class GoogleBusinessSettings(BaseModel):
     enabled: bool = True
-    business_name: str = "ReRoots"
+    business_name: str = "AUREM"
     place_id: str = ""
     review_url: str = ""
     maps_url: str = ""
@@ -1008,7 +1008,7 @@ class GoogleBusinessSettings(BaseModel):
 
 class NotificationSettings(BaseModel):
     order_email_enabled: bool = True
-    admin_email: str = "admin@reroots.ca"
+    admin_email: str = "admin@aurem.live"
     sms_notifications: bool = False
     notification_phone: str = "+12265017777"
 
@@ -1029,7 +1029,7 @@ class InfluencerProgramSettings(BaseModel):
     """Admin-configurable influencer program settings"""
 
     enabled: bool = True
-    program_name: str = "ReRoots Partner Program"
+    program_name: str = "AUREM Partner Program"
 
     # Commission Settings (what influencers earn)
     commission_type: str = "percentage"  # percentage, flat, tiered
@@ -1122,12 +1122,12 @@ class ReferralProgramSettings(BaseModel):
     widget_position: str = (
         "bottom-right"  # bottom-right, bottom-left, side-right, side-left
     )
-    widget_button_text: str = "Get ReRoots FREE"
+    widget_button_text: str = "Get AUREM FREE"
     widget_button_color: str = "#D4AF37"  # Gold color
     widget_popup_title: str = "Share the Glow ✨"
     widget_popup_subtitle: str = "Invite friends & earn rewards"
     widget_share_message: str = (
-        "I love ReRoots skincare! Use my link for $10 off your first order:"
+        "I love AUREM skincare! Use my link for $10 off your first order:"
     )
 
     # Limits
@@ -1402,7 +1402,7 @@ class AboutPageContent(BaseModel):
     hero_badge: str = "OUR STORY"
     hero_title: str = "Rooted in Science"
     hero_subtitle: str = (
-        "ReRoots was founded with a simple belief: skincare should be backed by science, not marketing hype."
+        "AUREM was founded with a simple belief: skincare should be backed by science, not marketing hype."
     )
     # Mission Section
     mission_title: str = "Our Mission"
@@ -1438,8 +1438,8 @@ class AboutPageContent(BaseModel):
 class StoreSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = "store_settings"
-    store_name: str = "ReRoots"
-    store_email: str = "admin@reroots.ca"
+    store_name: str = "AUREM"
+    store_email: str = "admin@aurem.live"
     store_phone: str = "+12265017777"
     payment: PaymentSettings = Field(default_factory=PaymentSettings)
     live_chat: LiveChatSettings = Field(default_factory=LiveChatSettings)

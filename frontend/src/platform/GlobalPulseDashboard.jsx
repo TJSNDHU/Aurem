@@ -59,7 +59,7 @@ export default function GlobalPulseDashboard({ token }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64" data-testid="global-pulse-loading">
-        <RefreshCw className="w-6 h-6 animate-spin text-[#C9A84C]" />
+        <RefreshCw className="size-6 animate-spin text-[#C9A84C]" />
       </div>
     );
   }
@@ -98,7 +98,7 @@ export default function GlobalPulseDashboard({ token }) {
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-bold tracking-wider transition-all hover:scale-[1.02] disabled:opacity-50"
           style={{ background: 'linear-gradient(135deg, #C9A84C, #A08636)', color: '#050507' }}
         >
-          {scanning ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+          {scanning ? <RefreshCw className="size-3 animate-spin" /> : <Globe className="size-3" />}
           {scanning ? 'SCANNING...' : 'SCAN NOW'}
         </button>
       </div>
@@ -109,7 +109,7 @@ export default function GlobalPulseDashboard({ token }) {
         <div className="aurem-glass-card p-4" data-testid="cad-usd-card">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] font-bold tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>CAD/USD</span>
-            <DollarSign className="w-3 h-3" style={{ color: '#C9A84C' }} />
+            <DollarSign className="size-3" style={{ color: '#C9A84C' }} />
           </div>
           <div className="text-2xl font-black" style={{ color: '#C9A84C' }}>
             {market.cad_usd || bocData?.cad_usd_rate || '--'}
@@ -117,9 +117,9 @@ export default function GlobalPulseDashboard({ token }) {
           {market.cad_usd_change_pct != null && (
             <div className="flex items-center gap-1 mt-1">
               {market.cad_usd_change_pct > 0 ? (
-                <TrendingUp className="w-3 h-3 text-[#22C55E]" />
+                <TrendingUp className="size-3 text-[#22C55E]" />
               ) : market.cad_usd_change_pct < 0 ? (
-                <TrendingDown className="w-3 h-3 text-[#EF4444]" />
+                <TrendingDown className="size-3 text-[#EF4444]" />
               ) : null}
               <span className={`text-[10px] font-bold ${market.cad_usd_change_pct >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
                 {market.cad_usd_change_pct >= 0 ? '+' : ''}{market.cad_usd_change_pct?.toFixed(3)}%
@@ -135,7 +135,7 @@ export default function GlobalPulseDashboard({ token }) {
         <div className="aurem-glass-card p-4" data-testid="boc-rate-card">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] font-bold tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>BoC RATE</span>
-            <Percent className="w-3 h-3" style={{ color: '#C9A84C' }} />
+            <Percent className="size-3" style={{ color: '#C9A84C' }} />
           </div>
           <div className="text-2xl font-black" style={{ color: 'var(--aurem-heading)' }}>
             {market.policy_rate ?? bocData?.policy_rate ?? '--'}%
@@ -149,7 +149,7 @@ export default function GlobalPulseDashboard({ token }) {
         <div className="aurem-glass-card p-4" data-testid="vix-card">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] font-bold tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>VIX INDEX</span>
-            {market.vix_alert && <AlertTriangle className="w-3 h-3 text-[#EF4444]" />}
+            {market.vix_alert && <AlertTriangle className="size-3 text-[#EF4444]" />}
           </div>
           <div className="text-2xl font-black" style={{ color: market.vix_alert ? '#EF4444' : 'var(--aurem-heading)' }}>
             {market.vix_estimate || '--'}
@@ -165,7 +165,7 @@ export default function GlobalPulseDashboard({ token }) {
         <div className="aurem-glass-card p-4" data-testid="next-boc-card">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] font-bold tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>NEXT BoC</span>
-            <Calendar className="w-3 h-3" style={{ color: '#C9A84C' }} />
+            <Calendar className="size-3" style={{ color: '#C9A84C' }} />
           </div>
           <div className="text-lg font-black" style={{ color: 'var(--aurem-heading)' }}>
             {market.next_boc_decision || bocData?.next_boc_decision || '--'}
@@ -186,7 +186,7 @@ export default function GlobalPulseDashboard({ token }) {
       {/* Learning Score (Oracle Accuracy) */}
       {deltas.length > 0 && (
         <div className="aurem-glass-card p-4 flex items-center gap-4" data-testid="learning-accuracy-bar">
-          <Brain className="w-5 h-5 text-[#C9A84C] flex-shrink-0" />
+          <Brain className="size-5 text-[#C9A84C] flex-shrink-0" />
           <div>
             <span className="text-[9px] font-bold tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>RECURSIVE BRAIN ACCURACY</span>
             <div className="text-lg font-black" style={{ color: '#C9A84C' }}>
@@ -208,7 +208,7 @@ export default function GlobalPulseDashboard({ token }) {
       {topKw.length > 0 && (
         <div className="aurem-glass-card p-5" data-testid="trending-keywords">
           <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--aurem-heading)' }}>
-            <Zap className="w-4 h-4 inline mr-1.5 text-[#C9A84C]" /> Trending Industry Topics
+            <Zap className="size-4 inline mr-1.5 text-[#C9A84C]" /> Trending Industry Topics
           </h3>
           <div className="flex flex-wrap gap-2">
             {topKw.map((kw, i) => (
@@ -228,17 +228,17 @@ export default function GlobalPulseDashboard({ token }) {
       {news.length > 0 && (
         <div className="aurem-glass-card p-5" data-testid="news-feed">
           <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--aurem-heading)' }}>
-            <Activity className="w-4 h-4 inline mr-1.5 text-[#3B82F6]" /> Intelligence Feed
+            <Activity className="size-4 inline mr-1.5 text-[#3B82F6]" /> Intelligence Feed
           </h3>
           <div className="space-y-3">
             {news.slice(0, 8).map((item, i) => (
               <div key={i} className="flex items-start gap-3 py-2 px-3 rounded-lg transition-all hover:bg-white/5" style={{
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
               }}>
-                <div className="w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center mt-0.5" style={{
+                <div className="size-6 rounded-md flex-shrink-0 flex items-center justify-center mt-0.5" style={{
                   background: 'rgba(201,168,76,0.08)',
                 }}>
-                  <Globe className="w-3 h-3 text-[#C9A84C]" />
+                  <Globe className="size-3 text-[#C9A84C]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -247,7 +247,7 @@ export default function GlobalPulseDashboard({ token }) {
                     </h4>
                     {item.link && (
                       <a href={item.link} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                        <ExternalLink className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                        <ExternalLink className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                       </a>
                     )}
                   </div>
@@ -275,7 +275,7 @@ export default function GlobalPulseDashboard({ token }) {
       {deltas.length > 0 && (
         <div className="aurem-glass-card p-5" data-testid="learning-deltas">
           <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--aurem-heading)' }}>
-            <Brain className="w-4 h-4 inline mr-1.5 text-[#C9A84C]" /> Recursive Brain — Delta History
+            <Brain className="size-4 inline mr-1.5 text-[#C9A84C]" /> Recursive Brain, Delta History
           </h3>
           <div className="space-y-2">
             {deltas.slice(0, 7).map((d, i) => (
@@ -303,7 +303,7 @@ export default function GlobalPulseDashboard({ token }) {
       {/* Compliance Disclaimer */}
       <div className="aurem-glass-card p-4 flex items-start gap-3" data-testid="compliance-disclaimer"
         style={{ borderColor: 'rgba(201,168,76,0.15)' }}>
-        <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#C9A84C' }} />
+        <Shield className="size-4 flex-shrink-0 mt-0.5" style={{ color: '#C9A84C' }} />
         <div>
           <p className="text-[10px] font-bold tracking-wider" style={{ color: '#C9A84C' }}>
             COMPLIANCE NOTICE

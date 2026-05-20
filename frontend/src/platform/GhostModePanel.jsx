@@ -77,7 +77,7 @@ export default function GhostModePanel({ token }) {
             <X size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
           </button>
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.15)' }}>
+            <div className="size-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.15)' }}>
               <Ghost size={20} style={{ color: '#D4AF37' }} />
             </div>
             <div>
@@ -120,7 +120,7 @@ export default function GhostModePanel({ token }) {
       <div className="aurem-glass-card p-6 rounded-2xl" style={{ border: isOn ? '1px solid rgba(212,175,55,0.3)' : '1px solid transparent' }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: isOn ? 'rgba(212,175,55,0.12)' : 'rgba(128,128,128,0.08)' }}>
+            <div className="size-12 rounded-xl flex items-center justify-center" style={{ background: isOn ? 'rgba(212,175,55,0.12)' : 'rgba(128,128,128,0.08)' }}>
               <Ghost size={24} style={{ color: isOn ? '#D4AF37' : 'var(--aurem-text-secondary)' }} />
             </div>
             <div>
@@ -144,7 +144,7 @@ export default function GhostModePanel({ token }) {
               className="relative w-14 h-7 rounded-full transition-all duration-300 cursor-pointer"
               style={{ background: isOn ? 'linear-gradient(135deg, #D4AF37, #8B7355)' : 'rgba(128,128,128,0.2)' }}
               data-testid="ghost-toggle">
-              <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-lg transition-all duration-300 ${isOn ? 'left-7' : 'left-0.5'}`} />
+              <div className={`absolute top-0.5 size-6 rounded-full bg-white shadow-lg transition-all duration-300 ${isOn ? 'left-7' : 'left-0.5'}`} />
             </button>
           </div>
         </div>

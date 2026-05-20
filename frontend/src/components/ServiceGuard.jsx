@@ -46,10 +46,10 @@ class ServiceGuard extends React.Component {
             }}
           >
             <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+              className="size-14 rounded-full flex items-center justify-center mx-auto mb-5"
               style={{ background: 'rgba(212,175,55,0.08)' }}
             >
-              <WifiOff className="w-7 h-7" style={{ color: '#D4AF37' }} />
+              <WifiOff className="size-7" style={{ color: '#D4AF37' }} />
             </div>
 
             <h2 className="text-lg font-semibold mb-1" style={{ color: '#1A1A2E' }}>
@@ -76,14 +76,14 @@ class ServiceGuard extends React.Component {
               }}
               data-testid="service-retry-btn"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="size-3.5" />
               Retry
             </button>
 
             {this.state.error && (
               <details className="mt-4 text-left">
                 <summary className="text-[10px] cursor-pointer" style={{ color: '#999' }}>
-                  <AlertTriangle className="w-3 h-3 inline mr-1" />
+                  <AlertTriangle className="size-3 inline mr-1" />
                   Error details
                 </summary>
                 <pre

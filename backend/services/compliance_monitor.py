@@ -6,7 +6,7 @@ Competition Act issues before publishing.
 
 CRITICAL violations block content. WARNING issues allow but flag.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os

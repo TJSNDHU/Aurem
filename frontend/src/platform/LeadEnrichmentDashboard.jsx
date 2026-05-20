@@ -36,7 +36,7 @@ export default function LeadEnrichmentDashboard({ token }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center">
-      <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+      <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
     </div>
   );
 
@@ -65,11 +65,11 @@ export default function LeadEnrichmentDashboard({ token }) {
               style={{ background: 'linear-gradient(135deg, #FF6B00, #CC5500)', color: '#0A0A00' }}
               data-testid="enrich-all-btn"
             >
-              {enriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+              {enriching ? <Loader2 className="size-3 animate-spin" /> : <Zap className="size-3" />}
               Enrich All New
             </button>
             <button onClick={fetchStats} className="p-2 rounded-lg hover:bg-white/10 transition-colors" data-testid="refresh-enrichment">
-              <RefreshCw className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+              <RefreshCw className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
             </button>
           </div>
         </div>
@@ -78,8 +78,8 @@ export default function LeadEnrichmentDashboard({ token }) {
           {cards.map((card, i) => (
             <MotionCard key={card.label} variant={cardVariant} className="aurem-glass-card p-4" data-testid={`enrichment-card-${card.label.toLowerCase().replace(/\s/g,'-')}`}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${card.color}15` }}>
-                  <card.icon className="w-4 h-4" style={{ color: card.color }} />
+                <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${card.color}15` }}>
+                  <card.icon className="size-4" style={{ color: card.color }} />
                 </div>
                 <span className="text-lg font-bold" style={{ color: card.color }}>{card.value}</span>
               </div>
@@ -95,7 +95,7 @@ export default function LeadEnrichmentDashboard({ token }) {
             className="aurem-glass-card p-4 mb-6" data-testid="enrichment-result"
           >
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4" style={{ color: '#22C55E' }} />
+              <CheckCircle className="size-4" style={{ color: '#22C55E' }} />
               <span className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>Enrichment Complete</span>
             </div>
             <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -114,7 +114,7 @@ export default function LeadEnrichmentDashboard({ token }) {
             ].map((item, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 * i }}
                 className="p-4 rounded-lg" style={{ background: 'rgba(255,107,0,0.04)' }}>
-                <item.icon className="w-5 h-5 mb-2" style={{ color: '#FF6B00' }} />
+                <item.icon className="size-5 mb-2" style={{ color: '#FF6B00' }} />
                 <div className="text-xs font-bold mb-1" style={{ color: 'var(--aurem-heading)' }}>{item.title}</div>
                 <div className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>{item.desc}</div>
               </motion.div>

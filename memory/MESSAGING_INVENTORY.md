@@ -5,13 +5,13 @@
 
 ## 📊 Totals at a glance
 - **Email subjects found**: 66 distinct (some dynamic, e.g. `{biz}`)
-- **SMS templates**: 11 (ReRoots-branded, tenant-scoped)
+- **SMS templates**: 11 (AUREM-branded, tenant-scoped)
 - **WhatsApp sends**: 30+ call sites, ~15 distinct templates
 - **Push notifications**: 8 trigger types (VAPID, `notification_triggers.py`)
 - **Active sequences (multi-step drips)**: 3
 - **Transport**: Resend (email), Twilio (SMS), Twilio WA (WhatsApp), pywebpush (web push)
 
-⚠️ **ReRoots/OROÉ/AURA-GEN subjects** are tenant-white-label templates (same engine, different brand) — **not sent under AUREM brand**.
+⚠️ **AUREM/OROÉ/AURA-GEN subjects** are tenant-white-label templates (same engine, different brand) — **not sent under AUREM brand**.
 
 ---
 
@@ -24,7 +24,7 @@
 | 2 | `Welcome to AUREM` (short) | Post-signup | `email_service.py` |
 | 3 | `Welcome to AUREM, {to_name} — Your AI Employee Awaits` | First login welcome | `welcome_package.py` |
 | 4 | `Welcome to AUREM — Your Business ID: {bid}` | BIN provisioned | `welcome_package.py` |
-| 5 | `Reset your ReRoots password` | Password reset (⚠ branded ReRoots) | `password_reset_router.py` |
+| 5 | `Reset your AUREM password` | Password reset (⚠ branded AUREM) | `password_reset_router.py` |
 
 ### B. Trial drip sequence (6 emails over 30 days)
 Trigger: `trial_sessions` collection · runs on `trial_scheduler` cron · file: `services/trial_scheduler.py`
@@ -99,18 +99,18 @@ File: `routers/daily_intel_router.py`
 | `[AUREM] New {lead['topic']} request — {lead['name']}` | Admin/founder |
 
 ### I. Tenant white-label (not AUREM brand)
-ReRoots / Maison OROÉ / AURA-GEN templates — triggered by tenant platform, not AUREM corporate. Includes:
-- ReRoots VIP welcome, order confirmation, refill reminders, skincare weather tips, cart abandonment, review requests, birthday discount, refund approved, store credit added, VIP status unlocked, founding member discount
+AUREM / Maison OROÉ / AURA-GEN templates — triggered by tenant platform, not AUREM corporate. Includes:
+- AUREM VIP welcome, order confirmation, refill reminders, skincare weather tips, cart abandonment, review requests, birthday discount, refund approved, store credit added, VIP status unlocked, founding member discount
 - Maison OROÉ VIP welcome
 - AURA-GEN 3-day tips, cart abandonment
 
-➡️ **These fire only when a ReRoots/OROÉ/AURA-GEN tenant's events trigger them.** AUREM corporate has ZERO of these subjects going out.
+➡️ **These fire only when a AUREM/OROÉ/AURA-GEN tenant's events trigger them.** AUREM corporate has ZERO of these subjects going out.
 
 ---
 
 ## 💬 2. SMS (Twilio)
 
-### ReRoots-branded (tenant white-label)
+### AUREM-branded (tenant white-label)
 File: `pillars/sales/routes/blast_service.py`
 1. Order confirmation
 2. Shipping tracking
@@ -129,7 +129,7 @@ File: `pillars/sales/routes/blast_service.py`
   - Drip day 14 urgency template (from lead drip sequence)
   - Test/debug sends via `sms_alerts_router.py`
 
-⚠️ **10DLC status**: still pending carrier approval (known blocker from iter 281). Right now AUREM-originated SMS may be filtered. ReRoots SMS runs under a different Twilio account/brand.
+⚠️ **10DLC status**: still pending carrier approval (known blocker from iter 281). Right now AUREM-originated SMS may be filtered. AUREM SMS runs under a different Twilio account/brand.
 
 ---
 
@@ -183,8 +183,8 @@ Files: `services/monday_brief.py` (lines 92), `services/autopilot_brief_notifier
 
 | Channel | AUREM-branded | Tenant-branded | Admin/founder-only |
 |---|---|---|---|
-| Email  | ~30 templates across auth + lifecycle + drips + monitors + system | ~16 (ReRoots/OROÉ/AURA-GEN) | 3 (Pillars, AWB Safety, new lead alerts) |
-| SMS    | ~2 (drip day-14 + debug) | 11 (all ReRoots) | 0 |
+| Email  | ~30 templates across auth + lifecycle + drips + monitors + system | ~16 (AUREM/OROÉ/AURA-GEN) | 3 (Pillars, AWB Safety, new lead alerts) |
+| SMS    | ~2 (drip day-14 + debug) | 11 (all AUREM) | 0 |
 | WhatsApp | ~8 customer-facing | 0 | 7 (Founder alerts) |
 | Push   | 8 trigger types | 0 | (same, scoped per-tenant) |
 | Telegram | 0 | 0 | 2 (Monday digest + autopilot brief) |
@@ -194,7 +194,7 @@ Files: `services/monday_brief.py` (lines 92), `services/autopilot_brief_notifier
 ## 🎯 Observations (no code changes suggested — just visibility)
 
 1. **High volume risk**: Trial drip (6) + lead drip (6) + winback (3) + monthly report + pixel nudges + scan reports can stack up for one customer. Worth checking `communication_preferences` honors `email_frequency_cap`.
-2. **ReRoots tenant templates** live inside the AUREM codebase. If you ever decommission that tenant, consider moving tenant-specific templates to `pillars/sales/templates/reroots/` for clean separation.
+2. **AUREM tenant templates** live inside the AUREM codebase. If you ever decommission that tenant, consider moving tenant-specific templates to `pillars/sales/templates/reroots/` for clean separation.
 3. **Iter 282 AWB bug** would have triggered template #47 (`{biz} — your free site is live`) 400+ times per lead. Already fixed — DB unique index + daily safety cron will alert founder (WhatsApp + email) if >3 active sites per lead per 24h.
 4. **SMS is light** — only ~2 AUREM corporate templates. Most lead comms routed through WhatsApp to dodge 10DLC pending status. When 10DLC approves, SMS drip expansion is an option.
 5. **Push notifications** are wired but require user to have granted permission in the `/ora` PWA or portal. Current adoption unknown (worth checking `push_subscriptions` count).

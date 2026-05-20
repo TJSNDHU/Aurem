@@ -88,13 +88,13 @@ const ASIEvolveDashboard = ({ token }) => {
               ASI-Evolve
             </h1>
             <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>
-              Self-Improvement Loop — Recursive Prompt Optimization
+              Self-Improvement Loop, Recursive Prompt Optimization
             </p>
           </div>
           <button onClick={triggerCycle} disabled={triggering} data-testid="trigger-evolution-btn"
             className="flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-opacity disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #FF6B00, #CC5500)', color: '#fff', border: 'none' }}>
-            <RefreshCw className={`w-3.5 h-3.5 ${triggering ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-3.5 ${triggering ? 'animate-spin' : ''}`} />
             {triggering ? 'Evolving...' : 'Trigger Cycle'}
           </button>
         </div>
@@ -109,8 +109,8 @@ const ASIEvolveDashboard = ({ token }) => {
               { label: 'Active Instructions', value: stats.active_instructions, icon: Zap, color: '#a855f7' },
             ].map((s, i) => (
               <div key={i} style={card} className="flex items-center gap-3" data-testid={`stat-${s.label.toLowerCase().replace(/\s/g,'-')}`}>
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${s.color}15` }}>
-                  <s.icon className="w-4 h-4" style={{ color: s.color }} />
+                <div className="size-9 rounded-lg flex items-center justify-center" style={{ background: `${s.color}15` }}>
+                  <s.icon className="size-4" style={{ color: s.color }} />
                 </div>
                 <div>
                   <div className="text-lg font-bold" style={{ color: 'var(--aurem-heading)' }}>{s.value}</div>
@@ -125,7 +125,7 @@ const ASIEvolveDashboard = ({ token }) => {
         {stats && (stats.cycles_run > 0 || stats.last_cycle) && (
           <div style={{ ...card, marginBottom: 16, padding: 12 }} data-testid="asi-cycles-strip" className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
-              <RefreshCw className="w-3.5 h-3.5" style={{ color: '#FF6B00' }} />
+              <RefreshCw className="size-3.5" style={{ color: '#FF6B00' }} />
               <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>
                 {stats.cycles_run || 0} cycle{stats.cycles_run === 1 ? '' : 's'} run
               </span>
@@ -166,7 +166,7 @@ const ASIEvolveDashboard = ({ token }) => {
             { id: 'active', label: 'Active Instructions', icon: Zap },
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={tabBtn(t.id)} data-testid={`tab-${t.id}`}>
-              <t.icon className="w-3.5 h-3.5" /> {t.label}
+              <t.icon className="size-3.5" /> {t.label}
             </button>
           ))}
         </div>
@@ -176,7 +176,7 @@ const ASIEvolveDashboard = ({ token }) => {
           <div className="space-y-3">
             {history.length === 0 ? (
               <div style={card} className="text-center py-12">
-                <Brain className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.12)' }} />
+                <Brain className="size-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.12)' }} />
                 <p className="text-sm mb-1" style={{ color: 'rgba(255,255,255,0.65)' }}>No evolutions yet</p>
                 <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Trigger a cycle to start the self-improvement loop</p>
               </div>
@@ -184,10 +184,10 @@ const ASIEvolveDashboard = ({ token }) => {
               <div key={i} style={card} data-testid={`evolution-${evo.pattern_id}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${statusColor(evo.status)}15` }}>
-                      {evo.status === 'approved' ? <Check className="w-3.5 h-3.5" style={{ color: statusColor(evo.status) }} /> :
-                       evo.status === 'pending_approval' ? <Clock className="w-3.5 h-3.5" style={{ color: statusColor(evo.status) }} /> :
-                       <X className="w-3.5 h-3.5" style={{ color: statusColor(evo.status) }} />}
+                    <div className="size-7 rounded-lg flex items-center justify-center" style={{ background: `${statusColor(evo.status)}15` }}>
+                      {evo.status === 'approved' ? <Check className="size-3.5" style={{ color: statusColor(evo.status) }} /> :
+                       evo.status === 'pending_approval' ? <Clock className="size-3.5" style={{ color: statusColor(evo.status) }} /> :
+                       <X className="size-3.5" style={{ color: statusColor(evo.status) }} />}
                     </div>
                     <div>
                       <span className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>{evo.domain}</span>
@@ -229,11 +229,11 @@ const ASIEvolveDashboard = ({ token }) => {
                 {evo.shadow_test && (
                   <div className="flex items-center gap-4 px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
                     <div className="flex items-center gap-1.5">
-                      <Activity className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                      <Activity className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                       <span className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>Shadow Test:</span>
                     </div>
                     <span className="text-[10px] font-mono" style={{ color: '#ef4444' }}>A: {evo.shadow_test.run_a_score}%</span>
-                    <ChevronRight className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                    <ChevronRight className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                     <span className="text-[10px] font-mono" style={{ color: '#4ade80' }}>B: {evo.shadow_test.run_b_score}%</span>
                     <span className="text-[10px] font-bold ml-auto" style={{ color: evo.shadow_test.passed ? '#4ade80' : '#ef4444' }}>
                       {evo.shadow_test.passed ? `+${evo.shadow_test.improvement_pct}%` : `NEURAL NOISE (${evo.shadow_test.improvement_pct}%)`}
@@ -256,7 +256,7 @@ const ASIEvolveDashboard = ({ token }) => {
           <div className="space-y-3">
             {pending.length === 0 ? (
               <div style={card} className="text-center py-12">
-                <Shield className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.12)' }} />
+                <Shield className="size-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.12)' }} />
                 <p className="text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>No pending approvals</p>
               </div>
             ) : pending.map((evo, i) => (
@@ -281,12 +281,12 @@ const ASIEvolveDashboard = ({ token }) => {
                   <button onClick={() => handleApprove(evo.pattern_id)} data-testid={`approve-${evo.pattern_id}`}
                     className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg"
                     style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.2)' }}>
-                    <Check className="w-3.5 h-3.5" /> Approve
+                    <Check className="size-3.5" /> Approve
                   </button>
                   <button onClick={() => handleReject(evo.pattern_id)} data-testid={`reject-${evo.pattern_id}`}
                     className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg"
                     style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
-                    <X className="w-3.5 h-3.5" /> Reject
+                    <X className="size-3.5" /> Reject
                   </button>
                 </div>
               </div>
@@ -299,7 +299,7 @@ const ASIEvolveDashboard = ({ token }) => {
           <div className="space-y-3">
             {activeInstructions.length === 0 ? (
               <div style={card} className="text-center py-12">
-                <Zap className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.12)' }} />
+                <Zap className="size-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.12)' }} />
                 <p className="text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>No active evolved instructions</p>
                 <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Approved evolutions will appear here as active instructions in the knowledge base</p>
               </div>
@@ -307,7 +307,7 @@ const ASIEvolveDashboard = ({ token }) => {
               <div key={i} style={{ ...card, borderColor: 'rgba(168,85,247,0.2)' }} data-testid={`instruction-${instr.pattern_id}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4" style={{ color: '#a855f7' }} />
+                    <Zap className="size-4" style={{ color: '#a855f7' }} />
                     <span className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>{instr.domain}</span>
                   </div>
                   <span className="text-[10px] font-mono" style={{ color: '#a855f7' }}>

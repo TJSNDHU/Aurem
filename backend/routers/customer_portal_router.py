@@ -460,7 +460,7 @@ async def get_customer_api_key(request: Request):
     user = await _get_user(db, payload)
     email = user["_email"]
 
-    # Prefer legacy plaintext key (ReRoots style)
+    # Prefer legacy plaintext key (AUREM style)
     key_doc = await db.api_keys.find_one(
         {"$or": [{"owner_email": email}, {"owner_email": {"$regex": f"^{email}$", "$options": "i"}}], "is_active": True},
         {"_id": 0, "key": 1, "created_at": 1, "last_used": 1, "tenant_id": 1, "business_name": 1, "permissions": 1, "hit_count": 1},

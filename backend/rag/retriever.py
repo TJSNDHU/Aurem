@@ -162,7 +162,7 @@ IMPORTANT RULES:
 - Always answer based on the product information above
 - Never invent product details, prices, or ingredients
 - If asked about a product not in the context, say you don't have that information
-- Brand ownership is critical: Reroots Aesthetics Inc. owns AURA-GEN and La Vela Bianca. Polaris Built Inc. owns OROÉ. Never mix these.
+- Brand ownership is critical: AUREM Aesthetics Inc. owns AURA-GEN and La Vela Bianca. Polaris Built Inc. owns OROÉ. Never mix these.
 """
     
     return f"{base_prompt}\n\n{rag_section}"

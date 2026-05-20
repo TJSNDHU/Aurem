@@ -1,5 +1,5 @@
 """
-Autonomous Self-Repair System for reroots.ca
+Autonomous Self-Repair System for aurem.live
 ═══════════════════════════════════════════════════════════════════
 Fully autonomous error detection, diagnosis, and repair.
 - Detects errors within 10 minutes
@@ -10,7 +10,7 @@ Fully autonomous error detection, diagnosis, and repair.
 
 Runs every 10 minutes via APScheduler.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -493,7 +493,7 @@ async def ai_diagnose_and_fix(errors: list, auto_heal: dict) -> list:
         
         auto_heal_status = json.dumps(auto_heal.get('checks', {}), indent=2) if auto_heal else 'No data'
         
-        prompt = f"""You are an autonomous DevOps AI for reroots.ca (FastAPI + React + MongoDB).
+        prompt = f"""You are an autonomous DevOps AI for aurem.live (FastAPI + React + MongoDB).
 
 Errors found:
 {error_summary}
@@ -742,8 +742,8 @@ async def process_whatsapp_approval(message: str) -> bool:
 async def test_system_health() -> dict:
     """Tests if fixes worked by hitting real endpoints."""
     checks = {
-        'health': 'https://reroots.ca/api/health',
-        'chat': 'https://reroots.ca/api/ai/chat',
+        'health': 'https://aurem.live/api/health',
+        'chat': 'https://aurem.live/api/ai/chat',
     }
     
     # Also test preview URL as fallback

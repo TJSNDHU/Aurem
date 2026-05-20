@@ -1,5 +1,5 @@
 """
-ReRoots AI Appointment Scheduler Router
+AUREM AI Appointment Scheduler Router
 Google Calendar integration for booking skincare consultations
 """
 

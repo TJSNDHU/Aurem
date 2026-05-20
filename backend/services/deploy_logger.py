@@ -23,7 +23,7 @@ from typing import Optional
 logger = logging.getLogger("deploy-events")
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-_DEFAULT_REPO = os.environ.get("AUREM_GITHUB_REPO", "RerootsBeauty/ReRoots-")
+_DEFAULT_REPO = os.environ.get("AUREM_GITHUB_REPO", "AUREMBeauty/AUREM-")
 _BOOT_ID = uuid.uuid4().hex[:12]
 
 

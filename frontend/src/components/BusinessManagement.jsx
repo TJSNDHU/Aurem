@@ -33,14 +33,14 @@ const BusinessCard = ({ business, onSelect, onEdit, isSelected }) => {
       }`}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center`}>
-          <Building2 className="w-5 h-5 text-white" />
+        <div className={`size-10 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center`}>
+          <Building2 className="size-5 text-white" />
         </div>
         <button 
           onClick={(e) => { e.stopPropagation(); onEdit(business); }}
           className="p-1 text-[#666] hover:text-[#D4AF37] transition-colors"
         >
-          <Settings className="w-4 h-4" />
+          <Settings className="size-4" />
         </button>
       </div>
       
@@ -76,7 +76,7 @@ const AgentCard = ({ agent }) => {
     <div className={`p-3 rounded-lg border ${colors.bg} ${colors.border}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Bot className={`w-4 h-4 ${colors.text}`} />
+          <Bot className={`size-4 ${colors.text}`} />
           <span className={`text-sm font-medium ${colors.text}`}>{agent.name}</span>
         </div>
         <span className={`px-2 py-0.5 text-[10px] rounded-full ${colors.bg} ${colors.text} border ${colors.border}`}>
@@ -251,9 +251,9 @@ const CreateBusinessModal = ({ onClose, onCreated, token }) => {
               className="px-6 py-2 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Plus className="w-4 h-4" />
+                <Plus className="size-4" />
               )}
               Create Business
             </button>
@@ -318,7 +318,7 @@ const BusinessManagement = ({ token }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />
+        <Loader2 className="size-8 text-[#D4AF37] animate-spin" />
       </div>
     );
   }
@@ -335,7 +335,7 @@ const BusinessManagement = ({ token }) => {
           onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="size-4" />
           Add Business
         </button>
       </div>
@@ -356,7 +356,7 @@ const BusinessManagement = ({ token }) => {
           
           {businesses.length === 0 && (
             <div className="text-center py-8 text-[#666]">
-              <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <Building2 className="size-12 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No businesses configured</p>
               <p className="text-xs mt-1">Click "Add Business" to get started</p>
             </div>
@@ -408,17 +408,17 @@ const BusinessManagement = ({ token }) => {
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 bg-white/90 backdrop-blur-sm border border-[#2D7A4A]/20 rounded-xl text-center">
-                  <MessageSquare className="w-6 h-6 text-[#D4AF37] mx-auto mb-2" />
+                  <MessageSquare className="size-6 text-[#D4AF37] mx-auto mb-2" />
                   <div className="text-lg font-semibold text-[#1A1A2E]">1,247</div>
                   <div className="text-xs text-[#666]">Conversations</div>
                 </div>
                 <div className="p-4 bg-white/90 backdrop-blur-sm border border-[#2D7A4A]/20 rounded-xl text-center">
-                  <Users className="w-6 h-6 text-[#4A4] mx-auto mb-2" />
+                  <Users className="size-6 text-[#4A4] mx-auto mb-2" />
                   <div className="text-lg font-semibold text-[#1A1A2E]">342</div>
                   <div className="text-xs text-[#666]">Customers</div>
                 </div>
                 <div className="p-4 bg-white/90 backdrop-blur-sm border border-[#2D7A4A]/20 rounded-xl text-center">
-                  <BarChart3 className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                  <BarChart3 className="size-6 text-purple-400 mx-auto mb-2" />
                   <div className="text-lg font-semibold text-[#1A1A2E]">94.2%</div>
                   <div className="text-xs text-[#666]">Resolution Rate</div>
                 </div>
@@ -427,7 +427,7 @@ const BusinessManagement = ({ token }) => {
           ) : (
             <div className="flex items-center justify-center h-64 bg-white/90 backdrop-blur-sm border border-[#2D7A4A]/20 rounded-xl">
               <div className="text-center text-[#666]">
-                <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <Sparkles className="size-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">Select a business to view details</p>
               </div>
             </div>

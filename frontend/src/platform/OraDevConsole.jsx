@@ -177,7 +177,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
       {/* Header row: id, status, safety, tier, sealed */}
       <div className="flex flex-wrap items-center gap-2 justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          <Code2 className="w-4 h-4 text-amber-400" />
+          <Code2 className="size-4 text-amber-400" />
           <span className="font-mono text-sm text-amber-300">#{short}</span>
           <span
             data-testid={`ora-dev-card-${short}-status`}
@@ -205,7 +205,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
           )}
           {sealed && (
             <span className="text-[10px] uppercase px-2 py-0.5 rounded border border-rose-500/50 bg-rose-500/10 text-rose-300 flex items-center gap-1">
-              <ShieldAlert className="w-3 h-3" /> sealed-blocked
+              <ShieldAlert className="size-3" /> sealed-blocked
             </span>
           )}
         </div>
@@ -253,7 +253,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
             data-testid={`ora-dev-approve-${short}`}
             className="text-[12px] px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-black font-medium flex items-center gap-1 disabled:opacity-40"
           >
-            <Check className="w-3.5 h-3.5" /> Approve
+            <Check className="size-3.5" /> Approve
           </button>
         )}
         {statusKey === "pending" && (
@@ -263,7 +263,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
             data-testid={`ora-dev-reject-${short}`}
             className="text-[12px] px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium flex items-center gap-1 disabled:opacity-40"
           >
-            <X className="w-3.5 h-3.5" /> Reject
+            <X className="size-3.5" /> Reject
           </button>
         )}
         {/* Tier-1 cancel-auto button */}
@@ -286,7 +286,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
               data-testid={`ora-dev-applied-${short}`}
               className="text-[12px] px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center gap-1 disabled:opacity-40"
             >
-              <PlayCircle className="w-3.5 h-3.5" /> Mark Applied
+              <PlayCircle className="size-3.5" /> Mark Applied
             </button>
             <button
               onClick={() => onAct(id, "prepare-pr")}
@@ -295,7 +295,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
               className="text-[12px] px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black font-medium flex items-center gap-1 disabled:opacity-40"
               title="Generate commit message + branch suggestion. Then use 'Save to GitHub'."
             >
-              <GitBranch className="w-3.5 h-3.5" /> Apply via PR
+              <GitBranch className="size-3.5" /> Apply via PR
             </button>
             <button
               onClick={() => onAct(id, "reject")}
@@ -303,7 +303,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
               data-testid={`ora-dev-reject-${short}`}
               className="text-[12px] px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium flex items-center gap-1 disabled:opacity-40"
             >
-              <X className="w-3.5 h-3.5" /> Revert to Reject
+              <X className="size-3.5" /> Revert to Reject
             </button>
           </>
         )}
@@ -314,7 +314,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
             data-testid={`ora-dev-rollback-${short}`}
             className="text-[12px] px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-black font-medium flex items-center gap-1 disabled:opacity-40"
           >
-            <RotateCcw className="w-3.5 h-3.5" /> Rollback
+            <RotateCcw className="size-3.5" /> Rollback
           </button>
         )}
         {/* Details toggle */}
@@ -325,7 +325,7 @@ const ProposalCard = ({ p, onAct, busyId, onTranslate }) => {
         >
           🔍 {showDetails ? "Hide" : "Details"}
         </button>
-        {busy && <Loader2 className="w-4 h-4 animate-spin text-zinc-400 ml-1" />}
+        {busy && <Loader2 className="size-4 animate-spin text-zinc-400 ml-1" />}
       </div>
 
       {/* Technical details — collapsed by default */}
@@ -485,7 +485,7 @@ const OraDevConsole = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <CircleDot className="w-4 h-4 text-amber-400" />
+            <CircleDot className="size-4 text-amber-400" />
             <h3 className="text-base font-semibold text-zinc-100">
               ORA Dev Console
             </h3>
@@ -505,9 +505,9 @@ const OraDevConsole = () => {
           className="text-[12px] px-3 py-1.5 rounded bg-zinc-900 border border-zinc-700 hover:border-zinc-500 text-zinc-200 flex items-center gap-1 disabled:opacity-40"
         >
           {loading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="size-3.5" />
           )}
           Refresh
         </button>
@@ -539,7 +539,7 @@ const OraDevConsole = () => {
       <div className="mt-4">
         {loading && items.length === 0 && (
           <div className="flex items-center gap-2 text-zinc-400 text-sm py-8 justify-center">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading proposals…
+            <Loader2 className="size-4 animate-spin" /> Loading proposals…
           </div>
         )}
 

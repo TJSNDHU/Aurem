@@ -8,7 +8,7 @@ Why this exists:
     2. /api/platform/auth/login (routers/platform_auth_router.py) — minted
        JWTs with ONLY `email` + `role`, never an `is_admin` claim.
 
-  Result: a real admin (e.g. admin@reroots.ca) who authenticated via the
+  Result: a real admin (e.g. admin@aurem.live) who authenticated via the
   platform endpoint received a token that admin routes rejected with 403,
   producing a Sentinel "403 Forbidden storm" on
   /api/admin/deploy-drift and /api/admin/pillars-map/overview.
@@ -38,7 +38,7 @@ from fastapi import HTTPException
 # Importing from routes/auth.py would create a circular dep at startup,
 # so we duplicate the literal list here.
 ADMIN_EMAIL_WHITELIST = [
-    "admin@reroots.ca",
+    "admin@aurem.live",
     "teji.ss1986@gmail.com",
 ]
 

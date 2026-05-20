@@ -44,7 +44,7 @@ export default function FallbackMonitorFeed({ token }) {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Shield className="w-7 h-7 text-[#FF6B00]" />
+            <Shield className="size-7 text-[#FF6B00]" />
             <div>
               <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Fallback Monitor</h1>
               <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -58,14 +58,14 @@ export default function FallbackMonitorFeed({ token }) {
             style={{ background: 'rgba(255,107,0,0.12)', color: '#FF6B00' }}
             data-testid="fallback-monitor-refresh"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-6">
           <StatCard label="Fallbacks (24h)" value={summary.last_24h ?? 0} color="#FF6B00" testid="fb-stat-24h"
-                    icon={<AlertTriangle className="w-4 h-4 text-[#FF6B00]" />} />
+                    icon={<AlertTriangle className="size-4 text-[#FF6B00]" />} />
           <StatCard label="All Time" value={summary.total_all_time ?? 0} color="#3b82f6" testid="fb-stat-total" />
           <StatCard label="Sources Affected (7d)" value={(summary.by_source_7d || []).length} color="#16a34a" testid="fb-stat-sources" />
         </div>
@@ -74,7 +74,7 @@ export default function FallbackMonitorFeed({ token }) {
         {summary.by_source_7d && summary.by_source_7d.length > 0 && (
           <div className="aurem-glass-card p-4 mb-6" data-testid="fallback-by-source">
             <div className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--aurem-body-secondary)' }}>
-              By source — last 7 days
+              By source, last 7 days
             </div>
             <div className="flex flex-wrap gap-2">
               {summary.by_source_7d.map((s) => (
@@ -89,7 +89,7 @@ export default function FallbackMonitorFeed({ token }) {
                   }}
                   data-testid={`fallback-chip-${s.source}`}
                 >
-                  <TrendingDown className="w-3 h-3" />
+                  <TrendingDown className="size-3" />
                   {s.source}
                   <span className="opacity-70">· {s.count}</span>
                 </button>
@@ -124,7 +124,7 @@ export default function FallbackMonitorFeed({ token }) {
               )}
               {!loading && rows.length === 0 && (
                 <tr><td colSpan={4} className="text-center py-10" style={{ color: 'var(--aurem-body-secondary)' }}>
-                  No fallback events yet — your primary services are all healthy.
+                  No fallback events yet, your primary services are all healthy.
                 </td></tr>
               )}
               {!loading && rows.map((e, i) => (

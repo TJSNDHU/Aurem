@@ -9,7 +9,7 @@
 ## Layer 1: Corporate & Brand (The "Head")
 
 - **Parent Entity**: Aurem AI Platform (overarching intelligence engine)
-- **Subsidiary/Brand**: Reroots Aesthetics Inc. (consumer-facing biotech skincare)
+- **Subsidiary/Brand**: AUREM Aesthetics Inc. (consumer-facing biotech skincare)
   - Function: Primary data lab and implementation case for Aurem AI
 
 ## Layer 2: Operational Workflow (The "Body")
@@ -40,7 +40,7 @@ graph TB
     subgraph Corporate["AUREM AI PLATFORM"]
         direction TB
         AUR["Aurem Automation Intelligence"]
-        RR["Reroots Aesthetics Inc."]
+        RR["AUREM Aesthetics Inc."]
         AUR --> RR
     end
 
@@ -81,4 +81,4 @@ graph TB
 
 Paste the Mermaid code above into:
 - https://mermaid.live
-- Or use the ChatGPT prompt: "Create a Mermaid.js diagram for a Scientific-Luxe business structure showing Python Monolith, Cloud SMS Gateway, and Biotech Skincare brand (Reroots). Use copper-themed labels."
+- Or use the ChatGPT prompt: "Create a Mermaid.js diagram for a Scientific-Luxe business structure showing Python Monolith, Cloud SMS Gateway, and Biotech Skincare brand (AUREM). Use copper-themed labels."

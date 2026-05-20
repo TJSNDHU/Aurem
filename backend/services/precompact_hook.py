@@ -121,7 +121,7 @@ async def precompact_state(session_id: str = "", reason: str = "threshold") -> D
 
     # 6. Learned rules
     state_parts.append("\n## Learned Rules\n")
-    state_parts.append("- Reroots Aesthetics and China Manufacturing have been purged from all context")
+    state_parts.append("- AUREM Aesthetics and China Manufacturing have been purged from all context")
     state_parts.append("- Focus is exclusively on AUREM platform and ORA ecosystem")
     state_parts.append("- Cloud-Native SMS Gateway replaces any hardware Android gateway references")
     state_parts.append("- WebAuthn RP ID must remain set to `localhost`")

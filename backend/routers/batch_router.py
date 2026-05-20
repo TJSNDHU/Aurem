@@ -1,5 +1,5 @@
 """
-ReRoots Batch Tracking Router
+AUREM Batch Tracking Router
 =============================
 Provides batch verification and COA (Certificate of Analysis) lookup
 for product authenticity and lab data transparency.

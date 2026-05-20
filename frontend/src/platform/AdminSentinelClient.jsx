@@ -147,7 +147,7 @@ export default function AdminSentinelClient() {
 
   return (
     <div style={s.root} data-testid="admin-sentinel-client">
-      <div style={s.title}>⚡ Sentinel — Client Error Observability</div>
+      <div style={s.title}>⚡ Sentinel, Client Error Observability</div>
       <div style={s.subtitle}>Trust-but-verify repair queue · AI diagnoses, humans decide</div>
 
       {toast && (

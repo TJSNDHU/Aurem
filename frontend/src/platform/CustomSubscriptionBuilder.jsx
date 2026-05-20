@@ -113,11 +113,11 @@ const CustomSubscriptionBuilder = () => {
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case 'llm': return <MessageSquare className="h-5 w-5" />;
-      case 'voice': return <Mic className="h-5 w-5" />;
-      case 'payment': return <CreditCard className="h-5 w-5" />;
-      case 'analytics': return <TrendingUp className="h-5 w-5" />;
-      default: return <Zap className="h-5 w-5" />;
+      case 'llm': return <MessageSquare className="size-5" />;
+      case 'voice': return <Mic className="size-5" />;
+      case 'payment': return <CreditCard className="size-5" />;
+      case 'analytics': return <TrendingUp className="size-5" />;
+      default: return <Zap className="size-5" />;
     }
   };
 
@@ -138,7 +138,7 @@ const CustomSubscriptionBuilder = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-slate-900 mb-2 flex items-center justify-center gap-2">
-            <Sparkles className="h-8 w-8 text-yellow-500" />
+            <Sparkles className="size-8 text-yellow-500" />
             Build Your Perfect Plan
           </h1>
           <p className="text-slate-600 text-lg">
@@ -227,7 +227,7 @@ const CustomSubscriptionBuilder = () => {
                       </div>
                       {service.status === 'active' && (
                         <Badge variant="outline" className="mt-2 text-green-600 border-green-600">
-                          <Check className="h-3 w-3 mr-1" />
+                          <Check className="size-3 mr-1" />
                           Active
                         </Badge>
                       )}
@@ -244,7 +244,7 @@ const CustomSubscriptionBuilder = () => {
               <Card className="border-2 border-slate-200" data-testid="pricing-summary-card">
                 <CardHeader className="bg-gradient-to-br from-blue-50 to-purple-50">
                   <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
+                    <DollarSign className="size-5" />
                     Pricing Summary
                   </CardTitle>
                 </CardHeader>
@@ -269,7 +269,7 @@ const CustomSubscriptionBuilder = () => {
                     </div>
                   ) : (
                     <div className="py-8 text-center text-slate-400 text-sm">
-                      <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <Info className="size-8 mx-auto mb-2 opacity-50" />
                       Select services to see pricing
                     </div>
                   )}

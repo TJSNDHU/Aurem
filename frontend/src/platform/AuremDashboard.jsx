@@ -580,11 +580,11 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
         <button
           onClick={onMobileClose}
           data-testid="sidebar-mobile-close"
-          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center"
+          className="absolute top-3 right-3 z-20 size-8 rounded-full flex items-center justify-center"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           aria-label="Close menu"
         >
-          <X className="w-4 h-4 text-white/70" />
+          <X className="size-4 text-white/70" />
         </button>
       )}
       {/* Ambient glow */}
@@ -592,7 +592,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
 
       {/* Logo */}
       <div className="text-center mb-6 px-4 relative z-10" style={{ animation: 'auremFadeSlideDown 0.5s ease both' }}>
-        <div className="w-11 h-11 rounded-xl mx-auto mb-2 flex items-center justify-center relative" style={{
+        <div className="size-11 rounded-xl mx-auto mb-2 flex items-center justify-center relative" style={{
           background: 'linear-gradient(135deg, #FF6B00, #CC5500)',
           boxShadow: '0 0 22px rgba(212,163,115,0.4)',
           animation: 'auremFloat 4s ease-in-out infinite',
@@ -608,13 +608,13 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
             <button onClick={onLaunchDemo} data-testid="sidebar-demo-btn"
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-bold tracking-wider transition-all hover:scale-[1.03]"
               style={{ background: 'linear-gradient(135deg, #FF6B00, #CC5500)', color: '#0A0A00' }}>
-              <Play className="w-2.5 h-2.5" /> DEMO
+              <Play className="size-2.5" /> DEMO
             </button>
           )}
           <button onClick={() => setEditMode(!editMode)} data-testid="sidebar-edit-btn"
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-bold tracking-wider transition-all hover:scale-[1.03]"
             style={{ background: editMode ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', color: editMode ? '#4ade80' : 'rgba(255,255,255,0.5)', border: editMode ? '1px solid rgba(74,222,128,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
-            {editMode ? <CheckCircle2 className="w-2.5 h-2.5" /> : <GripVertical className="w-2.5 h-2.5" />}
+            {editMode ? <CheckCircle2 className="size-2.5" /> : <GripVertical className="size-2.5" />}
             {editMode ? 'DONE' : 'EDIT'}
           </button>
         </div>
@@ -666,7 +666,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="text-[8px] text-white/45">{visibleItems.length}</span>
-                  <ChevronRight className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`size-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                 </span>
               </button>
               {isOpen && (
@@ -692,14 +692,14 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
                             isActive ? 'active' : (isWired ? 'text-white/60 hover:text-white' : 'text-white/30 hover:text-white/50')
                           } ${editMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
                         >
-                          {editMode && <GripVertical className="w-3 h-3 flex-shrink-0 text-white/60" />}
+                          {editMode && <GripVertical className="size-3 flex-shrink-0 text-white/60" />}
                           <Icon className={`w-[14px] h-[14px] flex-shrink-0 ${isActive ? 'drop-shadow-[0_0_4px_rgba(27,94,58,0.4)]' : ''} ${!isWired ? 'opacity-50' : ''}`} />
                           {/* Sentinel heartbeat dot — green healthy, amber degraded, red error. */}
                           {heartbeat[item.id] && (
                             <span
                               data-testid={`heartbeat-${item.id}`}
                               title={`Sentinel: ${heartbeat[item.id]}`}
-                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                              className="size-1.5 rounded-full flex-shrink-0"
                               style={{
                                 background: heartbeat[item.id] === 'error' ? '#EF4444'
                                   : heartbeat[item.id] === 'degraded' ? '#F59E0B' : '#4ADE80',
@@ -717,7 +717,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
                           {item.premium && !editMode && (
                             <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/60 font-bold tracking-wider">PRO</span>
                           )}
-                          {isActive && !editMode && <ChevronRight className="w-3 h-3 ml-auto" />}
+                          {isActive && !editMode && <ChevronRight className="size-3 ml-auto" />}
                         </button>
                       </li>
                     );
@@ -739,7 +739,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
           style={{ color: 'rgba(255,255,255,0.65)' }}
         >
           <ChevronDown
-            className="w-3 h-3 transition-transform duration-200"
+            className="size-3 transition-transform duration-200"
             style={{ transform: moreToolsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
           />
           MORE TOOLS
@@ -762,9 +762,9 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
                     }`}
                     style={{ animation: `auremSlideInLeft 0.2s ease ${i * 0.02}s both` }}
                   >
-                    <Icon className="w-3 h-3 flex-shrink-0" />
+                    <Icon className="size-3 flex-shrink-0" />
                     <span className="truncate flex-1 text-left">{item.label}</span>
-                    {isActive && <ChevronRight className="w-3 h-3 ml-auto" />}
+                    {isActive && <ChevronRight className="size-3 ml-auto" />}
                   </button>
                 </li>
               );
@@ -919,7 +919,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
               }}
               title="Unlock 10x actions, V2V voice, deep scout, and revenue forecasting with Growth"
             >
-              <Rocket className="w-3 h-3" />
+              <Rocket className="size-3" />
               UPGRADE TO GROWTH
             </button>
           )}
@@ -930,7 +930,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
       {viralStatus && viralStatus.phase === 'trial_active' && (
         <div className="px-3 pt-2 border-t border-white/[0.06] relative z-10" data-testid="sidebar-viral-trial">
           <div className="flex items-center gap-2 mb-1.5">
-            <Brain className="w-3 h-3 text-[#4ade80]" />
+            <Brain className="size-3 text-[#4ade80]" />
             <span className="text-[8px] font-bold tracking-[2px] text-[#4ade80]/60 uppercase">SOCIAL BRAIN TRIAL</span>
           </div>
           <div className="flex items-center justify-between mb-1">
@@ -956,7 +956,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
       {viralStatus && viralStatus.phase === 'review_required' && (
         <div className="px-3 pt-2 border-t border-white/[0.06] relative z-10" data-testid="sidebar-viral-review-required">
           <div className="flex items-center gap-2 mb-1.5">
-            <Lock className="w-3 h-3 text-[#f59e0b]" />
+            <Lock className="size-3 text-[#f59e0b]" />
             <span className="text-[8px] font-bold tracking-[2px] text-[#f59e0b]/80 uppercase">REVIEW TO UNLOCK</span>
           </div>
           <p className="text-[9px] text-white/50 mb-1.5 leading-relaxed">
@@ -972,7 +972,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
               color: '#D4B977',
             }}
           >
-            <Sparkles className="w-2.5 h-2.5" />
+            <Sparkles className="size-2.5" />
             LEAVE REVIEW
           </button>
         </div>
@@ -980,7 +980,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
       {viralStatus && viralStatus.phase === 'not_started' && (
         <div className="px-3 pt-2 border-t border-white/[0.06] relative z-10" data-testid="sidebar-viral-not-started">
           <div className="flex items-center gap-2 mb-1.5">
-            <Brain className="w-3 h-3 text-[#D4B977]" />
+            <Brain className="size-3 text-[#D4B977]" />
             <span className="text-[8px] font-bold tracking-[2px] text-white/60 uppercase">SOCIAL BRAIN</span>
           </div>
           <p className="text-[9px] text-white/65 mb-1.5">7-day free trial available</p>
@@ -998,7 +998,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
               color: '#FF6B00',
             }}
           >
-            <Rocket className="w-2.5 h-2.5" />
+            <Rocket className="size-2.5" />
             START FREE TRIAL
           </button>
         </div>
@@ -1006,7 +1006,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
       {viralStatus && viralStatus.phase === 'unlocked' && (
         <div className="px-3 pt-2 border-t border-white/[0.06] relative z-10" data-testid="sidebar-viral-unlocked">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 6px rgba(74,222,128,0.5)' }} />
+            <div className="size-1.5 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 6px rgba(74,222,128,0.5)' }} />
             <span className="text-[8px] font-bold tracking-[2px] text-[#4ade80]/60">SOCIAL BRAIN UNLOCKED</span>
           </div>
         </div>
@@ -1020,7 +1020,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
             data-testid="theme-auto-btn"
             className={`flex-1 flex items-center justify-center gap-1 px-1 py-1.5 rounded-md text-[10px] font-medium transition-all ${isAuto ? 'bg-[#FF6B00]/20 text-[#FF6B00]' : 'text-white/65 hover:text-white/70'}`}
           >
-            <Clock className="w-3 h-3" />
+            <Clock className="size-3" />
             Auto
           </button>
           <button
@@ -1028,7 +1028,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
             data-testid="theme-light-btn"
             className={`flex-1 flex items-center justify-center gap-1 px-1 py-1.5 rounded-md text-[10px] font-medium transition-all ${!isAuto && theme === 'light' ? 'bg-white/10 text-white/80' : 'text-white/65 hover:text-white/70'}`}
           >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
             Light
           </button>
           <button
@@ -1036,7 +1036,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
             data-testid="theme-dark-btn"
             className={`flex-1 flex items-center justify-center gap-1 px-1 py-1.5 rounded-md text-[10px] font-medium transition-all ${!isAuto && theme === 'dark' ? 'bg-white/10 text-white/80' : 'text-white/65 hover:text-white/70'}`}
           >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             Dark
           </button>
         </div>
@@ -1048,12 +1048,12 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
       {/* Status + Logout */}
       <div className="px-3 pt-3 relative z-10">
         {/* Pulse Rings */}
-        <div className="relative w-14 h-14 mx-auto mb-2">
+        <div className="relative size-14 mx-auto mb-2">
           {[0, 0.6, 1.2].map((d, i) => (
             <div key={i} className="absolute rounded-full border animate-ping" style={{ inset: `${i*4}px`, borderColor: 'rgba(74,222,128,0.2)', animationDuration: '2.5s', animationDelay: `${d}s` }} />
           ))}
           <div className="absolute inset-[18px] rounded-full flex items-center justify-center" style={{ background: 'rgba(74,222,128,0.12)' }}>
-            <div className="w-2 h-2 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 10px rgba(74,222,128,0.6)' }} />
+            <div className="size-2 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 10px rgba(74,222,128,0.6)' }} />
           </div>
         </div>
         <div className="text-center text-[8px] font-bold tracking-[2px] aurem-badge-online mb-3">ALL SYSTEMS ONLINE</div>
@@ -1066,7 +1066,7 @@ const Sidebar = ({ activeItem, onItemClick, user, onLogout, token, onLaunchDemo,
           data-testid="logout-btn"
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[11px] text-white/65 hover:text-[#FF6B00] hover:bg-white/5 transition-all"
         >
-          <LogOut className="w-3.5 h-3.5" />
+          <LogOut className="size-3.5" />
           <span>Disconnect</span>
         </button>
       </div>
@@ -1100,7 +1100,7 @@ const MetricsPanel = ({ metrics, onRefresh }) => {
             className="p-1 rounded-lg hover:bg-[rgba(61,58,57,0.25)] transition-colors"
             title="Sync metrics"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-[#FF6B00]" />
+            <RefreshCw className="size-3.5 text-[#FF6B00]" />
           </button>
         )}
       </div>
@@ -1136,7 +1136,7 @@ const AgentSwarmStatus = ({ agents }) => {
     return (
       <div className="aurem-glass-card p-3">
         <h3 className="text-[10px] font-bold tracking-[1.5px] mb-3" style={{ color: 'var(--aurem-heading)' }}>AGENT SWARM STATUS</h3>
-        <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Loading agents...</p>
+        <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Loading agents…</p>
       </div>
     );
   }
@@ -1148,7 +1148,7 @@ const AgentSwarmStatus = ({ agents }) => {
         {displayAgents.map((agent, idx) => (
           <div key={idx} className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{
+              <div className="size-2 rounded-full" style={{
                 backgroundColor: agent.color || (agent.status === 'STANDBY' ? '#888' : '#4ade80'),
                 boxShadow: agent.status !== 'STANDBY' ? `0 0 6px ${agent.color || '#4ade80'}40` : 'none'
               }} />
@@ -1221,8 +1221,8 @@ const LiveActivityFeed = ({ activities }) => {
           const Icon = activity.icon || Activity;
           return (
             <div key={idx} className="flex gap-2 text-xs" style={{ animation: `auremFadeSlideIn 0.3s ease ${idx * 0.1}s both` }}>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${activity.color}12` }}>
-                <Icon className="w-3.5 h-3.5" style={{ color: activity.color }} />
+              <div className="size-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${activity.color}12` }}>
+                <Icon className="size-3.5" style={{ color: activity.color }} />
               </div>
               <div>
                 <p className="leading-tight font-medium" style={{ color: 'var(--aurem-heading)' }}>{activity.text}</p>
@@ -1259,16 +1259,16 @@ const VibeMethodologyPanel = () => {
         className="w-full flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{
+          <div className="size-6 rounded-lg flex items-center justify-center" style={{
             background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(45,122,74,0.10))',
           }}>
-            <Sparkles className="w-3.5 h-3.5 text-[#D4B977]" />
+            <Sparkles className="size-3.5 text-[#D4B977]" />
           </div>
           <h3 className="text-[10px] font-bold tracking-[1.5px]" style={{ color: 'var(--aurem-heading)' }}>
             VIBE METHODOLOGY
           </h3>
         </div>
-        <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`} style={{ color: 'var(--aurem-body-secondary)' }} />
+        <ChevronRight className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`} style={{ color: 'var(--aurem-body-secondary)' }} />
       </button>
 
       {expanded && (
@@ -1282,12 +1282,12 @@ const VibeMethodologyPanel = () => {
             return (
               <div key={idx} className="p-2 rounded-lg" style={{ background: 'rgba(255,107,0,0.04)', border: '1px solid rgba(61,58,57,0.15)' }}>
                 <div className="flex items-center gap-2 mb-1">
-                  <Icon className="w-3 h-3 text-[#FF6B00]" />
+                  <Icon className="size-3 text-[#FF6B00]" />
                   <span className="text-[10px] font-bold" style={{ color: 'var(--aurem-heading)' }}>{item.concept}</span>
                 </div>
                 <div className="flex items-center gap-1 text-[9px]">
                   <span className="px-1.5 py-0.5 rounded" style={{ background: 'rgba(136,136,136,0.1)', color: 'var(--aurem-body-secondary)' }}>{item.manual}</span>
-                  <ChevronRight className="w-2.5 h-2.5 text-[#D4B977]" />
+                  <ChevronRight className="size-2.5 text-[#D4B977]" />
                   <span className="px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(61,58,57,0.15)', color: '#FF6B00' }}>{item.aurem}</span>
                 </div>
               </div>
@@ -1343,16 +1343,16 @@ const G0DM0D3Panel = ({ token }) => {
         className="w-full flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{
+          <div className="size-6 rounded-lg flex items-center justify-center" style={{
             background: 'linear-gradient(135deg, rgba(220,38,38,0.12), rgba(168,85,247,0.12))',
           }}>
-            <Shield className="w-3.5 h-3.5 text-red-500" />
+            <Shield className="size-3.5 text-red-500" />
           </div>
           <h3 className="text-[10px] font-bold tracking-[1.5px]" style={{ color: 'var(--aurem-heading)' }}>
             G0DM0D3
           </h3>
         </div>
-        <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`} style={{ color: 'var(--aurem-body-secondary)' }} />
+        <ChevronRight className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`} style={{ color: 'var(--aurem-body-secondary)' }} />
       </button>
 
       {expanded && (
@@ -1783,7 +1783,7 @@ const ChatInterface = ({ user, token }) => {
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-lg font-bold" style={{ color: 'var(--aurem-heading)', fontFamily: 'Cinzel, Georgia, serif' }}>ORA Intelligence</h1>
-            <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Commercial ORA Platform — Multi-Agent Architecture</p>
+            <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Commercial ORA Platform, Multi-Agent Architecture</p>
           </div>
           {(() => { try { const p = JSON.parse(atob((getPlatformToken()||'').split('.')[1])); return p.is_admin; } catch { return false; } })() && (
             <button
@@ -1792,7 +1792,7 @@ const ChatInterface = ({ user, token }) => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90"
               style={{ background: 'linear-gradient(135deg, #FF6B00, #D4AF37)', color: '#FFF', boxShadow: '0 2px 8px rgba(255,107,0,0.25)' }}
             >
-              <Shield className="w-3 h-3" />
+              <Shield className="size-3" />
               Mission Control
             </button>
           )}
@@ -1833,7 +1833,7 @@ const ChatInterface = ({ user, token }) => {
                 ].map((a) => (
                   <div key={a.key} className="flex items-center gap-1.5" data-testid={`agent-pill-${a.key}`}>
                     <span
-                      className="w-1.5 h-1.5 rounded-full"
+                      className="size-1.5 rounded-full"
                       style={{
                         background: a.dot,
                         boxShadow: `0 0 6px ${a.dot}`,
@@ -1847,7 +1847,7 @@ const ChatInterface = ({ user, token }) => {
                 ))}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#FF6B00', boxShadow: '0 0 6px #FF6B00' }} />
+                <span className="size-1.5 rounded-full" style={{ background: '#FF6B00', boxShadow: '0 0 6px #FF6B00' }} />
                 <span className="text-[10px] tracking-[1.5px] font-bold" style={{ color: '#FF6B00' }}>
                   OODA ACTIVE
                 </span>
@@ -1865,11 +1865,11 @@ const ChatInterface = ({ user, token }) => {
                 }}
               >
                 <div className="flex items-center gap-2 mb-1.5">
-                  <Sparkles className="w-3.5 h-3.5" style={{ color: '#FF6B00' }} />
+                  <Sparkles className="size-3.5" style={{ color: '#FF6B00' }} />
                   <span className="text-[10px] tracking-[2px] font-bold" style={{ color: '#FF6B00' }}>ORA</span>
                 </div>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--aurem-body)' }}>
-                  ORA online — OODA pipeline active. How can I assist?
+                  ORA online, OODA pipeline active. How can I assist?
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {[
@@ -1908,9 +1908,9 @@ const ChatInterface = ({ user, token }) => {
                   }}>
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <div className="size-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="size-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="size-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
                       <p className="text-xs italic" style={{ color: '#FF6B00' }}>{msg.content}</p>
                     </div>
@@ -1930,7 +1930,7 @@ const ChatInterface = ({ user, token }) => {
                       {/* Live Data Freshness Indicator */}
                       {msg.data_freshness && msg.data_freshness.sources && msg.data_freshness.sources.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap" data-testid={`freshness-${idx}`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
+                          <span className="size-1.5 rounded-full bg-[#4ade80] animate-pulse" />
                           <span className="text-[9px] text-[#FF6B00] font-medium">
                             Live data
                           </span>
@@ -2026,9 +2026,9 @@ const ChatInterface = ({ user, token }) => {
               <div className="flex justify-start">
                 <div className="aurem-glass-card p-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-[#FF6B00] rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-[#FF6B00] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    <div className="w-2 h-2 bg-[#FF6B00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <div className="size-2 bg-[#FF6B00] rounded-full animate-bounce" />
+                    <div className="size-2 bg-[#FF6B00] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="size-2 bg-[#FF6B00] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   </div>
                 </div>
               </div>
@@ -2049,7 +2049,7 @@ const ChatInterface = ({ user, token }) => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span
-                      className="inline-flex w-2.5 h-2.5 rounded-full"
+                      className="inline-flex size-2.5 rounded-full"
                       style={{
                         background: activeHunt.finished ? '#1B5E3A' : '#FF6B00',
                         animation: activeHunt.finished ? 'none' : 'pulse 1s ease-in-out infinite',
@@ -2183,7 +2183,7 @@ const ChatInterface = ({ user, token }) => {
             data-testid="mic-btn"
             className={`p-2 transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-[var(--aurem-body-secondary)] hover:text-[#FF6B00]'}`}
           >
-            <Mic className="w-5 h-5" />
+            <Mic className="size-5" />
           </button>
           <button 
             onClick={handleSendMessage}
@@ -2192,7 +2192,7 @@ const ChatInterface = ({ user, token }) => {
             className="p-2 rounded-xl text-white hover:opacity-90 transition-opacity disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #FF6B00, #1B5E3A)', boxShadow: '0 4px 12px rgba(255,107,0,0.12)' }}
           >
-            <Send className="w-5 h-5" />
+            <Send className="size-5" />
           </button>
           {/* 3 Dots Action Hub */}
           <div className="relative" ref={actionHubRef}>
@@ -2203,7 +2203,7 @@ const ChatInterface = ({ user, token }) => {
               style={{ color: 'var(--aurem-body-secondary)' }}
               title="Attach files"
             >
-              <MoreVertical className="w-5 h-5" />
+              <MoreVertical className="size-5" />
             </button>
             {showActionHub && (
               <div
@@ -2223,7 +2223,7 @@ const ChatInterface = ({ user, token }) => {
                   data-testid="action-hub-document"
                   className="w-full flex items-center gap-3 px-4 py-3 text-xs text-white/70 hover:text-[#FF6B00] hover:bg-white/5 transition-all"
                 >
-                  <FileText className="w-4 h-4 text-[#FF6B00]" />
+                  <FileText className="size-4 text-[#FF6B00]" />
                   <span className="font-medium">Document</span>
                   <span className="ml-auto text-[9px] text-white/60">PDF / Docs</span>
                 </button>
@@ -2232,7 +2232,7 @@ const ChatInterface = ({ user, token }) => {
                   data-testid="action-hub-image"
                   className="w-full flex items-center gap-3 px-4 py-3 text-xs text-white/70 hover:text-[#D4B977] hover:bg-white/5 transition-all"
                 >
-                  <Image className="w-4 h-4 text-[#D4B977]" />
+                  <Image className="size-4 text-[#D4B977]" />
                   <span className="font-medium">Image</span>
                   <span className="ml-auto text-[9px] text-white/60">Screenshots</span>
                 </button>
@@ -2241,7 +2241,7 @@ const ChatInterface = ({ user, token }) => {
                   data-testid="action-hub-video"
                   className="w-full flex items-center gap-3 px-4 py-3 text-xs text-white/70 hover:text-[#4ade80] hover:bg-white/5 transition-all"
                 >
-                  <Video className="w-4 h-4 text-[#4ade80]" />
+                  <Video className="size-4 text-[#4ade80]" />
                   <span className="font-medium">Video</span>
                   <span className="ml-auto text-[9px] text-white/60">Bug reports</span>
                 </button>
@@ -2269,20 +2269,20 @@ const ChatInterface = ({ user, token }) => {
             }}
             data-testid="feature-locked-modal"
           >
-            <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
+            <div className="size-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
               background: 'linear-gradient(135deg, rgba(212,185,119,0.15), rgba(255,107,0,0.10))',
               border: '1px solid rgba(212,185,119,0.2)',
             }}>
-              <Lock className="w-7 h-7 text-[#D4B977]" />
+              <Lock className="size-7 text-[#D4B977]" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'Cinzel, Georgia, serif' }}>Social Brain — Review Required</h3>
+            <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'Cinzel, Georgia, serif' }}>Social Brain, Review Required</h3>
             <p className="text-xs text-white/50 leading-relaxed mb-6">
               Your 7-day Social Brain trial has ended. To keep this powerful feature active permanently, 
               please leave a 5-star Google Review. You can also upload a screenshot via the attachment menu.
             </p>
             <div className="flex items-center justify-center gap-3 mb-4">
               <div className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: 'rgba(212,185,119,0.08)', color: '#D4B977', border: '1px solid rgba(212,185,119,0.15)' }}>
-                <Sparkles className="w-3 h-3 inline mr-1" /> 1 Google Review
+                <Sparkles className="size-3 inline mr-1" /> 1 Google Review
               </div>
             </div>
             <button
@@ -2327,7 +2327,7 @@ const PixelGateBanner = ({ user }) => {
                position: 'relative' }}>
       <span style={{ fontSize: 18 }}>⚠️</span>
       <div style={{ flex: 1, color: '#F59E0B', fontWeight: 600, fontSize: 13 }}>
-        Pixel not detected — fixes paused until you install the AUREM pixel.
+        Pixel not detected, fixes paused until you install the AUREM pixel.
       </div>
       <a href={`/onboarding/pixel?tenant_id=${encodeURIComponent(tenantId)}`}
         data-testid="pixel-gate-cta"
@@ -2516,7 +2516,7 @@ const AuremDashboard = () => {
       <div className="min-h-screen flex items-center justify-center p-4 relative">
         <div className="aurem-bg-container"><div className="geometric-overlay"></div></div>
         <div className="text-center relative z-10" style={{ animation: 'auremFadeSlideIn 0.5s ease both' }}>
-          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
+          <div className="size-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{
             background: 'linear-gradient(135deg, #D4B977, #B19A5E)',
             boxShadow: '0 0 28px rgba(212,185,119,0.25)',
             animation: 'auremFloat 2s ease-in-out infinite',
@@ -2524,7 +2524,7 @@ const AuremDashboard = () => {
             <span className="text-lg font-black text-[#0A0A00]">A</span>
           </div>
           <p className="text-sm font-bold tracking-[3px]" style={{ color: 'var(--aurem-heading)' }}>AUREM ORA</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>Initializing systems...</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>Initializing systems…</p>
         </div>
       </div>
     );
@@ -2605,7 +2605,7 @@ const AuremDashboard = () => {
               boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
             }}
           >
-            <ChevronRight className="w-4 h-4 text-[#D4AF37]" />
+            <ChevronRight className="size-4 text-[#D4AF37]" />
           </button>
         )}
         {isMobile && !rightOpen && activeItem === 'ai-conversation' && (
@@ -2622,7 +2622,7 @@ const AuremDashboard = () => {
               boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
             }}
           >
-            <ChevronRight className="w-4 h-4 text-[#D4AF37] rotate-180" />
+            <ChevronRight className="size-4 text-[#D4AF37] rotate-180" />
           </button>
         )}
 
@@ -2740,7 +2740,7 @@ const AuremDashboard = () => {
         ) : activeItem === 'revenue-automation' ? (
           <ServiceGuard name="Revenue Automation"><RevenueAutomation token={token} /></ServiceGuard>
         ) : activeItem === 'lead-enrichment' ? (
-          // Legacy route — moved to per-lead Enrich buttons in Lead Pipeline
+          // Legacy route, moved to per-lead Enrich buttons in Lead Pipeline
           <ServiceGuard name="Leads"><LeadsDashboard token={token} /></ServiceGuard>
         ) : activeItem === 'proximity-blast' ? (
           <ServiceGuard name="Proximity Blast"><div className="flex-1 overflow-auto p-6"><ProximityBlast token={token} /></div></ServiceGuard>
@@ -2771,13 +2771,13 @@ const AuremDashboard = () => {
         ) : activeItem === 'command-console' ? (
           <ServiceGuard name="ORA Command Console"><PageShell><ORACommandConsole /></PageShell></ServiceGuard>
         ) : activeItem === 'deep-scout' ? (
-          // Legacy route — redirect to unified Console
+          // Legacy route, redirect to unified Console
           <ServiceGuard name="ORA Command Console"><PageShell><ORACommandConsole /></PageShell></ServiceGuard>
         ) : activeItem === 'dark-scout' ? (
-          // Legacy route — redirect to unified Console
+          // Legacy route, redirect to unified Console
           <ServiceGuard name="ORA Command Console"><PageShell><ORACommandConsole /></PageShell></ServiceGuard>
         ) : activeItem === 'legacy-agent-center' ? (
-          // iter 285 — legacy AgentCommandCenter merged into ORACommandConsole
+          // iter 285, legacy AgentCommandCenter merged into ORACommandConsole
           <ServiceGuard name="ORA Command Console"><PageShell><ORACommandConsole /></PageShell></ServiceGuard>
         ) : activeItem === 'system-pulse' ? (
           <ServiceGuard name="System Pulse"><SystemPulseHUD token={token} /></ServiceGuard>
@@ -2822,11 +2822,11 @@ const AuremDashboard = () => {
                   <button
                     onClick={() => setRightOpen(false)}
                     data-testid="ora-right-mobile-close"
-                    className="sticky top-0 ml-auto mb-2 w-8 h-8 rounded-full flex items-center justify-center"
+                    className="sticky top-0 ml-auto mb-2 size-8 rounded-full flex items-center justify-center"
                     style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}
                     aria-label="Close panel"
                   >
-                    <X className="w-4 h-4 text-white/80" />
+                    <X className="size-4 text-white/80" />
                   </button>
                 )}
                 <VibeMethodologyPanel />
@@ -2855,11 +2855,11 @@ const AuremDashboard = () => {
         ) : (
           <div className="flex-1 flex items-center justify-center" style={{ background: 'transparent' }}>
             <div className="text-center aurem-glass-card p-12">
-              <Shield className="w-12 h-12 text-[#FF6B00] mx-auto mb-4" />
+              <Shield className="size-12 text-[#FF6B00] mx-auto mb-4" />
               <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--aurem-heading)' }}>
                 {activeItem.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </h2>
-              <p style={{ color: 'var(--aurem-body-secondary)' }}>Coming soon...</p>
+              <p style={{ color: 'var(--aurem-body-secondary)' }}>Coming soon…</p>
             </div>
           </div>
         )}

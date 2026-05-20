@@ -46,8 +46,8 @@ class BrowserToolkit:
         return "<html><body>Stub content</body></html>"
 
 
-class RerootsBrowser(BrowserToolkit):
-    """Stub for ReRoots-specific browser automation"""
+class AUREMBrowser(BrowserToolkit):
+    """Stub for AUREM-specific browser automation"""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

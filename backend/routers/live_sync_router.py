@@ -1,5 +1,5 @@
 """
-ReRoots AI Live Sync Router
+AUREM AI Live Sync Router
 WebSocket endpoints for real-time bi-directional sync
 
 Routes:

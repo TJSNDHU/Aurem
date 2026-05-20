@@ -127,9 +127,9 @@ const PlatformLanding = () => {
         style={{ background: 'rgba(5,5,7,0.88)', backdropFilter: 'blur(20px)' }}>
         <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center relative" style={{ background: goldGrad }}>
+            <div className="size-9 rounded-lg flex items-center justify-center relative" style={{ background: goldGrad }}>
               <Target className="w-[18px] h-[18px] text-[#050507]" />
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse bg-[#4ade80]" />
+              <div className="absolute -top-0.5 -right-0.5 size-2 rounded-full animate-pulse bg-[#4ade80]" />
             </div>
             <span className="text-base tracking-[0.25em] font-light" style={heading}>AUREM</span>
           </div>
@@ -154,7 +154,7 @@ const PlatformLanding = () => {
 
       {/* SEO Meta */}
       <Helmet>
-        <title>AUREM | World's First Sovereign AI Workforce — ORA by AUREM</title>
+        <title>AUREM | World's First Sovereign AI Workforce, ORA by AUREM</title>
         <meta name="description" content="AUREM is the world's first Sovereign AI Workforce. Six autonomous agents powered by ORA by AUREM hunt, qualify, and close leads in any language, 24/7. Multi-LLM ORA intelligence (GPT-4o, Claude Sonnet 4.5, Gemini 3, Llama 3.3). Sovereign data residency · CASL compliant · Built in Canada. Starting at $97 CAD/month." />
         <link rel="canonical" href="https://aurem.live/" />
       </Helmet>
@@ -202,7 +202,7 @@ const PlatformLanding = () => {
             </motion.div>
             <motion.div variants={fadeUp} className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] ml-2"
               style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.22)', color: '#D4AF37' }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#68DA8D', boxShadow: '0 0 8px #68DA8D' }} />
+              <span className="size-1.5 rounded-full" style={{ background: '#68DA8D', boxShadow: '0 0 8px #68DA8D' }} />
               ORA BY AUREM · AVAILABLE 24/7 · 20+ LANGUAGES
             </motion.div>
             <motion.h1 variants={fadeUp} className="text-4xl sm:text-5xl lg:text-6xl mb-6 leading-[1.05] tracking-tight" style={heading} data-testid="hero-title">
@@ -221,14 +221,14 @@ const PlatformLanding = () => {
                 onClick={() => navigate('/platform/signup')}
                 className="px-8 py-3.5 rounded-lg text-sm font-bold flex items-center gap-3 tracking-wider text-[#050507]"
                 style={{ background: goldGrad }} data-testid="hero-cta-btn">
-                Start Free Trial <ArrowRight className="w-4 h-4" />
+                Start Free Trial <ArrowRight className="size-4" />
               </motion.button>
               <motion.button whileHover={{ borderColor: 'rgba(212,175,55,0.4)' }}
                 onClick={() => navigate('/contact?topic=audit')}
                 className="px-8 py-3.5 rounded-lg text-sm font-medium flex items-center gap-2 text-[#c9c9d1] hover:text-[#D4AF37] transition-all tracking-wider"
                 style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(10,10,20,0.4)', backdropFilter: 'blur(8px)' }}
                 data-testid="hero-audit-btn">
-                Get a Free Audit <Sparkles className="w-4 h-4" />
+                Get a Free Audit <Sparkles className="size-4" />
               </motion.button>
             </motion.div>
 
@@ -265,12 +265,12 @@ const PlatformLanding = () => {
             }}
           >
             {/* Accent glow */}
-            <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full blur-[140px] pointer-events-none" style={{ background: 'rgba(74,222,128,0.08)' }} />
+            <div className="absolute -top-20 -right-20 size-80 rounded-full blur-[140px] pointer-events-none" style={{ background: 'rgba(74,222,128,0.08)' }} />
             <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 mb-3 px-2.5 py-1 rounded-full text-[10px] tracking-[0.2em]"
                   style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.25)', color: '#68DA8D' }}>
-                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#68DA8D', boxShadow: '0 0 8px #68DA8D' }} />
+                  <span className="size-1.5 rounded-full animate-pulse" style={{ background: '#68DA8D', boxShadow: '0 0 8px #68DA8D' }} />
                   NEW · 30-DAY FREE TRIAL
                 </div>
                 <h3 className="text-2xl sm:text-3xl text-white mb-2 leading-tight" style={heading}>
@@ -281,9 +281,9 @@ const PlatformLanding = () => {
                   No credit card. Setup takes 20 seconds.
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#9ca3af] tracking-wider mt-3">
-                  <div className="flex items-center gap-1.5"><Check className="w-3 h-3 text-[#4ade80]" /><span>3 URLs monitored</span></div>
-                  <div className="flex items-center gap-1.5"><Check className="w-3 h-3 text-[#4ade80]" /><span>Instant email alerts</span></div>
-                  <div className="flex items-center gap-1.5"><Check className="w-3 h-3 text-[#4ade80]" /><span>Live uptime dashboard</span></div>
+                  <div className="flex items-center gap-1.5"><Check className="size-3 text-[#4ade80]" /><span>3 URLs monitored</span></div>
+                  <div className="flex items-center gap-1.5"><Check className="size-3 text-[#4ade80]" /><span>Instant email alerts</span></div>
+                  <div className="flex items-center gap-1.5"><Check className="size-3 text-[#4ade80]" /><span>Live uptime dashboard</span></div>
                 </div>
               </div>
               <motion.button
@@ -294,7 +294,7 @@ const PlatformLanding = () => {
                 style={{ background: goldGrad }}
                 data-testid="site-monitor-cta-btn"
               >
-                Start Free Monitoring <ArrowRight className="w-4 h-4" />
+                Start Free Monitoring <ArrowRight className="size-4" />
               </motion.button>
               {/* iter 281.5 — Phase 2.5 Repair Lead Magnet */}
               <motion.button
@@ -321,8 +321,8 @@ const PlatformLanding = () => {
             {painPoints.map((p, i) => (
               <motion.div key={i} variants={scaleUp} whileHover={{ y: -4, borderColor: 'rgba(239,68,68,0.15)' }}
                 className="p-6 rounded-xl transition-all" style={glass} data-testid={`pain-${i}`}>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
-                  <p.icon className="w-5 h-5 text-[#EF4444]" />
+                <div className="size-10 rounded-lg flex items-center justify-center mb-4" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.1)' }}>
+                  <p.icon className="size-5 text-[#EF4444]" />
                 </div>
                 <h3 className="text-sm font-bold text-white mb-2">{p.title}</h3>
                 <p className="text-xs text-[#9ca3af] leading-relaxed">{p.body}</p>
@@ -343,8 +343,8 @@ const PlatformLanding = () => {
             {capabilities.map((c, i) => (
               <motion.div key={i} variants={scaleUp} whileHover={{ y: -4, borderColor: 'rgba(212,175,55,0.2)' }}
                 className="p-6 rounded-xl transition-all group" style={glass} data-testid={`feature-${i}`}>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.1)' }}>
-                  <c.icon className="w-5 h-5 text-[#D4AF37]" />
+                <div className="size-10 rounded-lg flex items-center justify-center mb-4" style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.1)' }}>
+                  <c.icon className="size-5 text-[#D4AF37]" />
                 </div>
                 <h3 className="text-sm font-bold text-white mb-2 group-hover:text-[#D4AF37] transition-colors">{c.title}</h3>
                 <p className="text-xs text-[#9ca3af] leading-relaxed">{c.body}</p>
@@ -369,9 +369,9 @@ const PlatformLanding = () => {
               <motion.div key={i} variants={fadeUpScroll} whileHover={{ x: 6 }}
                 className="flex items-center gap-5 p-5 rounded-xl transition-all" style={glass} data-testid={`agent-${i}`}>
                 <span className="text-[10px] font-bold tracking-[0.2em]" style={{ color: a.color }}>{a.step}</span>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                <div className="size-10 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ background: `${a.color}10`, border: `1px solid ${a.color}20` }}>
-                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: a.color }} />
+                  <div className="size-2 rounded-full animate-pulse" style={{ background: a.color }} />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">{a.name}</h3>
@@ -394,8 +394,8 @@ const PlatformLanding = () => {
             {personas.map((p, i) => (
               <motion.div key={i} variants={scaleUp} whileHover={{ y: -4, borderColor: 'rgba(212,175,55,0.2)' }}
                 className="p-6 rounded-xl transition-all" style={glass} data-testid={`persona-${i}`}>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.1)' }}>
-                  <p.icon className="w-5 h-5 text-[#D4AF37]" />
+                <div className="size-10 rounded-lg flex items-center justify-center mb-4" style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.1)' }}>
+                  <p.icon className="size-5 text-[#D4AF37]" />
                 </div>
                 <h3 className="text-sm font-bold text-white mb-2">{p.title}</h3>
                 <p className="text-xs text-[#9ca3af] leading-relaxed">{p.body}</p>
@@ -469,7 +469,7 @@ const PlatformLanding = () => {
                 <div className="space-y-2.5">
                   {plan.features.map((f, fi) => (
                     <div key={fi} className="flex items-start gap-2 text-xs">
-                      <Check className="w-3.5 h-3.5 text-[#4ade80] flex-shrink-0 mt-0.5" />
+                      <Check className="size-3.5 text-[#4ade80] flex-shrink-0 mt-0.5" />
                       <span className="text-[#9ca3af]">{f}</span>
                     </div>
                   ))}
@@ -496,7 +496,7 @@ const PlatformLanding = () => {
                   className="w-full flex items-center justify-between p-5 text-left"
                 >
                   <span className="text-sm text-white font-medium pr-4">{faq.q}</span>
-                  <ChevronDown className={`w-4 h-4 text-[#D4AF37] flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`size-4 text-[#D4AF37] flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
                 </button>
                 {openFaq === i && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="px-5 pb-5">
@@ -515,7 +515,7 @@ const PlatformLanding = () => {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
             className="p-12 rounded-2xl text-center relative overflow-hidden" style={{ ...glass, borderColor: 'rgba(212,175,55,0.15)' }}>
             <div className="absolute inset-0">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full blur-[150px]" style={{ background: 'rgba(212,175,55,0.06)' }} />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-72 rounded-full blur-[150px]" style={{ background: 'rgba(212,175,55,0.06)' }} />
             </div>
             <div className="relative">
               <h2 className="text-3xl text-white mb-3" style={heading}>
@@ -528,7 +528,7 @@ const PlatformLanding = () => {
                 onClick={() => navigate('/platform/signup')}
                 className="px-8 py-3.5 rounded-lg text-sm font-bold inline-flex items-center gap-3 tracking-wider text-[#050507]"
                 style={{ background: goldGrad }} data-testid="cta-final-btn">
-                Start Free Trial <ArrowRight className="w-4 h-4" />
+                Start Free Trial <ArrowRight className="size-4" />
               </motion.button>
             </div>
           </motion.div>
@@ -540,8 +540,8 @@ const PlatformLanding = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ background: goldGrad }}>
-                <Target className="w-3.5 h-3.5 text-[#050507]" />
+              <div className="size-7 rounded-md flex items-center justify-center" style={{ background: goldGrad }}>
+                <Target className="size-3.5 text-[#050507]" />
               </div>
               <div>
                 <span className="text-xs tracking-[0.2em]" style={heading}>AUREM</span>

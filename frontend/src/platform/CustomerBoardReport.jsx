@@ -102,7 +102,7 @@ export default function CustomerBoardReport() {
           </h1>
           <p className="text-sm max-w-2xl" style={{ color: "#aaa", lineHeight: 1.7 }}>
             Generate a professionally branded PDF for your board meetings in under 60 seconds.
-            Built from verified AUREM telemetry — uptime, incidents, AI workforce activity, and
+            Built from verified AUREM telemetry, uptime, incidents, AI workforce activity, and
             a Claude-powered outlook for the next quarter.
           </p>
         </div>

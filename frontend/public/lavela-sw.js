@@ -1,4 +1,4 @@
-// La Vela Bianca Service Worker - Separate PWA from ReRoots
+// La Vela Bianca Service Worker - Separate PWA from AUREM
 const CACHE_NAME = 'lavela-v1';
 const LAVELA_ASSETS = [
   '/la-vela-bianca',

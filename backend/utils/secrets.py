@@ -1,5 +1,5 @@
 """
-Secrets Manager for Reroots
+Secrets Manager for AUREM
 Centralized secrets access with validation and caching.
 
 Features:

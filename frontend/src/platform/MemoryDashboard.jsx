@@ -93,7 +93,7 @@ export default function MemoryDashboard({ token }) {
           style={{ background: 'rgba(61,58,57,0.25)', color: 'var(--aurem-heading)' }}
           whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
           data-testid="memory-refresh-btn">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </motion.button>
       </motion.div>
 
@@ -154,7 +154,7 @@ export default function MemoryDashboard({ token }) {
                     <div className="text-2xl font-black" style={{ color: card.color }}>{card.value}</div>
                     <div className="text-[10px] mt-0.5" style={{ color: 'var(--aurem-body-secondary)' }}>{card.sub}</div>
                   </div>
-                  <TrendingUp className="w-4 h-4 mt-1" style={{ color: card.color, opacity: 0.5 }} />
+                  <TrendingUp className="size-4 mt-1" style={{ color: card.color, opacity: 0.5 }} />
                 </div>
                 {/* Sparkline */}
                 <svg viewBox={`0 0 ${card.trend.length * 14} 24`} className="w-full h-6" preserveAspectRatio="none">
@@ -200,9 +200,9 @@ export default function MemoryDashboard({ token }) {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              <div className="size-10 rounded-xl flex items-center justify-center"
                 style={{ background: askUser.ask_user ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)' }}>
-                <Shield className="w-5 h-5" style={{ color: askUser.ask_user ? '#EAB308' : '#EF4444' }} />
+                <Shield className="size-5" style={{ color: askUser.ask_user ? '#EAB308' : '#EF4444' }} />
               </div>
               <div>
                 <div className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>
@@ -233,10 +233,10 @@ export default function MemoryDashboard({ token }) {
               data-testid="ask-user-toggle-btn"
             >
               {toggleLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <>
-                  <div className="w-2 h-2 rounded-full" style={{
+                  <div className="size-2 rounded-full" style={{
                     background: '#fff',
                     boxShadow: '0 0 6px rgba(255,255,255,0.6)',
                     animation: 'pulse 1.5s infinite',
@@ -255,7 +255,7 @@ export default function MemoryDashboard({ token }) {
       {/* Tier Stats Cards */}
       {loading && !stats ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+          <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
         </div>
       ) : (
         <>
@@ -267,9 +267,9 @@ export default function MemoryDashboard({ token }) {
                   variants={cardVariant}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    <div className="size-10 rounded-xl flex items-center justify-center"
                       style={{ background: `${card.color}20` }}>
-                      <Icon className="w-5 h-5" style={{ color: card.color }} />
+                      <Icon className="size-5" style={{ color: card.color }} />
                     </div>
                     <div>
                       <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{card.value}</div>
@@ -291,8 +291,8 @@ export default function MemoryDashboard({ token }) {
               className="aurem-glass-card p-4 mb-6" data-testid="memory-loop-stats"
             >
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.12)' }}>
-                  <ArrowUpRight className="w-4 h-4" style={{ color: '#F97316' }} />
+                <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.12)' }}>
+                  <ArrowUpRight className="size-4" style={{ color: '#F97316' }} />
                 </div>
                 <div>
                   <div className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>Stage 3 AI Memory Loop</div>
@@ -343,13 +343,13 @@ export default function MemoryDashboard({ token }) {
             {/* Episodic Memory */}
             <div className="aurem-glass-card overflow-hidden" data-testid="episodic-memory-list">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(255,107,0,0.03)' }}>
-                <Brain className="w-4 h-4" style={{ color: '#22C55E' }} />
+                <Brain className="size-4" style={{ color: '#22C55E' }} />
                 <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Episodic Memory</span>
                 <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{episodes.length} records</span>
               </div>
               {episodes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Brain className="w-8 h-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
+                  <Brain className="size-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
                   <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>No episodes yet</p>
                   <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.6 }}>
                     Episodes are written after pipeline runs
@@ -361,9 +361,9 @@ export default function MemoryDashboard({ token }) {
                     <div key={i} className="px-5 py-3 border-b" style={{ borderColor: 'rgba(255,107,0,0.05)' }}>
                       <div className="flex items-center gap-2 mb-1">
                         {ep.outcome === 'success' ? (
-                          <CheckCircle className="w-3 h-3" style={{ color: '#22C55E' }} />
+                          <CheckCircle className="size-3" style={{ color: '#22C55E' }} />
                         ) : (
-                          <XCircle className="w-3 h-3" style={{ color: '#EF4444' }} />
+                          <XCircle className="size-3" style={{ color: '#EF4444' }} />
                         )}
                         <span className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>{ep.action_type}</span>
                         <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{timeAgo(ep.timestamp)}</span>
@@ -381,13 +381,13 @@ export default function MemoryDashboard({ token }) {
             {/* Execution Plans */}
             <div className="aurem-glass-card overflow-hidden" data-testid="execution-plans-list">
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(255,107,0,0.03)' }}>
-                <Layers className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                <Layers className="size-4" style={{ color: '#3B82F6' }} />
                 <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Architect's Plans</span>
                 <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{plans.length} plans</span>
               </div>
               {plans.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Layers className="w-8 h-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
+                  <Layers className="size-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
                   <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>No execution plans yet</p>
                   <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.6 }}>
                     Architect writes plans during pipeline runs
@@ -409,7 +409,7 @@ export default function MemoryDashboard({ token }) {
                           data-testid={`plan-row-${plan.pipeline_run_id}`}
                         >
                           <div className="flex items-center gap-2 mb-1">
-                            <div className="w-2 h-2 rounded-full" style={{
+                            <div className="size-2 rounded-full" style={{
                               background: plan.status === 'complete' ? '#22C55E' : plan.status === 'failed' ? '#EF4444' : '#EAB308',
                             }} />
                             <span className="text-xs font-medium font-mono" style={{ color: 'var(--aurem-heading)' }}>
@@ -420,7 +420,7 @@ export default function MemoryDashboard({ token }) {
                               color: plan.status === 'complete' ? '#22C55E' : plan.status === 'failed' ? '#EF4444' : '#EAB308',
                             }}>{plan.status}</span>
                             <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{timeAgo(plan.created_at)}</span>
-                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
                           </div>
                           <div className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                             {steps.length} steps | {completedSteps} done {failedSteps > 0 ? `| ${failedSteps} failed` : ''}
@@ -432,11 +432,11 @@ export default function MemoryDashboard({ token }) {
                             {steps.map((step, si) => (
                               <div key={si} className="flex items-center gap-2 py-1">
                                 {step.status === 'completed' ? (
-                                  <CheckCircle className="w-3 h-3 flex-shrink-0" style={{ color: '#22C55E' }} />
+                                  <CheckCircle className="size-3 flex-shrink-0" style={{ color: '#22C55E' }} />
                                 ) : step.status === 'failed' ? (
-                                  <XCircle className="w-3 h-3 flex-shrink-0" style={{ color: '#EF4444' }} />
+                                  <XCircle className="size-3 flex-shrink-0" style={{ color: '#EF4444' }} />
                                 ) : (
-                                  <Clock className="w-3 h-3 flex-shrink-0" style={{ color: '#6B7280' }} />
+                                  <Clock className="size-3 flex-shrink-0" style={{ color: '#6B7280' }} />
                                 )}
                                 <span className="text-[10px] font-medium" style={{ color: 'var(--aurem-heading)' }}>
                                   {step.action}
@@ -475,16 +475,16 @@ export default function MemoryDashboard({ token }) {
               className="aurem-glass-card overflow-hidden mt-6" data-testid="auto-promotions-list"
             >
               <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(249,115,22,0.03)' }}>
-                <TrendingUp className="w-4 h-4" style={{ color: '#F97316' }} />
+                <TrendingUp className="size-4" style={{ color: '#F97316' }} />
                 <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Auto-Promoted Knowledge</span>
                 <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{promotions.length} patterns</span>
               </div>
               <div className="max-h-[300px] overflow-y-auto aurem-scroll">
                 {promotions.map((p, i) => (
                   <div key={i} className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'rgba(255,107,0,0.05)' }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    <div className="size-8 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{ background: 'rgba(139,92,246,0.1)' }}>
-                      <Database className="w-4 h-4" style={{ color: '#8B5CF6' }} />
+                      <Database className="size-4" style={{ color: '#8B5CF6' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium truncate" style={{ color: 'var(--aurem-heading)' }}>

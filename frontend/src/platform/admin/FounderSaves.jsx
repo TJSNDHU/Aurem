@@ -91,7 +91,7 @@ export default function FounderSaves() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Founder Saves — Audit Ledger</h1>
+          <h1 className="text-3xl font-bold mb-2">Founder Saves, Audit Ledger</h1>
           <div className="h-1 w-32 bg-amber-400"></div>
         </div>
 
@@ -103,7 +103,7 @@ export default function FounderSaves() {
               className="bg-slate-900 rounded-xl p-6"
             >
               <div className="flex items-center gap-3 mb-3">
-                <Icon className={`w-5 h-5 text-${color}-400`} />
+                <Icon className={`size-5 text-${color}-400`} />
                 <div className={`text-sm text-${color}-400 font-medium`}>{label}</div>
               </div>
               <div className="text-3xl font-bold">
@@ -144,8 +144,8 @@ export default function FounderSaves() {
             data-testid="empty-ledger"
             className="flex flex-col items-center justify-center py-16 text-slate-500"
           >
-            <Check className="w-12 h-12 mb-4" />
-            <div className="text-lg">Clean ledger — no founder saves yet.</div>
+            <Check className="size-12 mb-4" />
+            <div className="text-lg">Clean ledger, no founder saves yet.</div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -156,7 +156,7 @@ export default function FounderSaves() {
                 className="flex items-start gap-4 bg-slate-900 rounded-xl p-4"
               >
                 <div
-                  className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${
+                  className={`size-3 rounded-full mt-1.5 flex-shrink-0 ${
                     kindColors[item.kind]
                   }`}
                 ></div>

@@ -1,8 +1,8 @@
 """
-A2A Protocol Routes for Reroots AI
+A2A Protocol Routes for AUREM AI
 Agent-to-Agent communication protocol (Google A2A standard).
 
-Makes Reroots AI discoverable and callable by other AI agents.
+Makes AUREM AI discoverable and callable by other AI agents.
 Exposes skills: skincare_advice, skin_analysis, order_management, inventory_check.
 
 Reference: https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/
@@ -63,10 +63,10 @@ async def get_agent_card():
     """
     A2A Agent Discovery Endpoint.
     
-    Returns the agent card that describes Reroots AI's capabilities
+    Returns the agent card that describes AUREM AI's capabilities
     to other A2A-compatible agents.
     
-    This makes Reroots AI discoverable by:
+    This makes AUREM AI discoverable by:
     - Google's A2A-compatible agents
     - Other platforms implementing A2A protocol
     - Enterprise AI orchestration systems
@@ -78,7 +78,7 @@ async def get_agent_card():
             agent_card = json.load(f)
         
         # Update URL dynamically based on environment
-        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://reroots.ca")
+        base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://aurem.live")
         agent_card["url"] = f"{base_url}/api/a2a"
         
         return JSONResponse(content=agent_card)

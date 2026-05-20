@@ -26,7 +26,7 @@ production we don't fall back to Groq — we surface a clean message:
 Signals used (any true → production):
   1. AUREM_ENV=production    (set by server.py at boot)
   2. DISABLE_LEGION=true     (explicit override)
-  3. APP_URL contains aurem.live or reroots.ca (deployed domain)
+  3. APP_URL contains aurem.live or aurem.live (deployed domain)
 
 We cache the answer so any module can call this hundreds of times per
 second with zero overhead.
@@ -50,7 +50,7 @@ def is_production_pod() -> bool:
             in ("1", "true", "yes", "on")):
         return True
     app_url = (os.environ.get("APP_URL", "") or "").lower()
-    if "aurem.live" in app_url or "reroots.ca" in app_url:
+    if "aurem.live" in app_url or "aurem.live" in app_url:
         return True
     return False
 

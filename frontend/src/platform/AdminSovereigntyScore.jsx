@@ -298,7 +298,7 @@ export default function AdminSovereigntyScore() {
             </div>
             <div className="mt-6 flex items-center gap-2 text-[11px] text-gray-500" data-testid="sovereignty-last-probed">
               <span
-                className="inline-block h-2 w-2 rounded-full"
+                className="inline-block size-2 rounded-full"
                 style={{
                   backgroundColor: pulse ? "#22C55E" : "rgba(34,197,94,0.35)",
                   boxShadow: pulse ? "0 0 8px #22C55E" : "none",

@@ -71,7 +71,7 @@ const DarkScoutDashboard = ({ token }) => {
   };
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" /></div>
+    <div className="flex-1 flex items-center justify-center"><Loader2 className="size-8 animate-spin text-[#D4AF37]" /></div>
   );
 
   const st = status || {};
@@ -93,14 +93,14 @@ const DarkScoutDashboard = ({ token }) => {
         </div>
         <button onClick={fetchData} className="p-2 rounded-lg border transition-all hover:scale-[1.02]"
           style={{ borderColor: 'var(--aurem-border)', color: 'var(--aurem-body-secondary)' }} data-testid="refresh-scout-btn">
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className="size-3.5" />
         </button>
       </div>
 
       {/* Status Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="scout-status-cards">
         <div className="p-4 rounded-xl border" style={{ background: 'var(--aurem-card-bg)', borderColor: 'var(--aurem-border)' }}>
-          <div className="flex items-center gap-2 mb-2"><Shield className="w-4 h-4 text-[#D4AF37]" /><span className="text-[9px] tracking-[0.15em] uppercase font-bold" style={{ color: 'var(--aurem-body-secondary)' }}>Investigations</span></div>
+          <div className="flex items-center gap-2 mb-2"><Shield className="size-4 text-[#D4AF37]" /><span className="text-[9px] tracking-[0.15em] uppercase font-bold" style={{ color: 'var(--aurem-body-secondary)' }}>Investigations</span></div>
           <div className="text-2xl font-bold font-mono text-[#D4AF37]">{st.total_investigations || 0}</div>
         </div>
         {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(level => {
@@ -108,7 +108,7 @@ const DarkScoutDashboard = ({ token }) => {
           return (
             <div key={level} className="p-4 rounded-xl border" style={{ background: 'var(--aurem-card-bg)', borderColor: 'var(--aurem-border)' }}>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full" style={{ background: rc.color }} />
+                <span className="size-2 rounded-full" style={{ background: rc.color }} />
                 <span className="text-[9px] tracking-[0.15em] uppercase font-bold" style={{ color: 'var(--aurem-body-secondary)' }}>{level}</span>
               </div>
               <div className="text-2xl font-bold font-mono" style={{ color: rc.color }}>{riskDist[level] || 0}</div>
@@ -120,7 +120,7 @@ const DarkScoutDashboard = ({ token }) => {
       {/* Investigation Input */}
       <div className="p-5 rounded-xl border space-y-4" style={{ background: 'var(--aurem-card-bg)', borderColor: 'var(--aurem-border)' }} data-testid="investigation-input">
         <h3 className="text-sm font-bold tracking-widest uppercase" style={{ color: 'var(--aurem-body-secondary)' }}>
-          <Search className="w-3.5 h-3.5 inline mr-1" /> New Investigation
+          <Search className="size-3.5 inline mr-1" /> New Investigation
         </h3>
         <div className="flex gap-3">
           <input
@@ -134,7 +134,7 @@ const DarkScoutDashboard = ({ token }) => {
           <button onClick={runInvestigation} disabled={running || !query.trim()} data-testid="run-investigation-btn"
             className="px-5 py-2.5 rounded-lg text-xs font-bold tracking-wider transition-all hover:scale-[1.02] disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #D4AF37, #A08028)', color: '#050507' }}>
-            {running ? <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" />Scanning...</> : <><Send className="w-3.5 h-3.5 inline mr-1" />Investigate</>}
+            {running ? <><Loader2 className="size-3.5 inline mr-1 animate-spin" />Scanning…</> : <><Send className="size-3.5 inline mr-1" />Investigate</>}
           </button>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -143,7 +143,7 @@ const DarkScoutDashboard = ({ token }) => {
               className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${preset === p.id ? 'ring-2 ring-[#D4AF37]' : ''}`}
               style={{ background: preset === p.id ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', color: preset === p.id ? '#D4AF37' : 'var(--aurem-body-secondary)' }}
               data-testid={`preset-${p.id}`}>
-              <p.icon className="w-3 h-3 inline mr-1" />{p.name}
+              <p.icon className="size-3 inline mr-1" />{p.name}
             </button>
           ))}
         </div>
@@ -170,7 +170,7 @@ const DarkScoutDashboard = ({ token }) => {
             <tbody>
               {investigations.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-16 text-center" style={{ color: 'var(--aurem-body-secondary)' }}>
-                  <Shield className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                  <Shield className="size-8 mx-auto mb-3 opacity-30" />
                   <p className="text-sm font-medium mb-1">No investigations yet</p>
                   <p className="text-[11px]">Enter a query above to start your first Dark Scout investigation.</p>
                 </td></tr>
@@ -196,12 +196,12 @@ const DarkScoutDashboard = ({ token }) => {
                         {inv.search_results || 0} found / {inv.scraped_pages || 0} scraped
                       </td>
                       <td className="px-4 py-3">
-                        {inv.status === 'completed' ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : inv.status === 'failed' ? <XCircle className="w-3.5 h-3.5 text-red-400" /> : <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />}
+                        {inv.status === 'completed' ? <CheckCircle className="size-3.5 text-green-400" /> : inv.status === 'failed' ? <XCircle className="size-3.5 text-red-400" /> : <Loader2 className="size-3.5 text-blue-400 animate-spin" />}
                       </td>
                       <td className="px-4 py-3 text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                         {inv.started_at ? new Date(inv.started_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                       </td>
-                      <td className="px-4 py-3">{isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[#D4AF37]" /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />}</td>
+                      <td className="px-4 py-3">{isExpanded ? <ChevronDown className="size-3.5 text-[#D4AF37]" /> : <ChevronRight className="size-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />}</td>
                     </tr>
                     {isExpanded && (
                       <tr>

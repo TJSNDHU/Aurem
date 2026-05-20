@@ -772,7 +772,7 @@ async def get_a2a_specs():
     Get Agent-to-Agent (A2A) Communication Protocol specifications.
     
     Documents how different business agents collaborate:
-    - ReRoots Skincare Agent
+    - AUREM Skincare Agent
     - TJ Auto Clinic Agent
     - Finance Agent (Shared)
     - Research Agent (Agent-Reach)
@@ -784,7 +784,7 @@ async def get_a2a_specs():
             "version": "1.0",
             "agents": {
                 "reroots_skincare": {
-                    "name": "ReRoots Skincare Agent",
+                    "name": "AUREM Skincare Agent",
                     "domain": "Beauty & skincare consultations",
                     "knowledge_base": ["PDRN technology", "Skincare routines", "Product catalog", "Treatment pricing"],
                     "capabilities": ["Booking consultations", "Product recommendations", "Treatment education"],

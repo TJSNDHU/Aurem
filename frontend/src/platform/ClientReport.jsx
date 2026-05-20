@@ -60,7 +60,7 @@ const ClientReport = () => {
 
   if (loading) return (
     <div className="min-h-screen bg-[#050507] flex items-center justify-center">
-      <div className="animate-pulse text-[#D4AF37] text-sm tracking-widest">Loading report...</div>
+      <div className="animate-pulse text-[#D4AF37] text-sm tracking-widest">Loading report…</div>
     </div>
   );
 
@@ -97,8 +97,8 @@ const ClientReport = () => {
       <header className="border-b border-[#D4AF37]/10" style={{ background: 'rgba(5,5,7,0.95)' }}>
         <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: goldGrad }}>
-              <Shield className="w-4 h-4 text-[#050507]" />
+            <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: goldGrad }}>
+              <Shield className="size-4 text-[#050507]" />
             </div>
             <div>
               <span className="text-sm tracking-[0.2em] font-light" style={{ color: gold }}>AUREM</span>
@@ -111,7 +111,7 @@ const ClientReport = () => {
             aria-label="Print report"
             data-testid="print-report-btn"
           >
-            <Printer className="w-3 h-3" /> Print / PDF
+            <Printer className="size-3" /> Print / PDF
           </button>
         </div>
       </header>
@@ -123,7 +123,7 @@ const ClientReport = () => {
           <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-sm text-[#D4AF37] hover:underline">{d.url}</a>
           {d.industry && <p className="text-xs text-[#9ca3af] tracking-wider uppercase">{d.industry}</p>}
           <div className="flex items-center justify-center gap-2 text-[10px] text-[#9ca3af]">
-            <Clock className="w-3 h-3" />
+            <Clock className="size-3" />
             <span>Scanned {d.scanned_at ? new Date(d.scanned_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
             {d.scan_duration_seconds > 0 && <span>({d.scan_duration_seconds}s)</span>}
           </div>
@@ -158,7 +158,7 @@ const ClientReport = () => {
             const color = val >= 90 ? '#4ade80' : val >= 70 ? '#facc15' : '#ef4444';
             return (
               <div key={key} className="flex flex-col items-center p-4 rounded-xl border border-[#1a1a2e]" style={{ background: 'rgba(10,10,20,0.5)' }}>
-                <Icon className="w-4 h-4 mb-2" style={{ color }} />
+                <Icon className="size-4 mb-2" style={{ color }} />
                 <span className="text-xl font-bold" style={{ color }}>{val}</span>
                 <span className="text-[9px] text-[#9ca3af] tracking-wider uppercase mt-1 text-center">{key.replace(/_/g, ' ')}</span>
               </div>
@@ -170,7 +170,7 @@ const ClientReport = () => {
         {d.pagespeed_raw && (
           <section className="p-5 rounded-xl border border-[#1a1a2e]" style={{ background: 'rgba(10,10,20,0.5)' }} data-testid="web-vitals">
             <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#D4AF37]" /> Core Web Vitals
+              <Zap className="size-4 text-[#D4AF37]" /> Core Web Vitals
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
@@ -193,7 +193,7 @@ const ClientReport = () => {
         {issues.length > 0 && (
           <section className="print-break" data-testid="issues-section">
             <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-400" /> Issues Found ({issues.length})
+              <AlertTriangle className="size-4 text-yellow-400" /> Issues Found ({issues.length})
             </h2>
             <div className="space-y-2">
               {issues.map((issue, i) => (
@@ -207,7 +207,7 @@ const ClientReport = () => {
                   </div>
                   <div className="text-[10px] flex-shrink-0">
                     {issue.fixable ? (
-                      <span className="text-green-400 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Auto-fixable</span>
+                      <span className="text-green-400 flex items-center gap-1"><CheckCircle className="size-3" /> Auto-fixable</span>
                     ) : (
                       <span className="text-[#9ca3af]">Manual fix needed</span>
                     )}
@@ -222,7 +222,7 @@ const ClientReport = () => {
         {fixes.length > 0 && (
           <section data-testid="fixes-section">
             <h2 className="text-sm font-bold text-green-400 mb-4 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" /> Auto-Fixed by AUREM ({fixes.length})
+              <CheckCircle className="size-4" /> Auto-Fixed by AUREM ({fixes.length})
             </h2>
             <div className="space-y-2">
               {fixes.map((fix, i) => (
@@ -241,7 +241,7 @@ const ClientReport = () => {
         {d.history && d.history.length > 1 && (
           <section className="p-5 rounded-xl border border-[#1a1a2e]" style={{ background: 'rgba(10,10,20,0.5)' }} data-testid="score-trend">
             <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#D4AF37]" /> Score History
+              <TrendingUp className="size-4 text-[#D4AF37]" /> Score History
             </h2>
             <div className="flex items-end gap-1 h-20">
               {d.history.slice().reverse().map((h, i) => {
@@ -279,7 +279,7 @@ const ClientReport = () => {
             style={{ background: goldGrad }}
             data-testid="report-cta-btn"
           >
-            Start Free Trial <ArrowRight className="w-4 h-4" />
+            Start Free Trial <ArrowRight className="size-4" />
           </a>
           <p className="text-[9px] text-[#9ca3af]">No credit card required. Scan unlimited websites.</p>
         </section>
@@ -287,8 +287,8 @@ const ClientReport = () => {
         {/* ═══ FOOTER ═══ */}
         <footer className="border-t border-[#1a1a2e] pt-6 pb-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: goldGrad }}>
-              <Shield className="w-3 h-3 text-[#050507]" />
+            <div className="size-5 rounded flex items-center justify-center" style={{ background: goldGrad }}>
+              <Shield className="size-3 text-[#050507]" />
             </div>
             <span className="text-[10px] tracking-[0.2em]" style={{ color: gold }}>AUREM</span>
           </div>

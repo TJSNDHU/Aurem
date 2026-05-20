@@ -166,7 +166,7 @@ INDUSTRY_SLANG = {
             "clinic that shows up with real before/after results — not "
             "the best one"
         ),
-        # iter 282al-6 — Reroots Aesthetics (BIN: BEA-MSS-WZ48) is
+        # iter 282al-6 — AUREM Aesthetics (BIN: BEA-MSS-WZ48) is
         # AUREM Client #1. Don't name them — but use the insider tone.
         "credibility_note": (
             "AUREM works with leading Canadian skincare clinics, including "

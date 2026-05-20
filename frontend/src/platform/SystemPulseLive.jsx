@@ -157,7 +157,7 @@ export default function SystemPulseLive() {
           <div>
             <div className="spulse-hdr" style={{ fontSize: 28 }}>System Pulse · Live</div>
             <div className="spulse-body" style={{ color: '#888', fontSize: 14, marginTop: 4 }}>
-              Hybrid QA Bot — 10-min endpoint sweep + weekly journey simulation
+              Hybrid QA Bot, 10-min endpoint sweep + weekly journey simulation
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -347,7 +347,7 @@ export default function SystemPulseLive() {
               </thead>
               <tbody>
                 {endpoints.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#666', padding: 20 }}>No data yet — run pulse to populate.</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', color: '#666', padding: 20 }}>No data yet, run pulse to populate.</td></tr>
                 )}
                 {endpoints.map(e => {
                   const dotColor = e.uptime_pct >= 99 ? GREEN : e.uptime_pct >= 80 ? AMBER : RED;

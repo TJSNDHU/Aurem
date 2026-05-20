@@ -46,15 +46,15 @@ export default function VerifyEmail() {
       <div className="text-center max-w-md px-6" data-testid="verify-email-page">
         {status === 'verifying' && (
           <>
-            <Loader2 className="w-16 h-16 mx-auto mb-4 animate-spin" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
-            <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>Verifying Email...</h1>
+            <Loader2 className="size-16 mx-auto mb-4 animate-spin" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+            <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>Verifying Email…</h1>
             <p className="text-sm" style={{ color: 'var(--aurem-body-secondary, #888)' }}>Please wait while we verify your email address.</p>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{ color: '#FF6B00' }} />
+            <CheckCircle className="size-16 mx-auto mb-4" style={{ color: '#FF6B00' }} />
             <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }} data-testid="verify-success-title">Email Verified!</h1>
             <p className="text-sm mb-6" style={{ color: 'var(--aurem-body-secondary, #888)' }}>{message}</p>
             <Link to="/login" className="inline-block px-8 py-3 rounded-xl text-sm font-bold" style={{ background: 'linear-gradient(135deg, #D4AF37, #B8962E)', color: '#050505' }}>
@@ -65,7 +65,7 @@ export default function VerifyEmail() {
 
         {status === 'error' && (
           <>
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
+            <AlertCircle className="size-16 mx-auto mb-4 text-red-500" />
             <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }} data-testid="verify-error-title">Verification Failed</h1>
             <p className="text-sm mb-6" style={{ color: 'var(--aurem-body-secondary, #888)' }}>{message}</p>
             <Link to="/login" className="text-sm font-medium" style={{ color: 'var(--aurem-accent, #D4AF37)' }}>

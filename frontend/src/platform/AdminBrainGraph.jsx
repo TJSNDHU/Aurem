@@ -111,7 +111,7 @@ export default function AdminBrainGraph() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-start gap-4 mb-8">
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            className="size-14 rounded-2xl flex items-center justify-center"
             style={{ background: `linear-gradient(135deg, ${G}22, ${G}08)`, border: `1px solid ${G}44` }}
           >
             <Brain size={28} style={{ color: G }} />
@@ -122,7 +122,7 @@ export default function AdminBrainGraph() {
             </h1>
             <p className="text-sm text-[#999] mt-1 max-w-2xl">
               Build a portable knowledge graph of the codebase. Share the link with any external AI
-              (Claude.ai / ChatGPT / Gemini) for second-opinion debugging — no repo access needed.
+              (Claude.ai / ChatGPT / Gemini) for second-opinion debugging, no repo access needed.
             </p>
           </div>
         </div>

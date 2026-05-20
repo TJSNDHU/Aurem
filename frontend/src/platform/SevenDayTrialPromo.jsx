@@ -105,7 +105,7 @@ const SevenDayTrialPromo = () => {
                 data-testid="seven-day-trial-close"
                 onClick={dismiss}
                 aria-label="Dismiss offer"
-                className="absolute top-3 left-3 w-7 h-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10 active:scale-95 z-10"
+                className="absolute top-3 left-3 size-7 flex items-center justify-center rounded-full transition-all hover:bg-white/10 active:scale-95 z-10"
                 style={{ color: 'rgba(255,255,255,0.55)' }}
               >
                 <X size={14} strokeWidth={2.5} />

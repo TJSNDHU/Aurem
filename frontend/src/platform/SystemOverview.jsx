@@ -422,7 +422,7 @@ function SkillsAndVoiceOverviewTile() {
       border: '1px solid #4ADE8055', animation: 'sov-glow 5s ease-in-out infinite',
     }} data-testid="sov-skills-voice-tile">
       <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>
-        ANTIGRAVITY SKILLS + ORA VOICE — ITER 322bz SHIPPED
+        ANTIGRAVITY SKILLS + ORA VOICE, ITER 322bz SHIPPED
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
         <StatCard value={(meta?.total_in_db ?? 1453).toLocaleString()} label="SKILLS INGESTED" color="#4ADE80" sub="SKILL.md playbooks" />
@@ -495,7 +495,7 @@ function SovereigntyScoreTile() {
     }} data-testid="sov-sovereignty-score-tile">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div className="sov-hdr" style={{ fontSize: 14, color: ringColor }}>
-          FULL SOVEREIGNTY SCORE — LIVE
+          FULL SOVEREIGNTY SCORE, LIVE
         </div>
         <Link to="/admin/sovereignty-score" className="sov-mono" style={{
           fontSize: 10, color: GOLD, textDecoration: 'none', letterSpacing: '0.12em',
@@ -543,7 +543,7 @@ function SovereigntyScoreTile() {
       </div>
       {err && (
         <div className="sov-mono" style={{ fontSize: 10, color: '#EF4444', marginTop: 10 }}>
-          unable to reach /api/admin/sovereignty/score — admin auth required
+          unable to reach /api/admin/sovereignty/score, admin auth required
         </div>
       )}
     </div>
@@ -558,7 +558,7 @@ function AuditOverviewTile() {
       border: '1px solid #FF6B0055', animation: 'sov-glow 5s ease-in-out infinite',
     }} data-testid="sov-audit-tile">
       <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#FF6B00' }}>
-        CUSTOMER AUDIT — $49/mo SEO + ADS WASTE — ITER 322ca SHIPPED
+        CUSTOMER AUDIT, $49/mo SEO + ADS WASTE, ITER 322ca SHIPPED
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
         <FeatureGrid title="PIPELINE" accent="#FF6B00" items={[
@@ -723,7 +723,7 @@ export default function SystemOverview() {
           background: 'linear-gradient(135deg, #0D0D0D, #0A1A0A)',
         }} data-testid="sov-iter323-builds">
           <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: '#4ADE80' }}>
-            ITER 323 — SOVEREIGNTY HARDENING BATCH · MAY 17-18, 2026
+            ITER 323, SOVEREIGNTY HARDENING BATCH · MAY 17-18, 2026
           </div>
           <p className="sov-body" style={{ fontSize: 12, color: '#6A8A6A', marginBottom: 14, letterSpacing: '0.05em' }}>
             Token-conscious refactor · 3 high-burn LLM files routed through llm_gateway · 3 Claude Skills wired into ORA · Campaign diagnostic surfaced · 870 lines dead code removed
@@ -795,7 +795,7 @@ export default function SystemOverview() {
 
         {/* ═══ iter 322as — CUSTOMER FEATURES (A→B→C→D Frontend Batch) ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE8055`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-customer-features">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>CUSTOMER FEATURES — ITER 322as SHIPPED</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>CUSTOMER FEATURES, ITER 322as SHIPPED</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
             <FeatureGrid title="WHAT CUSTOMERS NOW SEE" accent="#4ADE80" items={[
               'White-Label branding (logo · color · domain · CNAME)',
@@ -835,7 +835,7 @@ export default function SystemOverview() {
 
         {/* ═══ iter 322as — LEARNING SYSTEM (ORA Universal + Collective Scan) ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #8B5CF655`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-learning-system">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#8B5CF6' }}>LEARNING SYSTEM — 100% SOVEREIGN</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#8B5CF6' }}>LEARNING SYSTEM, 100% SOVEREIGN</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 14 }}>
             <StatCard value={(data?.audit?.ora_brain_thoughts || 5657).toLocaleString() + '+'} label="BRAIN THOUGHTS" color="#8B5CF6" sub="organic, no paid API" />
             <StatCard value="11" label="ACTIVE SOURCES" color="#4ADE80" sub="hook events" />
@@ -874,7 +874,7 @@ export default function SystemOverview() {
 
         {/* ═══ ITER 322 (Feb–May 2026) — SHIPPED THIS QUARTER ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid ${GOLD}40`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-iter322-builds">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: GOLD }}>ITER 322 — FEB→MAY 2026 SHIPPED</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: GOLD }}>ITER 322, FEB→MAY 2026 SHIPPED</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
             <FeatureGrid title="INTELLIGENCE STACK" accent="#C9A84C" items={[
               'Client-side pixel hashing (aurem-pixel.js — sha256 PII only)',
@@ -946,7 +946,7 @@ export default function SystemOverview() {
 
         {/* ═══ ITER 322eu → 322fa — MAY 12, 2026 — SOVEREIGN AUTONOMY BATCH ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE80`, animation: 'sov-glow 5s ease-in-out infinite', background: 'linear-gradient(135deg, #0D0D0D, #0A1A0A)' }} data-testid="sov-iter322eu-fa-builds">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: '#4ADE80' }}>ITER 322eu → 322fa — SOVEREIGN AUTONOMY BATCH · MAY 12, 2026</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: '#4ADE80' }}>ITER 322eu → 322fa, SOVEREIGN AUTONOMY BATCH · MAY 12, 2026</div>
           <p className="sov-body" style={{ fontSize: 12, color: '#6A8A6A', marginBottom: 14, letterSpacing: '0.05em' }}>
             29 ORA tools · 14 broadcast skills · 19/19 pytests · ZERO mocks · Real Camoufox · Real subprocess · Real LLM round-trips
           </p>
@@ -1028,7 +1028,7 @@ export default function SystemOverview() {
 
         {/* ═══ ITER 256 (Feb 2026 archive) ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid #4ADE8040`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-iter256-builds">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>ITER 256 — FEB 2026 ARCHIVE</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: '#4ADE80' }}>ITER 256, FEB 2026 ARCHIVE</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
             <FeatureGrid title="RETELL AI VOICE AGENT — LIVE" accent="#4ADE80" items={[
               'RETELL_API_KEY wired (318 voices accessible)',
@@ -1087,7 +1087,7 @@ export default function SystemOverview() {
 
         {/* ═══ ITERATION 212 — SHIPPED THIS SPRINT ═══ */}
         <div className="sov-card" style={{ padding: '24px 32px', marginBottom: 20, border: `1px solid ${GOLD}40`, animation: 'sov-glow 5s ease-in-out infinite' }} data-testid="sov-latest-builds">
-          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: GOLD }}>ITERATIONS 198 → 212 — LATEST BUILDS</div>
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 14, color: GOLD }}>ITERATIONS 198 → 212, LATEST BUILDS</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
             <FeatureGrid title="AUREM SELF-BUILDING SYSTEM" accent={GOLD} items={[
               'Internal Builder (Claude Opus 4.6 via EMERGENT_LLM_KEY)',
@@ -1278,7 +1278,7 @@ export default function SystemOverview() {
             <div style={{ color: '#5A5468' }}>|</div>
             <div style={{ color: '#4ADE80' }}>[ React PWA Frontend ]</div>
             <div style={{ color: '#5A5468' }}>|</div>
-            <div style={{ color: GOLD }}>[ FastAPI Backend — 7 Agent Swarm ]</div>
+            <div style={{ color: GOLD }}>[ FastAPI Backend, 7 Agent Swarm ]</div>
             <div style={{ color: '#5A5468' }}>/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\</div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
               <span style={{ color: '#EF4444' }}>[ Redis 3-Lane ]</span>

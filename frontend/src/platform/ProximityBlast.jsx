@@ -120,7 +120,7 @@ export const ProximityBlast = ({ token }) => {
             Proximity Blast
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--aurem-body-secondary)' }}>
-            Local lead discovery — find businesses within your radius
+            Local lead discovery, find businesses within your radius
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -144,11 +144,11 @@ export const ProximityBlast = ({ token }) => {
       {/* Radius Control */}
       <div className="aurem-glass-card p-6" data-testid="radius-control">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+          <div className="size-10 rounded-xl flex items-center justify-center" style={{
             background: 'rgba(255,107,0,0.1)',
             border: '1px solid rgba(255,107,0,0.15)',
           }}>
-            <Target className="w-5 h-5 text-[#FF6B00]" />
+            <Target className="size-5 text-[#FF6B00]" />
           </div>
           <div>
             <h3 className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>Target Radius</h3>
@@ -209,9 +209,9 @@ export const ProximityBlast = ({ token }) => {
           }}
         >
           {blastRunning ? (
-            <><RefreshCw className="w-4 h-4 inline mr-2 animate-spin" /> SCANNING AREA...</>
+            <><RefreshCw className="size-4 inline mr-2 animate-spin" /> SCANNING AREA…</>
           ) : (
-            <><Zap className="w-4 h-4 inline mr-2" /> LAUNCH PROXIMITY BLAST</>
+            <><Zap className="size-4 inline mr-2" /> LAUNCH PROXIMITY BLAST</>
           )}
         </button>
       </div>
@@ -240,11 +240,11 @@ export const ProximityBlast = ({ token }) => {
                 }}
               >
                 {envoyDeployed ? (
-                  <><Star className="w-3 h-3" /> ENVOY DEPLOYED</>
+                  <><Star className="size-3" /> ENVOY DEPLOYED</>
                 ) : envoyDeploying ? (
-                  <><RefreshCw className="w-3 h-3 animate-spin" /> DEPLOYING...</>
+                  <><RefreshCw className="size-3 animate-spin" /> DEPLOYING…</>
                 ) : (
-                  <><Rocket className="w-3 h-3" /> DEPLOY ENVOY OUTREACH</>
+                  <><Rocket className="size-3" /> DEPLOY ENVOY OUTREACH</>
                 )}
               </button>
             </div>
@@ -261,11 +261,11 @@ export const ProximityBlast = ({ token }) => {
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
+                      <div className="size-8 rounded-lg flex items-center justify-center" style={{
                         background: 'rgba(255,107,0,0.08)',
                         border: '1px solid rgba(255,107,0,0.12)',
                       }}>
-                        <Building2 className="w-4 h-4 text-[#FF6B00]" />
+                        <Building2 className="size-4 text-[#FF6B00]" />
                       </div>
                       <div>
                         <h4 className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>
@@ -286,13 +286,13 @@ export const ProximityBlast = ({ token }) => {
 
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                      <MapPin className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                       <span className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                         {lead.distance_km}km away
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Star className="w-3 h-3 text-[#D4B977]" />
+                      <Star className="size-3 text-[#D4B977]" />
                       <span className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                         {lead.rating} ({lead.review_count} reviews)
                       </span>
@@ -315,10 +315,10 @@ export const ProximityBlast = ({ token }) => {
                     </div>
                     <div className="flex items-center gap-1">
                       <button className="p-1 rounded-md hover:bg-white/5 transition-colors" title={lead.phone}>
-                        <Phone className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                        <Phone className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                       </button>
                       <button className="p-1 rounded-md hover:bg-white/5 transition-colors" title={lead.email}>
-                        <Mail className="w-3 h-3" style={{ color: 'var(--aurem-body-secondary)' }} />
+                        <Mail className="size-3" style={{ color: 'var(--aurem-body-secondary)' }} />
                       </button>
                     </div>
                   </div>
@@ -342,7 +342,7 @@ export const ProximityBlast = ({ token }) => {
                 border: '1px solid rgba(255,255,255,0.04)',
               }}>
                 <div className="flex items-center gap-2">
-                  <Activity className="w-3 h-3 text-[#FF6B00]" />
+                  <Activity className="size-3 text-[#FF6B00]" />
                   <span className="text-[10px] font-medium" style={{ color: 'var(--aurem-heading)' }}>
                     {c.radius_km}km blast
                   </span>

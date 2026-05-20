@@ -147,7 +147,7 @@ const BoardroomPage = () => {
       <div className="max-w-7xl mx-auto mb-8 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <Crown className="w-5 h-5 text-[#D4AF37]" />
+            <Crown className="size-5 text-[#D4AF37]" />
             <span className="text-[10px] tracking-[0.3em] text-[#666] uppercase">Sovereign Boardroom</span>
           </div>
           <h1 className="text-2xl tracking-[0.08em]" style={{ fontFamily: "'Cinzel', serif" }}>
@@ -167,7 +167,7 @@ const BoardroomPage = () => {
                 border: `1px solid ${days === r.days ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.06)'}`,
                 color: days === r.days ? '#D4AF37' : '#888',
               }}>
-              <Calendar className="w-3 h-3 inline mr-1" />{r.label}
+              <Calendar className="size-3 inline mr-1" />{r.label}
             </button>
           ))}
           <button
@@ -176,7 +176,7 @@ const BoardroomPage = () => {
             data-testid="boardroom-refresh"
             className="px-3 py-1.5 rounded-lg text-xs ml-2"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#888' }}>
-            {loading ? <Loader2 className="w-3 h-3 inline animate-spin" /> : <RefreshCw className="w-3 h-3 inline" />}
+            {loading ? <Loader2 className="size-3 inline animate-spin" /> : <RefreshCw className="size-3 inline" />}
           </button>
           <button
             onClick={toggleSynthetic}
@@ -188,7 +188,7 @@ const BoardroomPage = () => {
               border: `1px solid ${excludeSynthetic ? 'rgba(245,158,11,0.55)' : 'rgba(255,255,255,0.06)'}`,
               color: excludeSynthetic ? '#F59E0B' : '#888',
             }}>
-            <AlertTriangle className="w-3 h-3 inline mr-1" />
+            <AlertTriangle className="size-3 inline mr-1" />
             {excludeSynthetic ? 'SYNTHETIC HIDDEN' : 'HIDE SYNTHETIC'}
           </button>
         </div>
@@ -199,7 +199,7 @@ const BoardroomPage = () => {
         <div className="max-w-7xl mx-auto mb-4 p-3 rounded-xl flex items-center gap-3"
           style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.25)' }}
           data-testid="boardroom-synthetic-banner">
-          <AlertTriangle className="w-4 h-4 text-[#F59E0B] shrink-0" />
+          <AlertTriangle className="size-4 text-[#F59E0B] shrink-0" />
           <div className="text-xs text-[#F59E0B] leading-relaxed">
             <strong>{rollup.synthetic_count} synthetic ledger entries detected</strong>
             {' — '}
@@ -213,14 +213,14 @@ const BoardroomPage = () => {
 
       {/* KPI STRIP */}
       <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <Kpi label="Gross burn" value={fmtUSD(rollup?.gross_burn_usd)} accent="#EF4444" icon={<Flame className="w-4 h-4" />} testid="kpi-burn" />
-        <Kpi label="Realized $" value={fmtUSD(rollup?.realized_revenue_usd)} accent="#22C55E" icon={<Trophy className="w-4 h-4" />} testid="kpi-realized" />
-        <Kpi label="Pipeline $" value={fmtUSD(rollup?.potential_pipeline_usd)} accent="#06B6D4" icon={<ArrowUpRight className="w-4 h-4" />} testid="kpi-pipeline" />
+        <Kpi label="Gross burn" value={fmtUSD(rollup?.gross_burn_usd)} accent="#EF4444" icon={<Flame className="size-4" />} testid="kpi-burn" />
+        <Kpi label="Realized $" value={fmtUSD(rollup?.realized_revenue_usd)} accent="#22C55E" icon={<Trophy className="size-4" />} testid="kpi-realized" />
+        <Kpi label="Pipeline $" value={fmtUSD(rollup?.potential_pipeline_usd)} accent="#06B6D4" icon={<ArrowUpRight className="size-4" />} testid="kpi-pipeline" />
         <Kpi
           label="Net margin"
           value={fmtUSD(rollup?.net_margin_usd)}
           accent={(rollup?.net_margin_usd || 0) >= 0 ? '#22C55E' : '#EF4444'}
-          icon={(rollup?.net_margin_usd || 0) >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+          icon={(rollup?.net_margin_usd || 0) >= 0 ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
           testid="kpi-margin"
         />
       </div>
@@ -230,7 +230,7 @@ const BoardroomPage = () => {
         <div className="max-w-7xl mx-auto mb-6 p-4 rounded-xl flex items-center gap-3"
           style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)' }}
           data-testid="boardroom-killlist">
-          <Skull className="w-4 h-4 text-[#EF4444]" />
+          <Skull className="size-4 text-[#EF4444]" />
           <div className="text-xs text-[#EF4444]">
             <strong>{losers.length} agent{losers.length === 1 ? '' : 's'} losing money</strong> over the last {days}d:
             <span className="text-[#888] ml-2">{losers.map((l) => l.agent_id).join(' · ')}</span>
@@ -251,7 +251,7 @@ const BoardroomPage = () => {
         ))}
         {board.length === 0 && !loading && (
           <div className="col-span-full text-center text-xs text-[#666] py-12">
-            No ledger entries yet — the board is silent.
+            No ledger entries yet, the board is silent.
           </div>
         )}
       </div>
@@ -263,7 +263,7 @@ const BoardroomPage = () => {
           style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-[#D4AF37]" />
+              <Brain className="size-4 text-[#D4AF37]" />
               <span className="text-xs tracking-[0.2em] uppercase text-[#888]">Board meeting</span>
             </div>
             <button
@@ -272,7 +272,7 @@ const BoardroomPage = () => {
               data-testid="boardroom-meeting-btn"
               className="px-4 py-2 rounded-lg text-xs disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#D4AF37,#8B7355)', color: '#050507' }}>
-              {meetingBusy ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : null}
+              {meetingBusy ? <Loader2 className="size-3 inline animate-spin mr-1" /> : null}
               Run reflection ({days}d)
             </button>
           </div>
@@ -300,7 +300,7 @@ const BoardroomPage = () => {
         <div className="rounded-xl p-5"
           style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-2 mb-3">
-            <Pencil className="w-4 h-4 text-[#D4AF37]" />
+            <Pencil className="size-4 text-[#D4AF37]" />
             <span className="text-xs tracking-[0.2em] uppercase text-[#888]">Rate card</span>
             <span className="text-[10px] text-[#444] ml-auto">USD per unit</span>
           </div>
@@ -326,9 +326,9 @@ const BoardroomPage = () => {
                       style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', color: '#D4AF37' }}
                     />
                     <button onClick={() => saveRate(r.key)} data-testid={`rate-save-${r.key}`}
-                      className="text-[#22C55E] hover:opacity-70"><Check className="w-3.5 h-3.5" /></button>
+                      className="text-[#22C55E] hover:opacity-70"><Check className="size-3.5" /></button>
                     <button onClick={() => setEditingRate(null)} className="text-[#666] hover:text-[#EF4444]">
-                      <X className="w-3.5 h-3.5" />
+                      <X className="size-3.5" />
                     </button>
                   </>
                 ) : (
@@ -338,7 +338,7 @@ const BoardroomPage = () => {
                       onClick={() => { setEditingRate(r.key); setRateDraft(String(r.rate)); }}
                       data-testid={`rate-edit-${r.key}`}
                       className="text-[#666] hover:text-[#D4AF37]">
-                      <Save className="w-3 h-3" />
+                      <Save className="size-3" />
                     </button>
                   </>
                 )}
@@ -386,7 +386,7 @@ const AgentCard = ({ row, meta, losing, days }) => {
         <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px]"
           style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}
           data-testid={`agent-loser-${row.agent_id}`}>
-          <Skull className="w-2.5 h-2.5" /> LOSING
+          <Skull className="size-2.5" /> LOSING
         </div>
       )}
       <div className="mb-3">
@@ -431,7 +431,7 @@ const AgentCard = ({ row, meta, losing, days }) => {
         <div className={positive ? 'text-[#22C55E]' : 'text-[#EF4444]'}>
           {positive ? '+' : ''}{fmtUSD(profit)} <span className="text-[#555]">net</span>
         </div>
-        {losing && <AlertTriangle className="w-3 h-3 text-[#EF4444]" />}
+        {losing && <AlertTriangle className="size-3 text-[#EF4444]" />}
       </div>
     </motion.div>
   );

@@ -252,7 +252,7 @@ export default function AdminOpenFang() {
           <ShieldCheck size={14}/> Signature Probe
         </h3>
         <div style={{fontSize:11,color:C.textD,marginBottom:12}}>
-          Legion node ke liye exact HMAC header compute karta hai — secret leak kiye bina. Use this to debug the Legion webhook pipe.
+          Legion node ke liye exact HMAC header compute karta hai, secret leak kiye bina. Use this to debug the Legion webhook pipe.
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10,marginBottom:10}}>
           <input

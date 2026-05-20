@@ -48,7 +48,7 @@ function CounterPill({ label, value, tone = "neutral", Icon, testId }) {
       data-testid={testId}
       className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-semibold ${tones[tone]}`}
     >
-      {Icon && <Icon className="w-3 h-3" />}
+      {Icon && <Icon className="size-3" />}
       <span className="opacity-70">{label}</span>
       <span className="font-mono font-bold">{value}</span>
     </div>
@@ -131,7 +131,7 @@ export default function MissionControlRibbon() {
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="flex items-center gap-2">
             <span
-              className="w-2 h-2 rounded-full"
+              className="size-2 rounded-full"
               style={{ background: overallColor, boxShadow: `0 0 8px ${overallColor}` }}
             />
             <span className="text-xs uppercase tracking-[0.18em] font-bold text-gray-200">
@@ -163,7 +163,7 @@ export default function MissionControlRibbon() {
                     : "text-gray-400 hover:text-gray-100 hover:bg-white/5 border border-transparent"
                 }`}
               >
-                <t.Icon className="w-3 h-3" /> {t.label}
+                <t.Icon className="size-3" /> {t.label}
               </button>
             );
           })}
@@ -197,8 +197,8 @@ export default function MissionControlRibbon() {
             title="Force-refresh the cached pillar snapshot"
           >
             {syncing
-              ? <Loader2 className="w-3 h-3 animate-spin" />
-              : <RefreshCw className="w-3 h-3" />
+              ? <Loader2 className="size-3 animate-spin" />
+              : <RefreshCw className="size-3" />
             }
             Sync
           </button>

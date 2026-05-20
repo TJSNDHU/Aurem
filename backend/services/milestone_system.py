@@ -409,7 +409,7 @@ async def send_milestone_almost_there_email(referrer_code: str, current_count: i
 
         FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
         resend.emails.send({
-            "from": "ReRoots <noreply@reroots.ca>",
+            "from": "AUREM <noreply@aurem.live>",
             "to": member["email"],
             "subject": f"You're SO Close! Just {remaining} Referrals Away from 30% OFF Forever",
             "html": f"""
@@ -448,7 +448,7 @@ async def send_milestone_unlocked_email(email: str, name: str, unlock_code: str)
         first_name = name.split()[0] if name else "Champion"
         FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
         resend.emails.send({
-            "from": "ReRoots <noreply@reroots.ca>",
+            "from": "AUREM <noreply@aurem.live>",
             "to": email,
             "subject": "UNLOCKED! Your 30% Lifetime Discount is Live",
             "html": f"""

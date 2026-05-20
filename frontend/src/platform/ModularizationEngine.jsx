@@ -33,7 +33,7 @@ const HealthRing = ({ score }) => {
 const StatCard = ({ icon: Icon, label, value, sub, accent = '#FF6B00' }) => (
   <div className="p-4 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid={`stat-card-${label.toLowerCase().replace(/\s/g, '-')}`}>
     <div className="flex items-center gap-2 mb-2">
-      <Icon className="w-4 h-4" style={{ color: accent }} />
+      <Icon className="size-4" style={{ color: accent }} />
       <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#888' }}>{label}</span>
     </div>
     <div className="text-2xl font-bold" style={{ color: '#1A1A2E' }}>{value}</div>
@@ -67,7 +67,7 @@ const SizeBar = ({ distribution, total }) => {
           const count = distribution[c.key] || 0;
           return count > 0 ? (
             <div key={c.key} className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ background: c.color }} />
+              <div className="size-2 rounded-full" style={{ background: c.color }} />
               <span className="text-[9px] font-medium" style={{ color: '#666' }}>{c.label}: {count}</span>
             </div>
           ) : null;
@@ -83,7 +83,7 @@ const Timeline = ({ milestones }) => (
     {milestones.map((m, i) => (
       <div key={i} className="flex gap-3 items-start">
         <div className="flex flex-col items-center">
-          <div className={`w-3 h-3 rounded-full border-2 ${i === milestones.length - 1 ? 'bg-green-500 border-green-500' : 'bg-white border-emerald-400'}`} />
+          <div className={`size-3 rounded-full border-2 ${i === milestones.length - 1 ? 'bg-green-500 border-green-500' : 'bg-white border-emerald-400'}`} />
           {i < milestones.length - 1 && <div className="w-0.5 h-8 bg-emerald-200" />}
         </div>
         <div className="flex-1 pb-2">
@@ -120,7 +120,7 @@ const ModuleTable = ({ modules, title }) => {
           <button onClick={() => setExpanded(!expanded)} className="text-[9px] font-medium flex items-center gap-1"
             style={{ color: '#FF6B00' }} data-testid={`toggle-${title.toLowerCase().replace(/\s/g, '-')}`}>
             {expanded ? 'Show less' : `Show all ${modules.length}`}
-            {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           </button>
         )}
       </div>
@@ -128,7 +128,7 @@ const ModuleTable = ({ modules, title }) => {
         {shown.map((m, i) => (
           <div key={i} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/60" style={{ transition: 'background 0.15s' }}>
             <div className="flex items-center gap-2">
-              <FileCode className="w-3 h-3" style={{ color: '#888' }} />
+              <FileCode className="size-3" style={{ color: '#888' }} />
               <span className="text-[10px] font-medium" style={{ color: '#1A1A2E' }}>{m.name}</span>
               {m.type && (
                 <span className="text-[8px] px-1 py-0.5 rounded" style={{
@@ -187,8 +187,8 @@ export default function ModularizationEngine({ token }) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="modular-loading">
         <div className="flex items-center gap-3">
-          <Layers className="w-5 h-5 animate-pulse" style={{ color: '#FF6B00' }} />
-          <span className="text-sm" style={{ color: '#888' }}>Scanning codebase...</span>
+          <Layers className="size-5 animate-pulse" style={{ color: '#FF6B00' }} />
+          <span className="text-sm" style={{ color: '#888' }}>Scanning codebase…</span>
         </div>
       </div>
     );
@@ -219,7 +219,7 @@ export default function ModularizationEngine({ token }) {
           </p>
         </div>
         <div className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ background: 'rgba(34,197,94,0.1)' }}>
-          <CheckCircle className="w-3.5 h-3.5" style={{ color: '#22C55E' }} />
+          <CheckCircle className="size-3.5" style={{ color: '#22C55E' }} />
           <span className="text-[10px] font-semibold" style={{ color: '#22C55E' }}>MODULARIZED</span>
         </div>
       </div>
@@ -251,7 +251,7 @@ export default function ModularizationEngine({ token }) {
                 <div className="mt-3 space-y-1">
                   {stats.health.penalties.map((p, i) => (
                     <div key={i} className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-3 h-3" style={{ color: '#EAB308' }} />
+                      <AlertTriangle className="size-3" style={{ color: '#EAB308' }} />
                       <span className="text-[9px]" style={{ color: '#888' }}>{p.rule} (-{p.penalty})</span>
                     </div>
                   ))}
@@ -261,7 +261,7 @@ export default function ModularizationEngine({ token }) {
 
             <div className="bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl p-5 col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <Server className="w-4 h-4" style={{ color: '#FF6B00' }} />
+                <Server className="size-4" style={{ color: '#FF6B00' }} />
                 <span className="text-xs font-bold" style={{ color: '#1A1A2E' }}>server.py Reduction</span>
               </div>
               <div className="flex items-end gap-6 mb-3">
@@ -269,7 +269,7 @@ export default function ModularizationEngine({ token }) {
                   <div className="text-[9px] uppercase tracking-wider font-medium mb-1" style={{ color: '#888' }}>Original</div>
                   <div className="text-2xl font-bold" style={{ color: '#EF4444' }}>{stats.server_py.original_lines.toLocaleString()}</div>
                 </div>
-                <ArrowDown className="w-6 h-6 mb-1" style={{ color: '#22C55E' }} />
+                <ArrowDown className="size-6 mb-1" style={{ color: '#22C55E' }} />
                 <div>
                   <div className="text-[9px] uppercase tracking-wider font-medium mb-1" style={{ color: '#888' }}>Current</div>
                   <div className="text-2xl font-bold" style={{ color: '#22C55E' }}>{stats.server_py.current_lines.toLocaleString()}</div>
@@ -347,7 +347,7 @@ export default function ModularizationEngine({ token }) {
       {tab === 'timeline' && (
         <div className="bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-4 h-4" style={{ color: '#FF6B00' }} />
+            <Activity className="size-4" style={{ color: '#FF6B00' }} />
             <span className="text-xs font-bold" style={{ color: '#1A1A2E' }}>Modularization Journey</span>
           </div>
           <Timeline milestones={history} />

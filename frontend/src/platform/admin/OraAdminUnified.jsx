@@ -149,7 +149,7 @@ export default function OraAdminUnified() {
       <div style={{ minHeight: "100vh", background: BG, color: TEXT, padding: 40,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <Crown size={32} color={GOLD} />
-        <h2 style={{ marginTop: 16 }}>ORA — Admin Only</h2>
+        <h2 style={{ marginTop: 16 }}>ORA, Admin Only</h2>
         <p style={{ color: TEXT_DIM, marginBottom: 24 }}>
           You need a founder / super-admin token to access this surface.
         </p>

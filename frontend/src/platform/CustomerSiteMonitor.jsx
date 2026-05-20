@@ -225,7 +225,7 @@ export default function CustomerSiteMonitor() {
                 <div className="sm-hdr" style={{ fontSize: 14, color: AMBER }}>FREE TRIAL ACTIVE</div>
                 <div className="sm-body" style={{ color: '#ccc', fontSize: 13 }}>Ends {plan.trial_ends_at ? new Date(plan.trial_ends_at).toLocaleDateString() : '—'}. Upgrade to unlock more URLs + WhatsApp alerts.</div>
               </div>
-              <button className="sm-btn sm-btn-solid" onClick={() => upgrade('site_monitor_lite')} data-testid="upgrade-from-free">Upgrade — $29/mo</button>
+              <button className="sm-btn sm-btn-solid" onClick={() => upgrade('site_monitor_lite')} data-testid="upgrade-from-free">Upgrade, $29/mo</button>
             </div>
           </div>
         )}
@@ -279,7 +279,7 @@ export default function CustomerSiteMonitor() {
         <div className="sm-card" style={{ marginBottom: 20 }}>
           <div className="sm-hdr" style={{ fontSize: 14, marginBottom: 12 }}>Recent Incidents</div>
           {incidents.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#4ADE80', padding: 16 }}>No incidents — all clear 🟢</div>
+            <div style={{ textAlign: 'center', color: '#4ADE80', padding: 16 }}>No incidents, all clear 🟢</div>
           ) : (
             <table className="sm-table" data-testid="incidents-table">
               <thead><tr><th>URL</th><th>Started</th><th>Duration</th><th>Status</th><th>Code</th></tr></thead>
@@ -342,7 +342,7 @@ function TrustBadgePanel({ bin: propBin }) {
     <div className="sm-card" style={{ marginTop: 20, borderColor: 'rgba(201,168,76,0.3)' }} data-testid="trust-badge-panel">
       <div className="sm-hdr" style={{ fontSize: 14, marginBottom: 12 }}>
         <span style={{ background: 'linear-gradient(90deg,#C9A84C,#F59E0B)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          Trust Signals — Embed on Your Site
+          Trust Signals, Embed on Your Site
         </span>
       </div>
       <div className="sm-body" style={{ color: '#ccc', fontSize: 14, marginBottom: 16 }}>
@@ -352,7 +352,7 @@ function TrustBadgePanel({ bin: propBin }) {
       {/* Badge snippet */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 11, color: '#888', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>
-          🪄 Live Trust Badge — paste into your site's <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: 4, color: GOLD }}>&lt;body&gt;</code>
+          🪄 Live Trust Badge, paste into your site's <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: 4, color: GOLD }}>&lt;body&gt;</code>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <pre style={{ flex: 1, background: 'rgba(0,0,0,0.5)', padding: 12, borderRadius: 8, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#E8E0D0', overflowX: 'auto', margin: 0, border: '1px solid rgba(201,168,76,0.1)' }} data-testid="badge-snippet">
@@ -370,7 +370,7 @@ function TrustBadgePanel({ bin: propBin }) {
       {/* Public status page URL */}
       <div>
         <div style={{ fontSize: 11, color: '#888', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>
-          🌐 Public Status Page — share this link
+          🌐 Public Status Page, share this link
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input className="sm-input" readOnly value={statusUrl} style={{ flex: 1 }} data-testid="status-url-input" />

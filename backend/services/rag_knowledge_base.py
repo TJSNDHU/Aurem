@@ -119,7 +119,7 @@ class RAGKnowledgeBase:
             "stock": int(product.get('stock', 0)),
             "is_featured": product.get('is_featured', False),
             "engine_type": product.get('engine_type', ''),
-            "brand": product.get('brand', 'ReRoots'),
+            "brand": product.get('brand', 'AUREM'),
             "has_pdrn": 'pdrn' in str(product).lower(),
             "has_egf": 'egf' in str(product).lower(),
             "has_peptides": 'peptide' in str(product).lower(),

@@ -105,8 +105,8 @@ const SystemStatusBar = ({ token }) => {
         display: 'flex', alignItems: 'center', gap: 12, fontSize: 12,
         backdropFilter: 'blur(8px)',
       }}>
-        <Activity className="w-3 h-3 text-[#888] animate-pulse" />
-        <span style={{color: '#888'}}>Loading system status...</span>
+        <Activity className="size-3 text-[#888] animate-pulse" />
+        <span style={{color: '#888'}}>Loading system status…</span>
       </div>
     );
   }
@@ -133,7 +133,7 @@ const SystemStatusBar = ({ token }) => {
       {/* Left - Status indicators */}
       <div style={{display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, overflow: 'hidden'}}>
         <div style={{display: 'flex', alignItems: 'center', gap: 5}}>
-          {isHealthy ? <CheckCircle className="w-3.5 h-3.5 text-[#4A4]" /> : <AlertCircle className="w-3.5 h-3.5 text-[#F44]" />}
+          {isHealthy ? <CheckCircle className="size-3.5 text-[#4A4]" /> : <AlertCircle className="size-3.5 text-[#F44]" />}
           <span style={{ color: isHealthy ? '#4A4' : '#F44', fontWeight: 600, fontSize: 10, letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
             {isHealthy ? 'HEALTHY' : 'ISSUES'}
           </span>
@@ -152,7 +152,7 @@ const SystemStatusBar = ({ token }) => {
         )}
 
         <div style={{ color: '#888', display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, whiteSpace: 'nowrap' }}>
-          <Database className="w-3 h-3" />
+          <Database className="size-3" />
           <span>DB: {dbCollections}</span>
         </div>
 
@@ -179,7 +179,7 @@ const SystemStatusBar = ({ token }) => {
             color: '#8B5CF6', fontWeight: 600, fontSize: 10, display: 'flex', alignItems: 'center', gap: 4,
             opacity: clearing ? 0.6 : 1, whiteSpace: 'nowrap',
           }}>
-          <Trash2 className={`w-3 h-3 ${clearing ? 'animate-spin' : ''}`} />
+          <Trash2 className={`size-3 ${clearing ? 'animate-spin' : ''}`} />
           {clearing ? 'Clearing' : 'Cache'}
         </button>
 
@@ -193,7 +193,7 @@ const SystemStatusBar = ({ token }) => {
             fontWeight: 700, fontSize: 10, display: 'flex', alignItems: 'center', gap: 4,
             opacity: syncing ? 0.6 : 1, whiteSpace: 'nowrap',
           }}>
-          <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`size-3 ${syncing ? 'animate-spin' : ''}`} />
           {syncing ? 'Syncing All...' : syncSuccess ? 'Done!' : 'Sync All'}
         </button>
       </div>

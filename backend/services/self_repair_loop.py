@@ -23,7 +23,7 @@ ADMIN_PHONE = os.environ.get("ADMIN_WHATSAPP", "12265017777")
 # code change after they onboard.
 BASELINE_SCAN_SITES = [
     {"url": "https://aurem.live", "tenant_id": "aurem_self", "label": "AUREM Platform"},
-    {"url": "https://reroots.ca", "tenant_id": "reroots_aesthetics", "label": "ReRoots Aesthetics"},
+    {"url": "https://aurem.live", "tenant_id": "reroots_aesthetics", "label": "AUREM Aesthetics"},
 ]
 
 # Backward-compat alias (older code imports this name)
@@ -61,7 +61,7 @@ async def _discover_scan_targets() -> List[Dict]:
             logger.warning(f"[SelfRepair] workspace discovery failed: {e}")
 
     # Baseline sites ALWAYS override workspace data (canonical labels + tenant IDs).
-    # This ensures our core products (AUREM, ReRoots) are always labeled correctly
+    # This ensures our core products (AUREM, AUREM) are always labeled correctly
     # in WhatsApp alerts even if the workspace document has stale metadata.
     for site in BASELINE_SCAN_SITES:
         targets[site["url"]] = dict(site)
@@ -440,7 +440,7 @@ async def self_repair_loop():
     Initial delay is intentionally long (30 min) so the K8s pod has time
     to settle (warm caches, finish APScheduler bootstrap, open Mongo
     connections). Scanning external URLs (https://aurem.live,
-    https://reroots.ca) immediately at boot — while the same pod is also
+    https://aurem.live) immediately at boot — while the same pod is also
     serving the request that just deployed it — pegs the event loop and
     causes nginx upstream timeouts on /health.
 

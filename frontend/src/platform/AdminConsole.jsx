@@ -594,7 +594,7 @@ export default function AdminConsole() {
                 value={megaForm.business_context}
                 onChange={e => setMegaForm(f => ({ ...f, business_context: e.target.value }))}
                 style={inputBox}>
-                <option>AUREM</option><option>Reroots</option>
+                <option>AUREM</option><option>AUREM</option>
                 <option>Personal</option><option>Polaris Built</option>
               </select>
             </ModalField>

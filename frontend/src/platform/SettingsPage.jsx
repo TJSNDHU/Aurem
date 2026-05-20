@@ -268,7 +268,7 @@ export default function SettingsPage({ token, user }) {
                     color: activeTab === tab.id ? '#D4AF37' : 'var(--aurem-body-secondary)',
                   }}
                 >
-                  <tab.icon className="w-4 h-4" />
+                  <tab.icon className="size-4" />
                   {tab.label}
                 </button>
               ))}
@@ -362,14 +362,14 @@ export default function SettingsPage({ token, user }) {
                 <div className="mt-6 pt-5 flex items-center justify-end gap-3" style={{ borderTop: '1px solid var(--aurem-divider)' }}>
                   {saved && (
                     <span className="flex items-center gap-1.5 text-[11px] text-[#4ade80]">
-                      <Check className="w-3.5 h-3.5" /> Saved successfully
+                      <Check className="size-3.5" /> Saved successfully
                     </span>
                   )}
                   {saveError && (
                     <span className="flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-lg"
                       style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
                       data-testid="save-error-banner">
-                      <RefreshCw className="w-3 h-3 animate-spin" /> {saveError}
+                      <RefreshCw className="size-3 animate-spin" /> {saveError}
                     </span>
                   )}
                   <button
@@ -377,7 +377,7 @@ export default function SettingsPage({ token, user }) {
                     data-testid="save-profile-btn"
                     className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
-                    <Save className="w-3.5 h-3.5" />
+                    <Save className="size-3.5" />
                     {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -406,7 +406,7 @@ export default function SettingsPage({ token, user }) {
                         />
                         <button onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--aurem-body-secondary)' }}>
-                          {showCurrentPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {showCurrentPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                         </button>
                       </div>
                     </div>
@@ -423,7 +423,7 @@ export default function SettingsPage({ token, user }) {
                         />
                         <button onClick={() => setShowNewPassword(!showNewPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--aurem-body-secondary)' }}>
-                          {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {showNewPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                         </button>
                       </div>
                       {security.new_password && !passwordValid && (
@@ -449,7 +449,7 @@ export default function SettingsPage({ token, user }) {
                       data-testid="change-password-btn"
                       className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
-                      <Lock className="w-3.5 h-3.5" />
+                      <Lock className="size-3.5" />
                       {saving ? 'Updating...' : 'Update Password'}
                     </button>
                   </div>
@@ -464,7 +464,7 @@ export default function SettingsPage({ token, user }) {
                     ].map(opt => (
                       <div key={opt.key} className="flex items-center justify-between p-4 rounded-lg" style={{ background: 'var(--aurem-surface)' }}>
                         <div className="flex items-center gap-3">
-                          <opt.icon className="w-4 h-4 text-[#D4AF37]" />
+                          <opt.icon className="size-4 text-[#D4AF37]" />
                           <div>
                             <p className="text-xs" style={{ color: 'var(--aurem-heading)' }}>{opt.label}</p>
                             <p className="text-[10px] mt-0.5" style={{ color: 'var(--aurem-body-secondary)' }}>{opt.desc}</p>
@@ -475,7 +475,7 @@ export default function SettingsPage({ token, user }) {
                           data-testid={`toggle-${opt.key}`}
                           className={`w-10 h-5 rounded-full transition-colors relative ${security[opt.key] ? 'bg-[#D4AF37]' : 'bg-[#555]'}`}
                         >
-                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${security[opt.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          <div className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${security[opt.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
                         </button>
                       </div>
                     ))}
@@ -487,7 +487,7 @@ export default function SettingsPage({ token, user }) {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-3 rounded-lg border border-[#4ade80]/20" style={{ background: 'var(--aurem-surface)' }}>
                       <div className="flex items-center gap-3">
-                        <Globe className="w-4 h-4 text-[#4ade80]" />
+                        <Globe className="size-4 text-[#4ade80]" />
                         <div>
                           <p className="text-xs" style={{ color: 'var(--aurem-heading)' }}>Current Session</p>
                           <p className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>Chrome - Active now</p>
@@ -498,7 +498,7 @@ export default function SettingsPage({ token, user }) {
                   </div>
                   <button data-testid="logout-all-sessions-btn"
                     className="mt-4 flex items-center gap-2 px-4 py-2 text-[11px] text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg hover:bg-[#ef4444]/20 transition-colors">
-                    <LogOut className="w-3.5 h-3.5" /> Sign Out All Other Sessions
+                    <LogOut className="size-3.5" /> Sign Out All Other Sessions
                   </button>
                 </div>
               </div>
@@ -536,7 +536,7 @@ export default function SettingsPage({ token, user }) {
                         data-testid={`toggle-${opt.key}`}
                         className={`w-10 h-5 rounded-full transition-colors relative ${notifications[opt.key] ? 'bg-[#D4AF37]' : 'bg-[#555]'}`}
                       >
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${notifications[opt.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                        <div className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${notifications[opt.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
                       </button>
                     </div>
                   ))}
@@ -544,13 +544,13 @@ export default function SettingsPage({ token, user }) {
                 <div className="mt-6 pt-5 flex items-center justify-end gap-3" style={{ borderTop: '1px solid var(--aurem-divider)' }}>
                   {saved && (
                     <span className="flex items-center gap-1.5 text-[11px] text-[#4ade80]">
-                      <Check className="w-3.5 h-3.5" /> Saved
+                      <Check className="size-3.5" /> Saved
                     </span>
                   )}
                   <button onClick={handleSaveNotifications} disabled={saving}
                     data-testid="save-notifications-btn"
                     className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
-                    <Save className="w-3.5 h-3.5" />
+                    <Save className="size-3.5" />
                     {saving ? 'Saving...' : 'Save Preferences'}
                   </button>
                 </div>
@@ -563,7 +563,7 @@ export default function SettingsPage({ token, user }) {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>Service Connections</h2>
                   <button onClick={fetchIntegrations} style={{ color: 'var(--aurem-body-secondary)' }} data-testid="refresh-integrations-btn">
-                    <RefreshCw className="w-3.5 h-3.5" />
+                    <RefreshCw className="size-3.5" />
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -578,28 +578,28 @@ export default function SettingsPage({ token, user }) {
                     return (
                       <div key={idx} className="flex items-center justify-between p-4 rounded-lg transition-colors" style={{ background: 'var(--aurem-surface)' }} data-testid={`integration-${idx}`}>
                         <div className="flex items-center gap-3">
-                          <Icon className="w-5 h-5" style={{ color: modeConfig.textColor }} />
+                          <Icon className="size-5" style={{ color: modeConfig.textColor }} />
                           <div>
                             <p className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>{svc.name}</p>
                             <p className="text-[10px] mt-0.5" style={{ color: 'var(--aurem-body-secondary)' }}>{svc.message || `${svc.category} integration`}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium" style={{ color: modeConfig.textColor, background: `${modeConfig.dotColor}15` }}>
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: modeConfig.dotColor }} />
+                          <div className="size-1.5 rounded-full" style={{ background: modeConfig.dotColor }} />
                           {modeConfig.label}
                         </div>
                       </div>
                     );
                   }) : (
                     <div className="text-center py-8">
-                      <Plug className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--aurem-body-secondary)' }} />
-                      <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Loading integration status...</p>
+                      <Plug className="size-6 mx-auto mb-2" style={{ color: 'var(--aurem-body-secondary)' }} />
+                      <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Loading integration status…</p>
                     </div>
                   )}
                 </div>
                 <div className="mt-5 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/10 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <Zap className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
+                    <Zap className="size-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>Transition to Live</p>
                       <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>Services in <span className="text-[#f59e0b] font-medium">Mock</span> mode use simulated data. Add your API keys via the Secret Vault to activate live connections.</p>
@@ -631,13 +631,13 @@ export default function SettingsPage({ token, user }) {
                   <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>Team Members</h2>
                   <button data-testid="invite-member-btn"
                     className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity">
-                    <Users className="w-3.5 h-3.5" /> Invite Member
+                    <Users className="size-3.5" /> Invite Member
                   </button>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-4 rounded-lg" style={{ background: 'var(--aurem-surface)' }}>
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-sm font-semibold text-[#D4AF37]">
+                      <div className="size-9 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-sm font-semibold text-[#D4AF37]">
                         {(user?.first_name || 'A')[0]}
                       </div>
                       <div>
@@ -649,7 +649,7 @@ export default function SettingsPage({ token, user }) {
                   </div>
                 </div>
                 <div className="mt-8 p-5 bg-[#D4AF37]/5 border border-[#D4AF37]/10 rounded-lg text-center">
-                  <Users className="w-6 h-6 text-[#D4AF37] mx-auto mb-2" />
+                  <Users className="size-6 text-[#D4AF37] mx-auto mb-2" />
                   <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Invite team members to collaborate on your AUREM workspace</p>
                   <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>Each member can be assigned specific roles and permissions</p>
                 </div>
@@ -741,14 +741,14 @@ function InfrastructureTab({ token, inputCls }) {
       <div className="aurem-glass-card rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#FF6B00]" />
+            <Database className="size-4 text-[#FF6B00]" />
             <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>Redis Cache Layer</h2>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium" style={{
             color: config?.redis_connected ? '#4ade80' : '#f59e0b',
             background: config?.redis_connected ? 'rgba(74,222,128,0.1)' : 'rgba(245,158,11,0.1)',
           }}>
-            <div className={`w-1.5 h-1.5 rounded-full ${config?.redis_connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <div className={`size-1.5 rounded-full ${config?.redis_connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
             {config?.redis_connected ? 'Connected' : 'In-Memory Fallback'}
           </div>
         </div>
@@ -770,21 +770,21 @@ function InfrastructureTab({ token, inputCls }) {
               style={{ background: 'var(--aurem-input-bg)', border: '1px solid var(--aurem-input-border)', color: 'var(--aurem-heading)' }}
             />
             <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
-              Free tier: <a href="https://console.upstash.com" target="_blank" rel="noopener noreferrer" className="text-[#FF6B00] underline">Upstash Console</a> — Create Database — Copy REST URL
+              Free tier: <a href="https://console.upstash.com" target="_blank" rel="noopener noreferrer" className="text-[#FF6B00] underline">Upstash Console</a>, Create Database, Copy REST URL
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button onClick={saveRedisUrl} disabled={saving} data-testid="save-redis-btn"
               className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
-              <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save Redis URL'}
+              <Save className="size-3.5" /> {saving ? 'Saving...' : 'Save Redis URL'}
             </button>
             <button onClick={testRedis} disabled={testingRedis} data-testid="test-redis-btn"
               className="flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors"
               style={{ border: '1px solid var(--aurem-input-border)', color: 'var(--aurem-heading)' }}>
-              <Activity className="w-3.5 h-3.5" /> {testingRedis ? 'Testing...' : 'Test Connection'}
+              <Activity className="size-3.5" /> {testingRedis ? 'Testing...' : 'Test Connection'}
             </button>
-            {saved && <span className="text-[11px] text-[#4ade80] flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Saved</span>}
+            {saved && <span className="text-[11px] text-[#4ade80] flex items-center gap-1"><Check className="size-3.5" /> Saved</span>}
           </div>
 
           {redisResult && (
@@ -794,7 +794,7 @@ function InfrastructureTab({ token, inputCls }) {
             }} data-testid="redis-test-result">
               {redisResult.connected ? (
                 <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-500" />
+                  <Check className="size-4 text-emerald-500" />
                   <span className="text-xs text-emerald-500 font-medium">Connected</span>
                   <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>
                     Memory: {redisResult.used_memory} | Latency: {redisResult.latency_ms}
@@ -802,7 +802,7 @@ function InfrastructureTab({ token, inputCls }) {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-400" />
+                  <AlertCircle className="size-4 text-red-400" />
                   <span className="text-xs text-red-400 font-medium">Failed</span>
                   <span className="text-[10px] ml-2" style={{ color: 'var(--aurem-body-secondary)' }}>{redisResult.error}</span>
                 </div>
@@ -816,7 +816,7 @@ function InfrastructureTab({ token, inputCls }) {
       <div className="aurem-glass-card rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-[#D4AF37]" />
+            <Zap className="size-4 text-[#D4AF37]" />
             <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>MongoDB Performance Indexes</h2>
           </div>
           {missingIndexCount > 0 && (
@@ -842,7 +842,7 @@ function InfrastructureTab({ token, inputCls }) {
                   {info.missing?.length > 0 ? (
                     <span className="text-[10px] text-amber-400">{info.missing.length} missing</span>
                   ) : (
-                    <Check className="w-3 h-3 text-emerald-400" />
+                    <Check className="size-3 text-emerald-400" />
                   )}
                 </div>
               </div>
@@ -852,13 +852,13 @@ function InfrastructureTab({ token, inputCls }) {
 
         <button onClick={createIndexes} disabled={creatingIndexes} data-testid="create-indexes-btn"
           className="flex items-center gap-2 px-5 py-2 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
-          <Database className="w-3.5 h-3.5" /> {creatingIndexes ? 'Creating...' : 'Create All Indexes'}
+          <Database className="size-3.5" /> {creatingIndexes ? 'Creating...' : 'Create All Indexes'}
         </button>
 
         {indexResult && (
           <div className="mt-3 p-3 rounded-lg" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)' }}>
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-emerald-500" />
+              <Check className="size-4 text-emerald-500" />
               <span className="text-xs text-emerald-500 font-medium">
                 Indexes created on {indexResult.indexes_created?.length || 0} collections
               </span>
@@ -870,7 +870,7 @@ function InfrastructureTab({ token, inputCls }) {
       {/* CORS Info (read-only display) */}
       <div className="aurem-glass-card rounded-xl p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Shield className="w-4 h-4 text-[#4ade80]" />
+          <Shield className="size-4 text-[#4ade80]" />
           <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>CORS & Security</h2>
         </div>
         <div className="space-y-2">
@@ -939,18 +939,18 @@ function LinkedInTab({ token }) {
     <div className="aurem-glass-card rounded-xl p-6" data-testid="settings-linkedin">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <Linkedin className="w-4 h-4" style={{ color: '#0A66C2' }} />
+          <Linkedin className="size-4" style={{ color: '#0A66C2' }} />
           <h2 className="text-sm font-medium" style={{ color: 'var(--aurem-heading)' }}>LinkedIn Publisher</h2>
         </div>
         <button onClick={fetchStatus} style={{ color: 'var(--aurem-body-secondary)' }} data-testid="linkedin-refresh-btn">
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
       {/* Status row */}
       <div className="flex items-center justify-between p-4 rounded-lg mb-4" style={{ background: 'var(--aurem-surface)' }} data-testid="linkedin-status-row">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full" style={{ background: connected ? '#4ade80' : '#ef4444' }} data-testid="linkedin-status-dot" />
+          <div className="size-2 rounded-full" style={{ background: connected ? '#4ade80' : '#ef4444' }} data-testid="linkedin-status-dot" />
           <div>
             <p className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>
               {connected ? 'Connected' : 'Not Connected'}
@@ -999,9 +999,9 @@ function LinkedInTab({ token }) {
       <div className="mt-5 p-4 bg-[#0A66C2]/5 border border-[#0A66C2]/10 rounded-lg">
         <p className="text-xs font-medium" style={{ color: 'var(--aurem-heading)' }}>Auto-published types</p>
         <ul className="mt-2 space-y-1 text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
-          <li>• <b>case_study</b> — fires on every new client onboard</li>
-          <li>• <b>weekly_tip</b> — every Monday 9 AM UTC</li>
-          <li>• <b>repair_win</b> — fires on any website repair delivered</li>
+          <li>• <b>case_study</b>, fires on every new client onboard</li>
+          <li>• <b>weekly_tip</b>, every Monday 9 AM UTC</li>
+          <li>• <b>repair_win</b>, fires on any website repair delivered</li>
         </ul>
       </div>
     </div>
@@ -1076,7 +1076,7 @@ function BusinessIdTab({ token }) {
     setRegenerating(false);
   };
 
-  if (loading) return <div className="p-6 text-center" style={{ color: 'var(--aurem-body-secondary)' }}>Loading...</div>;
+  if (loading) return <div className="p-6 text-center" style={{ color: 'var(--aurem-body-secondary)' }}>Loading…</div>;
 
   const bid = bizData?.business_id || '---';
 

@@ -1,5 +1,5 @@
 /**
- * ReRoots AI Platform - Module Exports
+ * AUREM AI Platform - Module Exports
  */
 
 export { default as PlatformLanding } from './PlatformLanding';

@@ -79,14 +79,14 @@ export default function OnboardingPixelStep() {
                padding: '48px 24px', fontFamily: 'system-ui' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <div style={{ fontSize: 11, color: GOLD, letterSpacing: '0.25em', fontWeight: 700 }}>
-          STEP 2 OF 4 — REQUIRED
+          STEP 2 OF 4, REQUIRED
         </div>
         <h1 style={{ fontSize: 36, fontWeight: 700, margin: '8px 0 6px',
                      fontFamily: 'serif', letterSpacing: '-0.01em' }}>
           Install the AUREM pixel
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginBottom: 32 }}>
-          One snippet. 30 seconds. After install, AUREM auto-fixes SEO, speed, schema and security on your site — forever.
+          One snippet. 30 seconds. After install, AUREM auto-fixes SEO, speed, schema and security on your site, forever.
         </p>
 
         {/* Status banner */}
@@ -97,7 +97,7 @@ export default function OnboardingPixelStep() {
                      display: 'flex', alignItems: 'center', gap: 12 }}>
             <ShieldCheck style={{ width: 20, height: 20, color: '#4ADE80' }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, color: '#4ADE80' }}>Pixel detected — dashboard unlocked</div>
+              <div style={{ fontWeight: 600, color: '#4ADE80' }}>Pixel detected, dashboard unlocked</div>
               <div style={{ fontSize: 11, opacity: 0.7 }}>Last seen {status.last_seen_at ? new Date(status.last_seen_at).toLocaleString() : 'just now'}</div>
             </div>
             <Link to="/dashboard" data-testid="goto-dashboard"
@@ -114,7 +114,7 @@ export default function OnboardingPixelStep() {
                      display: 'flex', alignItems: 'center', gap: 12 }}>
             <ShieldAlert style={{ width: 20, height: 20, color: '#F59E0B' }} />
             <div>
-              <div style={{ fontWeight: 600, color: '#F59E0B' }}>Pixel not detected — fixes paused</div>
+              <div style={{ fontWeight: 600, color: '#F59E0B' }}>Pixel not detected, fixes paused</div>
               <div style={{ fontSize: 11, opacity: 0.7 }}>Install + verify to unlock the dashboard.</div>
             </div>
           </div>
@@ -201,7 +201,7 @@ export default function OnboardingPixelStep() {
         </div>
 
         <div style={{ marginTop: 24, fontSize: 11, opacity: 0.5, textAlign: 'center' }}>
-          Need help? Reply YES to the SMS we sent — ORA will install it for you.
+          Need help? Reply YES to the SMS we sent, ORA will install it for you.
         </div>
       </div>
     </div>

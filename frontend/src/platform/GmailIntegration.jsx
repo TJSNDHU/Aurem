@@ -187,7 +187,7 @@ export default function GmailIntegration({ businessId }) {
       <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 20, height: 20, border: `2px solid ${GOLD}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-          <span style={{ color: MU }}>Loading Gmail integration...</span>
+          <span style={{ color: MU }}>Loading Gmail integration…</span>
         </div>
       </div>
     );

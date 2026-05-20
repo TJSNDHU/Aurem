@@ -84,7 +84,7 @@ const AuremBugHistory = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-[#D4AF37] animate-spin" />
+        <Loader2 className="size-8 text-[#D4AF37] animate-spin" />
       </div>
     );
   }
@@ -141,7 +141,7 @@ const AuremBugHistory = () => {
             onClick={exportHistory}
             className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-[#151515] rounded text-sm text-[#888] hover:border-[#D4AF37]/50 transition-all"
           >
-            <Download className="w-4 h-4" />
+            <Download className="size-4" />
             Export
           </button>
           <button
@@ -150,9 +150,9 @@ const AuremBugHistory = () => {
             className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/50 rounded text-sm text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all disabled:opacity-50"
           >
             {scanning ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="size-4" />
             )}
             {scanning ? 'Scanning...' : 'Manual Scan'}
           </button>
@@ -164,7 +164,7 @@ const AuremBugHistory = () => {
         <AnimatePresence>
           {filteredHistory.length === 0 ? (
             <div className="text-center py-12 text-[#444]">
-              <Shield className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <Shield className="size-12 mx-auto mb-4 opacity-30" />
               <p>No scan history found</p>
             </div>
           ) : (
@@ -194,7 +194,7 @@ const StatCard = ({ title, value, icon: Icon, highlight, color }) => (
   >
     <div className="flex items-center justify-between mb-2">
       <span className="text-[10px] text-[#444] tracking-[0.15em] uppercase">{title}</span>
-      <Icon className="w-4 h-4" style={{ color: color || (highlight ? '#D4AF37' : '#333') }} />
+      <Icon className="size-4" style={{ color: color || (highlight ? '#D4AF37' : '#333') }} />
     </div>
     <span className="text-2xl font-light" style={{ fontFamily: "'Playfair Display', serif" }}>
       {value}
@@ -227,13 +227,13 @@ const HistoryEntry = ({ entry, expanded, onToggle }) => {
         className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#0F0F0F] transition-colors"
       >
         <div className="flex items-center gap-4">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+          <div className={`size-10 rounded-lg flex items-center justify-center ${
             isHealthy ? 'bg-[#009874]/10' : 'bg-red-500/10'
           }`}>
             {isHealthy ? (
-              <CheckCircle className="w-5 h-5 text-[#009874]" />
+              <CheckCircle className="size-5 text-[#009874]" />
             ) : (
-              <XCircle className="w-5 h-5 text-red-400" />
+              <XCircle className="size-5 text-red-400" />
             )}
           </div>
           <div className="text-left">
@@ -247,26 +247,26 @@ const HistoryEntry = ({ entry, expanded, onToggle }) => {
         <div className="flex items-center gap-6">
           {errorsCount > 0 && (
             <div className="flex items-center gap-2">
-              <Bug className="w-4 h-4 text-red-400" />
+              <Bug className="size-4 text-red-400" />
               <span className="text-sm text-red-400">{errorsCount} errors</span>
             </div>
           )}
           {autoFixedCount > 0 && (
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#D4AF37]" />
+              <Zap className="size-4 text-[#D4AF37]" />
               <span className="text-sm text-[#D4AF37]">{autoFixedCount} auto-fixed</span>
             </div>
           )}
           {aiFixedCount > 0 && (
             <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-blue-400" />
+              <Terminal className="size-4 text-blue-400" />
               <span className="text-sm text-blue-400">{aiFixedCount} AI fixes</span>
             </div>
           )}
           {expanded ? (
-            <ChevronUp className="w-5 h-5 text-[#333]" />
+            <ChevronUp className="size-5 text-[#333]" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-[#333]" />
+            <ChevronDown className="size-5 text-[#333]" />
           )}
         </div>
       </button>
@@ -294,9 +294,9 @@ const HistoryEntry = ({ entry, expanded, onToggle }) => {
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-[#444]">{check.response_time_ms}ms</span>
                         {check.healthy ? (
-                          <CheckCircle className="w-3 h-3 text-[#009874]" />
+                          <CheckCircle className="size-3 text-[#009874]" />
                         ) : (
-                          <XCircle className="w-3 h-3 text-red-400" />
+                          <XCircle className="size-3 text-red-400" />
                         )}
                       </div>
                     </div>
@@ -315,7 +315,7 @@ const HistoryEntry = ({ entry, expanded, onToggle }) => {
                         className="p-3 bg-red-500/5 border border-red-500/20 rounded"
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <AlertTriangle className="w-3 h-3 text-red-400" />
+                          <AlertTriangle className="size-3 text-red-400" />
                           <span className="text-xs text-red-400 uppercase">{error.level}</span>
                         </div>
                         <p className="text-sm text-[#888] font-mono">{error.message}</p>
@@ -336,9 +336,9 @@ const HistoryEntry = ({ entry, expanded, onToggle }) => {
                         className="p-3 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded"
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <Zap className="w-3 h-3 text-[#D4AF37]" />
+                          <Zap className="size-3 text-[#D4AF37]" />
                           <span className="text-xs text-[#D4AF37]">{fix.action}</span>
-                          {fix.success && <CheckCircle className="w-3 h-3 text-[#009874]" />}
+                          {fix.success && <CheckCircle className="size-3 text-[#009874]" />}
                         </div>
                         <p className="text-sm text-[#888]">{fix.description}</p>
                         {fix.note && (
@@ -361,7 +361,7 @@ const HistoryEntry = ({ entry, expanded, onToggle }) => {
                         className="p-3 bg-blue-500/5 border border-blue-500/20 rounded"
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <Terminal className="w-3 h-3 text-blue-400" />
+                          <Terminal className="size-3 text-blue-400" />
                           <span className="text-xs text-blue-400">AI Suggestion</span>
                         </div>
                         <p className="text-xs text-[#666] mb-2">{fix.error}</p>

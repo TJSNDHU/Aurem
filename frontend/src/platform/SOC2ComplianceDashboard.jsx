@@ -168,8 +168,8 @@ const SOC2ComplianceDashboard = ({ token }) => {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="soc2-loading">
         <div className="text-center">
-          <Shield className="w-10 h-10 mx-auto mb-3 animate-pulse" style={{ color: 'var(--aurem-accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>Loading SOC 2 Compliance...</p>
+          <Shield className="size-10 mx-auto mb-3 animate-pulse" style={{ color: 'var(--aurem-accent)' }} />
+          <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>Loading SOC 2 Compliance…</p>
         </div>
       </div>
     );
@@ -180,13 +180,13 @@ const SOC2ComplianceDashboard = ({ token }) => {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
-          <Shield className="w-6 h-6" style={{ color: 'var(--aurem-accent)' }} />
+          <Shield className="size-6" style={{ color: 'var(--aurem-accent)' }} />
           <h1 className="text-xl font-bold tracking-wide" style={{ color: 'var(--aurem-heading)' }}>
             SOC 2 Compliance Center
           </h1>
         </div>
         <p className="text-xs ml-9" style={{ color: 'var(--aurem-body-secondary)' }}>
-          Trust Services Criteria — Confidentiality, Integrity, Availability, Privacy, Security
+          Trust Services Criteria, Confidentiality, Integrity, Availability, Privacy, Security
         </p>
       </div>
 
@@ -209,7 +209,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
                 color: activeTab === tab.id ? 'white' : 'var(--aurem-body)',
               }}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="size-3.5" />
               {tab.label}
             </button>
           );
@@ -244,7 +244,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {Object.entries(controls).map(([key, val]) => (
                 <div key={key} className="flex items-center gap-2 text-xs p-2 rounded-lg" style={{ background: 'var(--aurem-card-bg)' }}>
-                  {val ? <CheckCircle className="w-3.5 h-3.5 text-green-500" /> : <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                  {val ? <CheckCircle className="size-3.5 text-green-500" /> : <XCircle className="size-3.5 text-red-500" />}
                   <span style={{ color: 'var(--aurem-body)' }}>{key.replace(/_/g, ' ')}</span>
                 </div>
               ))}
@@ -259,7 +259,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-white transition-all"
             style={{ background: 'var(--aurem-accent)' }}
           >
-            <FileText className="w-3.5 h-3.5" />
+            <FileText className="size-3.5" />
             {snapshotLoading ? 'Taking Snapshot...' : 'Take Evidence Snapshot'}
           </button>
         </div>
@@ -273,7 +273,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: ks.maintenance_mode ? '#DC2626' : 'var(--aurem-heading)' }}>
-                  <AlertTriangle className="w-4 h-4" />
+                  <AlertTriangle className="size-4" />
                   Global Kill Switch
                 </h3>
                 <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -288,7 +288,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
                   ks.maintenance_mode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
                 }`}
               >
-                <Power className="w-4 h-4 inline mr-1.5" />
+                <Power className="size-4 inline mr-1.5" />
                 {ks.maintenance_mode ? 'DEACTIVATE' : 'ACTIVATE'}
               </button>
             </div>
@@ -373,7 +373,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
             <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--aurem-border)' }}>
               <h3 className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Immutable Audit Log (Last 7 Days)</h3>
               <button onClick={() => { fetchAuditLogs(); fetchAuditStats(); }} data-testid="refresh-audit-logs-btn" className="p-1 rounded hover:opacity-70">
-                <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />
+                <RefreshCw className="size-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />
               </button>
             </div>
             <div className="max-h-[400px] overflow-y-auto">
@@ -386,7 +386,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full ${log.success === false ? 'bg-red-500' : 'bg-green-500'}`} />
+                        <span className={`size-1.5 rounded-full ${log.success === false ? 'bg-red-500' : 'bg-green-500'}`} />
                         <span className="text-[10px] font-mono font-bold" style={{ color: 'var(--aurem-accent)' }}>{log.action}</span>
                         <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'var(--aurem-card-bg)', color: 'var(--aurem-body-secondary)' }}>
                           {log.actor_type}:{log.actor_id?.substring(0, 20)}
@@ -396,7 +396,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
                         <span className="text-[9px]" style={{ color: 'var(--aurem-body-secondary)' }}>
                           {log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}
                         </span>
-                        {expandedLog === i ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        {expandedLog === i ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
                       </div>
                     </div>
                     {expandedLog === i && (
@@ -454,9 +454,9 @@ const SOC2ComplianceDashboard = ({ token }) => {
                       {Object.entries(rbacMatrix.matrix || {}).map(([role, perms]) => (
                         <td key={role} className="text-center py-1.5 px-2">
                           {perms.includes(perm) ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-green-500 mx-auto" />
+                            <CheckCircle className="size-3.5 text-green-500 mx-auto" />
                           ) : (
-                            <XCircle className="w-3.5 h-3.5 text-red-400/40 mx-auto" />
+                            <XCircle className="size-3.5 text-red-400/40 mx-auto" />
                           )}
                         </td>
                       ))}
@@ -499,7 +499,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
             <ul className="space-y-1">
               {(encryptionEvidence.compliance_notes || []).map((note, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--aurem-body)' }}>
-                  <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="size-3 text-green-500 mt-0.5 flex-shrink-0" />
                   {note}
                 </li>
               ))}
@@ -526,7 +526,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-white transition-all"
                 style={{ background: 'var(--aurem-accent)' }}
               >
-                <Activity className="w-3.5 h-3.5" />
+                <Activity className="size-3.5" />
                 {reportLoading ? 'Generating...' : 'Generate Now'}
               </button>
             </div>
@@ -575,7 +575,7 @@ const SOC2ComplianceDashboard = ({ token }) => {
                 reportHistory.map((r, i) => (
                   <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: 'var(--aurem-card-bg)' }}>
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
+                      <span className={`size-2 rounded-full ${
                         r.status === 'GREEN' ? 'bg-green-500' : r.status === 'YELLOW' ? 'bg-yellow-500' : 'bg-red-500'
                       }`} />
                       <span className="text-[10px] font-mono" style={{ color: 'var(--aurem-body)' }}>{r.report_id}</span>
@@ -599,8 +599,8 @@ const SOC2ComplianceDashboard = ({ token }) => {
         <div className="space-y-4" data-testid="soc2-data-deletion">
           <div className="rounded-xl p-5" style={{ background: 'var(--aurem-glass)', border: '1px solid var(--aurem-border)' }}>
             <h3 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: 'var(--aurem-heading)' }}>
-              <Trash2 className="w-4 h-4" />
-              GDPR / PIPEDA — Right to Erasure
+              <Trash2 className="size-4" />
+              GDPR / PIPEDA, Right to Erasure
             </h3>
             <p className="text-[10px] mb-4" style={{ color: 'var(--aurem-body-secondary)' }}>
               Permanently delete all data for a specific tenant. Audit trail entries are retained for 2 years per compliance requirements.

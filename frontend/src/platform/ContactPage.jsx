@@ -212,11 +212,11 @@ export default function ContactPage() {
           style={{ color: 'var(--aurem-accent, #D4AF37)' }}
           data-testid="contact-back-link"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to AUREM
+          <ArrowLeft className="size-4" /> Back to AUREM
         </Link>
 
         <div className="flex items-center gap-3 mb-3">
-          <Mail className="w-8 h-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+          <Mail className="size-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
           <h1 className="text-3xl font-bold tracking-tight" data-testid="contact-title">
             {topic === 'audit' ? 'Get a Free Website Audit' : 'Talk to AUREM'}
           </h1>
@@ -235,7 +235,7 @@ export default function ContactPage() {
               data-testid="contact-success"
               style={{ padding: 32, textAlign: 'center' }}
             >
-              <CheckCircle2 className="w-14 h-14 mx-auto mb-4" style={{ color: '#D4AF37' }} />
+              <CheckCircle2 className="size-14 mx-auto mb-4" style={{ color: '#D4AF37' }} />
               <h2 className="text-2xl font-bold mb-3" style={{ color: '#F4F4F4' }}>Request received</h2>
               <p className="text-sm mb-6" style={{ color: '#C9C9D1' }}>
                 Thank you, <strong>{name || 'friend'}</strong>. We've logged your {topicLabel.toLowerCase()} and ORA is already looking into it.
@@ -345,7 +345,7 @@ export default function ContactPage() {
                     boxShadow: '0 10px 30px rgba(212,175,55,0.25)',
                   }}
                 >
-                  <Send className="w-4 h-4" /> {submitting ? 'Sending…' : 'Send Message'}
+                  <Send className="size-4" /> {submitting ? 'Sending…' : 'Send Message'}
                 </button>
 
                 <p className="text-xs mt-3 text-center" style={{ color: 'rgba(232,224,208,0.45)' }}>
@@ -399,7 +399,7 @@ export default function ContactPage() {
               </h3>
               <div className="flex items-start gap-2">
                 <MapPin
-                  className="w-4 h-4 mt-1 flex-shrink-0"
+                  className="size-4 mt-1 flex-shrink-0"
                   style={{ color: 'rgba(212,175,55,0.7)' }}
                 />
                 <p className="text-sm leading-relaxed" style={{ color: '#E8E0D0' }}>

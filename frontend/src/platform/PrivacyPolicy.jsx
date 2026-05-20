@@ -11,11 +11,11 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen" style={{ background: 'var(--aurem-bg, #050505)', color: 'var(--aurem-heading, #F4F4F4)' }}>
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link to="/" className="inline-flex items-center gap-2 text-sm mb-8 hover:opacity-80 transition-opacity" style={{ color: 'var(--aurem-accent, #D4AF37)' }} data-testid="privacy-back-link">
-          <ArrowLeft className="w-4 h-4" /> Back to AUREM
+          <ArrowLeft className="size-4" /> Back to AUREM
         </Link>
 
         <div className="flex items-center gap-3 mb-4">
-          <Shield className="w-8 h-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+          <Shield className="size-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
           <h1 className="text-3xl font-bold tracking-tight" data-testid="privacy-title">Privacy Policy</h1>
         </div>
 
@@ -95,7 +95,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>13. Contact — Privacy Officer</h2>
+            <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>13. Contact, Privacy Officer</h2>
             <p>For any privacy question, complaint, or access/deletion request, reach our Privacy Officer at <a href={`mailto:${EMAIL}`} style={{ color: 'var(--aurem-accent, #D4AF37)' }}>{EMAIL}</a> or by mail: {ENTITY}, {ADDRESS}. We respond within 30 days as required by PIPEDA.</p>
           </section>
         </div>

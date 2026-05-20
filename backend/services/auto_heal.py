@@ -1,5 +1,5 @@
 """
-Auto-Heal Monitor for reroots.ca
+Auto-Heal Monitor for aurem.live
 Self-healing system that monitors and automatically fixes common issues:
 - Backend health
 - Frontend serving
@@ -69,7 +69,7 @@ BACKEND_URL = "http://localhost:8001"  # always local — auto-heal runs inside 
 FRONTEND_URL = os.environ.get("SITE_URL", "http://localhost:3000")
 
 # External URL for response time monitoring (Emergent credits proxy)
-EXTERNAL_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://reroots.ca")
+EXTERNAL_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://aurem.live")
 
 # Expected scheduler job names (the 7 background tasks we start)
 EXPECTED_SCHEDULERS = [
@@ -232,7 +232,7 @@ async def check_frontend_serving() -> Dict[str, Any]:
         # Frontend may still be accessible via external URL even if localhost fails
         # Try checking external URL before attempting restart
         try:
-            site_url = os.environ.get("SITE_URL", "https://reroots.ca")
+            site_url = os.environ.get("SITE_URL", "https://aurem.live")
             async with httpx.AsyncClient(timeout=10.0) as client:
                 ext_response = await client.get(site_url)
                 if ext_response.status_code == 200:
@@ -585,7 +585,7 @@ async def check_ai_chat_working() -> Dict[str, Any]:
                 
                 await log_auto_heal_action(check_name, issue, action, False)
                 await send_alert_whatsapp(
-                    f"🚨 Reroots AI chat is BROKEN. Status: {response.status_code}. "
+                    f"🚨 AUREM AI chat is BROKEN. Status: {response.status_code}. "
                     f"Response: {str(data)[:100]}"
                 )
                 
@@ -614,7 +614,7 @@ async def check_ai_chat_working() -> Dict[str, Any]:
         
         await log_auto_heal_action(check_name, issue, action, False)
         await send_alert_whatsapp(
-            f"🚨 Reroots AI chat is DOWN. Error: {str(e)[:100]}"
+            f"🚨 AUREM AI chat is DOWN. Error: {str(e)[:100]}"
         )
         
         return {

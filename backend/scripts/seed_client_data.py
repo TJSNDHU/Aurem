@@ -1,5 +1,5 @@
 """
-Seed ReRoots & Aurem client business profiles, scan history, and repair fixes.
+Seed AUREM & Aurem client business profiles, scan history, and repair fixes.
 Idempotent — safe to run multiple times.
 """
 import asyncio
@@ -14,8 +14,8 @@ DB_NAME = os.environ.get("DB_NAME", "aurem_db")
 CLIENTS = [
     {
         "profile_id": f"bp_{secrets.token_urlsafe(8)}",
-        "business_name": "ReRoots Aesthetics",
-        "website_url": "https://reroots.ca",
+        "business_name": "AUREM Aesthetics",
+        "website_url": "https://aurem.live",
         "email": "pawandeep19may1985@gmail.com",
         "category": "health_beauty",
         "sub_category": "Aesthetics & Med Spa",

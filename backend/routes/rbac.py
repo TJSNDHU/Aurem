@@ -24,7 +24,7 @@ def set_db(database):
 
 from config import JWT_SECRET  # safe 3-tier resolver (env -> file -> ephemeral)
 JWT_EXPIRY_HOURS = 24
-OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@reroots.ca")
+OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@aurem.live")
 # Bug-fix #57 — refuse the committed default. If SETUP_KEY is unset
 # the /setup-owner endpoint is disabled entirely. (The endpoint is
 # meant to be a one-shot bootstrap; leaving "reroots-setup-2026" as

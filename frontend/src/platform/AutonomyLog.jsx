@@ -213,7 +213,7 @@ export default function AutonomyLog({ token }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--aurem-heading, #F5F5F5)' }}>Autonomous Operations</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--aurem-text-secondary, #888)' }}>Self-Audit + A2A Problem Resolution — 5 agents, zero human interference</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--aurem-text-secondary, #888)' }}>Self-Audit + A2A Problem Resolution, 5 agents, zero human interference</p>
         </div>
         <div className="flex items-center gap-3">
           {tier && (

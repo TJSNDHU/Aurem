@@ -102,7 +102,7 @@ export default function AdminImpersonationLog() {
           <div style={{padding:40,textAlign:'center',color:C.textD,fontSize:13}}>
             <UserCheck size={28} color={C.textD} style={{marginBottom:10}}/>
             <div>No impersonation events recorded yet.</div>
-            <div style={{fontSize:11,marginTop:6}}>This is the CASL-compliant audit trail — it will populate as admins use the Impersonate action.</div>
+            <div style={{fontSize:11,marginTop:6}}>This is the CASL-compliant audit trail, it will populate as admins use the Impersonate action.</div>
           </div>
         ) : (
           <table style={{width:'100%',borderCollapse:'collapse'}}>

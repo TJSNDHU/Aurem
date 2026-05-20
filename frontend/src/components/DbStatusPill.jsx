@@ -65,9 +65,9 @@ export default function DbStatusPill({
 
   const sizeCfg = {
     xs: { text: 'text-[8px]', padX: 'px-1.5', padY: 'py-[1px]', dot: 'w-[5px] h-[5px]' },
-    sm: { text: 'text-[9px]', padX: 'px-2', padY: 'py-0.5', dot: 'w-1.5 h-1.5' },
-    md: { text: 'text-[10px]', padX: 'px-2.5', padY: 'py-1', dot: 'w-2 h-2' },
-  }[size] || { text: 'text-[9px]', padX: 'px-2', padY: 'py-0.5', dot: 'w-1.5 h-1.5' };
+    sm: { text: 'text-[9px]', padX: 'px-2', padY: 'py-0.5', dot: 'size-1.5' },
+    md: { text: 'text-[10px]', padX: 'px-2.5', padY: 'py-1', dot: 'size-2' },
+  }[size] || { text: 'text-[9px]', padX: 'px-2', padY: 'py-0.5', dot: 'size-1.5' };
 
   const title = error
     ? `⚠ ${error}`

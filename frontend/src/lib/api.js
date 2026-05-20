@@ -10,7 +10,7 @@ const getBackendUrl = () => {
       return 'http://localhost:8001';
     }
 
-    // For custom domains (aurem.live, reroots.ca, etc.) — ALWAYS use same origin
+    // For custom domains (aurem.live, aurem.live, etc.) — ALWAYS use same origin
     // so API calls go to the correct backend regardless of env var.
     if (!hostname.includes('preview.emergentagent.com') && !hostname.includes('emergent.host')) {
       return window.location.origin;

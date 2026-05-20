@@ -240,7 +240,7 @@ export default function FirstLoginWizard({ ctx, onComplete }) {
             <h2 style={{fontFamily:"'Cinzel',serif",fontSize:22,fontWeight:700,color:'#FFF',letterSpacing:'0.03em',marginBottom:8}}>You're All Set</h2>
             <p style={{fontSize:13,color:'#8A8070',lineHeight:1.6,marginBottom:18}}>
               Your BIN is <span style={{fontFamily:"'JetBrains Mono',monospace",color:'#D4AF37',fontWeight:700}}>{ctx.bin}</span>.
-              <br/>Save it — you can log in with your BIN or email from any device.
+              <br/>Save it, you can log in with your BIN or email from any device.
             </p>
 
             {/* Power Trial banner */}

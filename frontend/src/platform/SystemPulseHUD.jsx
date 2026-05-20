@@ -154,7 +154,7 @@ function NeuralWiringMap({ wires }) {
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-amber-400" />
+          <Activity className="size-4 text-amber-400" />
           <span className="text-[10px] tracking-[0.2em] font-bold text-white uppercase">
             Neural Wiring Map
           </span>
@@ -191,7 +191,7 @@ function NeuralWiringMap({ wires }) {
                   }}
                 />
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 -top-0.5 w-1.5 h-1.5 rounded-full"
+                  className="absolute left-1/2 -translate-x-1/2 -top-0.5 size-1.5 rounded-full"
                   style={{ background: color, boxShadow: `0 0 6px ${color}` }}
                 />
               </div>
@@ -281,8 +281,8 @@ function SentientDiagnosis({ snapshot }) {
     >
       <div className="flex items-center gap-2 mb-3">
         {anyRed
-          ? <AlertTriangle className="w-4 h-4 text-red-400" />
-          : <ShieldCheck className="w-4 h-4 text-emerald-400" />}
+          ? <AlertTriangle className="size-4 text-red-400" />
+          : <ShieldCheck className="size-4 text-emerald-400" />}
         <span className="text-[10px] tracking-[0.2em] font-bold text-white uppercase">
           Sentient Diagnosis
         </span>
@@ -326,7 +326,7 @@ function SystemVitals({ snapshot }) {
       style={{ background: "linear-gradient(180deg, rgba(10,14,20,0.8), rgba(8,10,14,0.9))" }}
     >
       <div className="flex items-center gap-2 mb-3">
-        <TrendingUp className="w-4 h-4 text-blue-400" />
+        <TrendingUp className="size-4 text-blue-400" />
         <span className="text-[10px] tracking-[0.2em] font-bold text-white uppercase">
           Live System Vitals
         </span>
@@ -338,7 +338,7 @@ function SystemVitals({ snapshot }) {
             className="flex items-center justify-between px-2 py-1.5 rounded bg-black/30 border border-white/5"
           >
             <div className="flex items-center gap-1.5">
-              <it.Icon className="w-3 h-3 text-gray-500" />
+              <it.Icon className="size-3 text-gray-500" />
               <span className="text-[10px] text-gray-400">{it.label}</span>
             </div>
             <span
@@ -412,7 +412,7 @@ export default function SystemPulseHUD({ token: passedToken } = {}) {
         <div className="max-w-[1500px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <Crosshair className="w-4 h-4 text-amber-400" />
+              <Crosshair className="size-4 text-amber-400" />
               <span className="text-[10px] tracking-[0.2em] font-bold text-amber-400 uppercase">AUREM · Mission Control</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-100 mt-1">System Pulse</h1>
@@ -469,7 +469,7 @@ export default function SystemPulseHUD({ token: passedToken } = {}) {
           </div>
 
           <div className="text-[10px] text-gray-600 flex items-center gap-2 pt-2">
-            <Clock className="w-3 h-3" />
+            <Clock className="size-3" />
             snapshot {snap.cached ? "cached" : "live"} · generated {snap.generated_at}
           </div>
         </div>

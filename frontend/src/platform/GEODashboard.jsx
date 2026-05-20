@@ -85,7 +85,7 @@ export default function GEODashboard({ token }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: `${gradeColor}12` }}>
+              <div className="size-20 rounded-2xl flex items-center justify-center" style={{ background: `${gradeColor}12` }}>
                 <span className="text-3xl font-black" style={{ color: gradeColor }}>{score?.score || 0}</span>
               </div>
               <div className="absolute -top-1 -right-1 px-2 py-0.5 rounded-full text-[10px] font-black text-white" style={{ background: gradeColor }}>
@@ -95,7 +95,7 @@ export default function GEODashboard({ token }) {
             <div>
               <h1 className="text-xl font-bold" style={{ color: 'var(--aurem-text)' }}>GEO Readiness Score</h1>
               <p className="text-xs" style={{ color: 'var(--aurem-text-secondary)' }}>
-                Based on structured data analysis and content optimization — not live AI rankings
+                Based on structured data analysis and content optimization, not live AI rankings
               </p>
               <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-text-secondary)' }}>
                 Calculated: {score?.calculated_at?.slice(0, 16).replace('T', ' ')}
@@ -179,7 +179,7 @@ export default function GEODashboard({ token }) {
           <div className="space-y-2">
             {score.recommendations.map((r, i) => (
               <div key={i} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: 'rgba(245,158,11,0.04)' }}>
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: '#f59e0b' }}>{i + 1}</span>
+                <span className="size-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: '#f59e0b' }}>{i + 1}</span>
                 <span className="text-xs flex-1" style={{ color: 'var(--aurem-text)' }}>{r.text}</span>
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b' }}>+{r.impact}pts</span>
               </div>
@@ -191,7 +191,7 @@ export default function GEODashboard({ token }) {
       {/* Live AI Check */}
       <div className="aurem-glass-card p-6 rounded-2xl" style={{ border: '1px solid rgba(139,91,214,0.15)' }}>
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,91,214,0.12)' }}>
+          <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,91,214,0.12)' }}>
             <Brain size={18} style={{ color: '#8B5CF6' }} />
           </div>
           <div>

@@ -213,7 +213,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
         maxWidth: 400,
         margin: '0 auto'
       }}>
-        <Zap className="w-12 h-12 text-[#D4AF37] mb-4" />
+        <Zap className="size-12 text-[#D4AF37] mb-4" />
         
         <h2 style={{
           fontSize: 22,
@@ -254,7 +254,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
               gap: 12
             }}
           >
-            <Fingerprint className="w-6 h-6" />
+            <Fingerprint className="size-6" />
             <div style={{ flex: 1, textAlign: 'left' }}>
               <div>Face ID / Touch ID</div>
               <div style={{ fontSize: 11, opacity: 0.7 }}>⚡ Instant login (recommended)</div>
@@ -281,7 +281,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
             gap: 12
           }}
         >
-          <Lock className="w-6 h-6 text-[#D4AF37]" />
+          <Lock className="size-6 text-[#D4AF37]" />
           <div style={{ flex: 1, textAlign: 'left' }}>
             <div>PIN Code</div>
             <div style={{ fontSize: 11, opacity: 0.5 }}>4-6 digit backup</div>
@@ -330,7 +330,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
           justifyContent: 'center',
           marginBottom: 24
         }}>
-          <Fingerprint className="w-10 h-10 text-[#050505]" />
+          <Fingerprint className="size-10 text-[#050505]" />
         </div>
 
         <h2 style={{
@@ -364,7 +364,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
             gap: 8,
             width: '100%'
           }}>
-            <AlertCircle className="w-4 h-4 text-[#F44]" />
+            <AlertCircle className="size-4 text-[#F44]" />
             <span style={{ fontSize: 12, color: '#F88' }}>{error}</span>
           </div>
         )}
@@ -391,12 +391,12 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
         >
           {loading ? (
             <>
-              <div className="w-5 h-5 border-2 border-[#666] border-t-transparent rounded-full animate-spin" />
-              Setting up...
+              <div className="size-5 border-2 border-[#666] border-t-transparent rounded-full animate-spin" />
+              Setting up…
             </>
           ) : (
             <>
-              <Fingerprint className="w-5 h-5" />
+              <Fingerprint className="size-5" />
               Enable Biometric Login
             </>
           )}
@@ -441,7 +441,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
           justifyContent: 'center',
           marginBottom: 24
         }}>
-          <Lock className="w-8 h-8 text-[#050505]" />
+          <Lock className="size-8 text-[#050505]" />
         </div>
 
         <h2 style={{
@@ -508,7 +508,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
             gap: 8,
             width: '100%'
           }}>
-            <AlertCircle className="w-4 h-4 text-[#F44]" />
+            <AlertCircle className="size-4 text-[#F44]" />
             <span style={{ fontSize: 12, color: '#F88' }}>{error}</span>
           </div>
         )}
@@ -615,14 +615,14 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-[#666] border-t-transparent rounded-full animate-spin" />
-                Saving...
+                <div className="size-4 border-2 border-[#666] border-t-transparent rounded-full animate-spin" />
+                Saving…
               </>
             ) : (
               <>
                 {pinStep === 'enter' ? 'Continue' : (
                   <>
-                    <Check className="w-5 h-5" />
+                    <Check className="size-5" />
                     Finish
                   </>
                 )}
@@ -671,7 +671,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
           justifyContent: 'center',
           marginBottom: 24
         }}>
-          <Check className="w-10 h-10 text-white" />
+          <Check className="size-10 text-white" />
         </div>
 
         <h2 style={{
@@ -703,7 +703,7 @@ const FastBiometricSetup = ({ email, onComplete, onSkip }) => {
       justifyContent: 'center',
       padding: 48
     }}>
-      <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+      <div className="size-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 };

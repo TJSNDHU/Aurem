@@ -218,8 +218,8 @@ const LeadsDashboard = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading leads...</p>
+          <div className="animate-spin rounded-full size-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading leads…</p>
         </div>
       </div>
     );
@@ -291,7 +291,7 @@ const LeadsDashboard = () => {
                 aria-label="Toggle Adaptive ORA automation"
               >
                 <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                  className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
                     oraMode === 'automation' ? 'translate-x-7' : 'translate-x-0.5'
                   } mt-[1px]`}
                 />
@@ -430,7 +430,7 @@ const LeadsDashboard = () => {
                               checked={isChecked}
                               onChange={(e) => { e.stopPropagation(); toggleSelect(id); }}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 cursor-pointer"
+                              className="size-4 cursor-pointer"
                               data-testid={`lead-select-${id}`}
                               title="Select for bulk enrich"
                             />

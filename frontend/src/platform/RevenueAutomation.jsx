@@ -38,7 +38,7 @@ function MetricCard({ label, value, change, icon: Icon, color, prefix = '' }) {
     <div className="aurem-glass-card p-5 rounded-2xl" data-testid={`metric-${label.toLowerCase().replace(/\s/g, '-')}`}>
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--aurem-text-secondary)' }}>{label}</span>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}18` }}>
+        <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${color}18` }}>
           <Icon size={16} style={{ color }} />
         </div>
       </div>
@@ -355,7 +355,7 @@ export default function RevenueAutomation({ token }) {
       {tab === 'forecast' && !forecast && (
         <div className="aurem-glass-card p-8 rounded-2xl text-center">
           <BarChart3 size={36} className="mx-auto mb-3" style={{ color: 'var(--aurem-text-secondary)', opacity: 0.4 }} />
-          <p className="text-sm" style={{ color: 'var(--aurem-text-secondary)' }}>Forecast data loading...</p>
+          <p className="text-sm" style={{ color: 'var(--aurem-text-secondary)' }}>Forecast data loading…</p>
         </div>
       )}
     </div>
@@ -797,7 +797,7 @@ function AutoInvoiceForm({ token, onClose, onCreated }) {
     <div className="aurem-glass-card rounded-2xl p-6 space-y-5" data-testid="auto-invoice-form">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,91,214,0.12)' }}>
+          <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,91,214,0.12)' }}>
             <Briefcase size={16} style={{ color: '#8B5CF6' }} />
           </div>
           <div>

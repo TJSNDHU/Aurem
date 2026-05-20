@@ -70,7 +70,7 @@ export const OraCommandBar = () => {
   return (
     <div className="px-3 pb-3 relative z-10" data-testid="ora-command-bar">
       <div className="text-[8px] font-bold tracking-[2px] text-white/60 uppercase mb-1.5 flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#FF6B00', boxShadow: '0 0 6px rgba(255,107,0,0.8)' }} />
+        <span className="size-1.5 rounded-full" style={{ background: '#FF6B00', boxShadow: '0 0 6px rgba(255,107,0,0.8)' }} />
         ORA COMMAND
       </div>
       <div className="relative">
@@ -89,12 +89,12 @@ export const OraCommandBar = () => {
           onClick={submit}
           disabled={loading || !text.trim()}
           data-testid="ora-command-send"
-          className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          className="absolute right-1 top-1/2 -translate-y-1/2 size-6 rounded-md flex items-center justify-center hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           aria-label="Send command"
         >
           {loading
-            ? <Loader2 className="w-3 h-3 text-[#FF6B00] animate-spin" />
-            : <Send className="w-3 h-3 text-[#FF6B00]" />}
+            ? <Loader2 className="size-3 text-[#FF6B00] animate-spin" />
+            : <Send className="size-3 text-[#FF6B00]" />}
         </button>
       </div>
       {reply && (
@@ -108,8 +108,8 @@ export const OraCommandBar = () => {
           }}>
           <div className="flex items-start gap-1.5">
             {reply.ok
-              ? <CheckCircle2 className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: '#4ade80' }} />
-              : <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: '#f87171' }} />}
+              ? <CheckCircle2 className="size-3 mt-0.5 flex-shrink-0" style={{ color: '#4ade80' }} />
+              : <AlertCircle className="size-3 mt-0.5 flex-shrink-0" style={{ color: '#f87171' }} />}
             <div className="flex-1 min-w-0">
               <div className="text-[8px] tracking-wider font-bold uppercase mb-0.5 flex items-center justify-between gap-2" style={{ color: reply.ok ? '#4ade80' : '#f87171' }}>
                 <span>{reply.intent || 'RESULT'}</span>
@@ -203,13 +203,13 @@ export const SovereignNodeStatus = () => {
       }}>
       <div className="flex items-center gap-2">
         <div
-          className="w-2 h-2 rounded-full flex-shrink-0"
+          className="size-2 rounded-full flex-shrink-0"
           style={{
             background: dotColor,
             boxShadow: online ? `0 0 8px ${dotColor}` : 'none',
             animation: online ? 'pulse 2.2s ease-in-out infinite' : 'none',
           }} />
-        <Cpu className="w-3 h-3 text-white/65 flex-shrink-0" />
+        <Cpu className="size-3 text-white/65 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="text-[9px] tracking-[2px] font-bold uppercase text-white/70 leading-tight">
             Sovereign Node

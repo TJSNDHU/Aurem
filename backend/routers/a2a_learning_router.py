@@ -1,5 +1,5 @@
 """
-ReRoots AI A2A Self-Learning Interceptor
+AUREM AI A2A Self-Learning Interceptor
 Agent-to-Agent communication system for continuous skill upgrades
 """
 

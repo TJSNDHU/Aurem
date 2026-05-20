@@ -1,7 +1,7 @@
 """
 Site Audit Dashboard Service
 ═══════════════════════════════════════════════════════════════════
-Comprehensive health monitoring for all Reroots AI services.
+Comprehensive health monitoring for all AUREM AI services.
 
 Features:
 - Daily automated health checks at 7 AM EST
@@ -22,7 +22,7 @@ Checks:
 9. Auto-Heal Status
 10. Database Connectivity
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -302,7 +302,7 @@ async def run_full_audit(base_url: str = None) -> Dict[str, Any]:
     """
     # Always use production URL
     if not base_url:
-        base_url = "https://reroots.ca"
+        base_url = "https://aurem.live"
     
     logger.info(f"[AUDIT] Starting full site audit for {base_url}")
     
@@ -433,7 +433,7 @@ async def start_daily_audit():
                 await asyncio.sleep(wait_seconds)
                 
                 # Run audit
-                base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://reroots.ca")
+                base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://aurem.live")
                 await run_full_audit(base_url)
                 
             except asyncio.CancelledError:

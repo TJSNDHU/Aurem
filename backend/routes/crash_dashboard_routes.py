@@ -1,5 +1,5 @@
 """
-Crash Dashboard Routes for Reroots Admin Panel
+Crash Dashboard Routes for AUREM Admin Panel
 Provides endpoints for monitoring system health, crashes, and rate limits.
 """
 

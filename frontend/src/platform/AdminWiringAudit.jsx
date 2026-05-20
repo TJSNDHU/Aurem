@@ -137,7 +137,7 @@ export default function AdminWiringAudit() {
           <span style={{fontSize:11,color:COLORS.textD}}>Last 14 runs · WA alert fires when coverage &lt; 95%</span>
         </div>
         {history.length === 0 ? (
-          <p style={{fontSize:12,color:COLORS.textD}}>No nightly runs yet. Cron fires at 03:15 AM daily — or click “Run Nightly” above to trigger now.</p>
+          <p style={{fontSize:12,color:COLORS.textD}}>No nightly runs yet. Cron fires at 03:15 AM daily, or click “Run Nightly” above to trigger now.</p>
         ) : (
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse'}}>

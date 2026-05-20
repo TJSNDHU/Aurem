@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 # ============= Browser Integration =============
 from pinchtab_browser import (
-    RerootsBrowser, 
+    AUREMBrowser, 
     BrowserToolkit, 
     detect_intent, 
     Intent
 )
 
 # Global browser instance
-_browser: Optional[RerootsBrowser] = None
+_browser: Optional[AUREMBrowser] = None
 _toolkit: Optional[BrowserToolkit] = None
 
 async def get_browser_toolkit() -> BrowserToolkit:
@@ -35,7 +35,7 @@ async def get_browser_toolkit() -> BrowserToolkit:
     global _browser, _toolkit
     
     if _toolkit is None:
-        _browser = RerootsBrowser()
+        _browser = AUREMBrowser()
         await _browser.start()
         _toolkit = BrowserToolkit(_browser)
         logger.info("Browser toolkit initialized for WhatsApp AI")
@@ -261,7 +261,7 @@ class BrandVoice:
     
     def __init__(self):
         self.config = {
-            "brand_name": "ReRoots",
+            "brand_name": "AUREM",
             "tone": "friendly and knowledgeable",
             "personality_traits": ["helpful", "skincare-expert", "warm"],
             "key_phrases": [],

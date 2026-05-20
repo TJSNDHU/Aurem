@@ -101,7 +101,7 @@ export default function AdminLinksHub() {
         {/* Header */}
         <div className="flex items-start gap-4 mb-8">
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+            className="size-14 rounded-2xl flex items-center justify-center shrink-0"
             style={{ background: `linear-gradient(135deg, ${G}22, ${G}08)`, border: `1px solid ${G}44` }}
           >
             <FolderOpen size={28} style={{ color: G }} />

@@ -103,16 +103,16 @@ export default function AdminCustomersOnePane({ token }) {
       {/* Left: list */}
       <div className="w-1/2 border-r border-[#1a1410] flex flex-col">
         <div className="p-4 border-b border-[#1a1410] flex items-center gap-3">
-          <Users className="w-5 h-5 text-[#D4AF37]" />
+          <Users className="size-5 text-[#D4AF37]" />
           <h2 className="text-lg font-medium text-[#E8E0D0] tracking-wide flex-1">Customers · Live</h2>
           <span data-testid="customers-count" className="text-xs font-mono text-[#D4AF37]">{visible.length}/{customers.length}</span>
           <button data-testid="customers-refresh-btn" onClick={load} disabled={loading} className="p-1.5 rounded hover:bg-[#1a1410]" aria-label="Refresh">
-            <RefreshCw className={`w-4 h-4 text-[#888] ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 text-[#888] ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
         <div className="p-3 border-b border-[#1a1410]">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#666]" />
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#666]" />
             <input
               data-testid="customers-search"
               value={filter}
@@ -152,7 +152,7 @@ export default function AdminCustomersOnePane({ token }) {
             disabled={busy}
             className="w-full py-2 px-3 bg-[#3a1010] hover:bg-[#5a1818] border border-[#5a1818] rounded text-xs text-[#FFB4B4] flex items-center justify-center gap-2 disabled:opacity-40"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="size-3.5" />
             Wipe non-founder accounts
           </button>
         </div>
@@ -187,7 +187,7 @@ export default function AdminCustomersOnePane({ token }) {
               {selected.website && (
                 <DetailRow label="Website" value={
                   <a href={selected.website} target="_blank" rel="noreferrer" className="text-[#D4AF37] hover:underline inline-flex items-center gap-1">
-                    {selected.website} <ExternalLink className="w-3 h-3" />
+                    {selected.website} <ExternalLink className="size-3" />
                   </a>
                 } />
               )}
@@ -199,7 +199,7 @@ export default function AdminCustomersOnePane({ token }) {
                 disabled={busy}
                 className="flex-1 py-2 px-3 bg-[#1a1410] hover:bg-[#2a1f15] border border-[#D4AF37]/30 rounded text-xs text-[#D4AF37] flex items-center justify-center gap-2 disabled:opacity-40"
               >
-                <Key className="w-3.5 h-3.5" />
+                <Key className="size-3.5" />
                 Reissue Fresh BIN
               </button>
             </div>
@@ -213,7 +213,7 @@ export default function AdminCustomersOnePane({ token }) {
           border: `1px solid ${toast.kind === 'error' ? '#5a1818' : '#1a5a3a'}`,
           color: toast.kind === 'error' ? '#FFB4B4' : '#4ADE80',
         }}>
-          {toast.kind === 'error' && <AlertTriangle className="w-4 h-4" />}
+          {toast.kind === 'error' && <AlertTriangle className="size-4" />}
           <span className="text-sm">{toast.msg}</span>
         </div>
       )}

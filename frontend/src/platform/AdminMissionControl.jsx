@@ -38,7 +38,7 @@ function AdminBusinessIdsEmbed({ token }) {
     <Card>
       <CardHeader><CardTitle data-testid="business-ids-title">Business IDs ({tenants.length})</CardTitle></CardHeader>
       <CardContent>
-        {loading ? <div className="text-center py-8 text-gray-500">Loading...</div> : (
+        {loading ? <div className="text-center py-8 text-gray-500">Loading…</div> : (
           <div className="space-y-2">
             {tenants.map((t, i) => (
               <div key={t.business_id || i} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border">
@@ -146,7 +146,7 @@ function ClientDetail({ profileId, token, onBack }) {
     }
   };
 
-  if (loading) return <div className="text-center py-12 text-gray-500">Loading client details...</div>;
+  if (loading) return <div className="text-center py-12 text-gray-500">Loading client details…</div>;
   if (!client) return <div className="text-center py-12 text-red-500">Client not found</div>;
 
   const allRepairs = [...repairs, ...inlineRepairs];
@@ -162,15 +162,15 @@ function ClientDetail({ profileId, token, onBack }) {
       {/* Back button + Header + Rescan */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="client-detail-back">
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+          <ArrowLeft className="size-4 mr-1" /> Back
         </Button>
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-900">{client.business_name}</h2>
           <div className="flex items-center gap-3 text-sm text-gray-500">
             {client.website_url && (
               <a href={client.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline">
-                <Globe className="w-3 h-3" /> {client.website_url}
-                <ExternalLink className="w-3 h-3" />
+                <Globe className="size-3" /> {client.website_url}
+                <ExternalLink className="size-3" />
               </a>
             )}
             <span>{client.category} / {client.sub_category}</span>
@@ -184,7 +184,7 @@ function ClientDetail({ profileId, token, onBack }) {
             className={`${scanning ? 'bg-orange-500 hover:bg-orange-500' : 'bg-pink-600 hover:bg-pink-700'} text-white`}
             data-testid="rescan-button"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 mr-2 ${scanning ? 'animate-spin' : ''}`} />
             {scanning ? 'Scanning...' : 'Rescan Now'}
           </Button>
           {scanning && scanProgress && (
@@ -236,7 +236,7 @@ function ClientDetail({ profileId, token, onBack }) {
 
       {/* Scan History */}
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Search className="w-4 h-4" /> Scan History</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Search className="size-4" /> Scan History</CardTitle></CardHeader>
         <CardContent>
           {scans.length === 0 ? (
             <p className="text-gray-500 text-center py-4">No scans recorded</p>
@@ -286,10 +286,10 @@ function ClientDetail({ profileId, token, onBack }) {
                       <div className="flex items-center gap-2">
                         {inlineReps.length > 0 && (
                           <Badge variant="outline" className="text-xs">
-                            <Wrench className="w-3 h-3 mr-1" /> {inlineReps.length} repairs
+                            <Wrench className="size-3 mr-1" /> {inlineReps.length} repairs
                           </Badge>
                         )}
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                       </div>
                     </button>
                     {isExpanded && (
@@ -313,9 +313,9 @@ function ClientDetail({ profileId, token, onBack }) {
                                   <span className="text-gray-700">{t.test}</span>
                                   <div className="flex items-center gap-2">
                                     <span className="text-gray-500">{t.value}</span>
-                                    {t.result === 'pass' && <CheckCircle className="w-3 h-3 text-green-500" />}
-                                    {t.result === 'warning' && <AlertCircle className="w-3 h-3 text-yellow-500" />}
-                                    {t.result === 'fail' && <XCircle className="w-3 h-3 text-red-500" />}
+                                    {t.result === 'pass' && <CheckCircle className="size-3 text-green-500" />}
+                                    {t.result === 'warning' && <AlertCircle className="size-3 text-yellow-500" />}
+                                    {t.result === 'fail' && <XCircle className="size-3 text-red-500" />}
                                   </div>
                                 </div>
                               ))}
@@ -340,8 +340,8 @@ function ClientDetail({ profileId, token, onBack }) {
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <Badge variant="outline" className="text-xs capitalize">{issue._cat}</Badge>
-                                          {issue.severity === 'critical' && <XCircle className="w-3 h-3 text-red-500" />}
-                                          {issue.severity === 'warning' && <AlertCircle className="w-3 h-3 text-yellow-500" />}
+                                          {issue.severity === 'critical' && <XCircle className="size-3 text-red-500" />}
+                                          {issue.severity === 'warning' && <AlertCircle className="size-3 text-yellow-500" />}
                                         </div>
                                       </div>
                                     ))}
@@ -351,7 +351,7 @@ function ClientDetail({ profileId, token, onBack }) {
                               {fixedIssues.length > 0 && (
                                 <div>
                                   <div className="text-xs font-semibold text-green-600 uppercase mb-1 flex items-center gap-1">
-                                    <CheckCircle className="w-3 h-3" /> Already Fixed ({fixedIssues.length})
+                                    <CheckCircle className="size-3" /> Already Fixed ({fixedIssues.length})
                                   </div>
                                   <div className="space-y-1 opacity-60">
                                     {fixedIssues.map((issue, i) => (
@@ -362,7 +362,7 @@ function ClientDetail({ profileId, token, onBack }) {
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <Badge variant="outline" className="text-xs capitalize border-green-200 text-green-600">{issue._cat}</Badge>
-                                          <CheckCircle className="w-3 h-3 text-green-500" />
+                                          <CheckCircle className="size-3 text-green-500" />
                                         </div>
                                       </div>
                                     ))}
@@ -378,7 +378,7 @@ function ClientDetail({ profileId, token, onBack }) {
                               {scan.resolved_details?.length > 0 && (
                                 <div>
                                   <div className="text-xs font-semibold text-emerald-600 uppercase mb-1 flex items-center gap-1">
-                                    <CheckCircle className="w-3 h-3" /> Confirmed Resolved ({scan.resolved_details.length})
+                                    <CheckCircle className="size-3" /> Confirmed Resolved ({scan.resolved_details.length})
                                   </div>
                                   <div className="space-y-1 opacity-50">
                                     {scan.resolved_details.map((item, i) => (
@@ -389,7 +389,7 @@ function ClientDetail({ profileId, token, onBack }) {
                                         </div>
                                         <div className="flex items-center gap-2">
                                           <Badge variant="outline" className="text-xs capitalize border-emerald-200 text-emerald-600">{item.category}</Badge>
-                                          <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                          <CheckCircle className="size-3 text-emerald-500" />
                                         </div>
                                       </div>
                                     ))}
@@ -449,13 +449,13 @@ function ClientDetail({ profileId, token, onBack }) {
       {/* Repairs Summary */}
       {Object.keys(categoryGroups).length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="w-4 h-4" /> All Repairs ({allRepairs.length})</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="size-4" /> All Repairs ({allRepairs.length})</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
               {Object.entries(categoryGroups).map(([cat, items]) => (
                 <div key={cat}>
                   <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-4 h-4 text-gray-400" />
+                    <Shield className="size-4 text-gray-400" />
                     <span className="text-sm font-semibold capitalize">{cat}</span>
                     <Badge variant="secondary" className="text-xs">{items.length}</Badge>
                   </div>
@@ -511,13 +511,13 @@ function ClientsTab({ token }) {
         <div className="flex items-center justify-between">
           <CardTitle data-testid="clients-tab-title">Client Profiles ({clients.length})</CardTitle>
           <Button variant="outline" size="sm" onClick={loadClients} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`size-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="text-center py-8 text-gray-500">Loading clients...</div>
+          <div className="text-center py-8 text-gray-500">Loading clients…</div>
         ) : clients.length === 0 ? (
           <div className="text-center py-8 text-gray-500">No clients found</div>
         ) : (
@@ -530,14 +530,14 @@ function ClientsTab({ token }) {
                 data-testid={`client-row-${client.profile_id}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center text-white font-bold text-sm">
+                  <div className="size-10 rounded-full bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center text-white font-bold text-sm">
                     {(client.business_name || '?')[0].toUpperCase()}
                   </div>
                   <div>
                     <div className="font-medium text-gray-900">{client.business_name}</div>
                     <div className="text-xs text-gray-500 flex items-center gap-2">
                       {client.website_url ? (
-                        <span className="flex items-center gap-1"><Globe className="w-3 h-3" /> {client.website_url}</span>
+                        <span className="flex items-center gap-1"><Globe className="size-3" /> {client.website_url}</span>
                       ) : (
                         <span className="text-gray-400">No website</span>
                       )}
@@ -565,7 +565,7 @@ function ClientsTab({ token }) {
                       className="text-xs px-2 py-1 rounded border border-pink-300 text-pink-700 hover:bg-pink-50 flex items-center gap-1"
                       title="Open Customer 360°"
                     >
-                      <ExternalLink className="w-3 h-3" /> 360°
+                      <ExternalLink className="size-3" /> 360°
                     </a>
                   )}
                 </div>
@@ -746,7 +746,7 @@ const AdminMissionControl = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="mission-control-title" style={{color:'#FFFFFF', textShadow:'0 2px 18px rgba(212,175,55,0.35)'}}>
-              <Server className="w-8 h-8" style={{color:'#D4AF37'}} />
+              <Server className="size-8" style={{color:'#D4AF37'}} />
               AUREM Mission Control
             </h1>
             <p className="mt-1" style={{color:'rgba(232,224,208,0.75)', letterSpacing:'0.02em'}}>Manage clients, services, API keys & usage</p>
@@ -758,7 +758,7 @@ const AdminMissionControl = () => {
               className="flex items-center gap-2 border-orange-300 text-orange-600 hover:bg-orange-50"
               data-testid="go-ora-command-center"
             >
-              <Zap className="w-4 h-4" /> ORA Command Center
+              <Zap className="size-4" /> ORA Command Center
             </Button>
             <Button variant="outline" onClick={() => {
               localStorage.removeItem('admin_key');
@@ -800,25 +800,25 @@ const AdminMissionControl = () => {
               style={{ flexWrap: 'nowrap' }}
             >
               <TabsTrigger value="dashboard" data-testid="tab-dashboard" className="whitespace-nowrap">
-                <BarChart3 className="w-4 h-4 mr-1" /> Dashboard
+                <BarChart3 className="size-4 mr-1" /> Dashboard
               </TabsTrigger>
               <TabsTrigger value="clients" data-testid="tab-clients" className="whitespace-nowrap">
-                <Globe className="w-4 h-4 mr-1" /> Clients
+                <Globe className="size-4 mr-1" /> Clients
               </TabsTrigger>
               <TabsTrigger value="services" data-testid="tab-services" className="whitespace-nowrap">
-                <Database className="w-4 h-4 mr-1" /> Services
+                <Database className="size-4 mr-1" /> Services
               </TabsTrigger>
               <TabsTrigger value="api-keys" data-testid="tab-api-keys" className="whitespace-nowrap">
-                <Key className="w-4 h-4 mr-1" /> API Keys
+                <Key className="size-4 mr-1" /> API Keys
               </TabsTrigger>
               <TabsTrigger value="business-ids" data-testid="tab-biz-ids" className="whitespace-nowrap">
-                <Key className="w-4 h-4 mr-1" /> Biz IDs
+                <Key className="size-4 mr-1" /> Biz IDs
               </TabsTrigger>
               <TabsTrigger value="subscriptions" data-testid="tab-subscriptions" className="whitespace-nowrap">
-                <Users className="w-4 h-4 mr-1" /> Subs
+                <Users className="size-4 mr-1" /> Subs
               </TabsTrigger>
               <TabsTrigger value="analytics" data-testid="tab-analytics" className="whitespace-nowrap">
-                <Activity className="w-4 h-4 mr-1" /> Analytics
+                <Activity className="size-4 mr-1" /> Analytics
               </TabsTrigger>
             </TabsList>
           </div>
@@ -830,7 +830,7 @@ const AdminMissionControl = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">Active Clients</CardTitle>
-                  <Users className="w-4 h-4 text-gray-400" />
+                  <Users className="size-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="metric-active-clients">{overview?.active_clients ?? '--'}</div>
@@ -840,7 +840,7 @@ const AdminMissionControl = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">Total Scans</CardTitle>
-                  <Search className="w-4 h-4 text-gray-400" />
+                  <Search className="size-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="metric-total-scans">{overview?.total_scans ?? '--'}</div>
@@ -850,7 +850,7 @@ const AdminMissionControl = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">Repairs Applied</CardTitle>
-                  <Wrench className="w-4 h-4 text-gray-400" />
+                  <Wrench className="size-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600" data-testid="metric-total-repairs">{overview?.total_repairs ?? '--'}</div>
@@ -860,7 +860,7 @@ const AdminMissionControl = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">Platform Users</CardTitle>
-                  <Users className="w-4 h-4 text-gray-400" />
+                  <Users className="size-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold" data-testid="metric-total-users">{overview?.total_users ?? '--'}</div>
@@ -874,7 +874,7 @@ const AdminMissionControl = () => {
               >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">Sentinel · Errors (1h / 24h)</CardTitle>
-                  <Shield className={`w-4 h-4 ${(sentinel?.errors_1h ?? 0) > 0 ? 'text-red-500' : (sentinel?.errors_24h ?? 0) > 0 ? 'text-amber-500' : 'text-green-500'}`} />
+                  <Shield className={`size-4 ${(sentinel?.errors_1h ?? 0) > 0 ? 'text-red-500' : (sentinel?.errors_24h ?? 0) > 0 ? 'text-amber-500' : 'text-green-500'}`} />
                 </CardHeader>
                 <CardContent>
                   <div
@@ -894,7 +894,7 @@ const AdminMissionControl = () => {
             <Card data-testid="pixel-health-card" className="border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-white">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-amber-600" /> Pixel Deployment Health
+                  <Zap className="size-4 text-amber-600" /> Pixel Deployment Health
                   <span className="ml-auto text-xs font-normal text-gray-500">last updated {pixelHealth?.timestamp ? new Date(pixelHealth.timestamp).toLocaleTimeString() : '--'}</span>
                 </CardTitle>
               </CardHeader>
@@ -936,16 +936,16 @@ const AdminMissionControl = () => {
               <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Button onClick={() => setActiveTab('clients')} variant="outline" data-testid="quick-action-clients">
-                  <Globe className="w-4 h-4 mr-2" /> View Clients
+                  <Globe className="size-4 mr-2" /> View Clients
                 </Button>
                 <Button onClick={() => setActiveTab('api-keys')} variant="outline">
-                  <Key className="w-4 h-4 mr-2" /> Add API Key
+                  <Key className="size-4 mr-2" /> Add API Key
                 </Button>
                 <Button onClick={() => setActiveTab('services')} variant="outline">
-                  <Database className="w-4 h-4 mr-2" /> View Services
+                  <Database className="size-4 mr-2" /> View Services
                 </Button>
                 <Button onClick={() => setActiveTab('subscriptions')} variant="outline">
-                  <Users className="w-4 h-4 mr-2" /> Subscriptions
+                  <Users className="size-4 mr-2" /> Subscriptions
                 </Button>
               </CardContent>
             </Card>
@@ -965,7 +965,7 @@ const AdminMissionControl = () => {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">Loading…</div>
                 ) : (
                   <div className="space-y-3">
                     {services.map((service, idx) => (
@@ -995,7 +995,7 @@ const AdminMissionControl = () => {
                   <div>
                     <label className="text-sm font-medium">Service</label>
                     <select className="w-full mt-1 p-2 border rounded" value={newKey.service_id} onChange={(e) => setNewKey({ ...newKey, service_id: e.target.value })}>
-                      <option value="">Select service...</option>
+                      <option value="">Select service…</option>
                       {services.map((s, idx) => <option key={s.id || idx} value={s.id}>{s.id}</option>)}
                     </select>
                   </div>
@@ -1021,7 +1021,7 @@ const AdminMissionControl = () => {
               <CardHeader><CardTitle>Existing API Keys</CardTitle></CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">Loading…</div>
                 ) : apiKeys.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No API keys added yet</div>
                 ) : (
@@ -1051,7 +1051,7 @@ const AdminMissionControl = () => {
               <CardHeader><CardTitle>All Subscriptions</CardTitle></CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">Loading…</div>
                 ) : subscriptions.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No active subscriptions</div>
                 ) : (
@@ -1081,7 +1081,7 @@ const AdminMissionControl = () => {
               <CardHeader><CardTitle>Usage Analytics</CardTitle></CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-gray-500">
-                  Analytics dashboard coming soon...
+                  Analytics dashboard coming soon…
                   <br />
                   <span className="text-sm">View metrics at: <code className="bg-gray-100 px-2 py-1 rounded">/metrics</code></span>
                 </div>

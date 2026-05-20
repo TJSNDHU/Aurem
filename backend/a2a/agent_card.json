@@ -1,15 +1,15 @@
 {
-  "name": "Reroots AI",
+  "name": "AUREM AI",
   "description": "AI skincare advisor for beauty and skincare brands. Provides personalized product recommendations, skin analysis, order management, and customer support.",
-  "url": "https://reroots.ca/api/a2a",
+  "url": "https://aurem.live/api/a2a",
   "version": "1.0.0",
   "provider": {
-    "organization": "Reroots Aesthetics Inc.",
-    "url": "https://reroots.ca"
+    "organization": "AUREM Aesthetics Inc.",
+    "url": "https://aurem.live"
   },
   "authentication": {
     "schemes": ["Bearer", "API-Key"],
-    "instructions": "Contact Reroots Aesthetics to obtain API credentials"
+    "instructions": "Contact AUREM Aesthetics to obtain API credentials"
   },
   "defaultInputModes": ["text", "text/plain"],
   "defaultOutputModes": ["text", "text/plain"],
@@ -85,6 +85,6 @@
     }
   ],
   "supportedLanguages": ["en", "fr"],
-  "privacyPolicy": "https://reroots.ca/privacy",
-  "termsOfService": "https://reroots.ca/terms"
+  "privacyPolicy": "https://aurem.live/privacy",
+  "termsOfService": "https://aurem.live/terms"
 }

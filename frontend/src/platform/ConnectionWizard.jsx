@@ -152,7 +152,7 @@ export default function ConnectionWizard({ tenantId, token }) {
     return (
       <div className="flex items-center justify-center p-12" data-testid="wizard-loading">
         <Loader2 className="animate-spin" size={24} style={{ color: '#D4AF37' }} />
-        <span className="ml-3 text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>Loading integrations...</span>
+        <span className="ml-3 text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>Loading integrations…</span>
       </div>
     );
   }
@@ -183,7 +183,7 @@ export default function ConnectionWizard({ tenantId, token }) {
             <p className="text-sm font-mono font-bold mt-1" style={{ color: '#D4AF37' }}>{profile.instance_id}</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{
+            <div className="size-2 rounded-full" style={{
               background: profile.status === 'active' ? '#4ADE80' :
                 profile.status === 'email_active' ? '#D4AF37' : '#64C8FF',
               boxShadow: profile.status === 'active' ? '0 0 8px rgba(74,222,128,0.5)' : 'none',
@@ -219,7 +219,7 @@ export default function ConnectionWizard({ tenantId, token }) {
           className="w-full p-4 flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            <div className="size-10 rounded-xl flex items-center justify-center"
               style={{ background: ec.verified ? 'rgba(74,222,128,0.12)' : 'rgba(212,175,55,0.08)' }}>
               <Mail size={20} style={{ color: ec.verified ? '#4ADE80' : '#D4AF37' }} />
             </div>
@@ -330,7 +330,7 @@ export default function ConnectionWizard({ tenantId, token }) {
           className="w-full p-4 flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            <div className="size-10 rounded-xl flex items-center justify-center"
               style={{ background: waConnected ? 'rgba(74,222,128,0.12)' : 'rgba(74,222,128,0.06)' }}>
               <MessageSquare size={20} style={{ color: waConnected ? '#4ADE80' : '#5A5468' }} />
             </div>
@@ -390,7 +390,7 @@ export default function ConnectionWizard({ tenantId, token }) {
                 <div className="p-3 rounded-xl text-[10px] flex items-start gap-2"
                   style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.15)', color: '#4ADE80' }}>
                   <Lock size={12} className="flex-shrink-0 mt-0.5" />
-                  <span>Meta Cloud API — Never expires. Requires a Meta Business Account with WhatsApp API access.</span>
+                  <span>Meta Cloud API, Never expires. Requires a Meta Business Account with WhatsApp API access.</span>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider block mb-1" style={{ color: 'var(--aurem-body-secondary)' }}>Phone Number ID</label>
@@ -434,7 +434,7 @@ export default function ConnectionWizard({ tenantId, token }) {
                 <div className="p-3 rounded-xl text-[10px] flex items-start gap-2"
                   style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', color: '#f59e0b' }}>
                   <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
-                  <span>Session-based — may expire if your phone restarts. Upgrade to Meta API anytime for permanent connection.</span>
+                  <span>Session-based, may expire if your phone restarts. Upgrade to Meta API anytime for permanent connection.</span>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider block mb-1" style={{ color: 'var(--aurem-body-secondary)' }}>WHAPI Token</label>

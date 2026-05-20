@@ -658,7 +658,7 @@ export default function FrameworkMap() {
             boxShadow: eventFeed.length > 0 ? '0 0 12px #FF1744' : 'none',
             animation: eventFeed.length > 0 ? 'flowDash 1s linear infinite' : 'none',
           }} />
-          LIVE EVENT FEED — L11
+          LIVE EVENT FEED, L11
           <span style={{ marginLeft: 'auto', color: '#6A6070', fontSize: 9 }}>
             {eventFeed.length > 0 ? `${eventFeed.length} event${eventFeed.length === 1 ? '' : 's'}` : 'idle'}
           </span>
@@ -736,7 +736,7 @@ export default function FrameworkMap() {
       >
         {/* Title */}
         <text x={dim.w / 2} y={30} textAnchor="middle" style={{ fontFamily: "'Cinzel',serif", fontSize: 18, fontWeight: 700, fill: '#C9A84C', letterSpacing: '0.1em' }}>
-          AUREM EMPIRE HUD — SOVEREIGN ARCHITECTURE
+          AUREM EMPIRE HUD, SOVEREIGN ARCHITECTURE
         </text>
         <text x={dim.w / 2} y={48} textAnchor="middle" style={{ fontFamily: "'Jost',sans-serif", fontSize: 10, fill: '#6A6070', letterSpacing: '0.2em' }}>
           {pulse.summary?.total || 0} NODES · {pulse.summary?.live || 0} LIVE · {pulse.summary?.blocked || 0} BLOCKED · {pulse.summary?.health_pct || 0}% HEALTH
@@ -967,7 +967,7 @@ export default function FrameworkMap() {
         {/* Footer */}
         <text x={dim.w / 2} y={dim.h - 30} textAnchor="middle"
           style={{ fontFamily: "'Cinzel',serif", fontSize: 12, fontWeight: 700, fill: '#C9A84C', letterSpacing: '0.08em' }}>
-          AUREM — SOVEREIGN BANK LINK — POLARIS BUILT INC. 2026
+          AUREM, SOVEREIGN BANK LINK, POLARIS BUILT INC. 2026
         </text>
       </svg>
 
@@ -1123,7 +1123,7 @@ export default function FrameworkMap() {
                   SOVEREIGN NODE
                 </div>
                 <div style={{ fontFamily: "'Jost',sans-serif", fontSize: 10, color: '#6A6070', letterSpacing: '0.1em' }}>
-                  LOCAL LLM ENGINE — HYBRID MODE
+                  LOCAL LLM ENGINE, HYBRID MODE
                 </div>
               </div>
               <div style={{ marginLeft: 'auto' }}>
@@ -1295,7 +1295,7 @@ export default function FrameworkMap() {
                     SOVEREIGN VOICE
                   </div>
                   <div style={{ fontFamily: "'Jost',sans-serif", fontSize: 10, color: '#6A6070', letterSpacing: '0.1em' }}>
-                    XTTS v2 — LOCAL VOICE CLONING
+                    XTTS v2, LOCAL VOICE CLONING
                   </div>
                 </div>
                 <div style={{ marginLeft: 'auto' }}>

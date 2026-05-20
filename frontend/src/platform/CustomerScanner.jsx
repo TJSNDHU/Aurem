@@ -22,9 +22,9 @@ const CATEGORIES = {
 };
 
 const ResultIcon = ({ result }) => {
-  if (result === 'pass') return <CheckCircle className="w-3.5 h-3.5 text-[#4ade80]" />;
-  if (result === 'fail') return <XCircle className="w-3.5 h-3.5 text-[#FF6B6B]" />;
-  return <AlertTriangle className="w-3.5 h-3.5 text-[#D4B977]" />;
+  if (result === 'pass') return <CheckCircle className="size-3.5 text-[#4ade80]" />;
+  if (result === 'fail') return <XCircle className="size-3.5 text-[#FF6B6B]" />;
+  return <AlertTriangle className="size-3.5 text-[#D4B977]" />;
 };
 
 const ScoreGauge = ({ score, label }) => {
@@ -57,17 +57,17 @@ const CategoryBar = ({ category, tests, score, isComplete, isActive }) => {
     <div className="mb-3" data-testid={`scan-category-${category}`}>
       <button onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/50 backdrop-blur-sm border border-white/30 hover:bg-white/70 transition-all">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${cat.color}15` }}>
-          <Icon className="w-4 h-4" style={{ color: cat.color }} />
+        <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${cat.color}15` }}>
+          <Icon className="size-4" style={{ color: cat.color }} />
         </div>
         <div className="flex-1 text-left">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-bold tracking-[1.5px] text-[#1A1A2E]">{cat.label}</span>
             <div className="flex items-center gap-2">
               {isComplete && <span className="text-xs font-bold" style={{ color: score >= 80 ? '#4ade80' : score >= 60 ? '#D4B977' : '#FF6B6B' }}>{score}%</span>}
-              {!isComplete && isActive && <span className="text-[10px] text-[#D4B977] animate-pulse">SCANNING...</span>}
+              {!isComplete && isActive && <span className="text-[10px] text-[#D4B977] animate-pulse">SCANNING…</span>}
               <span className="text-[10px] text-[#888]">{passCount}/{tests.length}</span>
-              {expanded ? <ChevronDown className="w-3 h-3 text-[#888]" /> : <ChevronRight className="w-3 h-3 text-[#888]" />}
+              {expanded ? <ChevronDown className="size-3 text-[#888]" /> : <ChevronRight className="size-3 text-[#888]" />}
             </div>
           </div>
           <div className="w-full h-2 rounded-full bg-[rgba(61,58,57,0.15)] overflow-hidden">
@@ -102,7 +102,7 @@ const CodeBlock = ({ code }) => {
     <div className="relative mt-2 rounded-lg bg-[#1a1a2e] p-3 font-mono text-[11px] text-green-300 overflow-x-auto">
       <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
         className="absolute top-2 right-2 p-1 rounded bg-white/10 hover:bg-white/20 text-white/60">
-        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+        {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
       </button>
       <pre className="whitespace-pre-wrap">{code}</pre>
     </div>
@@ -119,10 +119,10 @@ const RepairItem = ({ fix, index }) => {
     <div className="mb-2" data-testid={`repair-item-${index}`}>
       <button onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/50 backdrop-blur-sm border border-white/30 hover:bg-white/70 transition-all">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${statusColor}15` }}>
-          {fix.status === 'deployed' ? <CheckCircle className="w-4 h-4 text-[#4ade80]" /> :
-           fix.status === 'ready' ? <Wrench className="w-4 h-4 text-[#D4B977]" /> :
-           <Activity className="w-4 h-4 text-[#888] animate-spin" />}
+        <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${statusColor}15` }}>
+          {fix.status === 'deployed' ? <CheckCircle className="size-4 text-[#4ade80]" /> :
+           fix.status === 'ready' ? <Wrench className="size-4 text-[#D4B977]" /> :
+           <Activity className="size-4 text-[#888] animate-spin" />}
         </div>
         <div className="flex-1 text-left">
           <div className="flex items-center justify-between mb-1">
@@ -132,7 +132,7 @@ const RepairItem = ({ fix, index }) => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-bold tracking-wider" style={{ color: statusColor }}>{statusLabel}</span>
-              {expanded ? <ChevronDown className="w-3 h-3 text-[#888]" /> : <ChevronRight className="w-3 h-3 text-[#888]" />}
+              {expanded ? <ChevronDown className="size-3 text-[#888]" /> : <ChevronRight className="size-3 text-[#888]" />}
             </div>
           </div>
           <div className="w-full h-1.5 rounded-full bg-[rgba(61,58,57,0.15)] overflow-hidden">
@@ -149,7 +149,7 @@ const RepairItem = ({ fix, index }) => {
           <p className="text-xs text-[#666] mb-1">{fix.description}</p>
           {fix.ai_recommendation && <p className="text-xs text-[#FF6B00] italic mb-2">ORA: {fix.ai_recommendation}</p>}
           <div className="flex items-center gap-1 mb-1">
-            <Terminal className="w-3 h-3 text-[#888]" />
+            <Terminal className="size-3 text-[#888]" />
             <span className="text-[9px] text-[#888] uppercase tracking-wider">Fix Code ({fix.platform})</span>
           </div>
           <CodeBlock code={fix.fix_code} />
@@ -524,7 +524,7 @@ const CustomerScanner = ({ token }) => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-[#1A1A2E] tracking-wider mb-1" data-testid="scanner-title">ORA System Scanner</h1>
-            <p className="text-xs text-[#888]">Fully automatic root-cause fix engine — scan, repair, push & verify</p>
+            <p className="text-xs text-[#888]">Fully automatic root-cause fix engine, scan, repair, push & verify</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -536,7 +536,7 @@ const CustomerScanner = ({ token }) => {
                   : 'bg-white/50 border-[#FF6B00]/15 text-[#888] hover:border-[#FF6B00]/30 hover:text-[#FF6B00]'
               }`}
             >
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="size-3.5" />
               History {history.length > 0 && `(${history.length})`}
             </button>
             {pushSupported && (
@@ -550,7 +550,7 @@ const CustomerScanner = ({ token }) => {
                 }`}
                 title={pushActive ? 'Push notifications enabled' : 'Enable push notifications'}
               >
-                {pushActive ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                {pushActive ? <Bell className="size-3.5" /> : <BellOff className="size-3.5" />}
                 {pushActive ? 'Alerts ON' : 'Enable Alerts'}
               </button>
             )}
@@ -562,15 +562,15 @@ const CustomerScanner = ({ token }) => {
           <div className="mb-6 p-5 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid="scan-history-panel">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#FF6B00]" />
+                <Clock className="size-4 text-[#FF6B00]" />
                 <h2 className="text-sm font-bold text-[#1A1A2E] tracking-wider">Scan History</h2>
               </div>
               <span className="text-[10px] text-[#888]">{history.length} saved scans</span>
             </div>
             {historyLoading ? (
               <div className="text-center py-6">
-                <Activity className="w-5 h-5 animate-spin text-[#888] mx-auto mb-2" />
-                <span className="text-[10px] text-[#888]">Loading history...</span>
+                <Activity className="size-5 animate-spin text-[#888] mx-auto mb-2" />
+                <span className="text-[10px] text-[#888]">Loading history…</span>
               </div>
             ) : history.length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -580,7 +580,7 @@ const CustomerScanner = ({ token }) => {
                     <button key={scan.scan_id || i} onClick={() => loadFromHistory(scan)}
                       data-testid={`history-item-${i}`}
                       className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/50 border border-white/30 hover:bg-white/80 hover:border-[#FF6B00]/20 transition-all text-left">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm" style={{ background: `${scoreColor}15`, color: scoreColor }}>
+                      <div className="size-10 rounded-lg flex items-center justify-center font-bold text-sm" style={{ background: `${scoreColor}15`, color: scoreColor }}>
                         {scan.overall_score}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -592,14 +592,14 @@ const CustomerScanner = ({ token }) => {
                           )}
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-[#888]" />
+                      <ChevronRight className="size-4 text-[#888]" />
                     </button>
                   );
                 })}
               </div>
             ) : (
               <div className="text-center py-6">
-                <Globe className="w-8 h-8 text-[#ccc] mx-auto mb-2" />
+                <Globe className="size-8 text-[#ccc] mx-auto mb-2" />
                 <p className="text-xs text-[#888]">No scans saved yet.</p>
               </div>
             )}
@@ -621,7 +621,7 @@ const CustomerScanner = ({ token }) => {
             </div>
             <button onClick={handleScan} disabled={isScanning || phase === 'repairing' || phase === 'pushing'} data-testid="scan-button"
               className="px-6 py-3 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-white rounded-lg font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-[#D4AF37]/20">
-              <Search className="w-4 h-4" />
+              <Search className="size-4" />
               {isScanning ? 'Scanning...' : 'Scan System'}
             </button>
           </div>
@@ -633,8 +633,8 @@ const CustomerScanner = ({ token }) => {
         {phase === 'verified' && finalResult && (
           <div className="mb-6 p-6 bg-gradient-to-r from-[#FF6B00]/10 to-[#4ade80]/10 rounded-xl border-2 border-[#4ade80]/30" data-testid="verified-success">
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#4ade80]/15 flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-[#4ade80]" />
+              <div className="size-14 rounded-2xl bg-[#4ade80]/15 flex items-center justify-center">
+                <CheckCircle className="size-8 text-[#4ade80]" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-[#FF6B00] tracking-wider">100% VERIFIED CLEAN</h2>
@@ -667,7 +667,7 @@ const CustomerScanner = ({ token }) => {
           <>
             <div className="mb-4 flex items-center justify-between px-2">
               <div className="flex items-center gap-3">
-                {isScanning && <div className="w-2 h-2 rounded-full bg-[#D4B977] animate-pulse" />}
+                {isScanning && <div className="size-2 rounded-full bg-[#D4B977] animate-pulse" />}
                 <span className="text-xs text-[#888]">{isScanning ? `Running test ${completed}/${total}` : `Scan Complete — ${completed} tests`}</span>
               </div>
               {isScanning && <span className="text-[10px] text-[#D4B977] font-mono tracking-wider animate-pulse">{currentTest}</span>}
@@ -724,9 +724,9 @@ const CustomerScanner = ({ token }) => {
             {issueCount > 0 && phase === 'scanned' && (
               <button onClick={handleRepair} data-testid="deploy-fixes-btn"
                 className="w-full py-4 bg-gradient-to-r from-[#FF6B00] to-[#4ade80] text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all flex items-center justify-center gap-3 shadow-lg shadow-[#FF6B00]/20 mt-4">
-                <Wrench className="w-5 h-5" />
+                <Wrench className="size-5" />
                 DEPLOY ORA FIXES — {issueCount} Issues Detected
-                <Play className="w-4 h-4" />
+                <Play className="size-4" />
               </button>
             )}
 
@@ -735,18 +735,18 @@ const CustomerScanner = ({ token }) => {
               <button onClick={handlePushToDb} disabled={isPushing} data-testid="push-to-db-btn"
                 className="w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-3 mt-4 shadow-lg transition-all disabled:opacity-60"
                 style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)', color: '#fff', boxShadow: '0 4px 15px rgba(212,175,55,0.3)' }}>
-                <Database className="w-5 h-5" />
+                <Database className="size-5" />
                 {isPushing ? 'PUSHING FIXES TO DATABASE...' : 'PUSH FIXES TO CUSTOMER WEBSITE DATABASE'}
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="size-4" />
               </button>
             )}
 
             {/* Pushing progress indicator */}
             {phase === 'pushing' && (
               <div className="mt-4 p-4 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center gap-3" data-testid="pushing-indicator">
-                <Activity className="w-5 h-5 text-[#D4AF37] animate-spin" />
+                <Activity className="size-5 text-[#D4AF37] animate-spin" />
                 <div>
-                  <span className="text-sm font-bold text-[#8B7355]">Pushing fixes to customer database...</span>
+                  <span className="text-sm font-bold text-[#8B7355]">Pushing fixes to customer database…</span>
                   <p className="text-[10px] text-[#888]">Writing root-cause fixes permanently</p>
                 </div>
               </div>
@@ -756,7 +756,7 @@ const CustomerScanner = ({ token }) => {
             {phase === 'pushed' && pushResult && (
               <div className="mt-4 space-y-3">
                 <div className="p-4 rounded-xl bg-[#4ade80]/10 border border-[#4ade80]/20 flex items-center gap-3" data-testid="push-success">
-                  <CheckCircle className="w-6 h-6 text-[#4ade80]" />
+                  <CheckCircle className="size-6 text-[#4ade80]" />
                   <div>
                     <span className="text-sm font-bold text-[#FF6B00]">{pushResult.total_pushed} fixes pushed to customer database</span>
                     <p className="text-[10px] text-[#666]">Root-cause fixes deployed permanently. Rescan to verify 100% clean.</p>
@@ -765,7 +765,7 @@ const CustomerScanner = ({ token }) => {
                 <button onClick={handleRescanVerify} data-testid="rescan-verify-btn"
                   className="w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-3 shadow-lg transition-all"
                   style={{ background: 'linear-gradient(135deg, #FF6B00, #4ade80)', color: '#fff', boxShadow: '0 4px 15px rgba(45,122,74,0.3)' }}>
-                  <RefreshCw className="w-5 h-5" />
+                  <RefreshCw className="size-5" />
                   RESCAN & VERIFY DEPLOYMENT
                 </button>
               </div>
@@ -778,12 +778,12 @@ const CustomerScanner = ({ token }) => {
                   <button onClick={handleShare} disabled={sharing} data-testid="share-report-btn"
                     className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                     style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#8B7355' }}>
-                    {sharing ? <><Activity className="w-4 h-4 animate-spin" /> Generating Link...</> : <><Share2 className="w-4 h-4" /> Share Report</>}
+                    {sharing ? <><Activity className="size-4 animate-spin" /> Generating Link…</> : <><Share2 className="size-4" /> Share Report</>}
                   </button>
                 ) : (
                   <div className="flex-1 p-3 rounded-xl" style={{ background: 'rgba(255,107,0,0.05)', border: '1px solid rgba(255,107,0,0.1)' }}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Link2 className="w-4 h-4 text-[#FF6B00]" />
+                      <Link2 className="size-4 text-[#FF6B00]" />
                       <span className="text-xs font-bold text-[#FF6B00] tracking-wider">REPORT LINK</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -792,7 +792,7 @@ const CustomerScanner = ({ token }) => {
                       <button onClick={copyShareLink} data-testid="copy-share-link"
                         className="px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
                         style={{ background: shareCopied ? 'rgba(255,107,0,0.1)' : 'rgba(212,175,55,0.15)', color: shareCopied ? '#FF6B00' : '#8B7355', border: `1px solid ${shareCopied ? 'rgba(45,122,74,0.25)' : 'rgba(212,175,55,0.25)'}` }}>
-                        {shareCopied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                        {shareCopied ? <><Check className="size-3.5" /> Copied!</> : <><Copy className="size-3.5" /> Copy</>}
                       </button>
                     </div>
                   </div>
@@ -800,12 +800,12 @@ const CustomerScanner = ({ token }) => {
                 {!savedScanId && (
                   <button onClick={() => saveScanToDb(null)} data-testid="save-scan-btn"
                     className="px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border bg-white/50 border-[#FF6B00]/15 text-[#888] hover:border-[#FF6B00]/30 hover:text-[#FF6B00]">
-                    <Save className="w-4 h-4" /> Save
+                    <Save className="size-4" /> Save
                   </button>
                 )}
                 {savedScanId && (
                   <div className="px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-2 border bg-[#FF6B00]/10 border-[#FF6B00]/20 text-[#FF6B00]">
-                    <Check className="w-4 h-4" /> Saved
+                    <Check className="size-4" /> Saved
                   </div>
                 )}
               </div>
@@ -817,8 +817,8 @@ const CustomerScanner = ({ token }) => {
         {(['repairing', 'repaired', 'pushing', 'pushed'].includes(phase)) && (
           <div className="mb-6" data-testid="repair-section">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-[#FF6B00]/10 flex items-center justify-center">
-                <Wrench className="w-4 h-4 text-[#FF6B00]" />
+              <div className="size-8 rounded-lg bg-[#FF6B00]/10 flex items-center justify-center">
+                <Wrench className="size-4 text-[#FF6B00]" />
               </div>
               <div>
                 <h2 className="text-sm font-bold text-[#1A1A2E] tracking-wider">ORA REPAIR ENGINE</h2>
@@ -831,7 +831,7 @@ const CustomerScanner = ({ token }) => {
               <div className="mb-4 px-2" data-testid="repair-progress">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-[#888]">{phase === 'repairing' ? `Deploying fix ${repairCompleted}/${repairTotal}` : `${repairTotal} fixes deployed`}</span>
-                  {phase === 'repairing' && <span className="text-[10px] text-[#FF6B00] font-mono animate-pulse">REPAIRING...</span>}
+                  {phase === 'repairing' && <span className="text-[10px] text-[#FF6B00] font-mono animate-pulse">REPAIRING…</span>}
                 </div>
                 <div className="w-full h-3 rounded-full bg-[rgba(61,58,57,0.15)] overflow-hidden">
                   <div className="h-full rounded-full transition-all duration-500 ease-out"
@@ -850,11 +850,11 @@ const CustomerScanner = ({ token }) => {
             {repairSummary && (
               <div className="mt-4 p-5 bg-gradient-to-r from-[#FF6B00]/10 to-[#4ade80]/10 rounded-xl border border-[#FF6B00]/20" data-testid="repair-summary">
                 <div className="flex items-center gap-3 mb-3">
-                  <CheckCircle className="w-6 h-6 text-[#4ade80]" />
+                  <CheckCircle className="size-6 text-[#4ade80]" />
                   <h3 className="text-sm font-bold text-[#FF6B00]">ORA REPAIR COMPLETE</h3>
                   {savedScanId && (
                     <span className="ml-auto flex items-center gap-1 text-[9px] font-bold text-[#FF6B00] bg-[#FF6B00]/10 px-2 py-0.5 rounded-full">
-                      <Save className="w-3 h-3" /> SAVED TO DB
+                      <Save className="size-3" /> SAVED TO DB
                     </span>
                   )}
                 </div>
@@ -863,7 +863,7 @@ const CustomerScanner = ({ token }) => {
                 {finalResult && (
                   <div className="mb-4 p-4 bg-white/60 rounded-xl border border-[#4ade80]/20">
                     <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-[#4ade80]" />
+                      <TrendingUp className="size-4 text-[#4ade80]" />
                       <span className="text-[10px] font-bold tracking-[1.5px] text-[#FF6B00] uppercase">Projected Scores After Deployment</span>
                     </div>
                     <div className="flex justify-around flex-wrap gap-3">

@@ -190,9 +190,9 @@ class ToonEncoder:
 # SPECIALIZED ENCODERS FOR REROOTS DATA
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class ReRootsToonEncoder(ToonEncoder):
+class AUREMToonEncoder(ToonEncoder):
     """
-    Specialized TOON encoder for ReRoots skincare data
+    Specialized TOON encoder for AUREM skincare data
     Optimized for formulas, products, and inventory
     """
     
@@ -375,7 +375,7 @@ def json_to_toon(data: Any, data_type: str = None) -> str:
     Returns:
         TOON-formatted string
     """
-    encoder = ReRootsToonEncoder()
+    encoder = AUREMToonEncoder()
     
     if data_type == 'formula':
         return encoder.encode_formula(data)
@@ -478,7 +478,7 @@ class ToonMiddleware:
     
     def __init__(self, db=None):
         self.db = db
-        self.encoder = ReRootsToonEncoder()
+        self.encoder = AUREMToonEncoder()
     
     def set_db(self, db):
         self.db = db

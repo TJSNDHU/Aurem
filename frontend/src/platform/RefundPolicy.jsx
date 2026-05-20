@@ -10,11 +10,11 @@ export default function RefundPolicy() {
     <div className="min-h-screen" style={{ background: 'var(--aurem-bg, #050505)', color: 'var(--aurem-heading, #F4F4F4)' }}>
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link to="/" className="inline-flex items-center gap-2 text-sm mb-8 hover:opacity-80 transition-opacity" style={{ color: 'var(--aurem-accent, #D4AF37)' }} data-testid="refund-back-link">
-          <ArrowLeft className="w-4 h-4" /> Back to AUREM
+          <ArrowLeft className="size-4" /> Back to AUREM
         </Link>
 
         <div className="flex items-center gap-3 mb-4">
-          <RotateCcw className="w-8 h-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+          <RotateCcw className="size-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
           <h1 className="text-3xl font-bold tracking-tight" data-testid="refund-title">Refund Policy</h1>
         </div>
 

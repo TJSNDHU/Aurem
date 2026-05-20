@@ -7,9 +7,9 @@ import { Inbox, BarChart3, Users, Zap, Activity, Brain, Target, Clock } from 'lu
 
 const EmptyState = ({ icon: Icon, title, subtitle, actionLabel, onAction, testId }) => (
   <div className="flex flex-col items-center justify-center py-16 px-6 text-center" data-testid={testId || 'empty-state'}>
-    <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+    <div className="size-14 rounded-2xl flex items-center justify-center mb-4"
       style={{ background: 'linear-gradient(135deg, rgba(255,107,0,0.08), rgba(212,175,55,0.08))', border: '1px solid rgba(255,107,0,0.12)' }}>
-      <Icon className="w-6 h-6" style={{ color: '#FF6B00' }} />
+      <Icon className="size-6" style={{ color: '#FF6B00' }} />
     </div>
     <h3 className="text-sm font-semibold mb-1" style={{ color: '#1A1A2E' }}>{title}</h3>
     <p className="text-[11px] max-w-xs mb-4" style={{ color: '#888' }}>{subtitle}</p>

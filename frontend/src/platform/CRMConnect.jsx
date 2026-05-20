@@ -166,8 +166,8 @@ export default function CRMConnect({ token, user }) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="crm-connect-loading">
         <div className="flex items-center gap-3 text-[#666]">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading CRM connections...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading CRM connections…</span>
         </div>
       </div>
     );
@@ -187,7 +187,7 @@ export default function CRMConnect({ token, user }) {
             data-testid="add-crm-btn"
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg text-[#050505] text-xs font-semibold hover:opacity-90 transition-opacity"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="size-3.5" />
             Add Connection
           </button>
         </div>
@@ -202,7 +202,7 @@ export default function CRMConnect({ token, user }) {
           ].map((stat, idx) => (
             <div key={idx} className="p-4 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
+                <stat.icon className="size-4" style={{ color: stat.color }} />
                 <span className="text-[9px] text-[#555] tracking-wider">{stat.label}</span>
               </div>
               <div className="text-2xl font-semibold font-mono" style={{ color: stat.color }}>{stat.value}</div>
@@ -232,7 +232,7 @@ export default function CRMConnect({ token, user }) {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-11 h-11 rounded-lg flex items-center justify-center text-sm font-bold text-white"
+                        className="size-11 rounded-lg flex items-center justify-center text-sm font-bold text-white"
                         style={{ backgroundColor: `${provider.color}30`, color: provider.color }}
                       >
                         {provider.logo}
@@ -244,12 +244,12 @@ export default function CRMConnect({ token, user }) {
                     </div>
                     {isConnected ? (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-[#4ade80]/10 text-[#4ade80]">
-                        <div className="w-1.5 h-1.5 bg-[#4ade80] rounded-full animate-pulse" />
+                        <div className="size-1.5 bg-[#4ade80] rounded-full animate-pulse" />
                         Connected
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] text-[#5a5a72] bg-white/50 border border-[#FF6B00]/10">
-                        <AlertCircle className="w-3 h-3" />
+                        <AlertCircle className="size-3" />
                         Not Connected
                       </div>
                     )}
@@ -270,7 +270,7 @@ export default function CRMConnect({ token, user }) {
                           onClick={() => handleDisconnect(connectionId)}
                           className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg hover:bg-[#ef4444]/20 transition-colors"
                         >
-                          <Unlink className="w-3 h-3" />
+                          <Unlink className="size-3" />
                           Disconnect
                         </button>
                         <button
@@ -279,7 +279,7 @@ export default function CRMConnect({ token, user }) {
                           className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-lg hover:bg-[#D4AF37]/20 transition-colors disabled:opacity-50"
                           disabled={syncing === connectionId}
                         >
-                          <RefreshCw className={`w-3 h-3 ${syncing === connectionId ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`size-3 ${syncing === connectionId ? 'animate-spin' : ''}`} />
                           {syncing === connectionId ? 'Syncing...' : 'Sync Now'}
                         </button>
                       </>
@@ -289,7 +289,7 @@ export default function CRMConnect({ token, user }) {
                         data-testid={`connect-${provider.id}-btn`}
                         className="flex items-center gap-1.5 px-4 py-2 text-[11px] text-[#050505] font-semibold bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity"
                       >
-                        <Link2 className="w-3 h-3" />
+                        <Link2 className="size-3" />
                         Connect
                       </button>
                     ) : (
@@ -298,7 +298,7 @@ export default function CRMConnect({ token, user }) {
                         data-testid={`coming-soon-${provider.id}`}
                         className="flex items-center gap-1.5 px-4 py-2 text-[11px] text-[#888] font-semibold bg-white/40 border border-[#FF6B00]/15 rounded-lg cursor-not-allowed"
                       >
-                        <Clock className="w-3 h-3" />
+                        <Clock className="size-3" />
                         Coming Soon
                       </button>
                     )}
@@ -315,7 +315,7 @@ export default function CRMConnect({ token, user }) {
             <h2 className="text-xs text-[#555] tracking-wider">RECENT SYNCED CONTACTS</h2>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#555]" />
+                <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#555]" />
                 <input
                   type="text"
                   placeholder="Search contacts..."
@@ -334,7 +334,7 @@ export default function CRMConnect({ token, user }) {
                 .map((contact, idx) => (
                 <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-white/50 transition-colors" data-testid={`crm-contact-${idx}`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[10px] font-semibold text-[#D4AF37]">
+                    <div className="size-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[10px] font-semibold text-[#D4AF37]">
                       {(contact.name || 'U')[0].toUpperCase()}
                     </div>
                     <div>
@@ -362,7 +362,7 @@ export default function CRMConnect({ token, user }) {
             </div>
           ) : (
             <div className="p-10 text-center">
-              <Database className="w-8 h-8 text-[#333] mx-auto mb-3" />
+              <Database className="size-8 text-[#333] mx-auto mb-3" />
               <p className="text-sm text-[#555]">No contacts synced yet</p>
               <p className="text-[11px] text-[#444] mt-1">Connect a CRM to start syncing contacts</p>
             </div>
@@ -377,7 +377,7 @@ export default function CRMConnect({ token, user }) {
             <div className="flex items-center justify-between p-5 border-b border-[#FF6B00]/20">
               <div className="flex items-center gap-3">
                 <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold"
+                  className="size-10 rounded-lg flex items-center justify-center text-sm font-bold"
                   style={{ backgroundColor: `${showSetup.color}30`, color: showSetup.color }}
                 >
                   {showSetup.logo}
@@ -391,7 +391,7 @@ export default function CRMConnect({ token, user }) {
                 onClick={() => { setShowSetup(null); setApiKey(''); setInstanceUrl(''); }}
                 className="text-[#555] hover:text-[#555] transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="size-5" />
               </button>
             </div>
 
@@ -421,7 +421,7 @@ export default function CRMConnect({ token, user }) {
                 </div>
               )}
               <div className="flex items-start gap-2 p-3 bg-[#D4AF37]/5 border border-[#D4AF37]/10 rounded-lg">
-                <Shield className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
+                <Shield className="size-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
                 <p className="text-[10px] text-[#888] leading-relaxed">
                   Your credentials are encrypted with AES-256 and stored securely. AUREM never stores plain-text secrets.
                 </p>

@@ -101,11 +101,11 @@ export default function SupportPage() {
     <div className="min-h-screen" style={{ background: 'var(--aurem-bg, #050505)', color: 'var(--aurem-heading, #F4F4F4)' }}>
       <div className="max-w-4xl mx-auto px-6 py-12">
         <Link to="/" className="inline-flex items-center gap-2 text-sm mb-8 hover:opacity-80 transition-opacity" style={{ color: 'var(--aurem-accent, #D4AF37)' }} data-testid="support-back-link">
-          <ArrowLeft className="w-4 h-4" /> Back to AUREM
+          <ArrowLeft className="size-4" /> Back to AUREM
         </Link>
 
         <div className="flex items-center gap-3 mb-2">
-          <HelpCircle className="w-8 h-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+          <HelpCircle className="size-8" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
           <h1 className="text-3xl font-bold tracking-tight" data-testid="support-title">Help & Support</h1>
         </div>
         <p className="text-sm mb-12" style={{ color: 'var(--aurem-body-secondary, #888)' }}>
@@ -132,7 +132,7 @@ export default function SupportPage() {
                         style={{ color: 'var(--aurem-heading, #F4F4F4)' }}
                       >
                         {item.q}
-                        {isOpen ? <ChevronDown className="w-4 h-4 shrink-0 ml-2" /> : <ChevronRight className="w-4 h-4 shrink-0 ml-2" />}
+                        {isOpen ? <ChevronDown className="size-4 shrink-0 ml-2" /> : <ChevronRight className="size-4 shrink-0 ml-2" />}
                       </button>
                       {isOpen && (
                         <div className="px-4 pb-4 text-sm leading-relaxed" style={{ color: 'var(--aurem-body, #CCC)' }}>
@@ -151,7 +151,7 @@ export default function SupportPage() {
         <div className="grid md:grid-cols-2 gap-8" data-testid="contact-section">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+              <MessageSquare className="size-5" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
               <h2 className="text-lg font-semibold">Contact Us</h2>
             </div>
             <form onSubmit={handleContactSubmit} className="space-y-3">
@@ -208,13 +208,13 @@ export default function SupportPage() {
           <div className="space-y-6">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Mail className="w-5 h-5" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+                <Mail className="size-5" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
                 <h2 className="text-lg font-semibold">Direct Contact</h2>
               </div>
               <div className="space-y-3">
                 <a href="mailto:support@aurem.ai" data-testid="email-support" className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-white/[0.02]" style={{ border: '1px solid rgba(212,175,55,0.08)' }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.1)' }}>
-                    <Mail className="w-4 h-4" style={{ color: 'var(--aurem-accent)' }} />
+                  <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(212,175,55,0.1)' }}>
+                    <Mail className="size-4" style={{ color: 'var(--aurem-accent)' }} />
                   </div>
                   <div>
                     <div className="text-sm font-medium">General Support</div>
@@ -222,8 +222,8 @@ export default function SupportPage() {
                   </div>
                 </a>
                 <a href="mailto:privacy@aurem.ai" className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-white/[0.02]" style={{ border: '1px solid rgba(212,175,55,0.08)' }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(61,58,57,0.25)' }}>
-                    <Mail className="w-4 h-4 text-green-500" />
+                  <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(61,58,57,0.25)' }}>
+                    <Mail className="size-4 text-green-500" />
                   </div>
                   <div>
                     <div className="text-sm font-medium">Privacy & GDPR</div>
@@ -237,10 +237,10 @@ export default function SupportPage() {
               <h3 className="text-sm font-semibold mb-2">Quick Links</h3>
               <div className="space-y-2">
                 <Link to="/privacy" className="flex items-center gap-2 text-xs hover:underline" style={{ color: 'var(--aurem-body-secondary)' }}>
-                  <ExternalLink className="w-3 h-3" /> Privacy Policy
+                  <ExternalLink className="size-3" /> Privacy Policy
                 </Link>
                 <Link to="/terms" className="flex items-center gap-2 text-xs hover:underline" style={{ color: 'var(--aurem-body-secondary)' }}>
-                  <ExternalLink className="w-3 h-3" /> Terms of Service
+                  <ExternalLink className="size-3" /> Terms of Service
                 </Link>
               </div>
             </div>

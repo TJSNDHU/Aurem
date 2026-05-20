@@ -31,10 +31,10 @@ def set_db(database):
     global db
     db = database
 
-SITE_URL = "https://www.reroots.ca"
+SITE_URL = "https://www.aurem.live"
 FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@aurem.live")
 FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "AUREM")
-OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@reroots.ca")
+OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "admin@aurem.live")
 OWNER_NAME = os.environ.get("OWNER_NAME", "Tj")
 
 sg = None
@@ -193,10 +193,10 @@ async def send_order_confirmation(order: dict):
     <strong>While you wait:</strong> Your PDRN routine works best applied morning and evening to clean skin. Most customers notice visible improvement around day 14–21 of consistent use.
   </div>
   <p class="body-text" style="font-size:14px;color:#8A8490;">We'll send you a shipping notification with your tracking number once your order is dispatched — usually within 1–2 business days.</p>
-  <div class="footer">ReRoots · Premium Biotech Skincare · Canada<br>Questions? Reply to this email — we respond within 24 hours.</div>
+  <div class="footer">AUREM · Premium Biotech Skincare · Canada<br>Questions? Reply to this email — we respond within 24 hours.</div>
 </div></body></html>"""
 
-    await send_email(email, name, f"Order Confirmed — {oid} | ReRoots", html)
+    await send_email(email, name, f"Order Confirmed — {oid} | AUREM", html)
     print(f"[ORDER CONFIRM] Sent to {email} for {oid}")
 
 
@@ -244,10 +244,10 @@ async def send_shipping_notification(order: dict, carrier: str, tracking: str):
     <a href="{tracking_url}" class="btn">Track My Package</a>
   </div>
   <p class="body-text" style="font-size:14px;color:#8A8490;">Once your order arrives, you'll be starting your PDRN repair cycle. We'll be in touch around day 25 with tips to maximize your results.</p>
-  <div class="footer">ReRoots · Premium Biotech Skincare · Canada<br>Questions? Reply to this email — we respond within 24 hours.</div>
+  <div class="footer">AUREM · Premium Biotech Skincare · Canada<br>Questions? Reply to this email — we respond within 24 hours.</div>
 </div></body></html>"""
 
-    await send_email(email, name, f"Your ReRoots order is on its way — {oid}", html)
+    await send_email(email, name, f"Your AUREM order is on its way — {oid}", html)
     print(f"[SHIPPING NOTIFY] Sent to {email} | Tracking: {tracking}")
 
 
@@ -258,7 +258,7 @@ async def send_shipping_notification(order: dict, carrier: str, tracking: str):
 def email_day7(customer_name: str, product: str, customer_email: str) -> dict:
     """Day 7 — Week 1 check-in + application tips"""
     first = customer_name.split()[0] if customer_name else "there"
-    subject = f"Week 1 with ReRoots — what to expect, {first}"
+    subject = f"Week 1 with AUREM — what to expect, {first}"
     html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{{font-family:Georgia,serif;background:#FDF9F9;margin:0;padding:0;}}.container{{max-width:560px;margin:0 auto;padding:40px 20px;}}.logo{{text-align:center;letter-spacing:.3em;font-size:22px;color:#2D2A2E;margin-bottom:8px;}}.logo span{{color:#F8A5B8;}}.tagline{{text-align:center;font-size:11px;letter-spacing:.2em;color:#C4BAC0;text-transform:uppercase;margin-bottom:40px;}}.body-text{{font-size:16px;line-height:1.8;color:#2D2A2E;margin-bottom:24px;}}.timeline{{margin:24px 0;}}.tl-item{{display:flex;gap:16px;margin-bottom:20px;align-items:flex-start;}}.tl-dot{{width:32px;height:32px;border-radius:50%;background:#FEF2F4;border:2px solid #F8A5B8;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:12px;color:#F8A5B8;flex-shrink:0;}}.tl-active{{background:#F8A5B8;color:#fff;}}.tl-text{{font-size:15px;color:#2D2A2E;line-height:1.7;padding-top:4px;}}.tl-label{{font-weight:bold;}}.tip-box{{background:#FEF2F4;border-left:3px solid #F8A5B8;padding:16px 20px;margin:24px 0;font-size:14px;color:#2D2A2E;line-height:1.8;}}.footer{{text-align:center;font-size:12px;color:#C4BAC0;margin-top:48px;line-height:1.8;}}</style></head>
 <body><div class="container">
   <div class="logo">RE<span>ROOTS</span></div><div class="tagline">Premium Biotech Skincare · Canada</div>
@@ -273,7 +273,7 @@ def email_day7(customer_name: str, product: str, customer_email: str) -> dict:
   <div class="tip-box">
     <strong>Tip for best results:</strong> Apply to slightly damp skin — PDRN absorbs more effectively with a small amount of water present.
   </div>
-  <div class="footer">ReRoots · Premium Biotech Skincare · Canada<br><a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color:#C4BAC0;">Unsubscribe</a></div>
+  <div class="footer">AUREM · Premium Biotech Skincare · Canada<br><a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color:#C4BAC0;">Unsubscribe</a></div>
 </div></body></html>"""
     return {"subject": subject, "html": html}
 
@@ -295,9 +295,9 @@ def email_day14(customer_name: str, product: str, customer_email: str) -> dict:
     · Overall tone looks more even and luminous<br>
     · Texture is smoother — pores appear refined
   </div>
-  <p class="body-text">If you're seeing results, we'd love to hear about it. Tag us <strong>@reroots.ca</strong> on Instagram!</p>
-  <a href="https://instagram.com/reroots.ca" class="btn">Share My Results</a>
-  <div class="footer">ReRoots · Premium Biotech Skincare · Canada<br><a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color:#C4BAC0;">Unsubscribe</a></div>
+  <p class="body-text">If you're seeing results, we'd love to hear about it. Tag us <strong>@aurem.live</strong> on Instagram!</p>
+  <a href="https://instagram.com/aurem.live" class="btn">Share My Results</a>
+  <div class="footer">AUREM · Premium Biotech Skincare · Canada<br><a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color:#C4BAC0;">Unsubscribe</a></div>
 </div></body></html>"""
     return {"subject": subject, "html": html}
 
@@ -344,10 +344,10 @@ async def check_low_stock_alerts():
   <div class="table-wrap"><table><thead><tr><th>Ingredient</th><th>Current Stock</th><th>Reorder At</th><th>Supplier</th></tr></thead><tbody>{rows}</tbody></table></div>
   <p class="body-text">Log in to the inventory module to adjust stock or place a reorder.</p>
   <a href="{SITE_URL}/admin?section=inventory-batch" class="btn">View Inventory</a>
-  <div class="footer">ReRoots Automated Alert · {date.today().strftime("%B %d, %Y")}</div>
+  <div class="footer">AUREM Automated Alert · {date.today().strftime("%B %d, %Y")}</div>
 </div></body></html>"""
 
-        ok = await send_email(OWNER_EMAIL, OWNER_NAME, f"⚠️ ReRoots Low Stock Alert — {len(low)} ingredient{'s' if len(low)>1 else ''} need attention", html)
+        ok = await send_email(OWNER_EMAIL, OWNER_NAME, f"⚠️ AUREM Low Stock Alert — {len(low)} ingredient{'s' if len(low)>1 else ''} need attention", html)
 
         await db["automation_logs"].insert_one({
             "automationType": "low_stock_alert",
@@ -400,7 +400,7 @@ async def check_npn_expiry_reminders():
         ])
 
         most_urgent = min(alerts, key=lambda x: x["days"])
-        subject = f"{'🚨' if most_urgent['days'] <= 7 else '⚠️'} ReRoots NPN Expiry — {len(alerts)} certificate{'s' if len(alerts)>1 else ''} need attention"
+        subject = f"{'🚨' if most_urgent['days'] <= 7 else '⚠️'} AUREM NPN Expiry — {len(alerts)} certificate{'s' if len(alerts)>1 else ''} need attention"
 
         html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{{font-family:Georgia,serif;background:#FDF9F9;margin:0;padding:0;}}.container{{max-width:620px;margin:0 auto;padding:40px 20px;}}.logo{{text-align:center;letter-spacing:.3em;font-size:22px;color:#2D2A2E;margin-bottom:40px;}}.logo span{{color:#F8A5B8;}}.body-text{{font-size:15px;line-height:1.8;color:#2D2A2E;margin-bottom:20px;}}.table-wrap{{border:1px solid #F0E8E8;border-radius:10px;overflow:hidden;margin-bottom:24px;}}table{{width:100%;border-collapse:collapse;}}th{{background:#FEF6F7;padding:10px;text-align:left;font-size:11px;letter-spacing:.15em;color:#C4BAC0;text-transform:uppercase;font-family:monospace;font-weight:400;}}.btn{{display:inline-block;background:#F8A5B8;color:#fff;text-decoration:none;padding:12px 24px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;border-radius:8px;}}.footer{{text-align:center;font-size:12px;color:#C4BAC0;margin-top:40px;}}</style></head>
 <body><div class="container">
@@ -409,7 +409,7 @@ async def check_npn_expiry_reminders():
   <div class="table-wrap"><table><thead><tr><th>Ingredient</th><th>NPN Number</th><th>Expiry Date</th><th>Days Left</th></tr></thead><tbody>{rows}</tbody></table></div>
   <p class="body-text" style="font-size:14px;color:#8A8490;">Log in to the compliance module to initiate renewal or update certificate status.</p>
   <a href="{SITE_URL}/admin?section=hc-compliance" class="btn">View Compliance Tracker</a>
-  <div class="footer">ReRoots Automated Alert · {date.today().strftime("%B %d, %Y")}</div>
+  <div class="footer">AUREM Automated Alert · {date.today().strftime("%B %d, %Y")}</div>
 </div></body></html>"""
 
         await send_email(OWNER_EMAIL, OWNER_NAME, subject, html)
@@ -482,10 +482,10 @@ async def send_monthly_pnl():
   <div class="table-wrap"><table>{table_html}</table></div>
   <div class="tax-note">GST/HST Collected: <strong style="color:#2D2A2E;">{fCur(tax_col)}</strong> — remit to CRA by quarterly deadline</div>
   <a href="{SITE_URL}/admin?section=accounting-gst" class="btn">View Full Accounting</a>
-  <div class="footer">ReRoots Aesthetics Inc. · Automated Monthly Report<br>{period_label}</div>
+  <div class="footer">AUREM Aesthetics Inc. · Automated Monthly Report<br>{period_label}</div>
 </div></body></html>"""
 
-        await send_email(OWNER_EMAIL, OWNER_NAME, f"ReRoots {period_label} P&L — {fCur(net)} net profit", html)
+        await send_email(OWNER_EMAIL, OWNER_NAME, f"AUREM {period_label} P&L — {fCur(net)} net profit", html)
         print(f"[MONTHLY PNL] Sent for {period_label} | Net: {fCur(net)}")
 
     except Exception as e:

@@ -21,7 +21,7 @@ import logging
 from fastapi import APIRouter, Request
 from typing import Optional
 
-logger = logging.getLogger("reroots.cache")
+logger = logging.getLogger("aurem.liveche")
 
 cache_router = APIRouter(prefix="/api/admin/cache", tags=["cache"])
 

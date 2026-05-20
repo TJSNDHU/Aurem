@@ -158,9 +158,9 @@ const PlatformDashboard = () => {
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
           >
-            <Target className="w-10 h-10 text-[#D4AF37] mx-auto mb-4" />
+            <Target className="size-10 text-[#D4AF37] mx-auto mb-4" />
           </motion.div>
-          <p className="text-[#444] text-sm tracking-[0.2em]">INITIALIZING AUREM...</p>
+          <p className="text-[#444] text-sm tracking-[0.2em]">INITIALIZING AUREM…</p>
         </motion.div>
       </div>
     );
@@ -195,10 +195,10 @@ const PlatformDashboard = () => {
         <div className="p-6 border-b border-[#151515]">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center">
-                <Target className="w-5 h-5 text-[#050505]" />
+              <div className="size-10 rounded bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center">
+                <Target className="size-5 text-[#050505]" />
               </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#009874] rounded-full animate-pulse"></div>
+              <div className="absolute -top-1 -right-1 size-3 bg-[#009874] rounded-full animate-pulse"></div>
             </div>
             <div>
               <div className="text-sm tracking-[0.15em]" style={{ fontFamily: "'Playfair Display', serif" }}>AUREM</div>
@@ -230,11 +230,11 @@ const PlatformDashboard = () => {
                 }`}
               >
                 <span className="flex items-center gap-3">
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="size-4" />
                   <span className="tracking-wide">{item.label}</span>
                 </span>
                 {item.badge && (
-                  <span className="w-2 h-2 bg-[#009874] rounded-full animate-pulse"></span>
+                  <span className="size-2 bg-[#009874] rounded-full animate-pulse"></span>
                 )}
               </motion.button>
             ))}
@@ -259,7 +259,7 @@ const PlatformDashboard = () => {
                 }`}
               >
                 <span className="flex items-center gap-3">
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className="size-4" />
                   <span className="tracking-wide">{item.label}</span>
                 </span>
               </motion.button>
@@ -294,7 +294,7 @@ const PlatformDashboard = () => {
             onClick={logout}
             className="w-full flex items-center gap-2 px-4 py-3 mt-3 text-sm text-[#444] hover:text-[#666] transition-colors"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="size-4" />
             <span className="tracking-wide">Disconnect</span>
           </button>
         </div>
@@ -326,7 +326,7 @@ const PlatformDashboard = () => {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-[#009874]/10 border border-[#009874]/30 rounded">
-                <div className="w-2 h-2 bg-[#009874] rounded-full animate-pulse"></div>
+                <div className="size-2 bg-[#009874] rounded-full animate-pulse"></div>
                 <span className="text-xs text-[#009874] tracking-wide">AUREM Online</span>
               </div>
               <motion.button 
@@ -335,7 +335,7 @@ const PlatformDashboard = () => {
                 onClick={fetchAllData}
                 className="p-2.5 bg-[#0F0F0F] border border-[#151515] rounded hover:border-[#D4AF37]/40"
               >
-                <RefreshCw className="w-4 h-4 text-[#555]" />
+                <RefreshCw className="size-4 text-[#555]" />
               </motion.button>
             </div>
           </div>
@@ -375,17 +375,17 @@ const PlatformDashboard = () => {
                         >
                           <div className="flex items-center justify-between mb-3">
                             <div 
-                              className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              className="size-10 rounded-lg flex items-center justify-center"
                               style={{ backgroundColor: `${color}15`, border: `1px solid ${color}30` }}
                             >
-                              <Icon className="w-5 h-5" style={{ color }} />
+                              <Icon className="size-5" style={{ color }} />
                             </div>
                             <span className="text-[10px] tracking-[0.15em]" style={{ color }}>{agent.role}</span>
                           </div>
                           <h3 className="font-medium mb-1">{agent.name}</h3>
                           <p className="text-xs text-[#444]">{agent.toolset}</p>
                           <div className="mt-3 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: color }}></div>
+                            <div className="size-2 rounded-full animate-pulse" style={{ backgroundColor: color }}></div>
                             <span className="text-[10px] text-[#333]">Ready</span>
                           </div>
                         </motion.div>
@@ -433,14 +433,14 @@ const PlatformDashboard = () => {
                   <div className="bg-white/80 backdrop-blur-sm border border-[#151515] rounded-lg overflow-hidden">
                     <div className="px-6 py-4 border-b border-[#151515] flex items-center justify-between">
                       <h3 className="text-sm font-medium flex items-center gap-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-                        <Terminal className="w-4 h-4 text-[#D4AF37]" />
+                        <Terminal className="size-4 text-[#D4AF37]" />
                         Live Agent Feed
                       </h3>
-                      <div className="w-2 h-2 bg-[#009874] rounded-full animate-pulse"></div>
+                      <div className="size-2 bg-[#009874] rounded-full animate-pulse"></div>
                     </div>
                     <div className="max-h-64 overflow-y-auto p-4 font-mono text-xs">
                       {liveLogs.length === 0 ? (
-                        <p className="text-[#333]">Awaiting agent activity...</p>
+                        <p className="text-[#333]">Awaiting agent activity…</p>
                       ) : (
                         liveLogs.slice(-8).map((log, i) => (
                           <LogEntry key={i} log={log} agentIcons={agentIcons} agentColors={agentColors} />
@@ -482,16 +482,16 @@ const PlatformDashboard = () => {
                       disabled={executing === target.id}
                       className="p-6 bg-white/80 backdrop-blur-sm rounded-lg border border-[#151515] text-left transition-all group disabled:opacity-50"
                     >
-                      <div className="w-12 h-12 rounded-lg bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mb-4 group-hover:bg-[#D4AF37]/20">
-                        <target.icon className="w-5 h-5 text-[#D4AF37]" />
+                      <div className="size-12 rounded-lg bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center justify-center mb-4 group-hover:bg-[#D4AF37]/20">
+                        <target.icon className="size-5 text-[#D4AF37]" />
                       </div>
                       <h3 className="font-medium mb-1 group-hover:text-[#D4AF37] transition-colors">{target.name}</h3>
                       <p className="text-xs text-[#444]">{target.desc}</p>
                       <div className="mt-4 pt-4 border-t border-[#151515]">
                         {executing === target.id ? (
                           <span className="text-xs text-[#D4AF37] flex items-center gap-2">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Deploying...
+                            <Loader2 className="size-3 animate-spin" />
+                            Deploying…
                           </span>
                         ) : (
                           <span className="text-xs text-[#555] group-hover:text-[#D4AF37]">Click to deploy →</span>
@@ -514,19 +514,19 @@ const PlatformDashboard = () => {
                 <div className="bg-white/80 backdrop-blur-sm border border-[#151515] rounded-lg overflow-hidden">
                   <div className="px-6 py-4 border-b border-[#151515] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Terminal className="w-5 h-5 text-[#D4AF37]" />
+                      <Terminal className="size-5 text-[#D4AF37]" />
                       <h3 className="font-medium" style={{ fontFamily: "'Playfair Display', serif" }}>Agent Activity Stream</h3>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-[#009874] rounded-full animate-pulse"></div>
+                      <div className="size-2 bg-[#009874] rounded-full animate-pulse"></div>
                       <span className="text-xs text-[#009874]">Live</span>
                     </div>
                   </div>
                   <div className="h-[500px] overflow-y-auto p-6 font-mono text-sm bg-white/60">
                     {liveLogs.length === 0 ? (
                       <div className="text-center text-[#333] py-20">
-                        <Terminal className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                        <p>Awaiting agent activity...</p>
+                        <Terminal className="size-12 mx-auto mb-4 opacity-30" />
+                        <p>Awaiting agent activity…</p>
                         <p className="text-xs mt-2">Launch a Vanguard mission to see live logs</p>
                       </div>
                     ) : (
@@ -561,8 +561,8 @@ const PlatformDashboard = () => {
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-[#8B5CF6]/10 border border-[#8B5CF6]/30">
-                            <Layers className="w-5 h-5 text-[#8B5CF6]" />
+                          <div className="size-12 rounded-lg flex items-center justify-center bg-[#8B5CF6]/10 border border-[#8B5CF6]/30">
+                            <Layers className="size-5 text-[#8B5CF6]" />
                           </div>
                           <div>
                             <h4 className="font-medium">WordPress Plugin</h4>
@@ -594,7 +594,7 @@ const PlatformDashboard = () => {
                               className="flex-shrink-0 p-2 rounded hover:bg-[#8B5CF6]/10 transition-colors"
                               aria-label="Copy tenant ID"
                             >
-                              <Copy className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                              <Copy className="size-3.5 text-[#8B5CF6]" />
                             </button>
                           </div>
                           <div id="wp-copy-feedback" className="text-[9px] text-[#4ADE80] mt-1" style={{ opacity: 0, transition: 'opacity 0.3s' }}>COPIED ✓</div>
@@ -606,7 +606,7 @@ const PlatformDashboard = () => {
                         data-testid="wordpress-download-btn"
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded text-sm font-medium bg-[#8B5CF6] text-white hover:bg-[#7C3AED] transition-all"
                       >
-                        <Download className="w-4 h-4" />
+                        <Download className="size-4" />
                         Download Plugin (4.4 KB)
                       </a>
                       <details className="mt-3">
@@ -627,8 +627,8 @@ const PlatformDashboard = () => {
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-[#009874]/10 border border-[#009874]/30">
-                            <ShoppingBag className="w-5 h-5 text-[#009874]" />
+                          <div className="size-12 rounded-lg flex items-center justify-center bg-[#009874]/10 border border-[#009874]/30">
+                            <ShoppingBag className="size-5 text-[#009874]" />
                           </div>
                           <div>
                             <h4 className="font-medium">Shopify Store</h4>
@@ -661,7 +661,7 @@ const PlatformDashboard = () => {
                         }}
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded text-sm font-medium bg-[#009874] text-white hover:bg-[#00785C] transition-all"
                       >
-                        <ShoppingBag className="w-4 h-4" />
+                        <ShoppingBag className="size-4" />
                         Install on Shopify
                       </button>
                     </motion.div>
@@ -684,10 +684,10 @@ const PlatformDashboard = () => {
                           className="p-6 bg-white/80 backdrop-blur-sm rounded-lg border border-[#151515] transition-all"
                         >
                           <div className="flex items-center gap-4 mb-4">
-                            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                            <div className={`size-12 rounded-lg flex items-center justify-center ${
                               status?.connected ? 'bg-[#009874]/10 border border-[#009874]/30' : 'bg-white/50'
                             }`}>
-                              <ToolIcon className={`w-5 h-5 ${status?.connected ? 'text-[#009874]' : 'text-[#444]'}`} />
+                              <ToolIcon className={`size-5 ${status?.connected ? 'text-[#009874]' : 'text-[#444]'}`} />
                             </div>
                             <div>
                               <h3 className="font-medium capitalize">{tool.replace('_', ' ')}</h3>
@@ -763,36 +763,36 @@ const PlatformDashboard = () => {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="p-6 bg-white/80 backdrop-blur-sm rounded-lg border border-[#151515]">
                     <div className="flex items-center gap-3 mb-4">
-                      <Shield className="w-5 h-5 text-[#009874]" />
+                      <Shield className="size-5 text-[#009874]" />
                       <h3 className="font-medium">Encryption</h3>
                     </div>
                     <p className="text-xs text-[#444] mb-4">AES-256 Fernet encryption for sensitive prospect data</p>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-[#009874]" />
+                      <CheckCircle className="size-4 text-[#009874]" />
                       <span className="text-xs text-[#009874]">Active</span>
                     </div>
                   </div>
                   
                   <div className="p-6 bg-white/80 backdrop-blur-sm rounded-lg border border-[#151515]">
                     <div className="flex items-center gap-3 mb-4">
-                      <Key className="w-5 h-5 text-[#D4AF37]" />
+                      <Key className="size-5 text-[#D4AF37]" />
                       <h3 className="font-medium">JWT Auth</h3>
                     </div>
                     <p className="text-xs text-[#444] mb-4">2-hour expiry, tier-based access control</p>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-[#009874]" />
+                      <CheckCircle className="size-4 text-[#009874]" />
                       <span className="text-xs text-[#009874]">Active</span>
                     </div>
                   </div>
                   
                   <div className="p-6 bg-white/80 backdrop-blur-sm rounded-lg border border-[#151515]">
                     <div className="flex items-center gap-3 mb-4">
-                      <AlertCircle className="w-5 h-5 text-[#D4AF37]" />
+                      <AlertCircle className="size-5 text-[#D4AF37]" />
                       <h3 className="font-medium">Rate Limiting</h3>
                     </div>
                     <p className="text-xs text-[#444] mb-4">20 req/hr unauth, 200 req/hr auth</p>
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-[#009874]" />
+                      <CheckCircle className="size-4 text-[#009874]" />
                       <span className="text-xs text-[#009874]">Active</span>
                     </div>
                   </div>
@@ -808,7 +808,7 @@ const PlatformDashboard = () => {
                       { name: 'Suspicious Detection', desc: '10+ identical requests = 24h block' },
                     ].map((feature, i) => (
                       <div key={i} className="flex items-start gap-3 p-3 bg-white/60 rounded">
-                        <CheckCircle className="w-4 h-4 text-[#009874] mt-0.5" />
+                        <CheckCircle className="size-4 text-[#009874] mt-0.5" />
                         <div>
                           <p className="text-sm">{feature.name}</p>
                           <p className="text-xs text-[#444]">{feature.desc}</p>
@@ -838,7 +838,7 @@ const KPICard = ({ title, value, icon: Icon, trend, trendUp, highlight }) => (
   >
     <div className="flex items-center justify-between mb-3">
       <span className="text-[10px] text-[#444] tracking-[0.15em] uppercase">{title}</span>
-      <Icon className={`w-4 h-4 ${highlight ? 'text-[#D4AF37]' : 'text-[#333]'}`} />
+      <Icon className={`size-4 ${highlight ? 'text-[#D4AF37]' : 'text-[#333]'}`} />
     </div>
     <div className="flex items-end justify-between">
       <span className="text-2xl font-light" style={{ fontFamily: "'Playfair Display', serif" }}>{value}</span>
@@ -861,10 +861,10 @@ const LogEntry = ({ log, agentIcons, agentColors, expanded }) => {
       className={`flex items-start gap-3 ${expanded ? 'py-3 border-b border-[#151515]/50' : 'py-1.5'}`}
     >
       <div 
-        className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5"
+        className="size-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5"
         style={{ backgroundColor: `${color}20` }}
       >
-        <Icon className="w-3 h-3" style={{ color }} />
+        <Icon className="size-3" style={{ color }} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">

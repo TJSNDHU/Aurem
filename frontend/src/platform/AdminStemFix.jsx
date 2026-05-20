@@ -96,7 +96,7 @@ export default function AdminStemFix() {
   if (loading && items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center" data-testid="stem-fix-loading">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="size-8 text-blue-400 animate-spin" />
       </div>
     );
   }
@@ -109,7 +109,7 @@ export default function AdminStemFix() {
           <div>
             <h1 className="text-3xl font-bold mb-1">Stem-Fix Queue</h1>
             <p className="text-gray-400 text-sm">
-              Structural refactors — the source gets healed, not patched.
+              Structural refactors, the source gets healed, not patched.
             </p>
           </div>
           <button
@@ -117,7 +117,7 @@ export default function AdminStemFix() {
             data-testid="stem-fix-refresh"
             className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded text-sm hover:bg-gray-700"
           >
-            <RefreshCw className="w-4 h-4" /> Refresh
+            <RefreshCw className="size-4" /> Refresh
           </button>
         </div>
 
@@ -129,7 +129,7 @@ export default function AdminStemFix() {
 
         {items.length === 0 ? (
           <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-10 text-center" data-testid="stem-fix-empty">
-            <Shield className="w-12 h-12 mx-auto text-green-500 mb-3" />
+            <Shield className="size-12 mx-auto text-green-500 mb-3" />
             <div className="text-lg font-semibold text-gray-200">No stem-fixes yet</div>
             <p className="text-sm text-gray-500 mt-2">
               Generate one from the <strong>Root Command</strong> page by clicking
@@ -158,12 +158,12 @@ export default function AdminStemFix() {
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
+                        className="size-2 rounded-full mt-2 flex-shrink-0"
                         style={{ backgroundColor: SEVERITY_COLORS[sev] }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <StatusIcon className="w-4 h-4" style={{ color: meta.color }} />
+                          <StatusIcon className="size-4" style={{ color: meta.color }} />
                           <span className="text-xs font-semibold" style={{ color: meta.color }}>
                             {meta.label}
                           </span>
@@ -178,7 +178,7 @@ export default function AdminStemFix() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <Code className="w-4 h-4 text-gray-500" />
+                          <Code className="size-4 text-gray-500" />
                           <span className="font-mono text-gray-300">{it.target_function}()</span>
                           <span className="text-gray-500 font-mono text-xs">
                             {it.target_file?.split("/").slice(-3).join("/")}:{it.start_line}-{it.end_line}
@@ -242,7 +242,7 @@ export default function AdminStemFix() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <div className="text-xs text-red-300 uppercase tracking-wide mb-2 flex items-center gap-1">
-                            <XCircle className="w-3 h-3" /> Original Source
+                            <XCircle className="size-3" /> Original Source
                           </div>
                           <pre className="text-[11px] bg-red-950/20 border border-red-900/50 text-red-100 p-3 rounded max-h-64 overflow-auto font-mono">
                             {it.original_source || "(empty)"}
@@ -250,7 +250,7 @@ export default function AdminStemFix() {
                         </div>
                         <div>
                           <div className="text-xs text-green-300 uppercase tracking-wide mb-2 flex items-center gap-1">
-                            <CheckCircle className="w-3 h-3" /> Proposed Refactor
+                            <CheckCircle className="size-3" /> Proposed Refactor
                           </div>
                           <pre className="text-[11px] bg-green-950/20 border border-green-900/50 text-green-100 p-3 rounded max-h-64 overflow-auto font-mono">
                             {claude.new_function_source || "(empty)"}
@@ -269,7 +269,7 @@ export default function AdminStemFix() {
                         <div className="mt-4 p-3 bg-gray-900 border border-gray-800 rounded" data-testid={`stem-fix-qa-${it.id}`}>
                           <div className="flex items-center justify-between mb-2">
                             <div className="text-xs uppercase tracking-wide text-gray-400 flex items-center gap-1">
-                              <Zap className="w-3 h-3" /> QA Self-Verification
+                              <Zap className="size-3" /> QA Self-Verification
                             </div>
                             <div className="text-xs">
                               <span className="text-green-400">{it.qa_result.passed}✓</span>

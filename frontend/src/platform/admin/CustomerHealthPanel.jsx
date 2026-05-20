@@ -339,7 +339,7 @@ export default function CustomerHealthPanel() {
           {loading && <div style={{ padding: 24, color: '#7A7468' }}>Loading…</div>}
           {!loading && filtered.length === 0 && (
             <div style={{ padding: 24, color: '#7A7468' }}>
-              No tenant data — click "Scan All" to populate.
+              No tenant data, click "Scan All" to populate.
             </div>
           )}
           {filtered.map((t) => (

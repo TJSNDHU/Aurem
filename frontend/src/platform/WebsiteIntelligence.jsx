@@ -46,7 +46,7 @@ const ClientScanCard = ({ client, onSelect }) => {
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-[#D4AF37]" />
+          <Globe className="size-4 text-[#D4AF37]" />
           <span className="text-sm font-medium text-white truncate max-w-[180px]">{client.business_name || client.tenant_id}</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -61,10 +61,10 @@ const ClientScanCard = ({ client, onSelect }) => {
       </div>
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#1a1a2e]">
         <div className="flex items-center gap-3 text-[9px] text-[#9ca3af]">
-          {client.issues_count > 0 && <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-yellow-400" /> {client.issues_count} issues</span>}
-          {client.auto_fix_count > 0 && <span className="flex items-center gap-1"><Wrench className="w-3 h-3 text-green-400" /> {client.auto_fix_count} fixed</span>}
+          {client.issues_count > 0 && <span className="flex items-center gap-1"><AlertTriangle className="size-3 text-yellow-400" /> {client.issues_count} issues</span>}
+          {client.auto_fix_count > 0 && <span className="flex items-center gap-1"><Wrench className="size-3 text-green-400" /> {client.auto_fix_count} fixed</span>}
         </div>
-        <ChevronRight className="w-3 h-3 text-[#9ca3af]" />
+        <ChevronRight className="size-3 text-[#9ca3af]" />
       </div>
     </motion.div>
   );
@@ -87,14 +87,14 @@ const ScanDetailPanel = ({ scan, onClose, onRescan, scanning, scanError }) => {
           style={{ background: 'linear-gradient(135deg, #D4AF37, #B8860B)' }}
           data-testid="rescan-btn"
         >
-          <RefreshCw className={`w-3 h-3 ${scanning ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`size-3 ${scanning ? 'animate-spin' : ''}`} />
           {scanning ? 'Scanning...' : 'Rescan Now'}
         </button>
       </div>
 
       {scanError && (
         <div className="p-3 rounded-lg flex items-start gap-2 bg-red-500/10 border border-red-500/30" data-testid="scan-error-banner">
-          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="size-4 text-red-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <div className="text-xs font-bold text-red-400">Rescan failed</div>
             <p className="text-[11px] text-red-300/80 mt-0.5">{scanError}</p>
@@ -130,7 +130,7 @@ const ScanDetailPanel = ({ scan, onClose, onRescan, scanning, scanError }) => {
         )}
 
         <div className="flex items-center gap-3 text-[9px] text-[#9ca3af]">
-          <Clock className="w-3 h-3" />
+          <Clock className="size-3" />
           <span>Last scan: {scan.scanned_at ? new Date(scan.scanned_at).toLocaleString() : 'N/A'}</span>
           {scan.scan_duration_seconds && <span>({scan.scan_duration_seconds}s)</span>}
         </div>
@@ -139,7 +139,7 @@ const ScanDetailPanel = ({ scan, onClose, onRescan, scanning, scanError }) => {
       {scan.issues && scan.issues.length > 0 && (
         <div className="p-4 rounded-xl border border-[#1a1a2e]" style={{ background: 'rgba(10,10,20,0.6)' }}>
           <h4 className="text-xs font-bold text-white mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+            <AlertTriangle className="size-3.5 text-yellow-400" />
             Issues Found ({scan.issues.length})
           </h4>
           <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -151,7 +151,7 @@ const ScanDetailPanel = ({ scan, onClose, onRescan, scanning, scanError }) => {
                   {issue.detail && <span className="text-[9px] text-[#9ca3af]">({issue.detail})</span>}
                 </div>
                 {issue.fixable ? (
-                  <span className="text-[9px] text-green-400 flex items-center gap-1"><Wrench className="w-3 h-3" /> Auto-fixable</span>
+                  <span className="text-[9px] text-green-400 flex items-center gap-1"><Wrench className="size-3" /> Auto-fixable</span>
                 ) : (
                   <span className="text-[9px] text-[#9ca3af]">Manual fix</span>
                 )}
@@ -164,7 +164,7 @@ const ScanDetailPanel = ({ scan, onClose, onRescan, scanning, scanError }) => {
       {scan.auto_fixed && scan.auto_fixed.length > 0 && (
         <div className="p-4 rounded-xl border border-green-500/20" style={{ background: 'rgba(74,222,128,0.03)' }}>
           <h4 className="text-xs font-bold text-green-400 mb-3 flex items-center gap-2">
-            <CheckCircle className="w-3.5 h-3.5" />
+            <CheckCircle className="size-3.5" />
             Auto-Fixed ({scan.auto_fixed.length})
           </h4>
           <div className="space-y-2">
@@ -262,7 +262,7 @@ const WebsiteIntelligence = ({ token }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20" data-testid="intelligence-loading">
-        <RefreshCw className="w-6 h-6 text-[#D4AF37] animate-spin" />
+        <RefreshCw className="size-6 text-[#D4AF37] animate-spin" />
       </div>
     );
   }
@@ -271,11 +271,11 @@ const WebsiteIntelligence = ({ token }) => {
     <div className="space-y-4" data-testid="website-intelligence">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Globe className="w-5 h-5 text-[#D4AF37]" />
+          <Globe className="size-5 text-[#D4AF37]" />
           <h2 className="text-lg font-bold text-white tracking-wide">Website Intelligence</h2>
         </div>
         <div className="flex items-center gap-2 text-[9px] text-[#9ca3af]">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          <div className="size-1.5 rounded-full bg-green-400 animate-pulse" />
           Auto-scanning daily at 3:15 AM UTC
         </div>
       </div>
@@ -292,7 +292,7 @@ const WebsiteIntelligence = ({ token }) => {
         <>
           {clients.length === 0 ? (
             <div className="text-center py-12 text-[#9ca3af]">
-              <Search className="w-8 h-8 mx-auto mb-3 opacity-40" />
+              <Search className="size-8 mx-auto mb-3 opacity-40" />
               <p className="text-sm">No client websites scanned yet.</p>
               <p className="text-xs mt-1">Add a website_url to a client profile to start scanning.</p>
             </div>

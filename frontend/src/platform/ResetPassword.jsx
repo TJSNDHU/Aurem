@@ -47,7 +47,7 @@ export default function ResetPassword() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--aurem-bg, #050505)' }}>
         <div className="text-center" data-testid="reset-invalid">
-          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
+          <AlertCircle className="size-16 mx-auto mb-4 text-red-500" />
           <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>Invalid Reset Link</h1>
           <p className="text-sm mb-6" style={{ color: 'var(--aurem-body-secondary, #888)' }}>This password reset link is invalid or has expired.</p>
           <Link to="/forgot-password" className="text-sm font-medium" style={{ color: 'var(--aurem-accent, #F97316)' }}>
@@ -62,12 +62,12 @@ export default function ResetPassword() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--aurem-bg, #050505)' }}>
       <div className="w-full max-w-md px-6">
         <Link to="/login" className="inline-flex items-center gap-2 text-sm mb-8 hover:opacity-80 transition-opacity" style={{ color: 'var(--aurem-accent, #F97316)' }} data-testid="reset-back-link">
-          <ArrowLeft className="w-4 h-4" /> Back to Login
+          <ArrowLeft className="size-4" /> Back to Login
         </Link>
 
         {success ? (
           <div className="text-center" data-testid="reset-success">
-            <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{ color: '#FF6B00' }} />
+            <CheckCircle className="size-16 mx-auto mb-4" style={{ color: '#FF6B00' }} />
             <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>Password Reset!</h1>
             <p className="text-sm mb-6" style={{ color: 'var(--aurem-body-secondary, #888)' }}>Your password has been reset successfully. You can now log in with your new password.</p>
             <Link to="/login" className="inline-block px-8 py-3 rounded-xl text-sm font-bold" style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)', color: '#050505' }} data-testid="reset-login-link">
@@ -77,7 +77,7 @@ export default function ResetPassword() {
         ) : (
           <>
             <div className="flex items-center gap-3 mb-2">
-              <Lock className="w-6 h-6" style={{ color: 'var(--aurem-accent, #F97316)' }} />
+              <Lock className="size-6" style={{ color: 'var(--aurem-accent, #F97316)' }} />
               <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading, #F4F4F4)' }} data-testid="reset-title">New Password</h1>
             </div>
             <p className="text-sm mb-8" style={{ color: 'var(--aurem-body-secondary, #888)' }}>

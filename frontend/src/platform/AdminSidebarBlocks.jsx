@@ -117,7 +117,7 @@ function BlockCard({ block, onOpen }) {
           ))}
         </span>
         <span className="text-gray-600 flex items-center gap-1 group-hover:text-gray-300">
-          drill <ExternalLink className="w-3 h-3" />
+          drill <ExternalLink className="size-3" />
         </span>
       </div>
     </button>
@@ -141,7 +141,7 @@ function PaymentToast({ event, onDismiss }) {
     >
       <div className="flex items-center gap-3">
         <div className="p-2 rounded-full bg-emerald-600/20 border border-emerald-500/40">
-          <DollarSign className="w-4 h-4 text-emerald-300" />
+          <DollarSign className="size-4 text-emerald-300" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs uppercase tracking-widest text-emerald-400 font-bold">Payment received</div>
@@ -260,14 +260,14 @@ export default function AdminSidebarBlocks() {
               onClick={load}
               className="text-xs flex items-center gap-1 text-gray-300 hover:text-gray-100 px-3 py-1.5 rounded border border-gray-800 bg-gray-900/60"
             >
-              <RefreshCw className="w-3 h-3" /> Refresh
+              <RefreshCw className="size-3" /> Refresh
             </button>
           </div>
         </div>
 
         {loading && !data && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+            <Loader2 className="size-6 text-gray-400 animate-spin" />
             <span className="ml-3 text-gray-400">Projecting pillar snapshot…</span>
           </div>
         )}
@@ -291,7 +291,7 @@ export default function AdminSidebarBlocks() {
             </div>
 
             <div className="mt-6 text-xs text-gray-500 flex items-center gap-3">
-              <Clock className="w-3 h-3" />
+              <Clock className="size-3" />
               snapshot {data.cached ? "cached" : "live"} · auto-refresh {BLOCKS_POLL_MS / 1000}s · events {EVENTS_POLL_MS / 1000}s
               <span className="text-gray-700">·</span>
               <span>Wired to /admin/pillars-map · no independent DB queries</span>

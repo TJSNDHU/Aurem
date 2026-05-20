@@ -10,8 +10,8 @@ from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
-FROM_EMAIL = "ReRoots <hello@reroots.ca>"
-ADMIN_EMAIL = "tj@reroots.ca"
+FROM_EMAIL = "AUREM <hello@aurem.live>"
+ADMIN_EMAIL = "tj@aurem.live"
 DEFAULT_BUSINESS_ID = os.environ.get("DEFAULT_BUSINESS_ID", "default")
 
 
@@ -100,7 +100,7 @@ def base_template(title: str, content: str, cta_text: str = None, cta_link: str 
                     Biotech Skincare Canada
                 </p>
                 <h1 style="font-size:32px;font-weight:300;color:#C9A86E;margin:0;letter-spacing:0.04em;">
-                    ReRoots
+                    AUREM
                 </h1>
             </div>
             
@@ -119,10 +119,10 @@ def base_template(title: str, content: str, cta_text: str = None, cta_link: str 
             <!-- Footer -->
             <div style="margin-top:40px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
                 <p style="font-family:sans-serif;font-size:10px;color:#524D45;letter-spacing:0.08em;margin:0 0 6px;">
-                    reroots.ca · Canadian Biotech Skincare
+                    aurem.live · Canadian Biotech Skincare
                 </p>
                 <p style="font-family:sans-serif;font-size:9px;color:#3a3530;margin:0;">
-                    <a href="https://reroots.ca/unsubscribe" style="color:#5C5548;text-decoration:underline;">
+                    <a href="https://aurem.live/unsubscribe" style="color:#5C5548;text-decoration:underline;">
                         Unsubscribe
                     </a>
                 </p>
@@ -144,7 +144,7 @@ def send_welcome_email(email: str, name: str, tier: str = "Silver", points: int 
     """Send welcome email after signup"""
     content = f'''
     <p style="margin-bottom:16px;">Hi {name},</p>
-    <p style="margin-bottom:16px;">Welcome to the ReRoots family! We're thrilled to have you join our community of skincare enthusiasts.</p>
+    <p style="margin-bottom:16px;">Welcome to the AUREM family! We're thrilled to have you join our community of skincare enthusiasts.</p>
     <div style="background:#0d0d10;border:1px solid rgba(201,168,110,0.15);border-radius:8px;padding:20px;margin:24px 0;">
         <p style="font-family:sans-serif;font-size:10px;letter-spacing:0.15em;color:#8A6B38;margin:0 0 8px;text-transform:uppercase;">Your Membership</p>
         <p style="font-size:22px;color:#C9A86E;margin:0 0 4px;">{tier} Tier</p>
@@ -152,8 +152,8 @@ def send_welcome_email(email: str, name: str, tier: str = "Silver", points: int 
     </div>
     <p>Explore our biotech skincare collection and start your journey to healthier skin.</p>
     '''
-    html = base_template("Welcome to ReRoots", content, "START SHOPPING", "https://reroots.ca/app")
-    return send_email(email, "Welcome to ReRoots — Your Skin Journey Begins", html)
+    html = base_template("Welcome to AUREM", content, "START SHOPPING", "https://aurem.live/app")
+    return send_email(email, "Welcome to AUREM — Your Skin Journey Begins", html)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -186,7 +186,7 @@ def send_order_confirmation(email: str, name: str, order_id: str, items: List[Di
     
     <p style="color:#A89880;">Estimated delivery: <span style="color:#C9A86E;">{estimated_delivery}</span></p>
     '''
-    html = base_template("Order Confirmed", content, "TRACK ORDER", f"https://reroots.ca/track?order={order_id}")
+    html = base_template("Order Confirmed", content, "TRACK ORDER", f"https://aurem.live/track?order={order_id}")
     return send_email(email, f"Order Confirmed — #{order_id}", html)
 
 
@@ -211,7 +211,7 @@ def send_shipping_confirmation(email: str, name: str, order_id: str, tracking_nu
     </div>
     '''
     html = base_template("Your Order Has Shipped", content, "TRACK PACKAGE", tracking_link)
-    return send_email(email, f"Your ReRoots Order Has Shipped — #{order_id}", html)
+    return send_email(email, f"Your AUREM Order Has Shipped — #{order_id}", html)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -232,7 +232,7 @@ def send_birthday_email(email: str, name: str, bonus_points: int = 500):
     
     <p>Use your points on your next purchase and treat yourself to something special.</p>
     '''
-    html = base_template("Happy Birthday!", content, "REDEEM POINTS", "https://reroots.ca/app")
+    html = base_template("Happy Birthday!", content, "REDEEM POINTS", "https://aurem.live/app")
     return send_email(email, f"Happy Birthday, {name}! A Gift Awaits", html)
 
 
@@ -266,7 +266,7 @@ def send_tier_upgrade_email(email: str, name: str, new_tier: str, current_points
         {perks_html}
     </ul>
     '''
-    html = base_template(f"You're Now {new_tier}!", content, "EXPLORE PERKS", "https://reroots.ca/app")
+    html = base_template(f"You're Now {new_tier}!", content, "EXPLORE PERKS", "https://aurem.live/app")
     return send_email(email, f"Congratulations! You've Reached {new_tier} Status", html)
 
 
@@ -343,7 +343,7 @@ def send_abandoned_cart_reminder(email: str, name: str, cart_items: List[Dict], 
     </div>
     {urgency}
     '''
-    html = base_template(title, content, "COMPLETE PURCHASE", "https://reroots.ca/cart")
+    html = base_template(title, content, "COMPLETE PURCHASE", "https://aurem.live/cart")
     return send_email(email, subject, html)
 
 
@@ -381,7 +381,7 @@ def send_daily_sales_digest(orders_today: int, revenue_today: float, new_signups
     
     {low_stock_html}
     '''
-    html = base_template("Daily Sales Digest", content, "VIEW DASHBOARD", "https://reroots.ca/new-admin")
+    html = base_template("Daily Sales Digest", content, "VIEW DASHBOARD", "https://aurem.live/new-admin")
     return send_email(ADMIN_EMAIL, f"Daily Digest — {orders_today} orders, ${revenue_today:,.2f} revenue", html)
 
 
@@ -404,7 +404,7 @@ def send_low_stock_alert(product_name: str, sku: str, current_stock: int, reorde
     
     <p>Please restock this item as soon as possible to avoid stockouts.</p>
     '''
-    html = base_template("Low Stock Alert", content, "MANAGE INVENTORY", "https://reroots.ca/new-admin?tab=products")
+    html = base_template("Low Stock Alert", content, "MANAGE INVENTORY", "https://aurem.live/new-admin?tab=products")
     return send_email(ADMIN_EMAIL, f"⚠️ Low Stock: {product_name} ({current_stock} left)", html)
 
 
@@ -419,4 +419,4 @@ def send_password_reset_email(email: str, name: str, reset_link: str):
     <p style="margin-bottom:24px;">Click below to reset your password. This link expires in 1 hour.</p>
     '''
     html = base_template("Password Reset", content, "RESET PASSWORD", reset_link)
-    return send_email(email, "Reset your ReRoots password", html)
+    return send_email(email, "Reset your AUREM password", html)

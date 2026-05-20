@@ -103,7 +103,7 @@ export default function BrainGraphShare() {
     return (
       <div className="min-h-screen bg-[#050505] text-[#F4F4F4] flex items-center justify-center" data-testid="share-loading">
         <div className="flex items-center gap-3 text-sm text-[#999]">
-          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: G }} />
+          <div className="size-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: G }} />
           Loading knowledge graph…
         </div>
       </div>
@@ -140,7 +140,7 @@ export default function BrainGraphShare() {
         {/* Hero */}
         <div className="flex flex-col sm:flex-row sm:items-start gap-5 mb-8">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0"
+            className="size-16 rounded-2xl flex items-center justify-center shrink-0"
             style={{ background: `linear-gradient(135deg, ${G}22, ${G}08)`, border: `1px solid ${G}44` }}
           >
             <Brain size={32} style={{ color: G }} />
@@ -155,7 +155,7 @@ export default function BrainGraphShare() {
             <p className="text-sm text-[#bbb] max-w-2xl">
               A portable, read-only map of the AUREM codebase. Hand this to any AI (Claude,
               ChatGPT, Gemini, Cursor) for architecture review, debugging help, or a fresh
-              pair of eyes — without granting live repo access.
+              pair of eyes, without granting live repo access.
             </p>
           </div>
         </div>

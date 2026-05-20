@@ -342,7 +342,7 @@ export default function AdminControlCenter() {
             ) : 'No cache activity yet.'}
           </div>
           <div style={{marginTop:6,fontSize:10.5,color:C.textD}}>
-            Fallback safe — if Redis down, every call routes direct to MongoDB.
+            Fallback safe, if Redis down, every call routes direct to MongoDB.
           </div>
         </Card>
 

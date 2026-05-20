@@ -29,7 +29,7 @@ const UpgradePrompt = () => (
   <div className="rounded-2xl p-8 text-center space-y-4" data-testid="video-upgrade-prompt"
     style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.08), rgba(184,115,51,0.08))', border: '1px solid rgba(212,175,55,0.15)' }}>
     <Lock size={40} style={{ color: '#D4AF37', margin: '0 auto' }} />
-    <h3 className="text-lg font-black" style={{ color: 'var(--aurem-heading, #F5F5F5)' }}>Video Generation — Growth & Enterprise</h3>
+    <h3 className="text-lg font-black" style={{ color: 'var(--aurem-heading, #F5F5F5)' }}>Video Generation, Growth & Enterprise</h3>
     <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--aurem-text-secondary, #888)' }}>
       AI-powered video generation for product demos, brand stories, and social ads.
       Growth ($297/mo): 480p text-to-video, 10/month.
@@ -146,7 +146,7 @@ export default function VideoMarketing({ token }) {
         <div>
           <h2 className="text-lg font-black tracking-tight" style={{ color: 'var(--aurem-heading, #F5F5F5)' }}>Video Marketing</h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--aurem-text-secondary, #888)' }}>
-            AI-powered video generation — Product Demo / Brand Story / Social Ad / Tutorial
+            AI-powered video generation, Product Demo / Brand Story / Social Ad / Tutorial
           </p>
         </div>
         {usageData?.videos && (
@@ -182,14 +182,14 @@ export default function VideoMarketing({ token }) {
         {/* Image URL (optional) */}
         <div>
           <label className="text-[10px] font-bold uppercase tracking-wider block mb-1.5" style={{ color: '#888' }}>
-            Product Image URL (optional — enables Image-to-Video)
+            Product Image URL (optional, enables Image-to-Video)
           </label>
           <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)}
             placeholder="https://example.com/product.jpg" data-testid="image-url-input"
             className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all focus:ring-1"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--aurem-text, #ccc)', border: '1px solid rgba(255,255,255,0.08)', '--tw-ring-color': '#D4AF37' }} />
           {imageUrl && (
-            <p className="text-[9px] mt-1 font-bold" style={{ color: '#D4AF37' }}>Multi-Reference mode — product image will guide video style</p>
+            <p className="text-[9px] mt-1 font-bold" style={{ color: '#D4AF37' }}>Multi-Reference mode, product image will guide video style</p>
           )}
         </div>
 

@@ -1,5 +1,5 @@
 """
-ReRoots AI SMS Alerts Router
+AUREM AI SMS Alerts Router
 Twilio-powered SMS notifications, OTP, and alerts
 """
 
@@ -53,16 +53,16 @@ class BulkSMSRequest(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SMS_TEMPLATES = {
-    "order_confirmation": "ReRoots: Your order #{order_id} is confirmed! Total: ${total}. Track at reroots.ca/track",
-    "shipping": "ReRoots: Great news! Your order #{order_id} has shipped. Tracking: {tracking_number}",
-    "delivery": "ReRoots: Your ReRoots order has been delivered! Enjoy your skincare journey.",
-    "otp": "ReRoots: Your verification code is {code}. Valid for 10 minutes.",
-    "welcome": "Welcome to ReRoots! Your skin transformation journey begins now. Shop at reroots.ca",
-    "promo": "ReRoots: {promo_message} Use code: {code}. Valid until {expiry}. reroots.ca",
-    "restock": "ReRoots: {product_name} is back in stock! Get yours before it sells out: reroots.ca/shop",
-    "abandoned_cart": "ReRoots: You left items in your cart! Complete your order now: reroots.ca/cart",
-    "review_request": "ReRoots: How's your {product_name}? Share your review: {review_link}",
-    "birthday": "ReRoots: Happy Birthday! Here's {discount}% off your next order. Code: {code}"
+    "order_confirmation": "AUREM: Your order #{order_id} is confirmed! Total: ${total}. Track at aurem.live/track",
+    "shipping": "AUREM: Great news! Your order #{order_id} has shipped. Tracking: {tracking_number}",
+    "delivery": "AUREM: Your AUREM order has been delivered! Enjoy your skincare journey.",
+    "otp": "AUREM: Your verification code is {code}. Valid for 10 minutes.",
+    "welcome": "Welcome to AUREM! Your skin transformation journey begins now. Shop at aurem.live",
+    "promo": "AUREM: {promo_message} Use code: {code}. Valid until {expiry}. aurem.live",
+    "restock": "AUREM: {product_name} is back in stock! Get yours before it sells out: aurem.live/shop",
+    "abandoned_cart": "AUREM: You left items in your cart! Complete your order now: aurem.live/cart",
+    "review_request": "AUREM: How's your {product_name}? Share your review: {review_link}",
+    "birthday": "AUREM: Happy Birthday! Here's {discount}% off your next order. Code: {code}"
 }
 
 
@@ -205,7 +205,7 @@ async def send_otp(data: SendOTPRequest):
 
     if is_sms_disabled():
         code = f"{secrets.randbelow(1_000_000):06d}"
-        otp_message = f"ReRoots: Your verification code is {code}. Valid for 10 minutes."
+        otp_message = f"AUREM: Your verification code is {code}. Valid for 10 minutes."
         try:
             from shared.providers.twilio import send_whatsapp_message
             wa_result = await send_whatsapp_message(to_number, otp_message)

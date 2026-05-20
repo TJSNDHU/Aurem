@@ -42,7 +42,7 @@ function HealthScorePanel({ healthBreakdown, healthScore, recalculating, onRecal
     <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="health-score-panel">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Heart className="w-4 h-4 text-[#FF6B00]" />
+          <Heart className="size-4 text-[#FF6B00]" />
           <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">Health Score</span>
         </div>
         <div className="flex items-center gap-3">
@@ -57,7 +57,7 @@ function HealthScorePanel({ healthBreakdown, healthScore, recalculating, onRecal
             className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium text-[#D4AF37] border border-[#D4AF37]/30 rounded-lg hover:bg-[#D4AF37]/5 disabled:opacity-40"
             data-testid="recalculate-health-btn"
           >
-            <RefreshCw className={`w-3 h-3 ${recalculating ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-3 ${recalculating ? 'animate-spin' : ''}`} />
             {recalculating ? 'Calculating...' : 'Recalculate'}
           </button>
         </div>
@@ -65,8 +65,8 @@ function HealthScorePanel({ healthBreakdown, healthScore, recalculating, onRecal
 
       <div className="flex items-start gap-6">
         {/* Score Ring */}
-        <div className="flex-shrink-0 relative w-24 h-24">
-          <svg viewBox="0 0 88 88" className="w-full h-full -rotate-90">
+        <div className="flex-shrink-0 relative size-24">
+          <svg viewBox="0 0 88 88" className="size-full -rotate-90">
             <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(128,128,128,0.08)" strokeWidth="6" />
             <circle
               cx="44" cy="44" r="38" fill="none"
@@ -92,7 +92,7 @@ function HealthScorePanel({ healthBreakdown, healthScore, recalculating, onRecal
             const signal = breakdown[key];
             if (!signal) return (
               <div key={key} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: 'rgba(128,128,128,0.03)' }}>
-                <meta.icon className="w-3.5 h-3.5 text-[#ccc]" />
+                <meta.icon className="size-3.5 text-[#ccc]" />
                 <span className="text-[10px] text-[#aaa] flex-1">{meta.label}</span>
                 <span className="text-[10px] text-[#ccc]">No data</span>
               </div>
@@ -101,7 +101,7 @@ function HealthScorePanel({ healthBreakdown, healthScore, recalculating, onRecal
             const barColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#f59e0b' : '#ef4444';
             return (
               <div key={key} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: `${meta.color}06` }} data-testid={`health-signal-${key}`}>
-                <meta.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: meta.color }} />
+                <meta.icon className="size-3.5 flex-shrink-0" style={{ color: meta.color }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-[10px] font-medium text-[#555]">{meta.label}</span>
@@ -229,14 +229,14 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center" data-testid="customer-detail-loading">
-      <RefreshCw className="w-5 h-5 animate-spin text-[#888]" />
+      <RefreshCw className="size-5 animate-spin text-[#888]" />
     </div>
   );
 
   if (!customer) return (
     <div className="flex-1 flex items-center justify-center" data-testid="customer-not-found">
       <div className="text-center">
-        <AlertCircle className="w-10 h-10 text-[#888] mx-auto mb-3" style={{ opacity: 0.3 }} />
+        <AlertCircle className="size-10 text-[#888] mx-auto mb-3" style={{ opacity: 0.3 }} />
         <p className="text-sm text-[#888]">Customer not found</p>
         <button onClick={onBack} className="mt-3 text-xs text-[#D4AF37] hover:underline">Back to list</button>
       </div>
@@ -256,14 +256,14 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
 
         {/* Back button */}
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-[#888] hover:text-[#1A1A2E] transition-colors" data-testid="back-to-list">
-          <ChevronLeft className="w-3.5 h-3.5" /> Back to Customers
+          <ChevronLeft className="size-3.5" /> Back to Customers
         </button>
 
         {/* SECTION A — Profile Card */}
         <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="profile-card">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold" style={{ background: `${planColor}15`, color: planColor }}>
+              <div className="size-14 rounded-xl flex items-center justify-center text-lg font-bold" style={{ background: `${planColor}15`, color: planColor }}>
                 {customer.company_name?.[0]?.toUpperCase() || 'C'}
               </div>
               <div>
@@ -273,34 +273,34 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
                     {customer.business_id}
                   </span>
                   <button onClick={copyBizId} className="text-[#888] hover:text-[#D4AF37]" data-testid="copy-biz-id">
-                    {copied ? <CheckCircle className="w-3 h-3 text-[#4ade80]" /> : <Copy className="w-3 h-3" />}
+                    {copied ? <CheckCircle className="size-3 text-[#4ade80]" /> : <Copy className="size-3" />}
                   </button>
                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${customer.is_active ? 'bg-[#4ade80]/10 text-[#4ade80]' : 'bg-[#ef4444]/10 text-[#ef4444]'}`}>
                     {customer.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
                 <div className="mt-3 space-y-1.5">
-                  <p className="text-xs text-[#555] flex items-center gap-2"><User className="w-3 h-3 text-[#888]" />{customer.full_name || '—'}</p>
-                  <p className="text-xs text-[#555] flex items-center gap-2"><Mail className="w-3 h-3 text-[#888]" />{customer.email || '—'}</p>
-                  <p className="text-xs text-[#555] flex items-center gap-2"><Phone className="w-3 h-3 text-[#888]" />{customer.phone || '—'}</p>
+                  <p className="text-xs text-[#555] flex items-center gap-2"><User className="size-3 text-[#888]" />{customer.full_name || '—'}</p>
+                  <p className="text-xs text-[#555] flex items-center gap-2"><Mail className="size-3 text-[#888]" />{customer.email || '—'}</p>
+                  <p className="text-xs text-[#555] flex items-center gap-2"><Phone className="size-3 text-[#888]" />{customer.phone || '—'}</p>
                   <p className="text-xs text-[#555] flex items-center gap-2">
-                    <Globe className="w-3 h-3 text-[#888]" />
+                    <Globe className="size-3 text-[#888]" />
                     {customer.website_url ? (
                       <a href={customer.website_url} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] hover:underline flex items-center gap-1">
-                        {customer.website_url.replace(/https?:\/\//, '')} <ExternalLink className="w-2.5 h-2.5" />
+                        {customer.website_url.replace(/https?:\/\//, '')} <ExternalLink className="size-2.5" />
                       </a>
                     ) : '—'}
                   </p>
-                  <p className="text-xs text-[#555] flex items-center gap-2"><MapPin className="w-3 h-3 text-[#888]" />{[addr.city, addr.province, addr.country].filter(Boolean).join(', ') || '—'}</p>
+                  <p className="text-xs text-[#555] flex items-center gap-2"><MapPin className="size-3 text-[#888]" />{[addr.city, addr.province, addr.country].filter(Boolean).join(', ') || '—'}</p>
                 </div>
                 <div className="flex items-center gap-4 mt-3 text-[10px] text-[#888]">
-                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Joined {formatDate(customer.joined_date)}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Last active {formatDate(customer.last_active)}</span>
+                  <span className="flex items-center gap-1"><Calendar className="size-3" /> Joined {formatDate(customer.joined_date)}</span>
+                  <span className="flex items-center gap-1"><Clock className="size-3" /> Last active {formatDate(customer.last_active)}</span>
                 </div>
               </div>
             </div>
             <button onClick={openEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium text-[#D4AF37] border border-[#D4AF37]/30 rounded-lg hover:bg-[#D4AF37]/5" data-testid="edit-customer-btn">
-              <Edit3 className="w-3 h-3" /> Edit
+              <Edit3 className="size-3" /> Edit
             </button>
           </div>
         </div>
@@ -318,7 +318,7 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
           {/* Subscription Card */}
           <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="plan-card">
             <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-4 h-4" style={{ color: planColor }} />
+              <Shield className="size-4" style={{ color: planColor }} />
               <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">Subscription</span>
             </div>
             <div className="text-lg font-bold uppercase tracking-wider" style={{ color: planColor }}>{plan} Plan</div>
@@ -334,7 +334,7 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
           {/* Daily Usage Card */}
           <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="usage-card">
             <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-4 h-4 text-[#FF6B00]" />
+              <Zap className="size-4 text-[#FF6B00]" />
               <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">Today's Usage</span>
             </div>
             <div className="mb-3">
@@ -359,7 +359,7 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
         <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="performance-section">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#D4AF37]" />
+              <TrendingUp className="size-4 text-[#D4AF37]" />
               <span className="text-xs font-bold text-[#1A1A2E] tracking-wide">Performance Since Day One</span>
             </div>
             <span className="text-[10px] text-[#888]">{formatDate(customer.joined_date)} - Today</span>
@@ -442,7 +442,7 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
         {/* Admin Notes */}
         <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="admin-notes">
           <div className="flex items-center gap-2 mb-3">
-            <FileText className="w-4 h-4 text-[#888]" />
+            <FileText className="size-4 text-[#888]" />
             <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">Admin Notes</span>
           </div>
           <textarea
@@ -457,7 +457,7 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
               {customer.notes ? `Last saved: ${formatDate(customer.last_active)}` : 'No notes saved yet'}
             </span>
             <button onClick={saveNote} disabled={savingNote || noteDraft === (customer.notes || '')} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium text-white bg-[#D4AF37] rounded-lg hover:opacity-90 disabled:opacity-40" data-testid="save-notes-btn">
-              <Save className="w-3 h-3" /> {savingNote ? 'Saving...' : 'Save Notes'}
+              <Save className="size-3" /> {savingNote ? 'Saving...' : 'Save Notes'}
             </button>
           </div>
         </div>
@@ -466,13 +466,13 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
         {auditLog.length > 0 && (
           <div className="p-5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl" data-testid="audit-log">
             <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-4 h-4 text-[#888]" />
+              <Activity className="size-4 text-[#888]" />
               <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">Change History</span>
             </div>
             <div className="space-y-2">
               {auditLog.slice(0, 15).map((log, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: 'rgba(128,128,128,0.03)' }}>
-                  <Edit3 className="w-3 h-3 text-[#888] flex-shrink-0" />
+                  <Edit3 className="size-3 text-[#888] flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <span className="text-[10px] text-[#1A1A2E]">
                       <strong>{log.field}</strong> changed from <em>{log.old_value || '(empty)'}</em> to <em>{log.new_value}</em>
@@ -492,7 +492,7 @@ export default function CustomerDetail({ token, tenantId, onBack }) {
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#1A1A2E]">Edit Customer</h3>
-              <button onClick={() => setEditing(false)}><X className="w-5 h-5 text-[#888]" /></button>
+              <button onClick={() => setEditing(false)}><X className="size-5 text-[#888]" /></button>
             </div>
 
             <div className="space-y-3">

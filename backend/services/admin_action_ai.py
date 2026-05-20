@@ -4,7 +4,7 @@ Admin Action AI Service
 AI assistant that can execute real admin actions via natural language.
 Tools: orders, customers, revenue, stock, WhatsApp, discount codes, flags.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -540,7 +540,7 @@ class AdminActionAI:
             return {"success": False, "error": "EMERGENT_LLM_KEY not configured"}
         
         # Step 1: Use LLM to interpret query and generate tool call
-        system_prompt = f"""You are an admin action assistant for Reroots Aesthetics Inc.
+        system_prompt = f"""You are an admin action assistant for AUREM Aesthetics Inc.
 Your job is to interpret admin requests and call the appropriate tool.
 
 {TOOL_DEFINITIONS}

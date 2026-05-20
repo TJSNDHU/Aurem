@@ -1,5 +1,5 @@
 """
-Geolocation Service for Reroots
+Geolocation Service for AUREM
 Provides IP-based and coordinate-based location detection.
 
 Methods:
@@ -127,7 +127,7 @@ async def _reverse_geocode_free(lat: float, lon: float) -> Dict[str, Any]:
         
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url, headers={
-                "User-Agent": "RerootsAI/1.0 (skincare advisor)"
+                "User-Agent": "AUREMAI/1.0 (skincare advisor)"
             })
             data = response.json()
         

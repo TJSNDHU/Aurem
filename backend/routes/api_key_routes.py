@@ -1,5 +1,5 @@
 """
-API Key Routes for Reroots AI
+API Key Routes for AUREM AI
 Admin endpoints for managing API keys
 """
 

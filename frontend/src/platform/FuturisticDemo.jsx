@@ -33,7 +33,7 @@ function GoldNetworkBg() {
     a = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(a); window.removeEventListener('resize', resize); };
   }, []);
-  return <canvas ref={ref} className="absolute inset-0 w-full h-full pointer-events-none" />;
+  return <canvas ref={ref} className="absolute inset-0 size-full pointer-events-none" />;
 }
 
 /* ═══ DNA Helix Logo (animated) ═══ */
@@ -56,12 +56,12 @@ function DnaLogo() {
 /* ═══ Pulse Rings ═══ */
 function PulseRings() {
   return (
-    <div className="relative w-16 h-16 mx-auto mb-2">
+    <div className="relative size-16 mx-auto mb-2">
       {[0, 0.6, 1.2].map((d, i) => (
         <div key={i} className="absolute rounded-full border animate-ping" style={{ inset: `${i*5}px`, borderColor: 'rgba(74,222,128,0.2)', animationDuration: '2.5s', animationDelay: `${d}s` }} />
       ))}
       <div className="absolute inset-[20px] rounded-full flex items-center justify-center" style={{ background: 'rgba(74,222,128,0.12)' }}>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 12px rgba(74,222,128,0.7)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div className="size-2.5 rounded-full bg-[#4ade80]" style={{ boxShadow: '0 0 12px rgba(74,222,128,0.7)', animation: 'pulse 1.5s ease-in-out infinite' }} />
       </div>
     </div>
   );
@@ -150,7 +150,7 @@ function SentimentGauge() {
   return (
     <div className="flex items-center gap-4">
       <div className="relative w-28 h-16">
-        <svg viewBox="0 0 120 70" className="w-full h-full">
+        <svg viewBox="0 0 120 70" className="size-full">
           <path d="M15,60 A45,45 0 0,1 105,60" fill="none" stroke="#ef4444" strokeWidth="8" strokeLinecap="round" opacity="0.3"/>
           <path d="M15,60 A45,45 0 0,1 60,15" fill="none" stroke="#f59e0b" strokeWidth="8" strokeLinecap="round" opacity="0.3"/>
           <path d="M60,15 A45,45 0 0,1 105,60" fill="none" stroke="#FF6B00" strokeWidth="8" strokeLinecap="round" opacity="0.5"/>
@@ -162,9 +162,9 @@ function SentimentGauge() {
         </svg>
       </div>
       <div className="space-y-1.5 text-[11px]">
-        <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#FF6B00] shadow-[0_0_6px_rgba(45,122,74,0.4)]"/>Positive <span className="font-bold text-[#1A1A2E]">75%</span></div>
-        <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shadow-[0_0_6px_rgba(245,158,11,0.4)]"/>Neutral <span className="font-bold text-[#1A1A2E]">20%</span></div>
-        <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.4)]"/>Negative <span className="font-bold text-[#1A1A2E]">5%</span></div>
+        <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-[#FF6B00] shadow-[0_0_6px_rgba(45,122,74,0.4)]"/>Positive <span className="font-bold text-[#1A1A2E]">75%</span></div>
+        <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-[#f59e0b] shadow-[0_0_6px_rgba(245,158,11,0.4)]"/>Neutral <span className="font-bold text-[#1A1A2E]">20%</span></div>
+        <div className="flex items-center gap-2"><div className="size-2.5 rounded-full bg-[#ef4444] shadow-[0_0_6px_rgba(239,68,68,0.4)]"/>Negative <span className="font-bold text-[#1A1A2E]">5%</span></div>
       </div>
     </div>
   );
@@ -221,9 +221,9 @@ function TypingLog({ logs, startDelay = 500 }) {
       ))}
       {visCount < logs.length && (
         <div className="flex gap-1 mt-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0s' }}/>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0.15s' }}/>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0.3s' }}/>
+          <span className="size-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0s' }}/>
+          <span className="size-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0.15s' }}/>
+          <span className="size-1.5 rounded-full bg-[#FF6B00] animate-bounce" style={{ animationDelay: '0.3s' }}/>
         </div>
       )}
     </div>
@@ -243,7 +243,7 @@ export default function FuturisticDemo() {
     '[10:46:22] SMS SEND: +1-416-555-013 (Ollama/Llama 3.2):',
     '[11:15:02] VOICE CALL RECV: +1-416-555-0987. ROUTING TO: Customer A Voice Agent.',
     '[11:15:10] AI AGENT (AUREM DIY Voice/ElevenLabs via Emergent Router): Analyzing intent...',
-    '[11:15:15] AI AGENT TALK: "Hi, thanks for calling Reroots Aesthetics."',
+    '[11:15:15] AI AGENT TALK: "Hi, thanks for calling AUREM Aesthetics."',
   ];
 
   return (
@@ -288,8 +288,8 @@ export default function FuturisticDemo() {
                 } : {}),
                 animation: `sidebarSlideIn 0.4s ease ${idx * 0.06}s both`,
               }}>
-              <item.icon className="w-4 h-4" />{item.label}
-              {activeNav === item.id && <ChevronRight className="w-3 h-3 ml-auto" />}
+              <item.icon className="size-4" />{item.label}
+              {activeNav === item.id && <ChevronRight className="size-3 ml-auto" />}
             </button>
           ))}
         </div>
@@ -360,16 +360,16 @@ export default function FuturisticDemo() {
                     <div className="mt-1 flex items-center gap-2">
                       <span className="text-[10px] font-bold text-[#1A1A2E]">STATUS:</span>
                       <span className="text-[10px] font-bold text-[#FF6B00] flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-pulse inline-block"/>
+                        <span className="size-1.5 rounded-full bg-[#FF6B00] animate-pulse inline-block"/>
                         SIM NODE ONLINE (Mississauga)
                       </span>
                     </div>
                   </div>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+                  <div className="size-10 rounded-xl flex items-center justify-center" style={{
                     background: 'rgba(61,58,57,0.15)', border: '1px solid rgba(255,107,0,0.1)',
                     animation: 'iconPulse 3s ease-in-out infinite',
                   }}>
-                    <Wifi className="w-5 h-5 text-[#FF6B00]" />
+                    <Wifi className="size-5 text-[#FF6B00]" />
                   </div>
                 </div>
                 <div className="mt-3">
@@ -460,8 +460,8 @@ export default function FuturisticDemo() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-[12px] font-bold text-[#1A1A2E]">DOCUMENT DISPATCH LOG</h3>
                   <div className="flex gap-1.5">
-                    <div className="w-7 h-7 rounded-lg bg-[#ef4444]/8 flex items-center justify-center hover:scale-110 transition-transform cursor-pointer"><FileText className="w-3.5 h-3.5 text-[#ef4444]" /></div>
-                    <div className="w-7 h-7 rounded-lg bg-[#FF6B00]/8 flex items-center justify-center hover:scale-110 transition-transform cursor-pointer"><MessageCircle className="w-3.5 h-3.5 text-[#FF6B00]" /></div>
+                    <div className="size-7 rounded-lg bg-[#ef4444]/8 flex items-center justify-center hover:scale-110 transition-transform cursor-pointer"><FileText className="size-3.5 text-[#ef4444]" /></div>
+                    <div className="size-7 rounded-lg bg-[#FF6B00]/8 flex items-center justify-center hover:scale-110 transition-transform cursor-pointer"><MessageCircle className="size-3.5 text-[#FF6B00]" /></div>
                   </div>
                 </div>
                 <TypingLog logs={[
@@ -477,8 +477,8 @@ export default function FuturisticDemo() {
                 <h3 className="text-[12px] font-bold text-[#1A1A2E] mb-3">MESSENGER GATEWAY STATUS</h3>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-8 h-8 rounded-lg bg-[#25D366]/10 flex items-center justify-center group-hover:scale-110 transition-transform" style={{ boxShadow: '0 0 12px rgba(37,211,102,0.1)' }}>
-                      <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                    <div className="size-8 rounded-lg bg-[#25D366]/10 flex items-center justify-center group-hover:scale-110 transition-transform" style={{ boxShadow: '0 0 12px rgba(37,211,102,0.1)' }}>
+                      <MessageCircle className="size-4 text-[#25D366]" />
                     </div>
                     <div>
                       <div className="text-[11px] text-[#1A1A2E]">WhatsApp API status: <span className="font-bold text-[#FF6B00]">connected</span></div>
@@ -486,8 +486,8 @@ export default function FuturisticDemo() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-8 h-8 rounded-lg bg-[#3b82f6]/10 flex items-center justify-center group-hover:scale-110 transition-transform" style={{ boxShadow: '0 0 12px rgba(59,130,246,0.1)' }}>
-                      <Phone className="w-4 h-4 text-[#3b82f6]" />
+                    <div className="size-8 rounded-lg bg-[#3b82f6]/10 flex items-center justify-center group-hover:scale-110 transition-transform" style={{ boxShadow: '0 0 12px rgba(59,130,246,0.1)' }}>
+                      <Phone className="size-4 text-[#3b82f6]" />
                     </div>
                     <div className="text-[11px] text-[#1A1A2E]">Email-to-SMS gateway status: <span className="font-bold text-[#FF6B00]">active</span></div>
                   </div>

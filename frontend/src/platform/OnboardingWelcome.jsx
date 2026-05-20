@@ -35,9 +35,9 @@ const TaskCard = ({ task }) => {
         background: task.status === 'done' ? 'rgba(74,222,128,0.06)' : 'rgba(255,255,255,0.02)',
         borderColor: task.status === 'done' ? 'rgba(74,222,128,0.3)' : 'rgba(201,162,39,0.18)',
       }}>
-      <div className="w-11 h-11 shrink-0 rounded-lg flex items-center justify-center"
+      <div className="size-11 shrink-0 rounded-lg flex items-center justify-center"
         style={{ background: `${cfg.color}22` }}>
-        <Icon className={`w-5 h-5 ${cfg.pulse ? 'animate-spin' : ''}`} style={{ color: cfg.color }} />
+        <Icon className={`size-5 ${cfg.pulse ? 'animate-spin' : ''}`} style={{ color: cfg.color }} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-white">{task.label}</div>
@@ -118,16 +118,17 @@ const OnboardingWelcome = () => {
       return;
     }
     let cancelled = false;
+    let retryTimer = null;
     const fetchData = async () => {
       try {
         const r = await fetch(`${API}/api/onboarding/by-session/${sessionId}`);
         if (r.status === 404) {
           // Tenant may still be provisioning — auto-retry up to 10 times every 3s
           if (retries < 10) {
-            setTimeout(() => !cancelled && setRetries((x) => x + 1), 3000);
+            retryTimer = setTimeout(() => !cancelled && setRetries((x) => x + 1), 3000);
             return;
           }
-          throw new Error('Tenant not provisioned yet — please refresh in a minute');
+          throw new Error('Tenant not provisioned yet, please refresh in a minute');
         }
         if (!r.ok) throw new Error('Failed to load onboarding');
         const d = await r.json();
@@ -137,7 +138,10 @@ const OnboardingWelcome = () => {
       }
     };
     fetchData();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [sessionId, retries]);
 
   // Auto-poll while the Google Business scan is still running (max 20 polls @ 8s = 160s)
@@ -169,7 +173,7 @@ const OnboardingWelcome = () => {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: BG, color: '#fff' }} data-testid="welcome-redirecting-stripe">
         <div className="text-center max-w-md">
-          <div className="w-12 h-12 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin mx-auto mb-4" />
+          <div className="size-12 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin mx-auto mb-4" />
           <div className="text-[11px] tracking-[0.4em] font-semibold mb-2" style={{ color: GOLD }}>
             REDIRECTING TO SECURE CHECKOUT
           </div>
@@ -177,7 +181,7 @@ const OnboardingWelcome = () => {
             🛡 AUREM Security Suite
           </h1>
           <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-            Hold tight — Stripe is opening with your $197/mo bundle…
+            Hold tight, Stripe is opening with your $197/mo bundle…
           </p>
         </div>
       </div>
@@ -205,7 +209,7 @@ const OnboardingWelcome = () => {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: BG, color: '#fff' }} data-testid="welcome-loading">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin mx-auto" />
+          <div className="size-12 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin mx-auto" />
           <div className="mt-5 text-xs tracking-[0.4em]" style={{ color: GOLD }}>
             {retries > 0 ? `PROVISIONING YOUR ACCOUNT (${retries}/10)…` : 'WELCOMING YOU TO AUREM…'}
           </div>
@@ -234,7 +238,7 @@ const OnboardingWelcome = () => {
         {/* Welcome Header */}
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 mb-5">
-            <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: GOLD, boxShadow: `0 0 16px ${GOLD}` }} />
+            <div className="size-2.5 rounded-full animate-pulse" style={{ background: GOLD, boxShadow: `0 0 16px ${GOLD}` }} />
             <div className="text-[11px] tracking-[0.4em] font-semibold" style={{ color: GOLD }}>AUREM</div>
           </div>
           <div className="text-[11px] tracking-[0.5em] mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -244,11 +248,11 @@ const OnboardingWelcome = () => {
             Welcome, {firstName}! 🎉
           </h1>
           <p className="text-base md:text-lg mb-3" style={{ color: 'rgba(255,255,255,0.75)' }}>
-            I'm <strong style={{ color: GOLD }}>ORA</strong> — your AI Business Intelligence.
+            I'm <strong style={{ color: GOLD }}>ORA</strong>, your AI Business Intelligence.
           </p>
           <p className="text-sm max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.55)' }}>
             Your <strong className="text-white">{(customer.plan || 'starter').toUpperCase()}</strong> account is active.
-            I'm setting up everything behind the scenes — you'll get your first new customers within 7 days or a full refund.
+            I'm setting up everything behind the scenes, you'll get your first new customers within 7 days or a full refund.
           </p>
         </div>
 
@@ -293,7 +297,7 @@ const OnboardingWelcome = () => {
             style={{ background: 'linear-gradient(135deg, rgba(74,222,128,0.06), rgba(0,0,0,0.25))', borderColor: 'rgba(74,222,128,0.3)' }}
             data-testid="welcome-scan-result">
             <div className="flex items-center gap-2 mb-5">
-              <CheckCircle className="w-5 h-5" style={{ color: '#4ADE80' }} />
+              <CheckCircle className="size-5" style={{ color: '#4ADE80' }} />
               <div className="text-[11px] tracking-[0.3em] font-semibold" style={{ color: '#4ADE80' }}>
                 GOOGLE BUSINESS SCAN COMPLETE
               </div>
@@ -311,7 +315,7 @@ const OnboardingWelcome = () => {
                 <div className="text-sm font-semibold flex items-center gap-1" style={{ color: GOLD }}>
                   {found.rating ? (
                     <>
-                      <Star className="w-3.5 h-3.5 fill-current" />
+                      <Star className="size-3.5 fill-current" />
                       {found.rating} <span className="opacity-60 text-[11px]">({found.review_count || 0})</span>
                     </>
                   ) : (
@@ -336,13 +340,13 @@ const OnboardingWelcome = () => {
             {(found.address || found.website) && (
               <div className="flex flex-wrap gap-4 text-xs mb-5 pb-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' }}>
                 {found.address && (
-                  <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" style={{ color: GOLD }} />{found.address}</div>
+                  <div className="flex items-center gap-1.5"><MapPin className="size-3.5" style={{ color: GOLD }} />{found.address}</div>
                 )}
                 {found.phone && (
-                  <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" style={{ color: GOLD }} />{found.phone}</div>
+                  <div className="flex items-center gap-1.5"><Phone className="size-3.5" style={{ color: GOLD }} />{found.phone}</div>
                 )}
                 {found.website && (
-                  <div className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" style={{ color: GOLD }} />
+                  <div className="flex items-center gap-1.5"><Globe className="size-3.5" style={{ color: GOLD }} />
                     <a href={found.website} target="_blank" rel="noreferrer" className="hover:underline truncate max-w-[260px]">{found.website.replace(/^https?:\/\//, '')}</a>
                   </div>
                 )}
@@ -358,7 +362,7 @@ const OnboardingWelcome = () => {
                   {gaps.slice(0, 6).map((g) => (
                     <li key={g.key} className="flex items-start gap-3 p-3 rounded-lg border"
                       style={{ borderColor: 'rgba(201,162,39,0.18)', background: 'rgba(255,255,255,0.02)' }}>
-                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0"
+                      <AlertCircle className="size-4 mt-0.5 shrink-0"
                         style={{ color: g.severity === 'critical' ? '#EF4444' : g.severity === 'high' ? '#F59E0B' : GOLD }} />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-white">{g.title}</div>
@@ -381,7 +385,7 @@ const OnboardingWelcome = () => {
           <div className="rounded-2xl p-6 border mb-10 flex items-center gap-3"
             style={{ background: 'rgba(201,162,39,0.05)', borderColor: 'rgba(201,162,39,0.2)' }}
             data-testid="welcome-scan-running">
-            <Loader2 className="w-5 h-5 animate-spin" style={{ color: GOLD }} />
+            <Loader2 className="size-5 animate-spin" style={{ color: GOLD }} />
             <div>
               <div className="text-sm font-semibold text-white">Scanning your Google Business profile…</div>
               <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
@@ -395,16 +399,16 @@ const OnboardingWelcome = () => {
         <div className="rounded-2xl p-6 md:p-7 border mb-10"
           style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(201,162,39,0.2)' }}>
           <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-4 h-4" style={{ color: GOLD }} />
+            <Sparkles className="size-4" style={{ color: GOLD }} />
             <div className="text-[11px] tracking-[0.3em] font-semibold" style={{ color: GOLD }}>
               WHAT ORA IS DOING RIGHT NOW
             </div>
           </div>
           <ul className="space-y-2.5 text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
-            <li className="flex items-start gap-2"><Zap className="w-4 h-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Scanning your Google Business profile for optimization opportunities</li>
-            <li className="flex items-start gap-2"><TrendingUp className="w-4 h-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Drafting your free professional website (ready in 24 hours)</li>
-            <li className="flex items-start gap-2"><MessageCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Setting up automated Google review collection</li>
-            <li className="flex items-start gap-2"><Phone className="w-4 h-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Configuring WhatsApp + SMS + email campaigns</li>
+            <li className="flex items-start gap-2"><Zap className="size-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Scanning your Google Business profile for optimization opportunities</li>
+            <li className="flex items-start gap-2"><TrendingUp className="size-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Drafting your free professional website (ready in 24 hours)</li>
+            <li className="flex items-start gap-2"><MessageCircle className="size-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Setting up automated Google review collection</li>
+            <li className="flex items-start gap-2"><Phone className="size-4 mt-0.5 shrink-0" style={{ color: GOLD }} />Configuring WhatsApp + SMS + email campaigns</li>
           </ul>
         </div>
 
@@ -413,7 +417,7 @@ const OnboardingWelcome = () => {
           style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.06), rgba(255,138,61,0.03))', borderColor: 'rgba(212,175,55,0.25)' }}
           data-testid="welcome-services-panel">
           <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-4 h-4" style={{ color: GOLD }} />
+            <Zap className="size-4" style={{ color: GOLD }} />
             <div className="text-[11px] tracking-[0.3em] font-semibold" style={{ color: GOLD }}>
               POWER UP · À LA CARTE SERVICES
             </div>
@@ -433,7 +437,7 @@ const OnboardingWelcome = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 text-[11px]" style={{ color: 'rgba(34,197,94,0.9)' }}>
-            <Sparkles className="w-3.5 h-3.5" />
+            <Sparkles className="size-3.5" />
             <span>Pick 3+ → auto <b>15% bundle discount</b> · Pick 5+ → 25% · Pick 8+ → 35%</span>
           </div>
         </div>
@@ -447,12 +451,12 @@ const OnboardingWelcome = () => {
             <a href="/my/website" data-testid="welcome-cta-my-website"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs tracking-wider hover:brightness-110 transition-all"
               style={{ background: GOLD, color: '#000' }}>
-              GO TO MY DASHBOARD <ArrowRight className="w-4 h-4" />
+              GO TO MY DASHBOARD <ArrowRight className="size-4" />
             </a>
             <a href="/my/ora" data-testid="welcome-cta-chat"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs tracking-wider border hover:bg-white/5 transition-all"
               style={{ borderColor: GOLD, color: GOLD }}>
-              <MessageCircle className="w-4 h-4" /> CHAT WITH ORA
+              <MessageCircle className="size-4" /> CHAT WITH ORA
             </a>
           </div>
           <div className="mt-8 pt-8 border-t text-[11px] tracking-wider"

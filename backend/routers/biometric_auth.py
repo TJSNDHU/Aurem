@@ -33,9 +33,9 @@ def set_db(database):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # WebAuthn configuration
-RP_NAME = "ReRoots AI"
-RP_ID = os.environ.get("WEBAUTHN_RP_ID", "reroots.ca")  # Your domain
-ORIGIN = os.environ.get("WEBAUTHN_ORIGIN", "https://reroots.ca")
+RP_NAME = "AUREM AI"
+RP_ID = os.environ.get("WEBAUTHN_RP_ID", "aurem.live")  # Your domain
+ORIGIN = os.environ.get("WEBAUTHN_ORIGIN", "https://aurem.live")
 
 # Voice recognition settings
 VOICE_SAMPLE_MIN_DURATION = 2  # seconds

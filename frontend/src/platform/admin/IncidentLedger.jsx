@@ -215,7 +215,7 @@ export default function IncidentLedger() {
               )}
               {!loading && rows.length === 0 && (
                 <tr><td colSpan={7} style={{ padding: 20, color: TEXT_DIM, textAlign: "center" }}>
-                  No incidents in window — pipeline quiet ✓
+                  No incidents in window, pipeline quiet ✓
                 </td></tr>
               )}
               {rows.map((r) => (
@@ -361,7 +361,7 @@ function FingerprintsPane({ rows }) {
       </div>
       {rows.length === 0 ? (
         <div style={{ color: TEXT_DIM, fontSize: 12, padding: 8 }}>
-          No patterns yet — resolve some incidents to seed the library.
+          No patterns yet, resolve some incidents to seed the library.
         </div>
       ) : rows.map((r) => (
         <div key={r.fingerprint}

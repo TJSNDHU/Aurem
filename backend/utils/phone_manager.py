@@ -13,7 +13,7 @@ Features:
 Supported Countries:
 CA, US, GB, FR, DE, AU, IN, AE, SA, SG, JP, BR, MX
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -338,7 +338,7 @@ async def release_number(
 def generate_texml_response(
     caller_country: str,
     voice_agent_ws_url: str,
-    brand_name: str = "Reroots"
+    brand_name: str = "AUREM"
 ) -> str:
     """
     Generate TeXML response for inbound calls.

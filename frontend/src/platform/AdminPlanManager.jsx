@@ -171,11 +171,11 @@ const AdminPlanManager = () => {
         
         <div className="flex gap-2">
           <Button onClick={handleSave} className="flex items-center gap-2">
-            <Save className="h-4 w-4" />
+            <Save className="size-4" />
             Save Changes
           </Button>
           <Button variant="outline" onClick={() => setEditingPlan(null)}>
-            <X className="h-4 w-4" />
+            <X className="size-4" />
             Cancel
           </Button>
         </div>
@@ -226,7 +226,7 @@ const AdminPlanManager = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 mb-2 flex items-center gap-2">
-            <Settings className="h-8 w-8 text-blue-600" />
+            <Settings className="size-8 text-blue-600" />
             Plan & Pricing Manager
           </h1>
           <p className="text-slate-600">Manage subscription plans and custom pricing</p>
@@ -237,7 +237,7 @@ const AdminPlanManager = () => {
           <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
             message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
           }`}>
-            {message.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+            {message.type === 'success' ? <CheckCircle className="size-5" /> : <AlertCircle className="size-5" />}
             {message.text}
           </div>
         )}
@@ -273,7 +273,7 @@ const AdminPlanManager = () => {
                           size="sm"
                           onClick={() => setEditingPlan(plan.plan_id)}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="size-4" />
                         </Button>
                         {plan.active && (
                           <Button
@@ -281,7 +281,7 @@ const AdminPlanManager = () => {
                             size="sm"
                             onClick={() => handleDeactivatePlan(plan.plan_id)}
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="size-4 text-red-600" />
                           </Button>
                         )}
                       </div>
@@ -333,7 +333,7 @@ const AdminPlanManager = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-4">
-                      <DollarSign className="h-8 w-8 text-slate-400" />
+                      <DollarSign className="size-8 text-slate-400" />
                       <div>
                         <p className="text-3xl font-bold text-slate-900">
                           ${customPricing.base_platform_fee}
@@ -341,7 +341,7 @@ const AdminPlanManager = () => {
                         <p className="text-sm text-slate-600">per month</p>
                       </div>
                       <Button variant="outline" size="sm" className="ml-auto">
-                        <Edit className="h-4 w-4 mr-2" />
+                        <Edit className="size-4 mr-2" />
                         Edit
                       </Button>
                     </div>
@@ -363,7 +363,7 @@ const AdminPlanManager = () => {
                               ${price}/mo
                             </span>
                             <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
+                              <Edit className="size-4" />
                             </Button>
                           </div>
                         </div>

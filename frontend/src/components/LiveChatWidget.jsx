@@ -182,7 +182,7 @@ export default function LiveChatWidget() {
                   background: 'rgba(255,255,255,0.06)', color: '#888',
                   fontSize: 12, fontStyle: 'italic',
                 }}>
-                  ORA is thinking...
+                  ORA is thinking…
                 </div>
               </div>
             )}

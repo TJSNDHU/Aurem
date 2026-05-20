@@ -210,7 +210,7 @@ export default function SEOAuditPage() {
                     onClick={unlock}
                     style={{ padding: '14px 32px', background: GOLD, color: '#0D0D0D', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer' }}
                   >
-                    UNLOCK FULL REPORT — $49 CAD
+                    UNLOCK FULL REPORT, $49 CAD
                   </button>
                   <div style={{ fontSize: 11, color: '#666', marginTop: 10 }}>One-time payment · Instant access · Apple Pay & Google Pay</div>
                 </div>

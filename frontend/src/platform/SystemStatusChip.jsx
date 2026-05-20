@@ -57,7 +57,7 @@ const DEPLOY_GRACE_SECONDS = 60;
 // pages" bugs forever — adding any new public route requires zero
 // changes to this file. iter 280.11
 const ADMIN_EMAIL_WHITELIST = [
-  "admin@reroots.ca",
+  "admin@aurem.live",
   "teji.ss1986@gmail.com",
 ];
 

@@ -61,7 +61,7 @@ export default function DesignExtractPublic() {
             <div className="flex flex-wrap gap-4">
               {data.colors.map((color, i) => (
                 <div key={i} className="flex flex-col items-center gap-1" data-testid={testIdPrefix ? `${testIdPrefix}-color-swatch-${i}` : `color-swatch-${i}`}>
-                  <div className="w-12 h-12 rounded-full border-2 border-slate-700" style={{ backgroundColor: color }}></div>
+                  <div className="size-12 rounded-full border-2 border-slate-700" style={{ backgroundColor: color }}></div>
                   <span className="text-xs text-slate-400 font-mono">{color}</span>
                 </div>
               ))}
@@ -117,7 +117,7 @@ export default function DesignExtractPublic() {
             Extract any site's design system in 10 seconds. Free.
           </h1>
           <p className="text-xl text-slate-400">
-            Colors, fonts, meta, headline count — pasted to a clean report your team can actually use.
+            Colors, fonts, meta, headline count, pasted to a clean report your team can actually use.
           </p>
         </div>
 
@@ -127,7 +127,7 @@ export default function DesignExtractPublic() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
                   <input
                     type="url"
                     placeholder="https://example.com"
@@ -140,7 +140,7 @@ export default function DesignExtractPublic() {
                   />
                 </div>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
                   <input
                     type="email"
                     placeholder="your@email.com"
@@ -161,12 +161,12 @@ export default function DesignExtractPublic() {
               >
                 {loading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Analysing...
+                    <Loader2 className="size-5 animate-spin" />
+                    Analysing…
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5" />
+                    <Sparkles className="size-5" />
                     Extract design
                   </>
                 )}
@@ -192,7 +192,7 @@ export default function DesignExtractPublic() {
                 data-testid="cta-pricing"
               >
                 Want competitor analysis + full audit report? See pricing →
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="size-4" />
               </a>
             </div>
           </div>

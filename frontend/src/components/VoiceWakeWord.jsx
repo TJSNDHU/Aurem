@@ -249,9 +249,9 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
         onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
         {listening ? (
-          <Mic className="w-8 h-8 text-white" />
+          <Mic className="size-8 text-white" />
         ) : (
-          <MicOff className="w-8 h-8 text-[#050505]" />
+          <MicOff className="size-8 text-[#050505]" />
         )}
 
         {listening && (
@@ -313,7 +313,7 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
                   gap: 6,
                 }}
               >
-                <Activity className="w-3 h-3" />
+                <Activity className="size-3" />
                 Listening for "Hey ORA"…
               </div>
 
@@ -371,11 +371,11 @@ const VoiceWakeWord = ({ token, businessId = "ABC-001" }) => {
               >
                 {speaking ? (
                   <>
-                    <Volume2 className="w-3 h-3 animate-pulse" /> Speaking…
+                    <Volume2 className="size-3 animate-pulse" /> Speaking…
                   </>
                 ) : (
                   <>
-                    <Zap className="w-3 h-3" /> Response
+                    <Zap className="size-3" /> Response
                   </>
                 )}
               </div>

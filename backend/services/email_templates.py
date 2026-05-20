@@ -66,7 +66,7 @@ def get_email_base_styles():
     """
 
 
-def _email_wrap(title: str, content_html: str, store_name: str = "ReRoots", support_email: str = "support@reroots.ca") -> str:
+def _email_wrap(title: str, content_html: str, store_name: str = "AUREM", support_email: str = "support@aurem.live") -> str:
     """Shared email wrapper: DOCTYPE + header + content + footer."""
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{title}</title></head>
 <body style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #2D2A2E; margin: 0; padding: 0; background-color: #f5f5f5;">
@@ -85,12 +85,12 @@ def _email_wrap(title: str, content_html: str, store_name: str = "ReRoots", supp
 def generate_order_confirmation_email(order: dict, store_settings: dict = None) -> str:
     """Generate HTML email for order confirmation"""
     store_name = (
-        store_settings.get("store_name", "ReRoots") if store_settings else "ReRoots"
+        store_settings.get("store_name", "AUREM") if store_settings else "AUREM"
     )
     support_email = (
-        store_settings.get("support_email", "support@reroots.ca")
+        store_settings.get("support_email", "support@aurem.live")
         if store_settings
-        else "support@reroots.ca"
+        else "support@aurem.live"
     )
 
     # Build items HTML with ENGINE/BUFFER badges for combo products
@@ -273,12 +273,12 @@ def generate_shipping_update_email(
 ) -> str:
     """Generate HTML email for shipping updates"""
     store_name = (
-        store_settings.get("store_name", "ReRoots") if store_settings else "ReRoots"
+        store_settings.get("store_name", "AUREM") if store_settings else "AUREM"
     )
     support_email = (
-        store_settings.get("support_email", "support@reroots.ca")
+        store_settings.get("support_email", "support@aurem.live")
         if store_settings
-        else "support@reroots.ca"
+        else "support@aurem.live"
     )
 
     # Status messages and badges
@@ -435,7 +435,7 @@ async def send_order_confirmation_email(order: dict, customer_email: str):
         params = {
             "from": SENDER_EMAIL,
             "to": [customer_email],
-            "subject": f"Order Confirmed! #{order.get('order_number', '')} - ReRoots",
+            "subject": f"Order Confirmed! #{order.get('order_number', '')} - AUREM",
             "html": html_content,
         }
 
@@ -515,7 +515,7 @@ async def send_shipping_sms(phone: str, name: str, order_number: str, tracking_n
     try:
         first_name = name.split()[0] if name else "Customer"
         message = (
-            f"📦 ReRoots: Hi {first_name}! Your order #{order_number} has shipped via {courier}. "
+            f"📦 AUREM: Hi {first_name}! Your order #{order_number} has shipped via {courier}. "
             f"Tracking: {tracking_number}. "
             f"Track: https://www.google.com/search?q={tracking_number}+tracking"
         )
@@ -823,8 +823,8 @@ async def process_auto_shipping(order_id: str):
 
 def generate_order_cancellation_email(order: dict, refund_amount: float, store_settings: dict = None) -> str:
     """Generate HTML email for order cancellation notification"""
-    store_name = store_settings.get("store_name", "ReRoots") if store_settings else "ReRoots"
-    support_email = store_settings.get("support_email", "support@reroots.ca") if store_settings else "support@reroots.ca"
+    store_name = store_settings.get("store_name", "AUREM") if store_settings else "AUREM"
+    support_email = store_settings.get("support_email", "support@aurem.live") if store_settings else "support@aurem.live"
     
     # Check if there was a refund
     has_refund = refund_amount > 0
@@ -965,7 +965,7 @@ async def send_review_notification_email(
             logging.info("Review notifications are disabled in settings")
             return False
 
-        admin_email = store_settings.get("admin_email", "admin@reroots.ca")
+        admin_email = store_settings.get("admin_email", "admin@aurem.live")
         rating = review.get("rating", 5)
         review_id = review.get("id", "")
 
@@ -1068,7 +1068,7 @@ async def send_review_notification_email(
             </div>
             
             <div class="action-buttons">
-                <a href="mailto:{customer_email}?subject=Re: Your ReRoots Experience&body=Hi {customer_name},%0D%0A%0D%0AThank you for your feedback. We noticed..." class="button button-contact">📧 Contact Customer</a>
+                <a href="mailto:{customer_email}?subject=Re: Your AUREM Experience&body=Hi {customer_name},%0D%0A%0D%0AThank you for your feedback. We noticed..." class="button button-contact">📧 Contact Customer</a>
                 <a href="{base_url}/admin" class="button button-view">📋 View in Admin</a>
             </div>
             
@@ -1077,7 +1077,7 @@ async def send_review_notification_email(
             </p>
         </div>
         <div class="footer">
-            <p>Sent automatically by ReRoots Review Alert System</p>
+            <p>Sent automatically by AUREM Review Alert System</p>
             <p>This is a priority alert for reviews rated 3 stars or below.</p>
         </div>
     </div>
@@ -1153,7 +1153,7 @@ async def send_daily_review_digest():
         if not store_settings.get("review_notifications_enabled", True):
             return False
 
-        admin_email = store_settings.get("admin_email", "admin@reroots.ca")
+        admin_email = store_settings.get("admin_email", "admin@aurem.live")
 
         # Get unsent digest items
         pending = await db.review_digest_queue.find({"sent": False}).to_list(100)
@@ -1232,7 +1232,7 @@ async def send_daily_review_digest():
         </div>
         
         <div style="font-size: 12px; color: #999; padding: 20px; border-top: 1px solid #eee; text-align: center; background: #fafafa;">
-            <p>Daily digest from ReRoots Review System</p>
+            <p>Daily digest from AUREM Review System</p>
             <p>Positive reviews (4-5★) are summarized daily. Low ratings trigger instant alerts.</p>
         </div>
     </div>
@@ -1355,10 +1355,10 @@ async def send_review_thank_you_email(
         <div style="background: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #eee;">
             <p style="color: #999; font-size: 13px; margin: 0;">
                 With gratitude,<br>
-                <strong style="color: #F8A5B8;">The ReRoots Team</strong>
+                <strong style="color: #F8A5B8;">The AUREM Team</strong>
             </p>
             <p style="color: #bbb; font-size: 11px; margin: 15px 0 0 0;">
-                ReRoots Skincare Canada | Biotech Beauty
+                AUREM Skincare Canada | Biotech Beauty
             </p>
         </div>
     </div>
@@ -1387,12 +1387,12 @@ def generate_newsletter_confirmation_email(
 ) -> str:
     """Generate HTML email for newsletter subscription confirmation"""
     store_name = (
-        store_settings.get("store_name", "ReRoots") if store_settings else "ReRoots"
+        store_settings.get("store_name", "AUREM") if store_settings else "AUREM"
     )
     support_email = (
-        store_settings.get("support_email", "support@reroots.ca")
+        store_settings.get("support_email", "support@aurem.live")
         if store_settings
-        else "support@reroots.ca"
+        else "support@aurem.live"
     )
 
     default_message = "Thank you for subscribing! You'll receive exclusive offers, skincare tips, and new product alerts."
@@ -1501,7 +1501,7 @@ async def send_newsletter_confirmation_email(email: str, thank_you_message: str 
         params = {
             "from": SENDER_EMAIL,
             "to": [email],
-            "subject": "Welcome to ReRoots! 🎉 You're Subscribed",
+            "subject": "Welcome to AUREM! 🎉 You're Subscribed",
             "html": html_content,
         }
 
@@ -1526,7 +1526,7 @@ def generate_goal_achieved_email(
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Goal Achieved - ReRoots</title>
+        <title>Goal Achieved - AUREM</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a0a;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0a0a0a; padding: 40px 20px;">
@@ -1578,7 +1578,7 @@ def generate_goal_achieved_email(
                         <tr>
                             <td style="padding: 10px 40px 30px; text-align: center;">
                                 <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 16px; line-height: 1.6;">
-                                    You have successfully completed the referral mission. Your dedication to the ReRoots community has unlocked the <strong style="color: #D4AF37;">maximum Founding Member subsidy</strong>.
+                                    You have successfully completed the referral mission. Your dedication to the AUREM community has unlocked the <strong style="color: #D4AF37;">maximum Founding Member subsidy</strong>.
                                 </p>
                             </td>
                         </tr>
@@ -1667,7 +1667,7 @@ def generate_goal_achieved_email(
                         <tr>
                             <td style="background: #0a0a0a; padding: 25px; text-align: center; border-top: 1px solid rgba(255,255,255,0.05);">
                                 <p style="color: rgba(255,255,255,0.3); font-size: 11px; margin: 0 0 10px;">
-                                    ReRoots · Canadian Biotech Skincare · Founding Member Program
+                                    AUREM · Canadian Biotech Skincare · Founding Member Program
                                 </p>
                                 <p style="color: rgba(255,255,255,0.2); font-size: 10px; margin: 0;">
                                     This email confirms your $70 Founding Member price lock. Keep this for your records.

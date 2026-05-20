@@ -144,7 +144,7 @@ _Week ending {now.strftime('%B %d, %Y')}_
 *Orders:* {order_count}
 *Top Product:* {top_product[0]} ({top_product[1]} sold)
 
-_Reroots Aesthetics Inc._"""
+_AUREM Aesthetics Inc._"""
 
             try:
                 from services.twilio_service import send_whatsapp_message
@@ -196,7 +196,7 @@ async def cnf_reminder_scheduler():
                 msg = "*Health Canada CNF Reminder*\n\nThe following AURA-GEN products do NOT have confirmed CNF filings:\n\n"
                 for p in unfiled:
                     msg += f"X {p['name']}\n"
-                msg += "\n*DO NOT SELL* these products until CNFs are confirmed.\n\nFile at: https://canada.ca/cosmetic-notification\n_Reroots Aesthetics Inc._"
+                msg += "\n*DO NOT SELL* these products until CNFs are confirmed.\n\nFile at: https://canada.ca/cosmetic-notification\n_AUREM Aesthetics Inc._"
 
                 try:
                     from services.twilio_service import send_whatsapp_message

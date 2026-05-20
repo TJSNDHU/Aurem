@@ -1,5 +1,5 @@
 /**
- * ReRoots AI Luxury PWA Service Worker v9 (v2.0.0-Biotech Fortress)
+ * AUREM AI Luxury PWA Service Worker v9 (v2.0.0-Biotech Fortress)
  * UNIFIED: Cache-First for Assets | Network-First for API
  * Handles Push Notifications for Cart Recovery
  * HOT-SWAP: Forces update for all existing users
@@ -42,7 +42,7 @@ const NETWORK_FIRST_PATTERNS = [
 
 // Install Event - Pre-cache static assets + Force skip waiting for hot-swap
 self.addEventListener('install', (event) => {
-  console.log(`[PWA SW ${SW_VERSION}] Installing ReRoots Biotech Fortress...`);
+  console.log(`[PWA SW ${SW_VERSION}] Installing AUREM Biotech Fortress...`);
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => {
@@ -172,7 +172,7 @@ self.addEventListener('push', (event) => {
   console.log('[PWA SW] Push notification received');
   
   let data = {
-    title: 'ReRoots AI',
+    title: 'AUREM AI',
     body: 'Your Skin Journey Begins Now',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-96x96.png',
@@ -301,4 +301,4 @@ self.addEventListener('message', (event) => {
   }
 });
 
-console.log(`[PWA SW ${SW_VERSION}] ReRoots Biotech Fortress Service Worker Loaded - Vault Encryption: AES-256-GCM`);
+console.log(`[PWA SW ${SW_VERSION}] AUREM Biotech Fortress Service Worker Loaded - Vault Encryption: AES-256-GCM`);

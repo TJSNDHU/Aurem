@@ -102,16 +102,16 @@ const AdminLogin = () => {
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-4"
+          <div className="inline-flex items-center justify-center size-14 rounded-xl mb-4"
             style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)' }}>
-            <Target className="w-7 h-7 text-[#050507]" />
+            <Target className="size-7 text-[#050507]" />
           </div>
           <h1 className="text-lg tracking-[0.15em] mb-1" style={{ fontFamily: "'Cinzel', serif", color: '#E8E6E1' }}
             data-testid="admin-login-title">
             AUREM ADMIN
           </h1>
           <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#555]">
-            <Shield className="w-3 h-3" />
+            <Shield className="size-3" />
             <span>Restricted Access</span>
           </div>
         </div>
@@ -126,7 +126,7 @@ const AdminLogin = () => {
               style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}
               data-testid="admin-login-error"
             >
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              <AlertTriangle className="size-3.5 flex-shrink-0" />
               {error}
             </motion.div>
           )}
@@ -134,7 +134,7 @@ const AdminLogin = () => {
           <div>
             <label className="block text-[9px] text-[#555] tracking-[0.2em] uppercase mb-1.5">Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444]" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#444]" />
               <input
                 type="email"
                 value={email}
@@ -151,7 +151,7 @@ const AdminLogin = () => {
           <div>
             <label htmlFor="admin-password" className="block text-[9px] text-[#9ca3af] tracking-[0.2em] uppercase mb-1.5">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444]" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#444]" />
               <input
                 id="admin-password"
                 type="password"
@@ -171,7 +171,7 @@ const AdminLogin = () => {
             <div>
               <label htmlFor="admin-totp" className="block text-[9px] text-[#9ca3af] tracking-[0.2em] uppercase mb-1.5">2FA Code</label>
               <div className="relative">
-                <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#444]" />
+                <Shield className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#444]" />
                 <input
                   id="admin-totp"
                   type="text"
@@ -201,11 +201,11 @@ const AdminLogin = () => {
             style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)', color: '#050507' }}
           >
             {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
               <>
                 Authenticate
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="size-4" />
               </>
             )}
           </motion.button>

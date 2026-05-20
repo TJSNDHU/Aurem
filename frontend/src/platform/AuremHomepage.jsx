@@ -545,7 +545,7 @@ const AuremHomepage = () => {
       </nav>
 
       <div className="world-first-bar" data-testid="world-first-banner">
-        <span>🌍 &nbsp;Canada's &nbsp;<em>Autonomous Business Platform</em>&nbsp; — Built in Canada &nbsp;🇨🇦</span>
+        <span>🌍 &nbsp;Canada's &nbsp;<em>Autonomous Business Platform</em>&nbsp;, Built in Canada &nbsp;🇨🇦</span>
       </div>
 
       {/* CANADIAN TRUST BAR — iter 282al-7 (Canadian Moat) */}
@@ -572,7 +572,7 @@ const AuremHomepage = () => {
         <div className="hero-inner">
           <div className="hero-eyebrow">
             <div className="dot" />
-            Live right now — <span data-testid="hero-live-count">Join Canadian businesses already on AUREM</span>
+            Live right now, <span data-testid="hero-live-count">Join Canadian businesses already on AUREM</span>
           </div>
           <h1 className="hero-title" data-testid="hero-title">
             <span className="t1">Your Business Finds Customers,</span>
@@ -584,7 +584,7 @@ const AuremHomepage = () => {
           </p>
           <div className="hero-btns">
             <button className="btn-primary" onClick={() => navigate("/repair-quote")} data-testid="hero-cta-check">
-              Check My Website Free — 60 Seconds →
+              Check My Website Free, 60 Seconds →
             </button>
             <button className="btn-ghost" onClick={() => scrollTo("demo")} data-testid="hero-cta-demo">
               See ORA in Action
@@ -609,17 +609,17 @@ const AuremHomepage = () => {
           <span className="s-label">Sound Familiar?</span>
           <h2 className="s-title">Every Missed Call Costs You a Job</h2>
           <p className="s-sub" style={{ margin: "14px auto 0" }}>
-            Most local businesses lose $800–$2,400 every month just from calls they miss after hours. AUREM stops that leak — permanently.
+            Most local businesses lose $800–$2,400 every month just from calls they miss after hours. AUREM stops that leak, permanently.
           </p>
         </div>
         <div className="pain-cards fade-up">
           <div className="pain-card c1">
-            <span className="pain-tag">❌ Without AUREM — 6:47 PM</span>
+            <span className="pain-tag">❌ Without AUREM, 6:47 PM</span>
             <p className="pain-text">A customer calls. You're on a job. It rings out. They Google the <strong>next business on the list.</strong></p>
-            <p className="pain-result">💸 $1,200 job — gone</p>
+            <p className="pain-result">💸 $1,200 job, gone</p>
           </div>
           <div className="pain-card c2">
-            <span className="pain-tag">⚡ With AUREM — Same Moment</span>
+            <span className="pain-tag">⚡ With AUREM, Same Moment</span>
             <p className="pain-text">AUREM answers instantly. Asks the right questions. Books the appointment. <strong>Sends a confirmation.</strong></p>
             <p className="pain-result">✅ Booked in 73 seconds</p>
           </div>
@@ -636,12 +636,12 @@ const AuremHomepage = () => {
         <div className="scan-box fade-up">
           <div className="scan-header">
             <div className="scan-dots"><span /><span /><span /></div>
-            <span className="scan-bar-title">AUREM Website Scanner — Free</span>
+            <span className="scan-bar-title">AUREM Website Scanner, Free</span>
             <div className="scan-live">LIVE</div>
           </div>
           <div className="scan-body">
             <h2 className="scan-title">Is Your Website Losing You Customers Right Now?</h2>
-            <p className="scan-sub">Enter your website and we'll find every issue costing you leads — in under 60 seconds. Free. No login. No pitch.</p>
+            <p className="scan-sub">Enter your website and we'll find every issue costing you leads, in under 60 seconds. Free. No login. No pitch.</p>
             <div className="scan-form">
               <input type="url" placeholder="www.yourbusiness.com" value={scanUrl} onChange={(e) => setScanUrl(e.target.value)} onKeyDown={onScanKey} data-testid="scan-url-input" />
               <button className="btn-primary" onClick={() => goRepairQuote()} data-testid="scan-submit-btn">Scan My Website →</button>
@@ -664,7 +664,7 @@ const AuremHomepage = () => {
         <div className="demo-wrap fade-up">
           <div className="center">
             <span className="s-label">Try It Right Now</span>
-            <h2 className="s-title">Talk to ORA — Your AI Employee</h2>
+            <h2 className="s-title">Talk to ORA, Your AI Employee</h2>
             <p className="s-sub" style={{ margin: "12px auto 0", fontSize: 14 }}>
               Type anything below. ORA handles it the same way it would handle your real customers. No login needed.
             </p>
@@ -672,7 +672,7 @@ const AuremHomepage = () => {
           <div className="demo-box" data-testid="ora-demo-box">
             <div className="demo-top">
               <div className="ddots"><span /><span /><span /></div>
-              <span className="dtitle">ORA by AUREM — Live</span>
+              <span className="dtitle">ORA by AUREM, Live</span>
               <div className="dlive">LIVE</div>
             </div>
             <div className="dmsgs" id="dmsgs" ref={dmsgsRef}>
@@ -712,7 +712,7 @@ const AuremHomepage = () => {
         </div>
         <div className="how-grid fade-up">
           <div className="how-step"><div className="how-arrow">→</div><div className="how-n">01</div><div className="how-emoji">🔍</div><div className="how-t">Finds Customers</div><div className="how-d">Searches the internet every day for people in your area who need your service. Sends them a message automatically.</div></div>
-          <div className="how-step"><div className="how-arrow">→</div><div className="how-n">02</div><div className="how-emoji">💬</div><div className="how-t">Answers Everything</div><div className="how-d">Every call, WhatsApp, or website chat gets an instant reply — day or night, in any language. Never miss a lead again.</div></div>
+          <div className="how-step"><div className="how-arrow">→</div><div className="how-n">02</div><div className="how-emoji">💬</div><div className="how-t">Answers Everything</div><div className="how-d">Every call, WhatsApp, or website chat gets an instant reply, day or night, in any language. Never miss a lead again.</div></div>
           <div className="how-step"><div className="how-arrow">→</div><div className="how-n">03</div><div className="how-emoji">📅</div><div className="how-t">Books the Job</div><div className="how-d">Qualifies the customer, checks your schedule, books the appointment, and sends a confirmation. Zero work from you.</div></div>
           <div className="how-step"><div className="how-n">04</div><div className="how-emoji">🛡️</div><div className="how-t">Fixes Problems</div><div className="how-d">Monitors your website and business tools 24/7. Finds and fixes issues automatically before they cost you customers.</div></div>
         </div>
@@ -723,12 +723,12 @@ const AuremHomepage = () => {
         <div className="center fade-up">
           <span className="s-label">Who It's For</span>
           <h2 className="s-title">Built for Canadian Business Owners</h2>
-          <p className="s-sub" style={{ margin: "12px auto 0" }}>If you run a service business and hate missing customers — AUREM is for you.</p>
+          <p className="s-sub" style={{ margin: "12px auto 0" }}>If you run a service business and hate missing customers, AUREM is for you.</p>
         </div>
         <div className="who-grid fade-up">
           <div className="who-card"><div className="who-icon">🔧</div><div className="who-title">Trades &amp; Services</div><div className="who-desc">Plumbers, electricians, cleaners, landscapers, HVAC. Never miss an after-hours call again. AUREM books the job while you're working.</div></div>
           <div className="who-card"><div className="who-icon">🏥</div><div className="who-title">Clinics &amp; Salons</div><div className="who-desc">Medical, dental, beauty, wellness. Automated booking, reminders, and follow-ups. Patients and clients get instant responses every time.</div></div>
-          <div className="who-card"><div className="who-icon">🏢</div><div className="who-title">Agencies &amp; Consultants</div><div className="who-desc">Manage multiple clients from one place. White-label available — your brand, your name, AUREM's power running behind the scenes.</div></div>
+          <div className="who-card"><div className="who-icon">🏢</div><div className="who-title">Agencies &amp; Consultants</div><div className="who-desc">Manage multiple clients from one place. White-label available, your brand, your name, AUREM's power running behind the scenes.</div></div>
         </div>
       </section>
 
@@ -792,7 +792,7 @@ const AuremHomepage = () => {
               <li>Everything in Starter</li>
               <li>ORA answers phone calls &amp; WhatsApp</li>
               <li>Up to 5,000 interactions/month</li>
-              <li>Finds 25 new customers daily — automatically</li>
+              <li>Finds 25 new customers daily, automatically</li>
               <li>Website repair service included</li>
               <li>Works across 3 of your businesses</li>
               <li>Revenue reports &amp; business insights</li>
@@ -916,7 +916,7 @@ const AuremHomepage = () => {
       <section className="trust">
         <div className="trust-row">
           <div className="trust-item"><span className="ti">🔒</span> CASL &amp; PIPEDA Compliant</div>
-          <div className="trust-item"><span className="ti">🇨🇦</span> Canadian Built — Mississauga, ON</div>
+          <div className="trust-item"><span className="ti">🇨🇦</span> Canadian Built, Mississauga, ON</div>
           <div className="trust-item"><span className="ti">🧠</span> Powered by Enterprise-Grade AI</div>
           <div className="trust-item"><span className="ti">⚡</span> No credit card to start</div>
           <div className="trust-item"><span className="ti">🛡️</span> Your data stays in Canada. Always.</div>
@@ -928,7 +928,7 @@ const AuremHomepage = () => {
         <div className="fade-up">
           <span className="s-label">Early Results</span>
           <h2 className="s-title">Real Businesses. Real Results.</h2>
-          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 10 }}>Our first beta clients in Ontario — their words, not ours.</p>
+          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 10 }}>Our first beta clients in Ontario, their words, not ours.</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20, maxWidth: 900, margin: "48px auto 0" }} className="fade-up">
           {[
@@ -979,7 +979,7 @@ const AuremHomepage = () => {
             Check your website free right now. Takes 60 seconds.<br />No credit card. No signup. Just results.
           </p>
           <button className="btn-primary" onClick={() => navigate("/repair-quote")} data-testid="final-cta-check">
-            Check My Website Free — It Takes 60 Seconds →
+            Check My Website Free, It Takes 60 Seconds →
           </button>
           <p style={{ fontSize: 12, color: "var(--muted2)", marginTop: 14 }}>Canada's Autonomous Business Platform &nbsp;·&nbsp; Mississauga, Canada 🇨🇦</p>
         </div>
@@ -1031,7 +1031,7 @@ const AuremHomepage = () => {
             textAlign: "center", fontStyle: "italic"
           }}>
             AUREM provides business automation tools. Results may vary based on industry, location, and usage.
-            CASL compliance features are designed to assist with regulatory requirements — consult a qualified
+            CASL compliance features are designed to assist with regulatory requirements, consult a qualified
             legal professional for advice specific to your situation.
             <br /><br />
             Polaris Built Inc. · Mississauga, Ontario, Canada

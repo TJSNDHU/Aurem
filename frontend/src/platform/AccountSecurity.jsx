@@ -97,7 +97,7 @@ export default function AccountSecurity() {
   if (status.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#050510' }}>
-        <Loader2 className="w-6 h-6 animate-spin text-[#F97316]" />
+        <Loader2 className="size-6 animate-spin text-[#F97316]" />
       </div>
     );
   }
@@ -111,7 +111,7 @@ export default function AccountSecurity() {
           className="mb-6 inline-flex items-center gap-2 text-sm text-[#9ca3af] hover:text-[#F97316] transition-colors"
           data-testid="account-security-back"
         >
-          <ChevronLeft className="w-4 h-4" /> Back
+          <ChevronLeft className="size-4" /> Back
         </button>
 
         <div
@@ -123,8 +123,8 @@ export default function AccountSecurity() {
           }}
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)' }}>
-              <Shield className="w-5 h-5 text-[#F97316]" />
+            <div className="size-10 rounded flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)' }}>
+              <Shield className="size-5 text-[#F97316]" />
             </div>
             <div>
               <h1 className="text-xl text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
@@ -141,7 +141,7 @@ export default function AccountSecurity() {
               className="mb-6 p-3 rounded text-xs flex items-center gap-2"
               style={{ background: 'rgba(34,197,94,0.08)', color: '#86EFAC', border: '1px solid rgba(34,197,94,0.25)' }}
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="size-4" />
               PIN is currently set on this account.
             </div>
           )}
@@ -165,7 +165,7 @@ export default function AccountSecurity() {
               <div>
                 <label className="block text-xs text-[#F97316] tracking-[0.15em] uppercase mb-2">Current PIN</label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                   <input
                     type="password"
                     inputMode="numeric"
@@ -189,7 +189,7 @@ export default function AccountSecurity() {
                 {status.pin_set ? 'New PIN' : 'PIN'} (4–6 digits)
               </label>
               <div className="relative">
-                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                 <input
                   type="password"
                   inputMode="numeric"
@@ -211,7 +211,7 @@ export default function AccountSecurity() {
             <div>
               <label className="block text-xs text-[#F97316] tracking-[0.15em] uppercase mb-2">Confirm PIN</label>
               <div className="relative">
-                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                 <input
                   type="password"
                   inputMode="numeric"
@@ -236,7 +236,7 @@ export default function AccountSecurity() {
               data-testid="security-submit"
               className="w-full py-3.5 bg-gradient-to-r from-[#F97316] to-[#8B7355] text-[#050505] rounded font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-all tracking-wide"
             >
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : (status.pin_set ? 'Update PIN' : 'Set PIN')}
+              {busy ? <Loader2 className="size-4 animate-spin" /> : (status.pin_set ? 'Update PIN' : 'Set PIN')}
             </button>
           </form>
         </div>

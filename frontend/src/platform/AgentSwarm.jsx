@@ -177,8 +177,8 @@ export default function AgentSwarm({ token }) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="agent-swarm-loading">
         <div className="flex items-center gap-3 text-[#666]">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading agent swarm...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading agent swarm…</span>
         </div>
       </div>
     );
@@ -191,7 +191,7 @@ export default function AgentSwarm({ token }) {
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-xl font-semibold tracking-wider mb-1" style={{ color: '#e2c97e' }}>Agent Swarm</h1>
-            <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Deploy ORA agent teams — Scout, Architect, Closer, Envoy, and Oracle working together</p>
+            <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Deploy ORA agent teams, Scout, Architect, Closer, Envoy, and Oracle working together</p>
           </div>
           <div className="flex items-center gap-3">
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium ${
@@ -199,7 +199,7 @@ export default function AgentSwarm({ token }) {
                 ? 'bg-[#4ade80]/10 text-[#4ade80]'
                 : 'bg-[#f59e0b]/10 text-[#f59e0b]'
             }`}>
-              <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+              <div className={`size-1.5 rounded-full animate-pulse ${
                 swarmStatus === 'active' ? 'bg-[#4ade80]' : 'bg-[#f59e0b]'
               }`} />
               SWARM {swarmStatus.toUpperCase()}
@@ -210,7 +210,7 @@ export default function AgentSwarm({ token }) {
               className="flex items-center gap-2 px-4 py-2 text-xs border border-[#FF6B00]/15 rounded-lg transition-colors"
               style={{ color: 'var(--aurem-body-secondary)' }}
             >
-              {swarmStatus === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {swarmStatus === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
               {swarmStatus === 'active' ? 'Pause' : 'Resume'}
             </button>
             <button
@@ -220,7 +220,7 @@ export default function AgentSwarm({ token }) {
               className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg text-white transition-all"
               style={{ background: swarmRunning ? '#555' : 'linear-gradient(135deg, #FF6B00, #4ADE80)' }}
             >
-              {swarmRunning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              {swarmRunning ? <RefreshCw className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
               {swarmRunning ? 'Executing...' : 'Execute All Agents'}
             </button>
           </div>
@@ -236,7 +236,7 @@ export default function AgentSwarm({ token }) {
           ].map((stat, idx) => (
             <div key={idx} className="p-4 rounded-lg" style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-border)' }}>
               <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
+                <stat.icon className="size-4" style={{ color: stat.color }} />
                 <span className="text-[9px] tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>{stat.label}</span>
               </div>
               <div className="text-2xl font-semibold font-mono" style={{ color: stat.color }}>{stat.value}</div>
@@ -261,10 +261,10 @@ export default function AgentSwarm({ token }) {
                 <div className="flex items-start gap-4">
                   {/* Agent Avatar */}
                   <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    className="size-12 rounded-xl flex items-center justify-center"
                     style={{ backgroundColor: `${agent.color}15` }}
                   >
-                    <Brain className="w-6 h-6" style={{ color: agent.color }} />
+                    <Brain className="size-6" style={{ color: agent.color }} />
                   </div>
 
                   <div>
@@ -320,7 +320,7 @@ export default function AgentSwarm({ token }) {
                         agent.status === 'active' ? 'bg-[#4ade80]' : 'bg-[#333]'
                       }`}
                     >
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                      <div className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${
                         agent.status === 'active' ? 'translate-x-5' : 'translate-x-0.5'
                       }`} />
                     </button>
@@ -340,7 +340,7 @@ export default function AgentSwarm({ token }) {
                       className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg text-white transition-all"
                       style={{ background: executing === agent.id ? '#555' : `linear-gradient(135deg, ${agent.color}, ${agent.color}aa)` }}
                     >
-                      {executing === agent.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                      {executing === agent.id ? <RefreshCw className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
                       {executing === agent.id ? 'Executing...' : `Execute ${agent.name.split(' ')[0]}`}
                     </button>
                   </div>
@@ -354,7 +354,7 @@ export default function AgentSwarm({ token }) {
                         <div className="mt-2 space-y-1">
                           {executionResults[agent.id].results.slice(0, 3).map((r, i) => (
                             <div key={i} className="text-[10px] flex items-center gap-2" style={{ color: 'var(--aurem-body-secondary)' }}>
-                              <CheckCircle className="w-3 h-3 flex-shrink-0" style={{ color: '#4ade80' }} />
+                              <CheckCircle className="size-3 flex-shrink-0" style={{ color: '#4ade80' }} />
                               {r.name || r.contact || r.deal || JSON.stringify(r).substring(0, 80)}
                             </div>
                           ))}
@@ -373,7 +373,7 @@ export default function AgentSwarm({ token }) {
                           'Updated competitor analysis report'
                         ].map((act, i) => (
                           <div key={i} className="flex items-center gap-2 text-[10px] text-[#888]">
-                            <CheckCircle className="w-3 h-3 text-[#4ade80] flex-shrink-0" />
+                            <CheckCircle className="size-3 text-[#4ade80] flex-shrink-0" />
                             {act}
                           </div>
                         ))}
@@ -425,7 +425,7 @@ export default function AgentSwarm({ token }) {
         {swarmResult && (
           <div className="mt-6 p-5 rounded-xl" style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-border)' }} data-testid="swarm-result">
             <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-4 h-4" style={{ color: '#4ade80' }} />
+              <Zap className="size-4" style={{ color: '#4ade80' }} />
               <h3 className="text-xs tracking-wider" style={{ color: 'var(--aurem-heading)' }}>SWARM EXECUTION COMPLETE</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
                 {swarmResult.agents_completed}/{swarmResult.agents_executed} agents
@@ -446,7 +446,7 @@ export default function AgentSwarm({ token }) {
         {auditChain.length > 0 && (
           <div className="mt-6 p-5 rounded-xl" style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-border)' }} data-testid="audit-chain">
             <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-4 h-4" style={{ color: '#D4AF37' }} />
+              <Shield className="size-4" style={{ color: '#D4AF37' }} />
               <h3 className="text-xs tracking-wider" style={{ color: 'var(--aurem-heading)' }}>BLOCKCHAIN AUDIT TRAIL</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>VERIFIED</span>
             </div>
@@ -470,26 +470,26 @@ export default function AgentSwarm({ token }) {
             {agents.slice(0, 4).map((agent, idx) => (
               <React.Fragment key={agent.id}>
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${agent.color}15`, border: `2px solid ${agent.color}40` }}>
-                    <Brain className="w-5 h-5" style={{ color: agent.color }} />
+                  <div className="size-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${agent.color}15`, border: `2px solid ${agent.color}40` }}>
+                    <Brain className="size-5" style={{ color: agent.color }} />
                   </div>
                   <span className="text-[9px] text-[#888]">{agent.name.split(' ')[0]}</span>
                 </div>
                 {idx < 3 && (
                   <div className="flex items-center">
                     <div className="w-8 h-[1px] bg-[#333]" />
-                    <ChevronRight className="w-3 h-3 text-[#333]" />
+                    <ChevronRight className="size-3 text-[#333]" />
                   </div>
                 )}
               </React.Fragment>
             ))}
             <div className="flex items-center">
               <div className="w-8 h-[1px] bg-[#D4AF37]/50" />
-              <ChevronRight className="w-3 h-3 text-[#D4AF37]" />
+              <ChevronRight className="size-3 text-[#D4AF37]" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#f59e0b]/10 border-2 border-[#f59e0b]/40">
-                <Cpu className="w-6 h-6 text-[#f59e0b]" />
+              <div className="size-12 rounded-full flex items-center justify-center bg-[#f59e0b]/10 border-2 border-[#f59e0b]/40">
+                <Cpu className="size-6 text-[#f59e0b]" />
               </div>
               <span className="text-[9px] text-[#f59e0b]">Orchestrator</span>
             </div>

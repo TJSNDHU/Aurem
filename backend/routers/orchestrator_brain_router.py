@@ -1,5 +1,5 @@
 """
-ReRoots AI Orchestrator - The Master Brain
+AUREM AI Orchestrator - The Master Brain
 Central intelligence that coordinates all AI agents, routes tasks, and executes workflows
 """
 
@@ -276,7 +276,7 @@ class AgentTask(BaseModel):
 # ORCHESTRATOR BRAIN - NATURAL LANGUAGE UNDERSTANDING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-ORCHESTRATOR_SYSTEM_PROMPT = """You are the ReRoots AI Orchestrator - the Master Brain that coordinates all AI agents.
+ORCHESTRATOR_SYSTEM_PROMPT = """You are the AUREM AI Orchestrator - the Master Brain that coordinates all AI agents.
 
 Your job is to:
 1. Understand natural language commands from the user

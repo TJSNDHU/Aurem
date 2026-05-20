@@ -85,8 +85,8 @@ const QuickStartWizard = ({ token, onNavigate }) => {
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2D7A4A, #1B5E35)' }}>
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2D7A4A, #1B5E35)' }}>
+            <Sparkles className="size-4 text-white" />
           </div>
           <div>
             <h3 className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>Quick Start</h3>
@@ -99,7 +99,7 @@ const QuickStartWizard = ({ token, onNavigate }) => {
           className="p-1.5 rounded-lg transition-colors hover:bg-black/5"
           style={{ color: 'var(--aurem-body-secondary)' }}
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="size-3.5" />
         </button>
       </div>
 
@@ -127,16 +127,16 @@ const QuickStartWizard = ({ token, onNavigate }) => {
               }}
             >
               <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
+                className="size-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
                 style={{
                   background: step.completed ? 'linear-gradient(135deg, #2D7A4A, #4ADE80)' : 'rgba(255,255,255,0.05)',
                   border: step.completed ? 'none' : '1px solid var(--aurem-border)',
                 }}
               >
                 {step.completed ? (
-                  <Check className="w-4 h-4 text-white" />
+                  <Check className="size-4 text-white" />
                 ) : (
-                  <Icon className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+                  <Icon className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -155,7 +155,7 @@ const QuickStartWizard = ({ token, onNavigate }) => {
               </div>
               {!step.completed && (
                 <ChevronRight
-                  className="w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="size-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ color: '#2D7A4A' }}
                 />
               )}

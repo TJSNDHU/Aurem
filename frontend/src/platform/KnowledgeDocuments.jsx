@@ -80,7 +80,7 @@ export default function KnowledgeDocuments({ token }) {
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Knowledge Documents</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
-            Multi-Agent RAG — ChromaDB + PageIndex dual retrieval
+            Multi-Agent RAG, ChromaDB + PageIndex dual retrieval
           </p>
         </div>
         <motion.button onClick={() => { setLoading(true); fetchData(); }}
@@ -88,7 +88,7 @@ export default function KnowledgeDocuments({ token }) {
           style={{ background: 'rgba(61,58,57,0.25)', color: 'var(--aurem-heading)' }}
           whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
           data-testid="docs-refresh-btn">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </motion.button>
       </motion.div>
 
@@ -102,8 +102,8 @@ export default function KnowledgeDocuments({ token }) {
           return (
             <MotionCard key={key} className="aurem-glass-card p-4" data-testid={`engine-${key}`} variants={cardVariant}>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
-                  <Icon className="w-4 h-4" style={{ color }} />
+                <div className="size-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
+                  <Icon className="size-4" style={{ color }} />
                 </div>
                 <div>
                   <div className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>{label}</div>
@@ -124,17 +124,17 @@ export default function KnowledgeDocuments({ token }) {
       {/* Upload Section */}
       <div className="aurem-glass-card p-5 mb-6" data-testid="upload-section">
         <div className="flex items-center gap-3 mb-3">
-          <Upload className="w-4 h-4" style={{ color: '#3B82F6' }} />
+          <Upload className="size-4" style={{ color: '#3B82F6' }} />
           <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Upload Document</span>
           <span className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>PDF, DOCX, TXT, MD, CSV (max 50MB)</span>
         </div>
         <label className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl border-2 border-dashed cursor-pointer hover:border-[#3B82F6] transition-colors"
           style={{ borderColor: 'rgba(255,107,0,0.1)' }}>
           {uploading ? (
-            <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#3B82F6' }} />
+            <Loader2 className="size-5 animate-spin" style={{ color: '#3B82F6' }} />
           ) : (
             <>
-              <FileText className="w-5 h-5" style={{ color: 'var(--aurem-body-secondary)' }} />
+              <FileText className="size-5" style={{ color: 'var(--aurem-body-secondary)' }} />
               <span className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Click to upload or drag & drop</span>
             </>
           )}
@@ -146,13 +146,13 @@ export default function KnowledgeDocuments({ token }) {
         {/* Documents List */}
         <div className="aurem-glass-card overflow-hidden" data-testid="documents-list">
           <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(59,130,246,0.03)' }}>
-            <FileText className="w-4 h-4" style={{ color: '#3B82F6' }} />
+            <FileText className="size-4" style={{ color: '#3B82F6' }} />
             <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Indexed Documents</span>
             <span className="text-[10px] ml-auto" style={{ color: 'var(--aurem-body-secondary)' }}>{documents.length} docs</span>
           </div>
           {documents.length === 0 ? (
             <div className="flex flex-col items-center py-12">
-              <FileText className="w-8 h-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
+              <FileText className="size-8 mb-2" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.3 }} />
               <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>No documents uploaded yet</p>
               <p className="text-[10px] mt-1" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.6 }}>
                 Upload PDFs, contracts, or manuals for ORA to reason over
@@ -162,7 +162,7 @@ export default function KnowledgeDocuments({ token }) {
             <div className="max-h-[400px] overflow-y-auto aurem-scroll">
               {documents.map((doc, i) => (
                 <div key={i} className="px-5 py-3 border-b flex items-center gap-3" style={{ borderColor: 'rgba(255,107,0,0.05)' }}>
-                  <FileText className="w-4 h-4 flex-shrink-0" style={{ color: '#3B82F6' }} />
+                  <FileText className="size-4 flex-shrink-0" style={{ color: '#3B82F6' }} />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium truncate" style={{ color: 'var(--aurem-heading)' }}>{doc.filename}</div>
                     <div className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -173,12 +173,12 @@ export default function KnowledgeDocuments({ token }) {
                   <button onClick={() => setQueryForm({ ...queryForm, doc_id: doc.pageindex_doc_id })}
                     className="p-1 rounded hover:bg-[rgba(59,130,246,0.1)]"
                     title="Query this document">
-                    <Search className="w-3 h-3" style={{ color: '#3B82F6' }} />
+                    <Search className="size-3" style={{ color: '#3B82F6' }} />
                   </button>
                   <button onClick={() => deleteDoc(doc.pageindex_doc_id)}
                     className="p-1 rounded hover:bg-[rgba(239,68,68,0.1)]"
                     title="Delete">
-                    <Trash2 className="w-3 h-3" style={{ color: '#EF4444' }} />
+                    <Trash2 className="size-3" style={{ color: '#EF4444' }} />
                   </button>
                 </div>
               ))}
@@ -189,7 +189,7 @@ export default function KnowledgeDocuments({ token }) {
         {/* Query Interface */}
         <div className="aurem-glass-card overflow-hidden" data-testid="query-interface">
           <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: 'rgba(61,58,57,0.25)', background: 'rgba(139,92,246,0.03)' }}>
-            <Search className="w-4 h-4" style={{ color: '#8B5CF6' }} />
+            <Search className="size-4" style={{ color: '#8B5CF6' }} />
             <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>Document Query (PageIndex)</span>
           </div>
           <div className="p-5">
@@ -212,7 +212,7 @@ export default function KnowledgeDocuments({ token }) {
               style={{ background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)', color: '#fff', opacity: (!queryForm.doc_id || !queryForm.query) ? 0.5 : 1 }}
               data-testid="query-submit-btn"
             >
-              {querying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+              {querying ? <Loader2 className="size-3 animate-spin" /> : <Search className="size-3" />}
               Query Document
             </button>
 
@@ -220,9 +220,9 @@ export default function KnowledgeDocuments({ token }) {
               <div className="mt-4 p-3 rounded-xl" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   {queryResult.reasoning ? (
-                    <CheckCircle className="w-3 h-3" style={{ color: '#22C55E' }} />
+                    <CheckCircle className="size-3" style={{ color: '#22C55E' }} />
                   ) : (
-                    <AlertCircle className="w-3 h-3" style={{ color: '#EAB308' }} />
+                    <AlertCircle className="size-3" style={{ color: '#EAB308' }} />
                   )}
                   <span className="text-[10px] font-bold" style={{ color: 'var(--aurem-heading)' }}>
                     Source: {queryResult.source}

@@ -49,7 +49,7 @@ export default function BuildBadge() {
       title={`Backend build ${info.v} · uptime ${uptimeMin} min`}
     >
       <span
-        className={`w-1.5 h-1.5 rounded-full ${
+        className={`size-1.5 rounded-full ${
           fresh ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
         }`}
       />

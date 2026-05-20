@@ -137,13 +137,13 @@ const VoiceSalesAgent = ({ token }) => {
         {/* Tabs */}
         <div className="mb-6 flex gap-2">
           <button onClick={() => setActiveTab('auto-calls')} style={tabStyle(activeTab === 'auto-calls')} data-testid="tab-auto-calls">
-            <PhoneCall className="w-4 h-4" /> Auto Calls
+            <PhoneCall className="size-4" /> Auto Calls
           </button>
           <button onClick={() => setActiveTab('voice-training')} style={tabStyle(activeTab === 'voice-training')} data-testid="tab-voice-training">
-            <Mic className="w-4 h-4" /> Voice Training
+            <Mic className="size-4" /> Voice Training
           </button>
           <button onClick={() => setActiveTab('call-history')} style={tabStyle(activeTab === 'call-history')} data-testid="tab-call-history">
-            <Clock className="w-4 h-4" /> Call History
+            <Clock className="size-4" /> Call History
           </button>
         </div>
 
@@ -151,7 +151,7 @@ const VoiceSalesAgent = ({ token }) => {
         {activeTab === 'auto-calls' && (
           <div className="space-y-6">
             <div style={{ ...cardStyle, background: 'rgba(255,107,0,0.06)', borderColor: 'rgba(255,107,0,0.2)' }} className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 mt-0.5" style={{ color: '#FF6B00' }} />
+              <Sparkles className="size-5 mt-0.5" style={{ color: '#FF6B00' }} />
               <div>
                 <p className="text-sm font-medium mb-1" style={{ color: '#FF6B00' }}>How Auto-Calls Work</p>
                 <p className="text-xs" style={{ color: 'rgba(255,107,0,0.65)' }}>
@@ -167,7 +167,7 @@ const VoiceSalesAgent = ({ token }) => {
 
               {recentScans.length === 0 ? (
                 <div className="text-center py-12">
-                  <Phone className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.55)' }} />
+                  <Phone className="size-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.55)' }} />
                   <p className="text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>No scans available. Scan a customer website first.</p>
                 </div>
               ) : (
@@ -215,7 +215,7 @@ const VoiceSalesAgent = ({ token }) => {
                           transition: 'opacity 0.2s',
                         }}
                       >
-                        <PhoneCall className="w-4 h-4" />
+                        <PhoneCall className="size-4" />
                         {!scan.enrichment?.manual_data?.phone 
                           ? 'No Phone Number' 
                           : loading 
@@ -241,7 +241,7 @@ const VoiceSalesAgent = ({ token }) => {
         {activeTab === 'voice-training' && (
           <div className="space-y-6">
             <div style={{ ...cardStyle, background: 'rgba(168,85,247,0.06)', borderColor: 'rgba(168,85,247,0.2)' }} className="flex items-start gap-3">
-              <Mic className="w-5 h-5 mt-0.5" style={{ color: '#a855f7' }} />
+              <Mic className="size-5 mt-0.5" style={{ color: '#a855f7' }} />
               <div>
                 <p className="text-sm font-medium mb-1" style={{ color: '#a855f7' }}>Voice Profile Training</p>
                 <p className="text-xs" style={{ color: 'rgba(168,85,247,0.6)' }}>
@@ -275,7 +275,7 @@ const VoiceSalesAgent = ({ token }) => {
 
               {voiceProfiles.length === 0 ? (
                 <div className="text-center py-12">
-                  <Mic className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.55)' }} />
+                  <Mic className="size-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.55)' }} />
                   <p className="text-sm mb-2" style={{ color: 'rgba(255,255,255,0.65)' }}>No voice profiles trained yet</p>
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Train voices to enable advanced features</p>
                 </div>
@@ -284,7 +284,7 @@ const VoiceSalesAgent = ({ token }) => {
                   {voiceProfiles.map((profile) => (
                     <div key={profile.profile_id} className="flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,107,0,0.1)', borderRadius: 10, padding: 16 }}>
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}>
+                        <div className="size-12 rounded-full flex items-center justify-center text-white font-bold" style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}>
                           {profile.team_member_name.charAt(0)}
                         </div>
                         <div>
@@ -314,7 +314,7 @@ const VoiceSalesAgent = ({ token }) => {
 
             {callHistory.length === 0 ? (
               <div className="text-center py-12">
-                <Clock className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.55)' }} />
+                <Clock className="size-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.55)' }} />
                 <p className="text-sm mb-2" style={{ color: 'rgba(255,255,255,0.65)' }}>No call history yet</p>
                 <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Start your first AI call to see history here</p>
               </div>
@@ -323,12 +323,12 @@ const VoiceSalesAgent = ({ token }) => {
                 {callHistory.map((call) => (
                   <div key={call.call_id} data-testid={`call-row-${call.call_id}`} className="flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,107,0,0.1)', borderRadius: 10, padding: 16 }}>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{
+                      <div className="size-10 rounded-full flex items-center justify-center" style={{
                         background: call.status === 'completed' ? 'rgba(74,222,128,0.12)' : call.status === 'active' ? 'rgba(255,107,0,0.12)' : 'rgba(255,255,255,0.06)',
                       }}>
-                        {call.status === 'completed' ? <CheckCircle className="w-5 h-5" style={{ color: '#4ade80' }} /> :
-                         call.status === 'active' ? <PhoneCall className="w-5 h-5" style={{ color: '#FF6B00' }} /> :
-                         <AlertCircle className="w-5 h-5" style={{ color: 'rgba(255,255,255,0.6)' }} />}
+                        {call.status === 'completed' ? <CheckCircle className="size-5" style={{ color: '#4ade80' }} /> :
+                         call.status === 'active' ? <PhoneCall className="size-5" style={{ color: '#FF6B00' }} /> :
+                         <AlertCircle className="size-5" style={{ color: 'rgba(255,255,255,0.6)' }} />}
                       </div>
                       <div>
                         <p className="text-sm font-medium" style={{ color: 'var(--aurem-heading, #E8E6E3)' }}>

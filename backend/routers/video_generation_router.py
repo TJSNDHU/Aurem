@@ -1,5 +1,5 @@
 """
-ReRoots AI Video Generation Router
+AUREM AI Video Generation Router
 Sora 2 powered video generation for product demos and marketing
 """
 

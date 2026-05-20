@@ -99,8 +99,8 @@ export default function GoogleAuthCallback() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--aurem-bg, #050505)' }}>
       <div className="text-center" data-testid="google-auth-loading">
-        <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
-        <p className="text-sm" style={{ color: 'var(--aurem-body-secondary, #888)' }}>Authenticating with Google...</p>
+        <Loader2 className="size-12 mx-auto mb-4 animate-spin" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+        <p className="text-sm" style={{ color: 'var(--aurem-body-secondary, #888)' }}>Authenticating with Google…</p>
       </div>
     </div>
   );

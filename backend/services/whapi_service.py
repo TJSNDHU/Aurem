@@ -230,7 +230,7 @@ Someone you referred just completed their Bio-Age Scan!
 
 Keep sharing: {referral_link}
 
-- ReRoots Lab 🧬""",
+- AUREM Lab 🧬""",
         "almost_there_8": """⚡ *You're SO Close!*
 
 Hi {name}! You're just {remaining} referral(s) away from unlocking your *30% LIFETIME DISCOUNT*!
@@ -246,7 +246,7 @@ Hi {name}! You're just {remaining} referral(s) away from unlocking your *30% LIF
 Share now: {referral_link}
 
 Don't let this slip away! 💪
-- ReRoots Lab""",
+- AUREM Lab""",
         "milestone_unlocked": """🏆 *CONGRATULATIONS!*
 
 {name}, you've done it!
@@ -258,11 +258,11 @@ You've unlocked your *30% LIFETIME DISCOUNT*! 🎉
 
 This discount is now permanently on your account. Every order. Forever.
 
-Shop now: https://reroots.ca/shop
+Shop now: https://aurem.live/shop
 
 Welcome to the inner circle! 💎
-- ReRoots Lab""",
-        "launch_invite": """🧬 *ReRoots Founding Member Invitation*
+- AUREM Lab""",
+        "launch_invite": """🧬 *AUREM Founding Member Invitation*
 
 Hi {name}!
 
@@ -279,7 +279,7 @@ Start now: {referral_link}
 
 This is your chance to lock in founder pricing forever.
 
-- ReRoots Lab 🧬""",
+- AUREM Lab 🧬""",
         "blog_followup": """📚 *Thanks for reading!*
 
 Hi {name}, I noticed you were exploring our article on {topic}.
@@ -290,7 +290,7 @@ Take your free Bio-Age Scan: {scan_link}
 
 Have questions? Just reply here - I'm real! 🙂
 
-- ReRoots Lab""",
+- AUREM Lab""",
     }
 
 
@@ -315,7 +315,7 @@ async def send_milestone_new_referral_whatsapp(
         threshold=threshold,
         progress_bar=progress_bar,
         remaining_text=remaining_text,
-        referral_link=f"https://reroots.ca/Bio-Age-Repair-Scan?ref={referral_code}",
+        referral_link=f"https://aurem.live/Bio-Age-Repair-Scan?ref={referral_code}",
     )
 
     return await send_whatsapp_message(phone, message)
@@ -336,7 +336,7 @@ async def send_milestone_almost_there_whatsapp(
         threshold=threshold,
         remaining=remaining,
         progress_bar=progress_bar,
-        referral_link=f"https://reroots.ca/Bio-Age-Repair-Scan?ref={referral_code}",
+        referral_link=f"https://aurem.live/Bio-Age-Repair-Scan?ref={referral_code}",
     )
 
     return await send_whatsapp_message(phone, message)
@@ -363,7 +363,7 @@ async def send_launch_invite_whatsapp(
 
     message = templates["launch_invite"].format(
         name=name.split()[0] if name else "there",
-        referral_link=f"https://reroots.ca/Bio-Age-Repair-Scan?ref={referral_code}",
+        referral_link=f"https://aurem.live/Bio-Age-Repair-Scan?ref={referral_code}",
     )
 
     return await send_whatsapp_message(phone, message)
@@ -375,7 +375,7 @@ async def send_blog_followup_whatsapp(
     """Send follow-up message when user reads a blog post (if logged in)."""
     templates = get_milestone_templates()
 
-    scan_link = f"https://reroots.ca/Bio-Age-Repair-Scan"
+    scan_link = f"https://aurem.live/Bio-Age-Repair-Scan"
     if referral_code:
         scan_link += f"?ref={referral_code}"
 
@@ -705,9 +705,9 @@ Ready to join them?
 3️⃣ Share with 10 friends
 4️⃣ Unlock 30% off forever
 
-Start: reroots.ca/Bio-Age-Repair-Scan
+Start: aurem.live/Bio-Age-Repair-Scan
 
-#ReRoots #FoundingMember #BiohackingSkincare #PDRN"""
+#AUREM #FoundingMember #BiohackingSkincare #PDRN"""
 
 
 # ============= PARTNER PROGRAM NOTIFICATIONS =============
@@ -722,11 +722,11 @@ async def send_partner_approved_whatsapp(
     """
     first_name = name.split()[0] if name else "there"
 
-    message = f"""🎉 *Welcome to the ReRoots Partner Circle!*
+    message = f"""🎉 *Welcome to the AUREM Partner Circle!*
 
 Hi {first_name},
 
-Your application has been *APPROVED*! You're now an official ReRoots Science Ambassador.
+Your application has been *APPROVED*! You're now an official AUREM Science Ambassador.
 
 🔑 *Your Partner Code:*
 *{partner_code}*
@@ -735,7 +735,7 @@ Your application has been *APPROVED*! You're now an official ReRoots Science Amb
 {referral_link}
 
 🧬 *What's Next:*
-1. Access your Partner Dashboard: https://reroots.ca/partner-dashboard
+1. Access your Partner Dashboard: https://aurem.live/partner-dashboard
 2. Download brand assets from your Resources tab
 3. Share your link & start earning 10-15% commission
 
@@ -744,7 +744,7 @@ Your followers get up to 50% OFF with your code!
 Questions? Just reply here - we're real humans 🙂
 
 Welcome to the lab! 🧬
-- ReRoots Partnership Team"""
+- AUREM Partnership Team"""
 
     return await send_whatsapp_message(phone, message)
 
@@ -758,7 +758,7 @@ async def send_partner_denied_whatsapp(phone: str, name: str) -> dict:
 
     message = f"""Hi {first_name},
 
-Thank you for your interest in partnering with ReRoots 🧬
+Thank you for your interest in partnering with AUREM 🧬
 
 After reviewing your application, we've decided not to move forward with a partnership at this time. Our program has specific requirements around audience alignment and content focus that we're prioritizing.
 
@@ -769,11 +769,11 @@ This isn't a reflection of your work - it's simply about finding the right fit f
 • Refer 10 friends to unlock a *permanent 30% discount*
 • Shop with code WELCOME15 for 15% off your first order
 
-Start here: https://reroots.ca/Bio-Age-Repair-Scan
+Start here: https://aurem.live/Bio-Age-Repair-Scan
 
 We appreciate your interest and wish you success!
 
-- ReRoots Team"""
+- AUREM Team"""
 
     return await send_whatsapp_message(phone, message)
 
@@ -803,7 +803,7 @@ async def send_shipping_whatsapp(
 
 Hi {first_name},
 
-Great news! Your ReRoots order is on its way! 🚚
+Great news! Your AUREM order is on its way! 🚚
 
 🧾 *Order:* #{order_number}
 📍 *Carrier:* {courier}
@@ -816,6 +816,6 @@ Your skincare essentials will arrive soon! ✨
 
 Questions? Just reply here.
 
-- ReRoots Team 🧬"""
+- AUREM Team 🧬"""
 
     return await send_whatsapp_message(phone, message)

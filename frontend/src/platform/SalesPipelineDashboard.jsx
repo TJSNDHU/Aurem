@@ -204,19 +204,19 @@ const SalesPipelineDashboard = ({ token }) => {
             ].map((step, idx, arr) => (
               <React.Fragment key={step.num}>
                 <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
+                  <div className={`size-12 rounded-full flex items-center justify-center mb-2 ${
                     step.active 
                       ? 'bg-gradient-to-r from-[#D4AF37] to-[#8B7355]' 
                       : 'bg-[#1A1A1A] border border-[#FF6B00]/15'
                   }`}>
-                    <step.icon className={`w-5 h-5 ${step.active ? 'text-[#050505]' : 'text-[#555]'}`} />
+                    <step.icon className={`size-5 ${step.active ? 'text-[#050505]' : 'text-[#555]'}`} />
                   </div>
                   <span className={`text-xs ${step.active ? 'text-[#1A1A2E]' : 'text-[#666]'}`}>
                     {step.label}
                   </span>
                 </div>
                 {idx < arr.length - 1 && (
-                  <ChevronRight className={`w-5 h-5 ${currentStep > step.num ? 'text-[#D4AF37]' : 'text-[#333]'}`} />
+                  <ChevronRight className={`size-5 ${currentStep > step.num ? 'text-[#D4AF37]' : 'text-[#333]'}`} />
                 )}
               </React.Fragment>
             ))}
@@ -228,7 +228,7 @@ const SalesPipelineDashboard = ({ token }) => {
           <div className="mb-8 p-5 rounded-xl" style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-border)' }} data-testid="pipeline-predictions">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" style={{ color: '#D4AF37' }} />
+                <Sparkles className="size-4" style={{ color: '#D4AF37' }} />
                 <h3 className="text-xs tracking-wider font-medium" style={{ color: 'var(--aurem-heading)' }}>AI DEAL PREDICTIONS</h3>
                 <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.1)', color: '#D4AF37' }}>
                   {predictions.summary?.total_deals} deals analyzed
@@ -274,13 +274,13 @@ const SalesPipelineDashboard = ({ token }) => {
         {currentStep === 1 && (
           <div className="p-6 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
             <h2 className="text-lg font-medium text-[#1A1A2E] mb-4 flex items-center gap-2">
-              <Search className="w-5 h-5 text-[#D4AF37]" />
+              <Search className="size-5 text-[#D4AF37]" />
               Select a Customer Scan
             </h2>
             
             {recentScans.length === 0 ? (
               <div className="text-center py-12">
-                <Search className="w-12 h-12 text-[#333] mx-auto mb-4" />
+                <Search className="size-12 text-[#333] mx-auto mb-4" />
                 <p className="text-sm text-[#666] mb-4">No scans found. Scan a customer website first.</p>
                 <button onClick={() => { if (window.handleNavClick) window.handleNavClick('customer-scanner'); }} className="px-4 py-2 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded-lg text-sm font-medium hover:opacity-90" data-testid="go-to-scanner-btn">
                   Go to Scanner
@@ -328,7 +328,7 @@ const SalesPipelineDashboard = ({ token }) => {
         {currentStep === 2 && decisionMakers.length > 0 && (
           <div className="p-6 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
             <h2 className="text-lg font-medium text-[#1A1A2E] mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-[#D4AF37]" />
+              <Users className="size-5 text-[#D4AF37]" />
               Decision Makers Found
             </h2>
 
@@ -336,7 +336,7 @@ const SalesPipelineDashboard = ({ token }) => {
               {decisionMakers.map((dm, idx) => (
                 <div key={idx} className="p-4 bg-white/60 border border-[#FF6B00]/20 rounded-lg flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-[#050505] font-bold">
+                    <div className="size-12 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-[#050505] font-bold">
                       {dm.name.charAt(0)}
                     </div>
                     <div>
@@ -345,12 +345,12 @@ const SalesPipelineDashboard = ({ token }) => {
                       <div className="flex gap-2 mt-1">
                         {dm.email && (
                           <a href={`mailto:${dm.email}`} className="text-xs text-[#64C8FF] hover:underline flex items-center gap-1">
-                            <Mail className="w-3 h-3" /> {dm.email}
+                            <Mail className="size-3" /> {dm.email}
                           </a>
                         )}
                         {dm.linkedin && (
                           <a href={dm.linkedin} target="_blank" rel="noopener noreferrer" className="text-xs text-[#64C8FF] hover:underline flex items-center gap-1">
-                            <Linkedin className="w-3 h-3" /> LinkedIn
+                            <Linkedin className="size-3" /> LinkedIn
                           </a>
                         )}
                       </div>
@@ -377,7 +377,7 @@ const SalesPipelineDashboard = ({ token }) => {
         {currentStep >= 3 && proposal && (
           <div className="p-6 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg mb-6">
             <h2 className="text-lg font-medium text-[#1A1A2E] mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#D4AF37]" />
+              <FileText className="size-5 text-[#D4AF37]" />
               Proposal Generated
             </h2>
 
@@ -403,7 +403,7 @@ const SalesPipelineDashboard = ({ token }) => {
                 rel="noopener noreferrer"
                 className="px-4 py-2 bg-[#1A1A1A] border border-[#FF6B00]/15 text-[#1A1A2E] rounded-lg text-sm hover:border-[#D4AF37]/30 transition-all flex items-center gap-2"
               >
-                <Download className="w-4 h-4" />
+                <Download className="size-4" />
                 Download PDF
               </a>
               
@@ -424,12 +424,12 @@ const SalesPipelineDashboard = ({ token }) => {
         {currentStep >= 4 && contract && (
           <div className="p-6 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg mb-6">
             <h2 className="text-lg font-medium text-[#1A1A2E] mb-4 flex items-center gap-2">
-              <FileSignature className="w-5 h-5 text-[#D4AF37]" />
+              <FileSignature className="size-5 text-[#D4AF37]" />
               Contract Ready
             </h2>
 
             <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg mb-4 flex items-center gap-3">
-              <CheckCircle className="w-5 h-5 text-green-400" />
+              <CheckCircle className="size-5 text-green-400" />
               <div>
                 <p className="text-sm text-green-400 font-medium">Contract Generated</p>
                 <p className="text-xs text-green-400/70">ID: {contract.contract_id}</p>
@@ -442,7 +442,7 @@ const SalesPipelineDashboard = ({ token }) => {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] border border-[#FF6B00]/15 text-[#1A1A2E] rounded-lg text-sm hover:border-[#D4AF37]/30 transition-all"
             >
-              <Download className="w-4 h-4" />
+              <Download className="size-4" />
               Download Contract
             </a>
           </div>
@@ -452,7 +452,7 @@ const SalesPipelineDashboard = ({ token }) => {
         {currentStep >= 5 && onboarding && (
           <div className="p-6 bg-gradient-to-br from-[#D4AF37]/10 to-[#8B7355]/10 border border-[#D4AF37]/30 rounded-lg">
             <h2 className="text-lg font-medium text-[#D4AF37] mb-4 flex items-center gap-2">
-              <Rocket className="w-5 h-5" />
+              <Rocket className="size-5" />
               Onboarding in Progress
             </h2>
 
@@ -473,11 +473,11 @@ const SalesPipelineDashboard = ({ token }) => {
               {onboarding.steps?.map((step, idx) => (
                 <div key={idx} className="flex items-center gap-3 p-3 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
                   {step.status === 'completed' ? (
-                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    <CheckCircle className="size-5 text-green-400" />
                   ) : step.status === 'pending' ? (
-                    <Clock className="w-5 h-5 text-yellow-400" />
+                    <Clock className="size-5 text-yellow-400" />
                   ) : (
-                    <AlertCircle className="w-5 h-5 text-gray-400" />
+                    <AlertCircle className="size-5 text-gray-400" />
                   )}
                   <span className={`text-sm ${step.status === 'completed' ? 'text-[#1A1A2E]' : 'text-[#888]'}`}>
                     {step.name}

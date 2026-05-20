@@ -137,8 +137,8 @@ const APIKeysManager = ({ token, user }) => {
     return (
       <div className="flex-1 flex items-center justify-center bg-white/60">
         <div className="text-center">
-          <div className="w-12 h-12 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-[#666]">Loading API keys...</p>
+          <div className="size-12 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-[#666]">Loading API keys…</p>
         </div>
       </div>
     );
@@ -158,7 +158,7 @@ const APIKeysManager = ({ token, user }) => {
         {/* Error Alert */}
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="size-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-red-400">{error}</p>
             </div>
@@ -169,11 +169,11 @@ const APIKeysManager = ({ token, user }) => {
         {newKey && (
           <div className="mb-6 p-6 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-lg">
             <div className="flex items-start gap-3 mb-4">
-              <CheckCircle className="w-5 h-5 text-[#D4AF37] flex-shrink-0 mt-0.5" />
+              <CheckCircle className="size-5 text-[#D4AF37] flex-shrink-0 mt-0.5" />
               <div>
                 <h3 className="text-sm font-medium text-[#D4AF37] mb-1">API Key Generated Successfully!</h3>
                 <p className="text-xs text-[#888]">
-                  Copy this key now — it won't be shown again for security reasons.
+                  Copy this key now, it won't be shown again for security reasons.
                 </p>
               </div>
             </div>
@@ -185,7 +185,7 @@ const APIKeysManager = ({ token, user }) => {
                   onClick={() => copyToClipboard(newKey.api_key, 'key')}
                   className="flex items-center gap-2 px-3 py-1 text-xs text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded transition-all"
                 >
-                  {copiedKey === newKey.api_key ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedKey === newKey.api_key ? <CheckCircle className="size-3" /> : <Copy className="size-3" />}
                   {copiedKey === newKey.api_key ? 'Copied!' : 'Copy'}
                 </button>
               </div>
@@ -199,7 +199,7 @@ const APIKeysManager = ({ token, user }) => {
                   onClick={() => copyToClipboard(generateSnippet(newKey.api_key), 'snippet')}
                   className="flex items-center gap-2 px-3 py-1 text-xs text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded transition-all"
                 >
-                  {copiedSnippet ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedSnippet ? <CheckCircle className="size-3" /> : <Copy className="size-3" />}
                   {copiedSnippet ? 'Copied!' : 'Copy Code'}
                 </button>
               </div>
@@ -224,7 +224,7 @@ const APIKeysManager = ({ token, user }) => {
             disabled={isGenerating}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] text-[#050505] rounded-lg font-medium hover:opacity-90 transition-all disabled:opacity-50"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="size-4" />
             {isGenerating ? 'Generating...' : 'Generate New API Key'}
           </button>
         </div>
@@ -235,7 +235,7 @@ const APIKeysManager = ({ token, user }) => {
           
           {apiKeys.length === 0 ? (
             <div className="p-12 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg text-center">
-              <Key className="w-12 h-12 text-[#333] mx-auto mb-4" />
+              <Key className="size-12 text-[#333] mx-auto mb-4" />
               <p className="text-sm text-[#666] mb-2">No API keys yet</p>
               <p className="text-xs text-[#555]">Generate your first API key to start integrating AUREM</p>
             </div>
@@ -248,7 +248,7 @@ const APIKeysManager = ({ token, user }) => {
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <Key className="w-4 h-4 text-[#D4AF37]" />
+                      <Key className="size-4 text-[#D4AF37]" />
                       <code className="text-sm text-[#888] font-mono">{maskKey(key.key_preview)}</code>
                       {key.active ? (
                         <span className="px-2 py-0.5 text-[9px] bg-green-500/10 text-green-400 border border-green-500/30 rounded uppercase tracking-wider">
@@ -272,7 +272,7 @@ const APIKeysManager = ({ token, user }) => {
                       className="p-2 text-[#666] hover:text-[#D4AF37] hover:bg-white/50 rounded transition-all"
                       title="Copy embed code"
                     >
-                      <Code className="w-4 h-4" />
+                      <Code className="size-4" />
                     </button>
                     {key.active && (
                       <button
@@ -280,7 +280,7 @@ const APIKeysManager = ({ token, user }) => {
                         className="p-2 text-[#666] hover:text-red-400 hover:bg-white/50 rounded transition-all"
                         title="Revoke key"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="size-4" />
                       </button>
                     )}
                   </div>
@@ -293,7 +293,7 @@ const APIKeysManager = ({ token, user }) => {
         {/* Documentation */}
         <div className="mt-8 p-6 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
           <div className="flex items-start gap-3 mb-4">
-            <ExternalLink className="w-5 h-5 text-[#D4AF37] flex-shrink-0" />
+            <ExternalLink className="size-5 text-[#D4AF37] flex-shrink-0" />
             <div>
               <h3 className="text-sm font-medium text-[#1A1A2E] mb-2">How to Use</h3>
               <ol className="text-xs text-[#888] space-y-2 list-decimal list-inside">

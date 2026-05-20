@@ -1,7 +1,7 @@
 """
 Circuit Breaker Pattern for External API Calls
 ═══════════════════════════════════════════════════════════════════
-Protects Reroots from cascading failures when external services fail.
+Protects AUREM from cascading failures when external services fail.
 When a service fails repeatedly, the circuit opens and skips calls
 until the service has time to recover.
 
@@ -218,7 +218,7 @@ async def startup_validation(db) -> tuple[bool, list]:
                 from services.twilio_service import send_whatsapp_message
                 await send_whatsapp_message(
                     tj_number,
-                    f"🚨 reroots.ca startup validation failed:\n\n" + 
+                    f"🚨 aurem.live startup validation failed:\n\n" + 
                     "\n".join(f"• {e}" for e in errors)
                 )
         except Exception as e:

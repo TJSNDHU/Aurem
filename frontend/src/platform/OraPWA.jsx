@@ -1259,7 +1259,7 @@ const OraPWA = () => {
               <input className="splash-input" type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="ora-splash-email" />
               <input className="splash-input" type="tel" placeholder="Phone number (+1...)" value={phone} onChange={(e) => setPhone(e.target.value)} data-testid="ora-splash-phone" />
               <button className="splash-btn" onClick={enter} data-testid="ora-splash-enter">GET ACCESS →</button>
-              <button className="splash-skip" onClick={enter} data-testid="ora-splash-skip">Skip — try ORA anonymously</button>
+              <button className="splash-skip" onClick={enter} data-testid="ora-splash-skip">Skip, try ORA anonymously</button>
               <p className="splash-note">Free 14-day trial · No credit card · Cancel anytime</p>
             </div>
           </div>
@@ -1456,7 +1456,7 @@ const OraPWA = () => {
           {tab === 'ora' && (
           <>
           <div className="chat-area" ref={chatAreaRef} data-testid="ora-chat-area">
-            <div className="date-div">Today — OODA Session</div>
+            <div className="date-div">Today, OODA Session</div>
             {messages.map(renderMsg)}
           </div>
 
@@ -1705,7 +1705,7 @@ const OraPWA = () => {
                       </div>
                       <div className="settings-sub">
                         Data-grounded critique on every strategy reply. Pulls from
-                        real performance metrics — no hallucinated negatives.
+                        real performance metrics, no hallucinated negatives.
                       </div>
                     </div>
                     <button
@@ -1909,7 +1909,7 @@ function ScoutTab({ data, userCtx }) {
   if (scope === 'customer') {
     return (
       <div className="tab-panel" data-testid="ora-tab-scout">
-        <div className="tp-eyebrow">Scout — Your Listings</div>
+        <div className="tp-eyebrow">Scout, Your Listings</div>
         <div className="tp-title">Review monitoring active</div>
         <div className="tp-card-strong">
           <div className="tp-stat-num" data-testid="ora-scout-count">{data?.your_reviews_total ?? 0}</div>

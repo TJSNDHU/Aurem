@@ -156,10 +156,10 @@ async def force_sync(request: Request):
     except Exception as e:
         results['orchestrator_cache'] = f'error: {str(e)}'
     
-    # 2. Sync MongoDB indexes for Reroots collections
+    # 2. Sync MongoDB indexes for AUREM collections
     # iter 322ee — `orders` is part of the e-commerce skeleton AUREM never
     # shipped. Skip those three indexes so the empty `orders` collection
-    # stops auto-resurrecting. Reroots-specific indexes (chat_sessions,
+    # stops auto-resurrecting. AUREM-specific indexes (chat_sessions,
     # customer_profiles, orchestrator_events) are kept because that
     # subsystem is alive.
     if _db is not None:

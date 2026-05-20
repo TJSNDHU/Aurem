@@ -15,7 +15,7 @@ BIOTECH_SCHEMA = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "additionalType": "BiotechEntity",
-    "name": "Reroots Aesthetics Inc",
+    "name": "AUREM Aesthetics Inc",
     "brand": {
         "@type": "Brand",
         "name": "AUREM",
@@ -39,7 +39,7 @@ BIOTECH_SCHEMA = {
     },
     "sameAs": [
         "https://aurem.live",
-        "https://reroots.ca"
+        "https://aurem.live"
     ]
 }
 

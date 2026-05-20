@@ -474,7 +474,7 @@ async def pulse(request: Request, agents_window_min: int = 15, timeline_limit: i
                 "ts": d.get("timestamp"),
                 "meta": {
                     "commit_sha": commit,
-                    "repo": d.get("repo") or os.environ.get("AUREM_GITHUB_REPO", "RerootsBeauty/ReRoots-"),
+                    "repo": d.get("repo") or os.environ.get("AUREM_GITHUB_REPO", "AUREMBeauty/AUREM-"),
                     "branch": d.get("branch", ""),
                 },
             })

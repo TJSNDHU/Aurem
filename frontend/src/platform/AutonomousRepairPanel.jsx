@@ -215,7 +215,7 @@ export default function AutonomousRepairPanel() {
         <div className="max-h-56 overflow-y-auto rounded border border-gray-800 bg-gray-900/40">
           {events.length === 0 ? (
             <div className="p-3 text-xs text-gray-500" data-testid="ar-events-empty">
-              No cycles yet — engine will trigger on sentinel red.
+              No cycles yet, engine will trigger on sentinel red.
             </div>
           ) : (
             events.map((e, i) => (

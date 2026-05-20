@@ -921,7 +921,7 @@ async def seed_business_system_data():
         existing_accounts = await db["accounting_accounts"].count_documents({})
         if existing_accounts == 0:
             await db["accounting_accounts"].insert_many([
-                {"name": "Chequing - Reroots Aesthetics Inc.", "balance": 0, "type": "Bank", "institution": "RBC"},
+                {"name": "Chequing - AUREM Aesthetics Inc.", "balance": 0, "type": "Bank", "institution": "RBC"},
                 {"name": "Business Savings", "balance": 0, "type": "Bank", "institution": "RBC"},
                 {"name": "Stripe Merchant Account", "balance": 0, "type": "Payment Processor", "institution": "Stripe"},
                 {"name": "Accounts Receivable", "balance": 0, "type": "A/R", "institution": "-"},

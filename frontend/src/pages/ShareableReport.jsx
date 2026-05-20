@@ -95,7 +95,7 @@ const ShareableReport = () => {
               data-testid="shareable-report-share-btn"
               className="text-[12px] flex items-center gap-2 bg-zinc-900 border border-zinc-800 hover:border-amber-500 px-3 py-1.5 rounded-lg transition"
             >
-              <Share2 className="w-3.5 h-3.5" />
+              <Share2 className="size-3.5" />
               {copied ? "Copied!" : "Share"}
             </button>
           )}
@@ -103,7 +103,7 @@ const ShareableReport = () => {
 
         {loading && (
           <div className="flex items-center justify-center gap-2 text-zinc-400 py-20">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading report…
+            <Loader2 className="size-4 animate-spin" /> Loading report…
           </div>
         )}
 
@@ -161,7 +161,7 @@ const ShareableReport = () => {
                       data-testid={`shareable-report-breakdown-${key}`}
                       className="flex items-center gap-3 p-3 rounded-lg bg-black/40 border border-zinc-900"
                     >
-                      <Icon className="w-4 h-4 text-amber-400 shrink-0" />
+                      <Icon className="size-4 text-amber-400 shrink-0" />
                       <div className="flex-1">
                         <div className="text-[12px] text-zinc-300">{label}</div>
                         <div className="h-1.5 rounded-full bg-zinc-900 overflow-hidden mt-1.5">

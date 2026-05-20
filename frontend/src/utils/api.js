@@ -1,5 +1,5 @@
 // API URL configuration - works on all domains
-// Supports: localhost, preview.emergentagent.com, and custom domains (reroots.ca)
+// Supports: localhost, preview.emergentagent.com, and custom domains (aurem.live)
 const getBackendUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
@@ -9,7 +9,7 @@ const getBackendUrl = () => {
       return 'http://localhost:8001';
     }
     
-    // For custom domains (reroots.ca, etc.) - ALWAYS use same origin
+    // For custom domains (aurem.live, etc.) - ALWAYS use same origin
     // This ensures API calls go to the correct backend regardless of env var
     if (!hostname.includes('preview.emergentagent.com') && !hostname.includes('emergent.host')) {
       return window.location.origin;

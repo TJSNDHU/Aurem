@@ -277,11 +277,11 @@ async def route_ai_request(request: AIRequest):
     
     # Build system prompt based on task type
     system_prompts = {
-        "skin_advisor": "You are an expert skincare advisor for ReRoots, a Canadian biotech skincare brand specializing in PDRN technology. Provide personalized, science-backed skincare advice.",
-        "whatsapp_twin": "You are the AI assistant for ReRoots skincare on WhatsApp. Be friendly, helpful, and knowledgeable about our PDRN-based products. Keep responses concise for mobile.",
+        "skin_advisor": "You are an expert skincare advisor for AUREM, a Canadian biotech skincare brand specializing in PDRN technology. Provide personalized, science-backed skincare advice.",
+        "whatsapp_twin": "You are the AI assistant for AUREM skincare on WhatsApp. Be friendly, helpful, and knowledgeable about our PDRN-based products. Keep responses concise for mobile.",
         "formulation": "You are a skincare formulation expert. Analyze ingredients, suggest improvements, and explain the science behind skincare formulations.",
         "admin_summary": "You are a business analyst. Summarize data clearly and concisely, highlighting key insights and actionable recommendations.",
-        "email_draft": "You are a marketing copywriter for ReRoots luxury skincare. Write elegant, persuasive email copy that matches our premium brand voice.",
+        "email_draft": "You are a marketing copywriter for AUREM luxury skincare. Write elegant, persuasive email copy that matches our premium brand voice.",
         "whatsapp_triage": "You are a customer service triage agent. Analyze the customer message and determine: 1) Category (order, product, return, other), 2) Urgency (low/medium/high), 3) Confidence score (0-1). Respond in JSON format.",
         "inventory_insight": "You are an inventory analyst. Analyze stock levels, identify trends, and suggest reorder quantities based on sales velocity.",
         "crm_segment": "You are a CRM strategist. Analyze customer data and suggest segments for targeted marketing campaigns."
@@ -387,7 +387,7 @@ async def generate_email_draft(request: EmailDraftRequest):
     """Generate email draft for marketing"""
     try:
         prompts = {
-            "promo": f"Write a promotional email for ReRoots skincare with these details:\n{request.context}",
+            "promo": f"Write a promotional email for AUREM skincare with these details:\n{request.context}",
             "announcement": f"Write an announcement email with these details:\n{request.context}",
             "followup": f"Write a customer follow-up email with these details:\n{request.context}"
         }
@@ -497,7 +497,7 @@ Ingredients: {', '.join(request.ingredients) if request.ingredients else 'Not sp
 Benefits: {', '.join(request.benefits) if request.benefits else 'Not specified'}
 Target Audience: {request.target_audience or 'Skincare enthusiasts'}
 
-Write in ReRoots brand voice - luxury, scientific, results-focused."""
+Write in AUREM brand voice - luxury, scientific, results-focused."""
         
         ai_request = AIRequest(
             task_type="product_copy",
@@ -537,7 +537,7 @@ async def skin_advisor_chat(request: ChatRequest):
         
         system_prompt = f"""CRITICAL INSTRUCTION: You MUST always respond in English only, regardless of what language the user writes in. Never switch languages.
 
-You are the ReRoots AI Skin Advisor - an expert cosmetic chemist specializing in the AURA-GEN Series with PDRN technology.
+You are the AUREM AI Skin Advisor - an expert cosmetic chemist specializing in the AURA-GEN Series with PDRN technology.
 
 USER PROFILE:
 - Name: {user_name}

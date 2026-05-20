@@ -1,5 +1,5 @@
 """
-Crash Protection System for reroots.ca
+Crash Protection System for aurem.live
 Implements:
 1. Circuit breaker for MongoDB
 2. Graceful degradation with Redis cache fallback

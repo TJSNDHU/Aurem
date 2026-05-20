@@ -86,7 +86,8 @@
     "dev": "craco start",
     "build": "craco build",
     "test": "craco test",
-    "react-doctor": "npx -y react-doctor@latest ."
+    "react-doctor": "npx -y react-doctor@latest .",
+    "react-doctor:fix": "node scripts/react-doctor-fix.js"
   },
   "browserslist": {
     "production": [

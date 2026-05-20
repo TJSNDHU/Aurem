@@ -96,7 +96,7 @@ const MathCaptcha = ({ onVerify, className = "" }) => {
           border: "1px solid rgba(34, 197, 94, 0.3)"
         }}
       >
-        <ShieldCheck className="w-5 h-5 text-green-500" />
+        <ShieldCheck className="size-5 text-green-500" />
         <span className="text-green-400 text-sm font-medium">Verified - You're human! ✓</span>
       </div>
     );
@@ -119,7 +119,7 @@ const MathCaptcha = ({ onVerify, className = "" }) => {
             className="text-white/30 hover:text-white/60 transition-colors"
             title="New problem"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="size-4" />
           </button>
         </div>
         

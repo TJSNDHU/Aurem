@@ -271,11 +271,11 @@ async def notify_admin_refund_request(order: dict, reason: str):
         
         sg = SendGridAPIClient(api_key=SENDGRID_API_KEY)
         
-        admin_email = os.environ.get("ADMIN_EMAIL", "support@reroots.ca")
+        admin_email = os.environ.get("ADMIN_EMAIL", "support@aurem.live")
         customer_name = order.get("customer_name") or f"{order.get('shipping_address', {}).get('first_name', '')} {order.get('shipping_address', {}).get('last_name', '')}".strip()
         
         msg = Mail(
-            from_email=("system@reroots.ca", "ReRoots System"),
+            from_email=("system@aurem.live", "AUREM System"),
             to_emails=admin_email,
             subject=f"🔄 Return Request: Order #{order.get('order_number', order.get('id'))}",
             html_content=f"""
@@ -286,7 +286,7 @@ async def notify_admin_refund_request(order: dict, reason: str):
                 <p><strong>Amount:</strong> ${order.get('total', 0):.2f} CAD</p>
                 <p><strong>Reason:</strong> {reason}</p>
                 <div style="margin-top: 20px;">
-                    <a href="https://reroots.ca/admin/refunds" 
+                    <a href="https://aurem.live/admin/refunds" 
                        style="background: #1a1a2e; color: white; padding: 12px 24px; 
                               border-radius: 6px; text-decoration: none;">
                         Review in Admin →
@@ -315,7 +315,7 @@ async def send_refund_approved_email(order: dict, refund: dict, amount: float):
         first_name = refund.get("customer_name", "").split()[0] if refund.get("customer_name") else "Customer"
         
         msg = Mail(
-            from_email=("support@reroots.ca", "ReRoots"),
+            from_email=("support@aurem.live", "AUREM"),
             to_emails=refund.get("customer_email"),
             subject=f"✅ Your Refund Has Been Approved - Order #{refund.get('order_number')}",
             html_content=f"""
@@ -337,8 +337,8 @@ async def send_refund_approved_email(order: dict, refund: dict, amount: float):
                     
                     <p>The refund will be processed to your original payment method within 5-10 business days.</p>
                     
-                    <p>Thank you for shopping with ReRoots. We hope to see you again!</p>
-                    <p><strong>ReRoots Team</strong></p>
+                    <p>Thank you for shopping with AUREM. We hope to see you again!</p>
+                    <p><strong>AUREM Team</strong></p>
                 </div>
             </div>
             """
@@ -363,7 +363,7 @@ async def send_store_credit_email(order: dict, refund: dict, amount: float):
         first_name = refund.get("customer_name", "").split()[0] if refund.get("customer_name") else "Customer"
         
         msg = Mail(
-            from_email=("support@reroots.ca", "ReRoots"),
+            from_email=("support@aurem.live", "AUREM"),
             to_emails=refund.get("customer_email"),
             subject=f"💳 Store Credit Added to Your Account - ${amount:.2f}",
             html_content=f"""
@@ -386,14 +386,14 @@ async def send_store_credit_email(order: dict, refund: dict, amount: float):
                     <p>This credit will be automatically applied to your next purchase.</p>
                     
                     <div style="text-align: center; margin: 25px 0;">
-                        <a href="https://reroots.ca/shop" 
+                        <a href="https://aurem.live/shop" 
                            style="background: #9C27B0; color: white; padding: 12px 30px; 
                                   border-radius: 6px; text-decoration: none; display: inline-block;">
                             Shop Now →
                         </a>
                     </div>
                     
-                    <p><strong>ReRoots Team</strong></p>
+                    <p><strong>AUREM Team</strong></p>
                 </div>
             </div>
             """
@@ -418,7 +418,7 @@ async def send_refund_rejected_email(order: dict, refund: dict, notes: str):
         first_name = refund.get("customer_name", "").split()[0] if refund.get("customer_name") else "Customer"
         
         msg = Mail(
-            from_email=("support@reroots.ca", "ReRoots"),
+            from_email=("support@aurem.live", "AUREM"),
             to_emails=refund.get("customer_email"),
             subject=f"Update on Your Return Request - Order #{refund.get('order_number')}",
             html_content=f"""
@@ -437,7 +437,7 @@ async def send_refund_rejected_email(order: dict, refund: dict, notes: str):
                     
                     <p>If you have any questions, please don't hesitate to reply to this email.</p>
                     
-                    <p><strong>ReRoots Team</strong></p>
+                    <p><strong>AUREM Team</strong></p>
                 </div>
             </div>
             """

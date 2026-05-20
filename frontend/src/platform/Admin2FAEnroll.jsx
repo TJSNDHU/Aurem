@@ -121,9 +121,9 @@ const Admin2FAEnroll = () => {
       >
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+            <div className="size-10 rounded-lg flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg,#D4AF37,#8B7355)' }}>
-              <Shield className="w-5 h-5 text-[#050507]" />
+              <Shield className="size-5 text-[#050507]" />
             </div>
             <div>
               <h1 className="text-base tracking-[0.15em]" style={{ fontFamily: "'Cinzel',serif", color: '#E8E6E1' }}>
@@ -136,7 +136,7 @@ const Admin2FAEnroll = () => {
             onClick={() => navigate('/admin/mission-control')}
             data-testid="admin-2fa-close"
             className="text-[#666] hover:text-[#E8E6E1] transition-colors">
-            <X className="w-4 h-4" />
+            <X className="size-4" />
           </button>
         </div>
 
@@ -144,13 +144,13 @@ const Admin2FAEnroll = () => {
           <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-xs"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}
             data-testid="admin-2fa-error">
-            <AlertTriangle className="w-3.5 h-3.5" />{error}
+            <AlertTriangle className="size-3.5" />{error}
           </div>
         )}
 
         {status === 'loading' && (
           <div className="flex items-center justify-center py-12 text-[#666]">
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 className="size-5 animate-spin" />
           </div>
         )}
 
@@ -158,7 +158,7 @@ const Admin2FAEnroll = () => {
           <div data-testid="admin-2fa-enrolled">
             <div className="p-4 rounded-lg flex items-center gap-3 mb-6"
               style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
-              <Check className="w-4 h-4 text-[#22C55E]" />
+              <Check className="size-4 text-[#22C55E]" />
               <div className="text-xs text-[#22C55E]">2FA is ACTIVE on this account.</div>
             </div>
             <p className="text-xs text-[#888] mb-6 leading-relaxed">
@@ -188,7 +188,7 @@ const Admin2FAEnroll = () => {
               data-testid="admin-2fa-start-btn"
               className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 text-sm disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#D4AF37,#8B7355)', color: '#050507' }}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Start enrolment <ArrowRight className="w-4 h-4" /></>}
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <>Start enrolment <ArrowRight className="size-4" /></>}
             </button>
           </div>
         )}
@@ -212,7 +212,7 @@ const Admin2FAEnroll = () => {
                 <button type="button" onClick={copySecret}
                   className="px-3 py-2 rounded-lg text-[#888] hover:text-[#D4AF37]"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="size-3.5" />
                 </button>
               </div>
             </div>
@@ -240,7 +240,7 @@ const Admin2FAEnroll = () => {
               data-testid="admin-2fa-confirm-btn"
               className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 text-sm disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#D4AF37,#8B7355)', color: '#050507' }}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Verify & enable <Check className="w-4 h-4" /></>}
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <>Verify & enable <Check className="size-4" /></>}
             </button>
             <p className="text-[10px] text-[#444] mt-4 text-center">
               The QR is single-use. Don't refresh until enrolment is confirmed.
@@ -252,7 +252,7 @@ const Admin2FAEnroll = () => {
           <div data-testid="admin-2fa-done">
             <div className="p-4 rounded-lg flex items-center gap-3 mb-6"
               style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
-              <Check className="w-4 h-4 text-[#22C55E]" />
+              <Check className="size-4 text-[#22C55E]" />
               <div className="text-xs text-[#22C55E]">2FA enabled. Stolen-password attacks neutralised.</div>
             </div>
             <button

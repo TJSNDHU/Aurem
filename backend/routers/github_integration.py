@@ -39,7 +39,7 @@ def set_db(database):
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
-GITHUB_REDIRECT_URI = os.environ.get("GITHUB_REDIRECT_URI", "https://reroots.ca/api/github/callback")
+GITHUB_REDIRECT_URI = os.environ.get("GITHUB_REDIRECT_URI", "https://aurem.live/api/github/callback")
 
 # File types to ingest for knowledge base
 INGESTIBLE_EXTENSIONS = {

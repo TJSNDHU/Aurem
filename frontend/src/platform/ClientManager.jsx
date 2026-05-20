@@ -82,7 +82,7 @@ function ClientForm({ client, onSave, onCancel, saving }) {
         />
         {sensitive && (
           <button type="button" onClick={() => togglePw(field)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#888]">
-            {showPasswords[field] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {showPasswords[field] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
           </button>
         )}
       </div>
@@ -94,14 +94,14 @@ function ClientForm({ client, onSave, onCancel, saving }) {
       <div className="bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-[#FF6B00]/20">
           <h3 className="text-sm font-medium text-[#1A1A2E]">{client ? 'Edit Client' : 'Add New Client'}</h3>
-          <button onClick={onCancel} className="text-[#555] hover:text-[#555]"><X className="w-5 h-5" /></button>
+          <button onClick={onCancel} className="text-[#555] hover:text-[#555]"><X className="size-5" /></button>
         </div>
 
         {/* Section Tabs */}
         <div className="flex gap-1 px-5 pt-4 pb-2 overflow-x-auto">
           {sections.map(s => (
             <button key={s.id} onClick={() => setActiveSection(s.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] whitespace-nowrap transition-all ${activeSection === s.id ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30' : 'text-[#666] hover:text-[#555]'}`}>
-              <s.icon className="w-3 h-3" style={{ color: s.color }} />{s.label}
+              <s.icon className="size-3" style={{ color: s.color }} />{s.label}
             </button>
           ))}
         </div>
@@ -110,11 +110,11 @@ function ClientForm({ client, onSave, onCancel, saving }) {
           {activeSection === 'business' && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="BUSINESS NAME *" field="business_name" placeholder="Reroots Aesthetics" />
+                <Field label="BUSINESS NAME *" field="business_name" placeholder="AUREM Aesthetics" />
                 <div>
                   <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider">INDUSTRY</label>
                   <select value={form.industry} onChange={e => set('industry', e.target.value)} data-testid="client-industry" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] outline-none focus:border-[#D4AF37]/50">
-                    <option value="">Select industry...</option>
+                    <option value="">Select industry…</option>
                     {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
                 </div>
@@ -143,7 +143,7 @@ function ClientForm({ client, onSave, onCancel, saving }) {
               </div>
               <Field label="MONITOR KEYWORDS" field="gmail_keywords" placeholder="New Inquiry, Consultation, Booking" />
               {client?.has_gmail_password && !form.gmail_app_password && (
-                <div className="flex items-center gap-2 text-[10px] text-[#4ade80]"><Shield className="w-3 h-3" /> Password already stored (encrypted). Leave blank to keep current.</div>
+                <div className="flex items-center gap-2 text-[10px] text-[#4ade80]"><Shield className="size-3" /> Password already stored (encrypted). Leave blank to keep current.</div>
               )}
             </div>
           )}
@@ -161,7 +161,7 @@ function ClientForm({ client, onSave, onCancel, saving }) {
               </div>
               <Field label="WHATSAPP PRE-FILL MESSAGE" field="whatsapp_prefill" placeholder="Hi! I'd like to know more about..." />
               {client?.has_meta_token && !form.meta_access_token && (
-                <div className="flex items-center gap-2 text-[10px] text-[#4ade80]"><Shield className="w-3 h-3" /> Token already stored (encrypted). Leave blank to keep current.</div>
+                <div className="flex items-center gap-2 text-[10px] text-[#4ade80]"><Shield className="size-3" /> Token already stored (encrypted). Leave blank to keep current.</div>
               )}
             </div>
           )}
@@ -170,26 +170,26 @@ function ClientForm({ client, onSave, onCancel, saving }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Instagram className="w-3 h-3 text-[#E4405F]" /> INSTAGRAM</label>
+                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Instagram className="size-3 text-[#E4405F]" /> INSTAGRAM</label>
                   <input type="text" value={form.instagram_handle} onChange={e => set('instagram_handle', e.target.value)} placeholder="@your_business" data-testid="client-instagram" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50" />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Facebook className="w-3 h-3 text-[#1877F2]" /> FACEBOOK PAGE ID</label>
+                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Facebook className="size-3 text-[#1877F2]" /> FACEBOOK PAGE ID</label>
                   <input type="text" value={form.facebook_page_id} onChange={e => set('facebook_page_id', e.target.value)} placeholder="Page ID or URL" data-testid="client-facebook" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Youtube className="w-3 h-3 text-[#FF0000]" /> YOUTUBE</label>
+                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Youtube className="size-3 text-[#FF0000]" /> YOUTUBE</label>
                   <input type="text" value={form.youtube_channel} onChange={e => set('youtube_channel', e.target.value)} placeholder="Channel URL" data-testid="client-youtube" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50" />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Linkedin className="w-3 h-3 text-[#0A66C2]" /> LINKEDIN</label>
+                  <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Linkedin className="size-3 text-[#0A66C2]" /> LINKEDIN</label>
                   <input type="text" value={form.linkedin_url} onChange={e => set('linkedin_url', e.target.value)} placeholder="Profile/Company URL" data-testid="client-linkedin" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50" />
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Twitter className="w-3 h-3 text-[#999]" /> X (TWITTER)</label>
+                <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider flex items-center gap-1"><Twitter className="size-3 text-[#999]" /> X (TWITTER)</label>
                 <input type="text" value={form.twitter_handle} onChange={e => set('twitter_handle', e.target.value)} placeholder="@handle" data-testid="client-twitter" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50" />
               </div>
             </div>
@@ -206,7 +206,7 @@ function ClientForm({ client, onSave, onCancel, saving }) {
                 <div>
                   <label className="block text-[10px] text-[#5a5a72] mb-1 tracking-wider">CARRIER</label>
                   <select value={form.sms_carrier} onChange={e => set('sms_carrier', e.target.value)} data-testid="client-sms-carrier" className="w-full px-3 py-2.5 bg-white/50 border border-[#FF6B00]/15 rounded-lg text-xs text-[#1A1A2E] outline-none focus:border-[#D4AF37]/50">
-                    <option value="">Select carrier...</option>
+                    <option value="">Select carrier…</option>
                     {CARRIERS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                 </div>
@@ -229,7 +229,7 @@ function ClientForm({ client, onSave, onCancel, saving }) {
                     { id: 'manual', label: 'Manual Override', desc: 'Review before sending', icon: User, color: '#f59e0b' },
                   ].map(m => (
                     <button key={m.id} type="button" onClick={() => set('automation_mode', m.id)} className={`flex-1 p-3 rounded-lg border text-left transition-colors ${form.automation_mode === m.id ? 'bg-[#D4AF37]/5 border-[#D4AF37]/30' : 'bg-white/50 border-[#FF6B00]/15'}`}>
-                      <div className="flex items-center gap-2 mb-1"><m.icon className="w-3.5 h-3.5" style={{ color: m.color }} /><span className="text-xs text-[#1A1A2E]">{m.label}</span></div>
+                      <div className="flex items-center gap-2 mb-1"><m.icon className="size-3.5" style={{ color: m.color }} /><span className="text-xs text-[#1A1A2E]">{m.label}</span></div>
                       <p className="text-[9px] text-[#555]">{m.desc}</p>
                     </button>
                   ))}
@@ -440,7 +440,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="client-manager-loading">
-      <div className="flex items-center gap-3 text-[#666]"><RefreshCw className="w-5 h-5 animate-spin" /><span className="text-sm">Loading Client Manager...</span></div>
+      <div className="flex items-center gap-3 text-[#666]"><RefreshCw className="size-5 animate-spin" /><span className="text-sm">Loading Client Manager…</span></div>
     </div>
   );
 
@@ -451,10 +451,10 @@ export default function ClientManager({ token, user, onViewCustomer }) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-xl font-semibold text-[#e2c97e] tracking-wider mb-1">Client Manager</h1>
-            <p className="text-xs text-[#5a5a72]">Onboard businesses, store credentials, manage automation — all from one window</p>
+            <p className="text-xs text-[#5a5a72]">Onboard businesses, store credentials, manage automation, all from one window</p>
           </div>
           <button onClick={() => { setEditClient(null); setShowForm(true); }} data-testid="add-client-btn" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg text-[#050505] text-xs font-semibold hover:opacity-90">
-            <Plus className="w-3.5 h-3.5" /> Add Client
+            <Plus className="size-3.5" /> Add Client
           </button>
         </div>
 
@@ -467,7 +467,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
             { label: 'Setup Needed', value: stats.setup, color: '#3b82f6', icon: Settings },
           ].map((s, i) => (
             <div key={i} className="p-4 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl">
-              <s.icon className="w-5 h-5 mb-2" style={{ color: s.color }} />
+              <s.icon className="size-5 mb-2" style={{ color: s.color }} />
               <div className="text-2xl font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
               <p className="text-[10px] text-[#555] mt-1">{s.label}</p>
             </div>
@@ -477,7 +477,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
         {/* Search */}
         <div className="flex gap-3 mb-4">
           <div className="flex-1 relative">
-            <Search className="w-4 h-4 text-[#555] absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="size-4 text-[#555] absolute left-3 top-1/2 -translate-y-1/2" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients by name, contact, or industry..." data-testid="client-search" className="w-full pl-10 pr-4 py-2.5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg text-xs text-[#1A1A2E] placeholder-[#555] outline-none focus:border-[#D4AF37]/50" />
           </div>
         </div>
@@ -491,7 +491,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
               data-testid="platform-subscribers-toggle"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] font-bold">
+                <div className="size-8 rounded-lg bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] font-bold">
                   {subscribers.length}
                 </div>
                 <div>
@@ -512,7 +512,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                     className="flex items-center justify-between p-3 bg-white/70 border border-[#FF6B00]/15 rounded-lg text-xs"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-[#8B7355]/20 flex items-center justify-center text-[#8B7355] font-bold text-xs">
+                      <div className="size-8 rounded-full bg-[#8B7355]/20 flex items-center justify-center text-[#8B7355] font-bold text-xs">
                         {(s.full_name || s.email || '?')[0].toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -572,14 +572,14 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                   {/* Client Header */}
                   <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/40" onClick={() => setExpandedId(isExpanded ? null : client.id)}>
                     <div className="flex items-center gap-4">
-                      <div className="w-11 h-11 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-sm font-bold text-[#D4AF37]">
+                      <div className="size-11 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center text-sm font-bold text-[#D4AF37]">
                         {client.business_name?.[0]?.toUpperCase() || 'C'}
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-sm font-medium text-[#1A1A2E]">{client.business_name}</h3>
                           <span className="px-2 py-0.5 text-[9px] rounded-full flex items-center gap-1" style={{ backgroundColor: `${sc.color}12`, color: sc.color }}>
-                            <sc.icon className="w-3 h-3" />{sc.label}
+                            <sc.icon className="size-3" />{sc.label}
                           </span>
                           <span className={`px-2 py-0.5 text-[9px] rounded-full ${client.automation_mode === 'auto' ? 'bg-[#4ade80]/10 text-[#4ade80]' : 'bg-[#f59e0b]/10 text-[#f59e0b]'}`}>
                             {client.automation_mode === 'auto' ? 'Auto' : 'Manual'}
@@ -598,25 +598,25 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                       {/* Channel Badges */}
                       <div className="flex gap-1">
                         {badges.map((b, i) => (
-                          <div key={i} className="w-6 h-6 rounded flex items-center justify-center" style={{ backgroundColor: `${b.color}10` }} title={b.label}>
-                            <b.icon className="w-3 h-3" style={{ color: b.color }} />
+                          <div key={i} className="size-6 rounded flex items-center justify-center" style={{ backgroundColor: `${b.color}10` }} title={b.label}>
+                            <b.icon className="size-3" style={{ color: b.color }} />
                           </div>
                         ))}
                       </div>
                       {/* Actions */}
                       <div className="flex items-center gap-1">
                         <button onClick={e => { e.stopPropagation(); handleModeToggle(client.id, client.automation_mode); }} title="Toggle auto/manual" className="p-1.5 rounded-md text-[#888] hover:text-[#1A1A2E] hover:bg-white/50">
-                          {client.automation_mode === 'auto' ? <Zap className="w-3.5 h-3.5 text-[#4ade80]" /> : <User className="w-3.5 h-3.5 text-[#f59e0b]" />}
+                          {client.automation_mode === 'auto' ? <Zap className="size-3.5 text-[#4ade80]" /> : <User className="size-3.5 text-[#f59e0b]" />}
                         </button>
                         <button onClick={e => { e.stopPropagation(); handleToggle(client.id); }} title="Pause/Resume" className="p-1.5 rounded-md text-[#888] hover:text-[#1A1A2E] hover:bg-white/50">
-                          {client.status === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                          {client.status === 'active' ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
                         </button>
                         <button onClick={e => { e.stopPropagation(); setEditClient(client); setShowForm(true); }} title="Edit" className="p-1.5 rounded-md text-[#888] hover:text-[#1A1A2E] hover:bg-white/50">
-                          <Settings className="w-3.5 h-3.5" />
+                          <Settings className="size-3.5" />
                         </button>
                         {onViewCustomer && client.tenant_id && (
                           <button onClick={e => { e.stopPropagation(); onViewCustomer(client.tenant_id); }} title="View Detail" className="p-1.5 rounded-md text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10" data-testid={`view-customer-${client.id}`}>
-                            <BarChart3 className="w-3.5 h-3.5" />
+                            <BarChart3 className="size-3.5" />
                           </button>
                         )}
                         {(client.business_id || client.contact_email) && (
@@ -629,23 +629,23 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                             data-testid={`c360-open-${client.id}`}
                             className="p-1.5 rounded-md text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 inline-flex items-center"
                           >
-                            <Globe className="w-3.5 h-3.5" />
+                            <Globe className="size-3.5" />
                           </a>
                         )}
                         <button onClick={e => { e.stopPropagation(); setServicesPopupClient(client); }}
                           title="View Active AUREM Services"
                           data-testid={`view-services-${client.id}`}
                           className="p-1.5 rounded-md text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10">
-                          <Package className="w-3.5 h-3.5" />
+                          <Package className="size-3.5" />
                         </button>
                         <button onClick={e => { e.stopPropagation(); handleDelete(client.id); }} title="Delete" className="p-1.5 rounded-md text-[#555] hover:text-[#ef4444] hover:bg-[#ef4444]/10">
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="size-3.5" />
                         </button>
                         <div className="relative">
                           <button onClick={e => { e.stopPropagation(); setReportDropdown(reportDropdown === client.id ? null : client.id); }}
                             title="Generate Report" data-testid={`generate-report-btn-${client.id}`}
                             className="p-1.5 rounded-md text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10">
-                            {generatingReport === client.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#D4AF37]" /> : <FileText className="w-3.5 h-3.5" />}
+                            {generatingReport === client.id ? <Loader2 className="size-3.5 animate-spin text-[#D4AF37]" /> : <FileText className="size-3.5" />}
                           </button>
                           {reportDropdown === client.id && (
                             <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#FF6B00]/20 rounded-lg shadow-lg py-1 min-w-[160px]" data-testid="report-format-dropdown">
@@ -664,7 +664,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                           )}
                         </div>
                       </div>
-                      {isExpanded ? <ChevronDown className="w-4 h-4 text-[#555]" /> : <ChevronRight className="w-4 h-4 text-[#555]" />}
+                      {isExpanded ? <ChevronDown className="size-4 text-[#555]" /> : <ChevronRight className="size-4 text-[#555]" />}
                     </div>
                   </div>
 
@@ -675,17 +675,17 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                         {/* Contact */}
                         <div className="p-3 bg-white/60 rounded-lg">
                           <h4 className="text-[10px] text-[#555] tracking-wider mb-2">CONTACT</h4>
-                          {client.contact_email && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5 mb-1"><Mail className="w-3 h-3 text-[#888]" />{client.contact_email}</p>}
-                          {client.contact_phone && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5 mb-1"><Phone className="w-3 h-3 text-[#888]" />{client.contact_phone}</p>}
-                          {client.website && <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#D4AF37] flex items-center gap-1.5 hover:underline"><Globe className="w-3 h-3" />{client.website}</a>}
+                          {client.contact_email && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5 mb-1"><Mail className="size-3 text-[#888]" />{client.contact_email}</p>}
+                          {client.contact_phone && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5 mb-1"><Phone className="size-3 text-[#888]" />{client.contact_phone}</p>}
+                          {client.website && <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#D4AF37] flex items-center gap-1.5 hover:underline"><Globe className="size-3" />{client.website}</a>}
                         </div>
                         {/* Channels */}
                         <div className="p-3 bg-white/60 rounded-lg">
                           <h4 className="text-[10px] text-[#555] tracking-wider mb-2">ACTIVE CHANNELS</h4>
                           <div className="space-y-1">
-                            {client.gmail_email && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5"><Mail className="w-3 h-3 text-[#EA4335]" />{client.gmail_email}</p>}
-                            {client.whatsapp_number && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5"><MessageCircle className="w-3 h-3 text-[#25D366]" />+{client.whatsapp_number}</p>}
-                            {client.sms_phone && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5"><Smartphone className="w-3 h-3 text-[#f59e0b]" />{client.sms_phone} ({client.sms_carrier})</p>}
+                            {client.gmail_email && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5"><Mail className="size-3 text-[#EA4335]" />{client.gmail_email}</p>}
+                            {client.whatsapp_number && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5"><MessageCircle className="size-3 text-[#25D366]" />+{client.whatsapp_number}</p>}
+                            {client.sms_phone && <p className="text-[10px] text-[#1A1A2E] flex items-center gap-1.5"><Smartphone className="size-3 text-[#f59e0b]" />{client.sms_phone} ({client.sms_carrier})</p>}
                           </div>
                         </div>
                         {/* Campaign */}
@@ -695,8 +695,8 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                           {client.default_discount && <p className="text-[10px] text-[#D4AF37]">{client.default_discount}% default discount</p>}
                           <div className="flex items-center gap-2 mt-2">
                             <span className="text-[9px] text-[#555]">Security:</span>
-                            {client.has_gmail_password && <span className="text-[9px] px-1.5 py-0.5 bg-[#4ade80]/10 text-[#4ade80] rounded flex items-center gap-1"><Shield className="w-2.5 h-2.5" /> Gmail</span>}
-                            {client.has_meta_token && <span className="text-[9px] px-1.5 py-0.5 bg-[#25D366]/10 text-[#25D366] rounded flex items-center gap-1"><Shield className="w-2.5 h-2.5" /> Meta</span>}
+                            {client.has_gmail_password && <span className="text-[9px] px-1.5 py-0.5 bg-[#4ade80]/10 text-[#4ade80] rounded flex items-center gap-1"><Shield className="size-2.5" /> Gmail</span>}
+                            {client.has_meta_token && <span className="text-[9px] px-1.5 py-0.5 bg-[#25D366]/10 text-[#25D366] rounded flex items-center gap-1"><Shield className="size-2.5" /> Meta</span>}
                           </div>
                         </div>
                       </div>
@@ -705,11 +705,11 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                         <div className="mt-3 p-3 bg-white/60 rounded-lg">
                           <h4 className="text-[10px] text-[#555] tracking-wider mb-2">SOCIAL MEDIA</h4>
                           <div className="flex flex-wrap gap-2">
-                            {client.instagram_handle && <span className="text-[10px] px-2 py-1 bg-[#E4405F]/10 text-[#E4405F] rounded flex items-center gap-1"><Instagram className="w-3 h-3" />{client.instagram_handle}</span>}
-                            {client.facebook_page_id && <span className="text-[10px] px-2 py-1 bg-[#1877F2]/10 text-[#1877F2] rounded flex items-center gap-1"><Facebook className="w-3 h-3" />{client.facebook_page_id}</span>}
-                            {client.youtube_channel && <span className="text-[10px] px-2 py-1 bg-[#FF0000]/10 text-[#FF0000] rounded flex items-center gap-1"><Youtube className="w-3 h-3" />YouTube</span>}
-                            {client.linkedin_url && <span className="text-[10px] px-2 py-1 bg-[#0A66C2]/10 text-[#0A66C2] rounded flex items-center gap-1"><Linkedin className="w-3 h-3" />LinkedIn</span>}
-                            {client.twitter_handle && <span className="text-[10px] px-2 py-1 bg-[#999]/10 text-[#999] rounded flex items-center gap-1"><Twitter className="w-3 h-3" />{client.twitter_handle}</span>}
+                            {client.instagram_handle && <span className="text-[10px] px-2 py-1 bg-[#E4405F]/10 text-[#E4405F] rounded flex items-center gap-1"><Instagram className="size-3" />{client.instagram_handle}</span>}
+                            {client.facebook_page_id && <span className="text-[10px] px-2 py-1 bg-[#1877F2]/10 text-[#1877F2] rounded flex items-center gap-1"><Facebook className="size-3" />{client.facebook_page_id}</span>}
+                            {client.youtube_channel && <span className="text-[10px] px-2 py-1 bg-[#FF0000]/10 text-[#FF0000] rounded flex items-center gap-1"><Youtube className="size-3" />YouTube</span>}
+                            {client.linkedin_url && <span className="text-[10px] px-2 py-1 bg-[#0A66C2]/10 text-[#0A66C2] rounded flex items-center gap-1"><Linkedin className="size-3" />LinkedIn</span>}
+                            {client.twitter_handle && <span className="text-[10px] px-2 py-1 bg-[#999]/10 text-[#999] rounded flex items-center gap-1"><Twitter className="size-3" />{client.twitter_handle}</span>}
                           </div>
                         </div>
                       )}
@@ -721,7 +721,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
           </div>
         ) : (
           <div className="p-16 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl text-center">
-            <Users className="w-12 h-12 text-[#333] mx-auto mb-4" />
+            <Users className="size-12 text-[#333] mx-auto mb-4" />
             <h3 className="text-sm font-medium text-[#1A1A2E] mb-2">No clients yet</h3>
             <p className="text-[11px] text-[#5a5a72] mb-6">Add your first business client to start managing their automation</p>
             <button onClick={() => { setEditClient(null); setShowForm(true); }} data-testid="add-first-client-btn" className="px-5 py-2.5 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90">
@@ -755,7 +755,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
             {!resetResult ? (
               <>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#ef4444]/15 flex items-center justify-center text-xl">🔑</div>
+                  <div className="size-10 rounded-lg bg-[#ef4444]/15 flex items-center justify-center text-xl">🔑</div>
                   <div>
                     <h3 className="text-base font-semibold text-[#F5E6C8]">Reset Password</h3>
                     <p className="text-xs text-[#B8AE9F]">{resetTarget.email}</p>
@@ -797,7 +797,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
             ) : (
               <>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#4ADE80]/15 flex items-center justify-center text-xl">✓</div>
+                  <div className="size-10 rounded-lg bg-[#4ADE80]/15 flex items-center justify-center text-xl">✓</div>
                   <div>
                     <h3 className="text-base font-semibold text-[#F5E6C8]">Password Reset</h3>
                     <p className="text-xs text-[#B8AE9F]">{resetResult.email}</p>
@@ -827,7 +827,7 @@ export default function ClientManager({ token, user, onViewCustomer }) {
                   </button>
                 </div>
                 <div className="p-3 mb-4 rounded bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-xs text-[#F5E6C8]">
-                  ⚠ This password is shown ONCE. Copy it now — it will not be retrievable again. Share with the user over WhatsApp or SMS.
+                  ⚠ This password is shown ONCE. Copy it now, it will not be retrievable again. Share with the user over WhatsApp or SMS.
                 </div>
                 <button
                   onClick={closeResetModal}

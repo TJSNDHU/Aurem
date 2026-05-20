@@ -117,7 +117,7 @@ const GitHubLeadMiner = ({ token }) => {
         justifyContent: 'center',
         minHeight: 400
       }}>
-        <Loader className="w-8 h-8 animate-spin text-[#D4AF37]" />
+        <Loader className="size-8 animate-spin text-[#D4AF37]" />
       </div>
     );
   }
@@ -159,12 +159,12 @@ const GitHubLeadMiner = ({ token }) => {
         >
           {syncing ? (
             <>
-              <Loader className="w-4 h-4 animate-spin" />
-              Syncing...
+              <Loader className="size-4 animate-spin" />
+              Syncing…
             </>
           ) : (
             <>
-              <Github className="w-4 h-4" />
+              <Github className="size-4" />
               Sync GitHub
             </>
           )}
@@ -186,7 +186,7 @@ const GitHubLeadMiner = ({ token }) => {
             borderRadius: 12
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8}}>
-              <Users className="w-4 h-4 text-[#D4AF37]" />
+              <Users className="size-4 text-[#D4AF37]" />
               <span style={{fontSize: 11, color: '#888', textTransform: 'uppercase'}}>
                 Total Leads
               </span>
@@ -203,7 +203,7 @@ const GitHubLeadMiner = ({ token }) => {
             borderRadius: 12
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8}}>
-              <TrendingUp className="w-4 h-4 text-[#4A4]" />
+              <TrendingUp className="size-4 text-[#4A4]" />
               <span style={{fontSize: 11, color: '#888', textTransform: 'uppercase'}}>
                 High Value
               </span>
@@ -220,7 +220,7 @@ const GitHubLeadMiner = ({ token }) => {
             borderRadius: 12
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8}}>
-              <Zap className="w-4 h-4 text-[#FA4]" />
+              <Zap className="size-4 text-[#FA4]" />
               <span style={{fontSize: 11, color: '#888', textTransform: 'uppercase'}}>
                 Avg ORA Score
               </span>
@@ -246,7 +246,7 @@ const GitHubLeadMiner = ({ token }) => {
           alignItems: 'center',
           gap: 8
         }}>
-          <Github className="w-4 h-4 text-[#D4AF37]" />
+          <Github className="size-4 text-[#D4AF37]" />
           <span style={{fontSize: 13, fontWeight: 600}}>
             Discovered Leads ({leads.length})
           </span>
@@ -258,7 +258,7 @@ const GitHubLeadMiner = ({ token }) => {
             textAlign: 'center',
             color: '#666'
           }}>
-            <Github className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <Github className="size-12 mx-auto mb-3 opacity-30" />
             <p style={{fontSize: 14}}>
               No leads discovered yet
             </p>
@@ -321,7 +321,7 @@ const GitHubLeadMiner = ({ token }) => {
                         rel="noopener noreferrer"
                         style={{color: '#888'}}
                       >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="size-3" />
                       </a>
                     )}
                   </div>
@@ -329,13 +329,13 @@ const GitHubLeadMiner = ({ token }) => {
                   <div style={{display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: '#888'}}>
                     {lead.email && (
                       <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
-                        <Mail className="w-3 h-3" />
+                        <Mail className="size-3" />
                         {lead.email}
                       </div>
                     )}
                     {lead.phone && (
                       <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
-                        <Phone className="w-3 h-3" />
+                        <Phone className="size-3" />
                         {lead.phone}
                       </div>
                     )}
@@ -365,7 +365,7 @@ const GitHubLeadMiner = ({ token }) => {
                     gap: 6
                   }}
                 >
-                  <Zap className="w-3 h-3" />
+                  <Zap className="size-3" />
                   ORA Outbound
                 </button>
               </div>

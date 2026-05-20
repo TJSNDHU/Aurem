@@ -45,7 +45,7 @@ const StatCard = ({ icon: Icon, label, value, sub, accent }) => (
     style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-card-border)', backdropFilter: 'blur(16px)' }}
     data-testid={`stat-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
     <div className="flex items-center justify-between">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: accent || 'rgba(104,218,141,0.12)' }}>
+      <div className="size-9 rounded-xl flex items-center justify-center" style={{ background: accent || 'rgba(104,218,141,0.12)' }}>
         <Icon size={18} style={{ color: accent ? '#fff' : '#68DA8D' }} />
       </div>
       {sub && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,163,115,0.1)', color: '#FF6B00' }}>{sub}</span>}
@@ -61,7 +61,7 @@ const CategoryBadge = ({ label, score }) => {
   const color = score >= 80 ? '#68DA8D' : score >= 60 ? '#FF6B00' : '#E05252';
   return (
     <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+      <div className="size-2 rounded-full flex-shrink-0" style={{ background: color }} />
       <span className="text-xs font-medium flex-1 capitalize" style={{ color: 'var(--aurem-body)' }}>{label}</span>
       <span className="text-sm font-bold" style={{ color }}>{score}</span>
     </div>
@@ -86,7 +86,7 @@ const ActivityIcon = ({ type }) => {
   const map = { scan: Search, message: Mail, lead: Users, voice: Phone, security: Shield, activity: Activity };
   const colors = { scan: '#68DA8D', message: '#4FC3F7', lead: '#FF6B00', voice: '#CE93D8', security: '#E05252', activity: '#D4AF37' };
   const Icon = map[type] || Activity;
-  return <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${colors[type] || '#D4AF37'}15` }}><Icon size={14} style={{ color: colors[type] || '#D4AF37' }} /></div>;
+  return <div className="size-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${colors[type] || '#D4AF37'}15` }}><Icon size={14} style={{ color: colors[type] || '#D4AF37' }} /></div>;
 };
 
 /* ─── Time Ago ─── */
@@ -256,7 +256,7 @@ const OnboardingWizard = ({ token, onComplete }) => {
         <div className="flex items-center gap-2 mb-8 justify-center">
           {stepConfig.map(s => (
             <div key={s.num} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step >= s.num ? 'text-[#050507]' : ''}`}
+              <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${step >= s.num ? 'text-[#050507]' : ''}`}
                 style={{ background: step >= s.num ? '#D4AF37' : 'rgba(255,255,255,0.06)', color: step >= s.num ? '#050507' : 'var(--aurem-body-secondary)' }}>
                 {step > s.num ? <CheckCircle2 size={16} /> : s.num}
               </div>
@@ -330,8 +330,8 @@ const OnboardingWizard = ({ token, onComplete }) => {
               <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>ORA will analyze your website for performance, security, SEO and accessibility</p>
               {scanning ? (
                 <div className="py-8">
-                  <div className="w-16 h-16 mx-auto rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: '#D4AF37', borderTopColor: 'transparent' }} />
-                  <p className="text-xs mt-4 font-bold animate-pulse" style={{ color: '#D4AF37' }}>Scanning your website...</p>
+                  <div className="size-16 mx-auto rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: '#D4AF37', borderTopColor: 'transparent' }} />
+                  <p className="text-xs mt-4 font-bold animate-pulse" style={{ color: '#D4AF37' }}>Scanning your website…</p>
                 </div>
               ) : (
                 <button onClick={runFirstScan} data-testid="onboard-scan-btn"
@@ -349,7 +349,7 @@ const OnboardingWizard = ({ token, onComplete }) => {
           {/* Step 4: Ready */}
           {step === 4 && (
             <div className="text-center space-y-6" data-testid="onboarding-step-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)' }}>
+              <div className="size-16 mx-auto rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)' }}>
                 <CheckCircle2 size={32} style={{ color: '#050507' }} />
               </div>
               <h2 className="text-xl font-black" style={{ color: 'var(--aurem-heading)' }}>Your AUREM is Ready</h2>
@@ -425,7 +425,7 @@ const BillingTab = ({ token }) => {
     } catch (e) { console.error(e); }
   };
 
-  if (loading) return <div className="flex items-center justify-center p-12"><div className="animate-spin w-6 h-6 border-2 border-t-transparent rounded-full" style={{ borderColor: '#D4AF37', borderTopColor: 'transparent' }} /></div>;
+  if (loading) return <div className="flex items-center justify-center p-12"><div className="animate-spin size-6 border-2 border-t-transparent rounded-full" style={{ borderColor: '#D4AF37', borderTopColor: 'transparent' }} /></div>;
 
   const currentPlan = sub?.plan || 'trial';
 
@@ -620,7 +620,7 @@ const SettingsTab = ({ token, workspace }) => {
             <label key={p.key} className="flex items-center justify-between py-2 px-3 rounded-xl cursor-pointer" style={{ background: 'rgba(255,255,255,0.02)' }}>
               <span className="text-xs" style={{ color: 'var(--aurem-body)' }}>{p.label}</span>
               <input type="checkbox" checked={notifPrefs[p.key]} onChange={e => { setNotifPrefs(prev => ({ ...prev, [p.key]: e.target.checked })); setTimeout(saveNotifPrefs, 100); }}
-                className="w-4 h-4 rounded accent-[#D4AF37]" data-testid={`notif-${p.key}`} />
+                className="size-4 rounded accent-[#D4AF37]" data-testid={`notif-${p.key}`} />
             </label>
           ))}
         </div>
@@ -683,7 +683,7 @@ const ClientDashboard = ({ token, user, onLogout }) => {
   if (loading) return (
     <div className="flex-1 flex items-center justify-center" data-testid="client-dashboard-loading">
       <div className="text-center">
-        <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)', animation: 'auremFloat 2s ease-in-out infinite' }}>
+        <div className="size-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)', animation: 'auremFloat 2s ease-in-out infinite' }}>
           <span className="text-base font-black text-[#0A0A00]">A</span>
         </div>
         <p className="text-xs tracking-[3px] font-bold" style={{ color: 'var(--aurem-heading)' }}>LOADING DASHBOARD</p>
@@ -725,7 +725,7 @@ const ClientDashboard = ({ token, user, onLogout }) => {
           borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center levitate"
+          <div className="size-8 rounded-xl flex items-center justify-center levitate"
             style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)', boxShadow: '0 6px 20px rgba(212,185,119,0.45)' }}>
             <span className="text-xs font-black text-[#0A0A00]">A</span>
           </div>
@@ -850,7 +850,7 @@ const ClientDashboard = ({ token, user, onLogout }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <GlassWindow testId="pixel-events-card" draggable dragConstraints={dragBoundsRef} delay={0.48} className="cursor-grab active:cursor-grabbing">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(212,163,115,0.12)' }}><Globe size={18} style={{ color: '#FF6B00' }} /></div>
+                <div className="size-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(212,163,115,0.12)' }}><Globe size={18} style={{ color: '#FF6B00' }} /></div>
                 <div><p className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>Tracking Pixel</p><p className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>Events captured from your website</p></div>
               </div>
               <p className="text-4xl font-black mb-1 text-glow-gold" style={{ color: 'var(--aurem-heading)' }}>{data?.pixel_events || 0}</p>
@@ -861,7 +861,7 @@ const ClientDashboard = ({ token, user, onLogout }) => {
             </GlassWindow>
             <GlassWindow testId="api-key-card" draggable dragConstraints={dragBoundsRef} delay={0.54} className="cursor-grab active:cursor-grabbing">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(104,218,141,0.12)' }}><Shield size={18} style={{ color: '#68DA8D' }} /></div>
+                <div className="size-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(104,218,141,0.12)' }}><Shield size={18} style={{ color: '#68DA8D' }} /></div>
                 <div><p className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>API Key</p><p className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>For pixel and webhook integration</p></div>
               </div>
               {data?.api_key ? (

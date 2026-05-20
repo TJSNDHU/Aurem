@@ -160,7 +160,7 @@ export default function PublicStatus() {
 
       <div className="s-shell">
         <Link to="/" className="s-back" data-testid="public-status-back">
-          <ArrowLeft className="w-4 h-4" /> Back to AUREM
+          <ArrowLeft className="size-4" /> Back to AUREM
         </Link>
 
         <div className="s-hero">
@@ -175,7 +175,7 @@ export default function PublicStatus() {
           <p className="s-sub">
             AUREM measures, scores, and self-corrects every part of its own
             system in real time. The numbers below are pulled live from the
-            production Council — no marketing, no padding, no human in the
+            production Council, no marketing, no padding, no human in the
             loop.
           </p>
         </div>
@@ -199,7 +199,7 @@ export default function PublicStatus() {
         <div className="tiles" data-testid="public-status-tiles">
           <div className="tile" data-testid="tile-autonomy">
             <div className="tile-icon">
-              <Shield className="w-5 h-5" />
+              <Shield className="size-5" />
             </div>
             <div className="tile-label">System Autonomy · 24h</div>
             <div className="tile-value">
@@ -211,7 +211,7 @@ export default function PublicStatus() {
 
           <div className="tile" data-testid="tile-heals">
             <div className="tile-icon">
-              <Activity className="w-5 h-5" />
+              <Activity className="size-5" />
             </div>
             <div className="tile-label">Watchdog Heals · 24h</div>
             <div className="tile-value">
@@ -222,7 +222,7 @@ export default function PublicStatus() {
 
           <div className="tile" data-testid="tile-heal-time">
             <div className="tile-icon">
-              <Zap className="w-5 h-5" />
+              <Zap className="size-5" />
             </div>
             <div className="tile-label">Avg Heal Time</div>
             <div className="tile-value">
@@ -234,7 +234,7 @@ export default function PublicStatus() {
 
           <div className="tile" data-testid="tile-veracity">
             <div className="tile-icon">
-              <Brain className="w-5 h-5" />
+              <Brain className="size-5" />
             </div>
             <div className="tile-label">Decision Veracity</div>
             <div className="tile-value">
@@ -275,7 +275,7 @@ export default function PublicStatus() {
         <div className="embed-wrap" data-testid="public-status-embed">
           <div className="embed-title">Embed the trust badge</div>
           <div className="embed-desc">
-            Drop this into your README, sales deck, or proposal — it auto-updates
+            Drop this into your README, sales deck, or proposal, it auto-updates
             from the same live feed.
           </div>
           <div className="embed-code">
@@ -286,7 +286,7 @@ export default function PublicStatus() {
               data-testid="public-status-copy-embed"
               aria-label="Copy embed snippet"
             >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
             </button>
           </div>
         </div>

@@ -88,7 +88,7 @@ function DonutChart({ data, size = 120 }) {
       <div>
         {segments.map((seg, i) => (
           <div key={i} className="flex items-center gap-2 mb-1">
-            <div className="w-2.5 h-2.5 rounded-sm" style={{ background: seg.color }} />
+            <div className="size-2.5 rounded-sm" style={{ background: seg.color }} />
             <span className="text-[11px]" style={{ color: TEXT_SEC }}>{seg.label}</span>
             <span className="text-[11px] ml-auto" style={{ color: TEXT_MUTED }}>{seg.percent}%</span>
           </div>
@@ -125,7 +125,7 @@ function StatCard({ label, value, subValue, icon: Icon, trend, color = COPPER, s
   return (
     <div className="aurem-glass-card p-4" data-testid={`stat-${label.toLowerCase().replace(/\s/g,'-')}`}>
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
+        <div className="size-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
           <Icon size={20} color={color} />
         </div>
         <div className="flex-1 min-w-0">
@@ -187,8 +187,8 @@ export default function VoiceAnalytics({ token }) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="voice-analytics-loading">
         <div className="flex items-center gap-3" style={{ color: TEXT_MUTED }}>
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading voice analytics...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading voice analytics…</span>
         </div>
       </div>
     );
@@ -233,7 +233,7 @@ export default function VoiceAnalytics({ token }) {
         {/* Live Calls Banner */}
         <div className="aurem-glass-card p-4 mb-6 flex items-center justify-between" data-testid="live-calls-banner">
           <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-[#16a34a] animate-pulse" />
+            <div className="size-3 rounded-full bg-[#16a34a] animate-pulse" />
             <span className="text-sm font-semibold" style={{ color: FOREST, fontFamily: "'Montserrat', sans-serif" }}>
               {liveCalls.active} Active Calls
             </span>
@@ -279,7 +279,7 @@ export default function VoiceAnalytics({ token }) {
             <div className="space-y-3">
               {sentimentData.map((s, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${s.color}12` }}>
+                  <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${s.color}12` }}>
                     <s.icon size={16} color={s.color} />
                   </div>
                   <div className="flex-1">
@@ -358,7 +358,7 @@ export default function VoiceAnalytics({ token }) {
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-full h-0.5"
                     style={{ background: `linear-gradient(90deg, ${stage.color}30, ${arr[i+1].color}30)` }} />
                 )}
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto relative z-10"
+                <div className="size-16 rounded-full flex items-center justify-center mx-auto relative z-10"
                   style={{ background: `${stage.color}10`, border: `2px solid ${stage.color}`, boxShadow: `0 0 15px ${stage.color}10` }}>
                   <span className="text-lg font-semibold" style={{ color: stage.color }}>{stage.value}</span>
                 </div>

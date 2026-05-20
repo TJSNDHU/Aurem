@@ -1,5 +1,5 @@
 """
-Email AI Service for Reroots
+Email AI Service for AUREM
 Automated email generation and sending via SendGrid
 Activates when SENDGRID_API_KEY is added to environment
 
@@ -25,7 +25,7 @@ _db = None
 # SendGrid configuration
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@aurem.live")
-SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "ReRoots Skincare")
+SENDGRID_FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "AUREM Skincare")
 
 # LLM configuration
 LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
@@ -41,13 +41,13 @@ BRAND VOICE RULES - STRICTLY FOLLOW:
 - Never mention competitors by name
 - Focus on skin health journey, not quick fixes
 - Use "clinical-grade" and "medical aesthetics" terminology
-- Sign off as "The ReRoots Team" or "Tj & The ReRoots Team"
+- Sign off as "The AUREM Team" or "Tj & The AUREM Team"
 """
 
 EMAIL_TYPES = {
     "welcome": {
         "name": "Welcome Email",
-        "subject": "Welcome to Reroots — your skin journey starts here",
+        "subject": "Welcome to AUREM — your skin journey starts here",
         "trigger": "new_customer_registration",
         "description": "Sent when a new customer registers"
     },
@@ -178,10 +178,10 @@ async def generate_email_content(
     
     # Build prompt based on email type
     prompts = {
-        "welcome": f"""Write a warm, personalized welcome email for a new ReRoots customer.
+        "welcome": f"""Write a warm, personalized welcome email for a new AUREM customer.
 {customer_context}
 The email should:
-- Welcome them to the ReRoots family
+- Welcome them to the AUREM family
 - Reference their skin concern if known
 - Introduce the AURA-GEN System briefly
 - Invite them to explore and ask questions
@@ -216,7 +216,7 @@ The email should:
 The email should:
 - Acknowledge it's been a while without being guilt-trippy
 - Reference their last skin concern if known
-- Share what's new at ReRoots
+- Share what's new at AUREM
 - Offer a reason to return (new tips, not discounts)
 - Warm and welcoming tone
 - Keep it under 180 words""",
@@ -235,7 +235,7 @@ The email should:
     
     prompt = prompts.get(email_type, prompts["welcome"])
     
-    system_prompt = f"""You are the email copywriter for ReRoots Aesthetics Inc., a clinical skincare brand.
+    system_prompt = f"""You are the email copywriter for AUREM Aesthetics Inc., a clinical skincare brand.
 
 {BRAND_VOICE_RULES}
 
@@ -331,9 +331,9 @@ async def send_email(
             {html_content}
         </div>
         <div class="footer">
-            <p>ReRoots Aesthetics Inc. | Toronto, Canada</p>
-            <p><a href="https://reroots.ca">reroots.ca</a></p>
-            <p style="font-size: 10px;">You're receiving this because you're part of the ReRoots family.</p>
+            <p>AUREM Aesthetics Inc. | Toronto, Canada</p>
+            <p><a href="https://aurem.live">aurem.live</a></p>
+            <p style="font-size: 10px;">You're receiving this because you're part of the AUREM family.</p>
         </div>
     </body>
     </html>

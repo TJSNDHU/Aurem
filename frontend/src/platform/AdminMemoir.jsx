@@ -82,7 +82,7 @@ export default function AdminMemoir() {
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
         <GitBranch size={28} style={{ color: COLORS.accent }} />
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>Memoir — Git for AI Memory</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>Memoir, Git for AI Memory</h1>
           <div style={{ fontSize: 12, color: COLORS.textD, marginTop: 4 }}>
             {info?.available ? <span style={{ color: COLORS.ok }}>● ONLINE</span> : <span style={{ color: COLORS.warn }}>● WARMING UP</span>}
             {" · "}{info?.store_path || "/app/data/memoir/store"}

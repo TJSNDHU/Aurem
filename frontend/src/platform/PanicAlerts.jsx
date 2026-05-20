@@ -81,7 +81,7 @@ const PanicAlerts = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+        <div className="animate-spin rounded-full size-8 border-b-2 border-pink-600"></div>
       </div>
     );
   }
@@ -89,7 +89,7 @@ const PanicAlerts = () => {
   if (alerts.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-        <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <AlertTriangle className="size-12 text-gray-300 mx-auto mb-3" />
         <p className="text-gray-600 font-medium">No active panic alerts</p>
         <p className="text-sm text-gray-500 mt-1">All conversations are running smoothly</p>
       </div>
@@ -101,7 +101,7 @@ const PanicAlerts = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="w-6 h-6 text-red-600" />
+          <AlertTriangle className="size-6 text-red-600" />
           <h2 className="text-2xl font-bold text-gray-900">
             Active Panic Alerts
             <span className="ml-3 text-sm font-normal text-gray-500">
@@ -135,7 +135,7 @@ const PanicAlerts = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                      <AlertTriangle className="size-5 text-red-600" />
                       <h3 className="text-lg font-semibold text-gray-900">
                         {alert.customer?.name || 'Unknown Customer'}
                       </h3>
@@ -147,7 +147,7 @@ const PanicAlerts = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
+                    <Clock className="size-4 text-gray-400" />
                     <span className="text-sm text-gray-600">
                       {getTimeAgo(alert.created_at)}
                     </span>
@@ -158,13 +158,13 @@ const PanicAlerts = () => {
                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                   {alert.customer?.email && alert.customer.email !== 'N/A' && (
                     <div className="flex items-center gap-1">
-                      <Mail className="w-4 h-4" />
+                      <Mail className="size-4" />
                       <span>{alert.customer.email}</span>
                     </div>
                   )}
                   {alert.customer?.phone && alert.customer.phone !== 'N/A' && (
                     <div className="flex items-center gap-1">
-                      <Phone className="w-4 h-4" />
+                      <Phone className="size-4" />
                       <span>{alert.customer.phone}</span>
                     </div>
                   )}
@@ -207,7 +207,7 @@ const PanicAlerts = () => {
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-gray-600" />
+                      <MessageSquare className="size-4 text-gray-600" />
                       <span className="text-sm font-medium text-gray-700">
                         {isOriginal ? 'Original Message' : 'English Translation'}
                       </span>
@@ -218,7 +218,7 @@ const PanicAlerts = () => {
                         onClick={() => toggleTranslation(alert.event_id)}
                         className="text-xs text-pink-600 hover:text-pink-700 font-medium flex items-center gap-1"
                       >
-                        <Globe className="w-3 h-3" />
+                        <Globe className="size-3" />
                         {isOriginal ? 'Show Translation' : 'Show Original'}
                       </button>
                     )}
@@ -235,7 +235,7 @@ const PanicAlerts = () => {
                     onClick={() => takeControl(alert.conversation_id)}
                     className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center justify-center gap-2"
                   >
-                    <AlertTriangle className="w-5 h-5" />
+                    <AlertTriangle className="size-5" />
                     Take Manual Control
                   </button>
                   

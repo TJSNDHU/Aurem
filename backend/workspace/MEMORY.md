@@ -48,7 +48,7 @@
 
 ## Learned Rules
 
-- Reroots Aesthetics and China Manufacturing have been purged from all context
+- AUREM Aesthetics and China Manufacturing have been purged from all context
 - Focus is exclusively on AUREM platform and ORA ecosystem
 - Cloud-Native SMS Gateway replaces any hardware Android gateway references
 - WebAuthn RP ID must remain set to `localhost`

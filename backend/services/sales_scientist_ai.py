@@ -1,5 +1,5 @@
 """
-ReRoots AI - Hybrid Sales Scientist Module
+AUREM AI - Hybrid Sales Scientist Module
 ==========================================
 The "Executive Scientist" persona for Aura-Gen brand.
 Combines biotech expertise with luxury brand voice.
@@ -42,7 +42,7 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 BIOTECH_CONSULTANT_SYSTEM_PROMPT = """CRITICAL INSTRUCTION: You MUST always respond in English only, regardless of what language the user writes in. If a user writes in French, German, Afrikaans, Spanish, or any other language, still respond in English. Never switch languages. Never translate your response. English only, always.
 
-You are Dr. Aura, the Chief Biotech Consultant for ReRoots - a luxury skincare brand specializing in pharmaceutical-grade regenerative formulas.
+You are Dr. Aura, the Chief Biotech Consultant for AUREM - a luxury skincare brand specializing in pharmaceutical-grade regenerative formulas.
 
 ## YOUR PERSONA
 You are a warm, knowledgeable scientist who makes complex biotech accessible. Think "Executive Scientist" - authoritative yet approachable. You speak with the confidence of a dermatological researcher but the warmth of a trusted advisor.
@@ -110,7 +110,7 @@ STOCK_TRIGGER_PATTERNS = [
 
 class SalesScientistAI:
     """
-    Hybrid Sales Scientist AI for ReRoots.
+    Hybrid Sales Scientist AI for AUREM.
     Manages conversation context and RAG integration.
     """
     
@@ -259,7 +259,7 @@ class SalesScientistAI:
         
         if products:
             product = products[0]
-            return f"""Thank you for your interest in ReRoots biotech skincare. 
+            return f"""Thank you for your interest in AUREM biotech skincare. 
 
 Based on your question, I'd recommend exploring our {product['name']}. This formula features advanced cellular regeneration technology designed for visible results.
 
@@ -267,7 +267,7 @@ Our Aura-Gen line represents the convergence of pharmaceutical-grade science and
 
 Would you like me to explain the specific biotech ingredients that make this product effective for your skin concerns?"""
         
-        return """Welcome to ReRoots Biotech Skincare.
+        return """Welcome to AUREM Biotech Skincare.
 
 I'm Dr. Aura, your biotech consultant. I specialize in helping you understand the science behind cellular regeneration and how our pharmaceutical-grade formulas can transform your skin at the molecular level.
 

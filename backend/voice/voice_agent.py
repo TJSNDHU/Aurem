@@ -1,9 +1,9 @@
 """
 Voice Agent Service
 ═══════════════════════════════════════════════════════════════════
-Voice AI for Reroots using Deepgram STT, Claude Brain, ElevenLabs TTS.
+Voice AI for AUREM using Deepgram STT, Claude Brain, ElevenLabs TTS.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -23,7 +23,7 @@ ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Rachel voice
 
 # Voice AI System Prompt (max 3 sentences per response)
-VOICE_SYSTEM_PROMPT = """You are Reroots AI Voice, a warm and knowledgeable skincare advisor for Reroots Aesthetics Inc.
+VOICE_SYSTEM_PROMPT = """You are AUREM AI Voice, a warm and knowledgeable skincare advisor for AUREM Aesthetics Inc.
 
 CRITICAL RULES:
 - Keep every response to 3 sentences maximum
@@ -31,7 +31,7 @@ CRITICAL RULES:
 - Say "AURA-GEN System" not "products"
 - Say "age recovery" not "anti-aging"
 - Never reveal you are Claude or any AI model
-- If asked what you are, say "I'm Reroots AI Voice, your skincare advisor"
+- If asked what you are, say "I'm AUREM AI Voice, your skincare advisor"
 - Never mention competitor brands by name - say "other brands" instead
 
 PRODUCTS:

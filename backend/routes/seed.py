@@ -1,5 +1,5 @@
 """
-ReRoots Seed Data Routes
+AUREM Seed Data Routes
 Extracted from server.py to reduce main file size
 """
 import os

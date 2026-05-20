@@ -135,9 +135,9 @@ export default function HotLeadsFeed({ token }) {
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div className="flex items-start gap-3 min-w-0">
-            <Flame className="w-7 h-7 text-[#FF6B00] flex-shrink-0 mt-1" style={{ filter: 'drop-shadow(0 0 8px rgba(255,107,0,0.6))' }} />
+            <Flame className="size-7 text-[#FF6B00] flex-shrink-0 mt-1" style={{ filter: 'drop-shadow(0 0 8px rgba(255,107,0,0.6))' }} />
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Hot Leads — Flame Ranked</h1>
+              <h1 className="text-xl sm:text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Hot Leads, Flame Ranked</h1>
               <p className="text-xs sm:text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>
                 Prospects currently on their sample site, ranked by Flame Score · Score &gt; {data.flame_alert_threshold ?? 50} auto-fires WhatsApp alert
               </p>
@@ -169,7 +169,7 @@ export default function HotLeadsFeed({ token }) {
               style={{ background: 'rgba(255,23,68,0.15)', color: '#ff1744', border: '1px solid rgba(255,23,68,0.3)' }}
               data-testid="hot-leads-test-alert"
             >
-              <Bell className="w-4 h-4 flex-shrink-0" />
+              <Bell className="size-4 flex-shrink-0" />
               <span className="hidden sm:inline">{testing ? 'Sending…' : 'Test WA Alert'}</span>
               <span className="sm:hidden">{testing ? '…' : 'Test'}</span>
             </button>
@@ -179,7 +179,7 @@ export default function HotLeadsFeed({ token }) {
               style={{ background: 'rgba(255,107,0,0.12)', color: '#FF6B00', border: '1px solid rgba(255,107,0,0.25)' }}
               data-testid="hot-leads-refresh"
             >
-              <RefreshCw className={`w-4 h-4 flex-shrink-0 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 flex-shrink-0 ${loading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
           </div>
@@ -188,12 +188,12 @@ export default function HotLeadsFeed({ token }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <StatCard
             label="Live Viewers NOW" value={data.count ?? 0} color="#FF6B00" testid="hot-leads-stat-live"
-            icon={<Activity className="w-4 h-4 text-[#FF6B00] animate-pulse" />} />
+            icon={<Activity className="size-4 text-[#FF6B00] animate-pulse" />} />
           <StatCard
             label="Hottest Score"
             value={data.viewers?.[0]?.flame_score ?? data.top_engaged?.[0]?.engagement_score ?? 0}
             color="#ff1744" testid="hot-leads-stat-top"
-            icon={<Flame className="w-4 h-4 text-red-500" />} />
+            icon={<Flame className="size-4 text-red-500" />} />
           <StatCard
             label={data.unique_ips_24h ? "Unique (24h)" : "Unique (lifetime)"}
             value={data.unique_ips_24h || data.lifetime_unique_ips || 0}
@@ -207,7 +207,7 @@ export default function HotLeadsFeed({ token }) {
         {(!data.viewers || data.viewers.length === 0) ? (
           <>
             <div className="aurem-glass-card text-center py-16" data-testid="hot-leads-empty">
-              <Eye className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,107,0,0.4)' }} />
+              <Eye className="size-12 mx-auto mb-4" style={{ color: 'rgba(255,107,0,0.4)' }} />
               <p className="text-lg font-medium mb-1" style={{ color: 'var(--aurem-heading)' }}>No one viewing right now</p>
               <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>
                 When a prospect opens their sample site, their Flame Score grows in real-time. Score &gt; 50 auto-triggers a WhatsApp ping to you.
@@ -232,7 +232,7 @@ export default function HotLeadsFeed({ token }) {
                         className="flex flex-col items-center justify-center rounded-lg px-3 py-2 min-w-[90px]"
                         style={{ background: 'rgba(100,150,255,0.10)', color: '#6b9fff' }}
                       >
-                        <Flame className="w-4 h-4 mb-1 opacity-80" />
+                        <Flame className="size-4 mb-1 opacity-80" />
                         <div className="text-lg font-bold leading-tight">{v.flame_score}</div>
                         <div className="text-[9px] uppercase tracking-wider opacity-90 font-bold">RECENT</div>
                       </div>
@@ -290,7 +290,7 @@ export default function HotLeadsFeed({ token }) {
                           className="flex flex-col items-center justify-center rounded-lg px-3 py-2 min-w-[90px]"
                           style={{ background: 'rgba(255,107,0,0.10)', color: '#FF8A3D' }}
                         >
-                          <Eye className="w-4 h-4 mb-1 opacity-80" />
+                          <Eye className="size-4 mb-1 opacity-80" />
                           <div className="text-lg font-bold leading-tight">{v.engagement_score}</div>
                           <div className="text-[9px] uppercase tracking-wider opacity-90 font-bold">VIEWS</div>
                         </div>
@@ -364,7 +364,7 @@ export default function HotLeadsFeed({ token }) {
                       style={{ background: style.bg, color: style.fg }}
                       data-testid={`hot-lead-score-${i}`}
                     >
-                      <Flame className="w-5 h-5 mb-1" />
+                      <Flame className="size-5 mb-1" />
                       <div className="text-2xl font-bold leading-tight">{v.flame_score}</div>
                       <div className="text-[10px] uppercase tracking-wider opacity-90 font-bold">{tier}</div>
                     </div>
@@ -377,25 +377,25 @@ export default function HotLeadsFeed({ token }) {
                             🏆 Top Lead
                           </span>
                         )}
-                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        <span className="size-2 rounded-full bg-red-500 animate-pulse" />
                         <h3 className="text-lg font-bold truncate" style={{ color: 'var(--aurem-heading)' }}>
                           {v.business_name || 'Unknown Business'}
                         </h3>
                         {v.flame_alert_fired && (
                           <span className="px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1" style={{ background: 'rgba(255,23,68,0.18)', color: '#ff1744' }} data-testid={`hot-lead-alert-fired-${i}`}>
-                            <Zap className="w-3 h-3" />
+                            <Zap className="size-3" />
                             WA sent
                           </span>
                         )}
                         {v.auto_dial_status === 'dialed' && (
                           <span className="px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1" style={{ background: 'linear-gradient(135deg, #ff1744, #ff6b00)', color: '#fff' }} data-testid={`hot-lead-auto-dial-${i}`}>
-                            <PhoneOutgoing className="w-3 h-3" />
+                            <PhoneOutgoing className="size-3" />
                             DIALING
                           </span>
                         )}
                         {v.auto_dial_status === 'mock_dialed' && (
                           <span className="px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1" style={{ background: 'rgba(255,107,0,0.15)', color: '#FF6B00' }}>
-                            <Phone className="w-3 h-3" />
+                            <Phone className="size-3" />
                             Dial (mock)
                           </span>
                         )}
@@ -433,7 +433,7 @@ export default function HotLeadsFeed({ token }) {
                       data-testid={`hot-lead-open-${i}`}
                     >
                       Open Site
-                      <ExternalLink className="w-3 h-3" />
+                      <ExternalLink className="size-3" />
                     </a>
                   </div>
                 </div>
@@ -445,7 +445,7 @@ export default function HotLeadsFeed({ token }) {
         {/* Formula legend */}
         <div className="mt-6 aurem-glass-card p-4 text-xs" style={{ color: 'var(--aurem-body-secondary)' }} data-testid="flame-formula-legend">
           <div className="font-bold mb-2 flex items-center gap-1" style={{ color: 'var(--aurem-heading)' }}>
-            <Flame className="w-3 h-3 text-[#FF6B00]" /> Flame Score Formula
+            <Flame className="size-3 text-[#FF6B00]" /> Flame Score Formula
           </div>
           <code className="block mb-2 font-mono" style={{ color: '#FF6B00' }}>
             flame_score = (duration_seconds / 10) × ping_count × referral_bonus

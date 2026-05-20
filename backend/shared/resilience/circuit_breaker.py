@@ -1,7 +1,7 @@
 """
 AUREM Circuit Breaker System
 Protects against cascading failures from external APIs
-Based on battle-tested Reroots patterns
+Based on battle-tested AUREM patterns
 """
 
 import logging
@@ -28,7 +28,7 @@ class CircuitBreaker:
     - OPEN: Too many failures, block all calls
     - HALF_OPEN: Testing recovery, allow one call
     
-    Pattern from Reroots production system
+    Pattern from AUREM production system
     """
     
     def __init__(

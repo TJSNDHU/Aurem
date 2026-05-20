@@ -123,7 +123,7 @@ export default function BuildLog() {
             background: COLORS.panel, borderRadius: 14,
             border: '1px dashed rgba(255,255,255,0.08)',
           }}>
-            Build journal is being indexed — check back in a few seconds.
+            Build journal is being indexed, check back in a few seconds.
           </div>
         )}
 

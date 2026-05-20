@@ -104,7 +104,7 @@ export default function CustomerOnboarding({ ctx }) {
         <Sparkles size={24} color="#D4AF37"/>
         <h1 style={title}>Smart Onboarding</h1>
       </div>
-      <p style={sub}>AUREM finds everything automatically. You confirm — we start.</p>
+      <p style={sub}>AUREM finds everything automatically. You confirm, we start.</p>
 
       {/* ─── STEP 1: Kick off detection ─── */}
       {step === 1 && (
@@ -160,7 +160,7 @@ export default function CustomerOnboarding({ ctx }) {
             {/* Social Media */}
             <div style={{marginTop:16,borderTop:'1px solid rgba(255,255,255,0.05)',paddingTop:16}}>
               <h4 style={{...sectionH, fontSize:13}}>Social Media</h4>
-              {Object.keys(socials).length === 0 && <p style={{fontSize:12,color:'#8A8070'}}>No social accounts found — add any you have below.</p>}
+              {Object.keys(socials).length === 0 && <p style={{fontSize:12,color:'#8A8070'}}>No social accounts found, add any you have below.</p>}
               {Object.entries(socials).map(([p, url]) => (
                 <div key={p} data-testid={`detected-social-${p}`} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
                   <span style={{fontSize:12,fontWeight:600,color:'#D4AF37',textTransform:'capitalize',minWidth:90}}>{p}</span>

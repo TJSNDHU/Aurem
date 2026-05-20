@@ -37,12 +37,12 @@ export default function ForgotPassword() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--aurem-bg, #050505)' }}>
       <div className="w-full max-w-md px-6">
         <Link to="/login" className="inline-flex items-center gap-2 text-sm mb-8 hover:opacity-80 transition-opacity" style={{ color: 'var(--aurem-accent, #D4AF37)' }} data-testid="forgot-back-link">
-          <ArrowLeft className="w-4 h-4" /> Back to Login
+          <ArrowLeft className="size-4" /> Back to Login
         </Link>
 
         {sent ? (
           <div className="text-center" data-testid="forgot-success">
-            <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{ color: '#FF6B00' }} />
+            <CheckCircle className="size-16 mx-auto mb-4" style={{ color: '#FF6B00' }} />
             <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>Check Your Email</h1>
             <p className="text-sm mb-6" style={{ color: 'var(--aurem-body-secondary, #888)' }}>
               If an account exists for <strong style={{ color: 'var(--aurem-heading, #F4F4F4)' }}>{email}</strong>, we've sent password reset instructions.
@@ -54,7 +54,7 @@ export default function ForgotPassword() {
         ) : (
           <>
             <div className="flex items-center gap-3 mb-2">
-              <Mail className="w-6 h-6" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
+              <Mail className="size-6" style={{ color: 'var(--aurem-accent, #D4AF37)' }} />
               <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading, #F4F4F4)' }} data-testid="forgot-title">Reset Password</h1>
             </div>
             <p className="text-sm mb-8" style={{ color: 'var(--aurem-body-secondary, #888)' }}>

@@ -41,7 +41,7 @@ export default function RevenueForecastDashboard({ token }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center">
-      <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+      <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
     </div>
   );
 
@@ -65,7 +65,7 @@ export default function RevenueForecastDashboard({ token }) {
             </p>
           </div>
           <button onClick={() => { setLoading(true); fetchData(); }} className="p-2 rounded-lg hover:bg-white/10 transition-colors" data-testid="refresh-forecast">
-            <RefreshCw className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+            <RefreshCw className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
           </button>
         </div>
 
@@ -74,7 +74,7 @@ export default function RevenueForecastDashboard({ token }) {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             className="aurem-glass-card p-6" data-testid="projected-revenue">
             <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-5 h-5" style={{ color: '#22C55E' }} />
+              <TrendingUp className="size-5" style={{ color: '#22C55E' }} />
               <span className="text-xs font-bold" style={{ color: 'var(--aurem-body-secondary)' }}>Projected Revenue (90d)</span>
             </div>
             <div className="text-3xl font-black" style={{ color: '#22C55E' }}>{fmt(projected)}</div>
@@ -85,7 +85,7 @@ export default function RevenueForecastDashboard({ token }) {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
             className="aurem-glass-card p-6" data-testid="revenue-at-risk">
             <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-5 h-5" style={{ color: '#EF4444' }} />
+              <AlertTriangle className="size-5" style={{ color: '#EF4444' }} />
               <span className="text-xs font-bold" style={{ color: 'var(--aurem-body-secondary)' }}>Revenue at Risk</span>
             </div>
             <div className="text-3xl font-black" style={{ color: '#EF4444' }}>{fmt(atRisk)}</div>
@@ -99,7 +99,7 @@ export default function RevenueForecastDashboard({ token }) {
         <StaggerGrid className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <MotionCard variant={cardVariant} className="aurem-glass-card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Target className="w-4 h-4" style={{ color: '#3B82F6' }} />
+              <Target className="size-4" style={{ color: '#3B82F6' }} />
               <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Pipeline</span>
             </div>
             <div className="space-y-2">
@@ -126,7 +126,7 @@ export default function RevenueForecastDashboard({ token }) {
 
           <MotionCard variant={cardVariant} className="aurem-glass-card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Layers className="w-4 h-4" style={{ color: '#22C55E' }} />
+              <Layers className="size-4" style={{ color: '#22C55E' }} />
               <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Recurring</span>
             </div>
             <div className="space-y-2">
@@ -153,7 +153,7 @@ export default function RevenueForecastDashboard({ token }) {
 
           <MotionCard variant={cardVariant} className="aurem-glass-card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <CreditCard className="w-4 h-4" style={{ color: '#F97316' }} />
+              <CreditCard className="size-4" style={{ color: '#F97316' }} />
               <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Pending Recovery</span>
             </div>
             <div className="space-y-2">
@@ -194,10 +194,10 @@ export default function RevenueForecastDashboard({ token }) {
             className="aurem-glass-card p-5" data-testid="context-overlay-card"
             style={{ border: '1px solid rgba(255,107,0,0.12)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
+              <div className="size-8 rounded-lg flex items-center justify-center" style={{
                 background: 'rgba(255,107,0,0.08)', border: '1px solid rgba(255,107,0,0.15)',
               }}>
-                <Rocket className="w-4 h-4 text-[#FF6B00]" />
+                <Rocket className="size-4 text-[#FF6B00]" />
               </div>
               <div>
                 <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Context Overlay</span>
@@ -229,10 +229,10 @@ export default function RevenueForecastDashboard({ token }) {
           <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}
             className="aurem-glass-card p-5" data-testid="conversion-tracker-card">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
+              <div className="size-8 rounded-lg flex items-center justify-center" style={{
                 background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)',
               }}>
-                <BarChart3 className="w-4 h-4 text-[#3B82F6]" />
+                <BarChart3 className="size-4 text-[#3B82F6]" />
               </div>
               <div>
                 <span className="text-xs font-bold" style={{ color: 'var(--aurem-heading)' }}>Envoy Performance</span>

@@ -39,7 +39,7 @@ export default function CustomerIntegrations({ ctx }) {
   return (
     <div data-testid="customer-integrations">
       <h1 style={title}>Integrations</h1>
-      <p style={sub}>Connect AUREM to your store, website and tracking pixel — all in one place.</p>
+      <p style={sub}>Connect AUREM to your store, website and tracking pixel, all in one place.</p>
 
       <div style={{display:'grid', gridTemplateColumns:'1fr', gap:16}}>
         <ShopifyCard />

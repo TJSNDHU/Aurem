@@ -156,7 +156,7 @@ const FaceIDAuthWrapper = () => {
     return (
       <div className="min-h-screen flex items-center justify-center relative">
         <div className="aurem-bg-container"><div className="geometric-overlay"></div></div>
-        <div className="relative z-10 w-16 h-16 border-3 border-[#D4A373] border-t-transparent rounded-full animate-spin" />
+        <div className="relative z-10 size-16 border-3 border-[#D4A373] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -172,7 +172,7 @@ const FaceIDAuthWrapper = () => {
         playsInline
         preload="auto"
         poster="/assets/aurem-hero-robot.jpg"
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 size-full object-cover"
         style={{ zIndex: 0, opacity: 0.6 }}
       >
         <source src="/videos/login-bg.mp4" type="video/mp4" />
@@ -192,7 +192,7 @@ const FaceIDAuthWrapper = () => {
             <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'auremPulseDelay 2s ease-out 0.6s both' }}>
               <div className="login-logo-glow" />
             </div>
-            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center relative"
+            <div className="size-20 mx-auto mb-4 rounded-2xl flex items-center justify-center relative"
               style={{ background: 'linear-gradient(135deg, #D4A373, #B38659)', boxShadow: '0 0 30px rgba(212,163,115,0.4)' }}>
               <span className="text-2xl font-black text-[#1A3026]">A</span>
             </div>
@@ -237,7 +237,7 @@ const FaceIDAuthWrapper = () => {
             <div className="aurem-glass-card p-8 text-center" data-testid="biometric-prompt">
               <div className="mb-4">
                 <div style={{ width: 64, height: 64, margin: '0 auto', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(212,175,55,0.15), rgba(45,122,74,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Scan className="w-7 h-7" style={{ color: '#D4AF37' }} />
+                  <Scan className="size-7" style={{ color: '#D4AF37' }} />
                 </div>
               </div>
               <h3 className="text-base font-bold mb-1" style={{ color: '#D4AF37', fontFamily: "'Cinzel', serif", letterSpacing: '0.05em' }}>Enable Face ID / PIN?</h3>
@@ -378,14 +378,14 @@ const LoginForm = ({ onLogin, onSwitchToFaceID, onSwitchToRegister, faceIDAvaila
 
     <div className="aurem-floating-login p-8" data-testid="login-form" style={{ padding: '34px 30px' }}>
       <h2 className="text-xl font-bold mb-1" data-testid="customer-signin-heading" style={{ fontFamily: "'Cinzel', 'Montserrat', serif", letterSpacing: '0.06em', color: '#F7E7CE' }}>Sign in to your business</h2>
-      <p className="text-sm mb-6" style={{ color: '#BFA679', fontFamily: "'Jost', sans-serif" }}>Welcome back — log in with your email or BIN</p>
+      <p className="text-sm mb-6" style={{ color: '#BFA679', fontFamily: "'Jost', sans-serif" }}>Welcome back, log in with your email or BIN</p>
 
       {faceIDAvailable && (
         <>
           <button type="button" onClick={onSwitchToFaceID} data-testid="faceid-login-button"
             className="w-full p-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2.5 mb-4 transition-all hover:shadow-lg"
             style={{ background: 'rgba(212,163,115,0.08)', border: '1px solid rgba(212,163,115,0.2)', color: '#E8E4DE' }}>
-            <Scan className="w-5 h-5" /> Sign in with FaceID
+            <Scan className="size-5" /> Sign in with FaceID
           </button>
           <div className="relative mb-4">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#D4A373]/10" /></div>
@@ -423,7 +423,7 @@ const LoginForm = ({ onLogin, onSwitchToFaceID, onSwitchToRegister, faceIDAvaila
             <button type="button" onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-[#F7E7CE]"
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#BFA679' }}>
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
             </button>
           </div>
         </div>
@@ -436,7 +436,7 @@ const LoginForm = ({ onLogin, onSwitchToFaceID, onSwitchToRegister, faceIDAvaila
             color: '#1A1208', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
             boxShadow: '0 6px 24px rgba(212,163,115,0.38), inset 0 1px 0 rgba(255,255,255,0.18)',
           }}>
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Authenticating...</> : <>SIGN IN <Lock className="w-4 h-4" /></>}
+          {loading ? <><Loader2 className="size-4 animate-spin" /> Authenticating…</> : <>SIGN IN <Lock className="size-4" /></>}
         </button>
       </form>
 
@@ -447,7 +447,7 @@ const LoginForm = ({ onLogin, onSwitchToFaceID, onSwitchToRegister, faceIDAvaila
           <button type="button" onClick={onSwitchToRegister} data-testid="switch-to-register"
             className="font-semibold hover:underline transition-colors"
             style={{ color: '#F7E7CE', background: 'none', border: 'none', cursor: 'pointer' }}>
-            Create an account <ArrowRight className="w-3.5 h-3.5 inline" />
+            Create an account <ArrowRight className="size-3.5 inline" />
           </button>
         </p>
         <a href="/forgot-password" data-testid="forgot-password-link"
@@ -576,7 +576,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             <button type="button" onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-[#F7E7CE]"
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#BFA679' }}>
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
             </button>
           </div>
           <p className="text-[10px] mt-1.5" style={{ color: '#8A8070' }}>Must include uppercase, lowercase, and a number</p>
@@ -590,7 +590,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
             color: '#1A1208', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
             boxShadow: '0 4px 15px rgba(212,163,115,0.35)',
           }}>
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating Account...</> : <>Create Account <UserPlus className="w-4 h-4" /></>}
+          {loading ? <><Loader2 className="size-4 animate-spin" /> Creating Account…</> : <>Create Account <UserPlus className="size-4" /></>}
         </button>
       </form>
 
@@ -601,7 +601,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
           <button type="button" onClick={onSwitchToLogin} data-testid="switch-to-login"
             className="font-semibold hover:underline transition-colors"
             style={{ color: '#F7E7CE', background: 'none', border: 'none', cursor: 'pointer' }}>
-            Sign in <ArrowRight className="w-3.5 h-3.5 inline" />
+            Sign in <ArrowRight className="size-3.5 inline" />
           </button>
         </p>
       </div>

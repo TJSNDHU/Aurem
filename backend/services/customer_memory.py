@@ -9,7 +9,7 @@ When a user logs in, their session-based profile is merged with their
 account-based profile (keyed by email). This allows conversation memory
 to persist across devices and browsers.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -143,7 +143,7 @@ def extract_purchase_intent(text: str) -> str:
 
 
 def extract_products_mentioned(text: str) -> List[str]:
-    """Extract Reroots products mentioned in conversation."""
+    """Extract AUREM products mentioned in conversation."""
     text_lower = text.lower()
     mentioned = []
     for product in REROOTS_PRODUCTS:

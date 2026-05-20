@@ -112,7 +112,7 @@ function TenantOptimization({ token }) {
   if (loading) {
     return (
       <div data-testid="tenant-optimization-loading" className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#FF6B00] border-t-transparent" />
+        <div className="animate-spin rounded-full size-8 border-2 border-[#FF6B00] border-t-transparent" />
       </div>
     );
   }
@@ -135,7 +135,7 @@ function TenantOptimization({ token }) {
             onClick={fetchData}
             className="px-3 py-1.5 rounded-lg bg-[#1a1a1f] border border-[#2a2a30] text-[#8B8578] hover:text-[#FF6B00] text-xs flex items-center gap-1.5 transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            <RefreshCw className="size-3.5" /> Refresh
           </button>
           <button
             data-testid="profile-all-btn"
@@ -143,7 +143,7 @@ function TenantOptimization({ token }) {
             disabled={actionLoading === 'all'}
             className="px-3 py-1.5 rounded-lg bg-[#FF6B00]/10 border border-[#FF6B00]/30 text-[#FF6B00] hover:bg-[#FF6B00]/20 text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
-            {actionLoading === 'all' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+            {actionLoading === 'all' ? <RefreshCw className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
             Profile All Tenants
           </button>
         </div>
@@ -154,32 +154,32 @@ function TenantOptimization({ token }) {
         <SummaryCard
           label="Tenants Profiled"
           value={dashboard?.total_tenants_profiled || 0}
-          icon={<Activity className="w-4 h-4" />}
+          icon={<Activity className="size-4" />}
           color="#FF6B00"
         />
         <SummaryCard
           label="Fully Optimized"
           value={dashboard?.tenants_fully_optimized || 0}
-          icon={<CheckCircle className="w-4 h-4" />}
+          icon={<CheckCircle className="size-4" />}
           color="#22C55E"
         />
         <SummaryCard
           label="In Shadow Mode"
           value={dashboard?.tenants_in_shadow || 0}
-          icon={<Shield className="w-4 h-4" />}
+          icon={<Shield className="size-4" />}
           color="#8B5CF6"
         />
         <SummaryCard
           label="Blocked"
           value={dashboard?.tenants_blocked || 0}
-          icon={<XCircle className="w-4 h-4" />}
+          icon={<XCircle className="size-4" />}
           color="#EF4444"
         />
         <SummaryCard
           label="Tokens Saved"
           value={formatNumber(dashboard?.total_tokens_saved_estimate || 0)}
           subtitle={`~$${dashboard?.total_cost_saved_estimate || 0}`}
-          icon={<TrendingUp className="w-4 h-4" />}
+          icon={<TrendingUp className="size-4" />}
           color="#10B981"
         />
       </div>
@@ -191,7 +191,7 @@ function TenantOptimization({ token }) {
           <div className="flex gap-4">
             {Object.entries(dashboard.risk_distribution).map(([level, count]) => (
               <div key={level} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ background: RISK_COLORS[level] }} />
+                <div className="size-3 rounded-full" style={{ background: RISK_COLORS[level] }} />
                 <span className="text-sm text-[#F0EBE0] font-medium">{count}</span>
                 <span className="text-xs text-[#8B8578]">{level}</span>
               </div>
@@ -265,9 +265,9 @@ function TenantOptimization({ token }) {
                     <td className="px-4 py-2.5 text-right text-[#8B8578] font-mono">{p.total_calls_7d}</td>
                     <td className="px-4 py-2.5">
                       {p.optimization_enabled ? (
-                        <span className="text-[#22C55E] flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Active</span>
+                        <span className="text-[#22C55E] flex items-center gap-1"><CheckCircle className="size-3" /> Active</span>
                       ) : (
-                        <span className="text-[#8B8578] flex items-center gap-1"><Pause className="w-3 h-3" /> Inactive</span>
+                        <span className="text-[#8B8578] flex items-center gap-1"><Pause className="size-3" /> Inactive</span>
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-right">
@@ -280,7 +280,7 @@ function TenantOptimization({ token }) {
                             className="p-1 rounded hover:bg-[#EAB308]/10 text-[#EAB308] transition-colors"
                             title="Pause Optimization"
                           >
-                            <Pause className="w-3.5 h-3.5" />
+                            <Pause className="size-3.5" />
                           </button>
                         ) : (
                           <button
@@ -290,7 +290,7 @@ function TenantOptimization({ token }) {
                             className="p-1 rounded hover:bg-[#22C55E]/10 text-[#22C55E] transition-colors"
                             title="Enable Optimization"
                           >
-                            <Play className="w-3.5 h-3.5" />
+                            <Play className="size-3.5" />
                           </button>
                         )}
                         <button
@@ -300,7 +300,7 @@ function TenantOptimization({ token }) {
                           className="p-1 rounded hover:bg-[#EF4444]/10 text-[#EF4444] transition-colors"
                           title="Force Rollback"
                         >
-                          <RotateCcw className="w-3.5 h-3.5" />
+                          <RotateCcw className="size-3.5" />
                         </button>
                         <button
                           data-testid={`advance-${p.tenant_id}`}
@@ -309,7 +309,7 @@ function TenantOptimization({ token }) {
                           className="p-1 rounded hover:bg-[#FF6B00]/10 text-[#FF6B00] transition-colors"
                           title="Advance Stage"
                         >
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="size-3.5" />
                         </button>
                         <button
                           data-testid={`reprofile-${p.tenant_id}`}
@@ -318,7 +318,7 @@ function TenantOptimization({ token }) {
                           className="p-1 rounded hover:bg-[#3B82F6]/10 text-[#3B82F6] transition-colors"
                           title="Re-Profile"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${actionLoading === p.tenant_id ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`size-3.5 ${actionLoading === p.tenant_id ? 'animate-spin' : ''}`} />
                         </button>
                       </div>
                     </td>

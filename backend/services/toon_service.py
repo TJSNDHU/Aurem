@@ -12,7 +12,7 @@ This service:
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
-from utils.toon_encoder import ToonEncoder, ReRootsToonEncoder, json_to_toon
+from utils.toon_encoder import ToonEncoder, AUREMToonEncoder, json_to_toon
 from models.saas_toon_models import (
     SaaSToonEncoder,
     ServiceDefinition,
@@ -37,7 +37,7 @@ class AuremToonService:
     def __init__(self, db=None):
         self.db = db
         self.base_encoder = ToonEncoder()
-        self.reroots_encoder = ReRootsToonEncoder()
+        self.reroots_encoder = AUREMToonEncoder()
         self.saas_encoder = SaaSToonEncoder()
         
     def set_db(self, db):

@@ -134,7 +134,7 @@ export default function VoiceAgentStudio({ token }) {
                 color: '#FDF9F9', fontSize: 12,
               }}
             >
-              {voices.length === 0 && <option value="">Loading voices...</option>}
+              {voices.length === 0 && <option value="">Loading voices…</option>}
               {voices.map((v) => (
                 <option key={v.voice_id} value={v.voice_id}>
                   {v.voice_name || v.voice_id} {v.provider ? `(${v.provider})` : ''} {v.gender ? ` · ${v.gender}` : ''}

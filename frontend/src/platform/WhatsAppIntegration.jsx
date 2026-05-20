@@ -275,7 +275,7 @@ function SendTestMessage({ businessId, onSent }) {
         {sending ? (
           <>
             <RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} />
-            Sending...
+            Sending…
           </>
         ) : (
           <>
@@ -397,7 +397,7 @@ export default function WhatsAppIntegration({ businessId }) {
       <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, color: MU }}>
           <RefreshCw size={20} style={{ animation: "spin 1s linear infinite" }} />
-          <span>Loading WhatsApp status...</span>
+          <span>Loading WhatsApp status…</span>
         </div>
       </div>
     );
@@ -592,7 +592,7 @@ export default function WhatsAppIntegration({ businessId }) {
               {connecting ? (
                 <>
                   <RefreshCw size={18} style={{ animation: "spin 1s linear infinite" }} />
-                  Waiting for Authorization...
+                  Waiting for Authorization…
                 </>
               ) : (
                 <>

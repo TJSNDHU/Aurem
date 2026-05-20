@@ -1,5 +1,5 @@
 """
-ReRoots AI PWA Backend Router
+AUREM AI PWA Backend Router
 Handles Push Notifications, Voice Synthesis, and AI Chat
 """
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/pwa", tags=["PWA"])
 # Environment variables
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
-VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@reroots.ca")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@aurem.live")
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 VOXTRAL_API_KEY = os.environ.get("VOXTRAL_API_KEY", "")  # Optional Voxtral key
 
@@ -280,13 +280,13 @@ async def ai_chat(request: AIChatRequest):
         from emergentintegrations.llm import LlmChat, ChatMessage
         
         # Build system prompt for skincare consultant
-        system_prompt = """You are an expert skincare consultant for ReRoots, a luxury biotech skincare brand. 
+        system_prompt = """You are an expert skincare consultant for AUREM, a luxury biotech skincare brand. 
 Your role is to:
 - Provide personalized skincare advice
 - Explain product ingredients and their benefits (especially PDRN, peptides, antioxidants)
 - Help users build effective skincare routines
 - Answer questions about skin concerns (acne, aging, hyperpigmentation, sensitivity)
-- Recommend products from the ReRoots AURA-GEN line when appropriate
+- Recommend products from the AUREM AURA-GEN line when appropriate
 
 Keep responses concise (2-3 sentences for voice), warm, and professional.
 Use simple language that's easy to understand.
@@ -387,7 +387,7 @@ async def test_pwa():
     """Test PWA router is working"""
     return {
         "status": "ok",
-        "message": "ReRoots AI PWA Backend Active",
+        "message": "AUREM AI PWA Backend Active",
         "vapid_configured": bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY),
         "voxtral_configured": bool(VOXTRAL_API_KEY),
         "ai_configured": bool(EMERGENT_LLM_KEY),

@@ -168,7 +168,7 @@ export default function PricingPage() {
           className="flex items-center gap-2 group"
           data-testid="pricing-logo"
         >
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{
+          <div className="size-9 rounded-xl flex items-center justify-center" style={{
             background: 'linear-gradient(135deg, #FF6B00, #CC5500)',
             boxShadow: '0 0 20px rgba(255,107,0,0.25)',
           }}>
@@ -201,7 +201,7 @@ export default function PricingPage() {
           background: 'rgba(255,107,0,0.08)',
           border: '1px solid rgba(255,107,0,0.15)',
         }}>
-          <Activity className="w-3 h-3 text-[#FF6B00]" />
+          <Activity className="size-3 text-[#FF6B00]" />
           <span className="text-[10px] font-bold tracking-[2px] text-[#FF6B00]">SUBSCRIPTION PLANS</span>
         </div>
         <h1
@@ -272,7 +272,7 @@ export default function PricingPage() {
                       color: '#050507',
                       boxShadow: '0 4px 16px rgba(255,107,0,0.3)',
                     }} data-testid="growth-badge">
-                      <Star className="w-3 h-3" />
+                      <Star className="size-3" />
                       PROFESSIONAL STANDARD
                     </div>
                   </div>
@@ -281,11 +281,11 @@ export default function PricingPage() {
                 <div className={`p-8 ${isGrowth ? 'pt-10' : ''}`}>
                   {/* Icon + Name */}
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+                    <div className="size-10 rounded-xl flex items-center justify-center" style={{
                       background: `${colors.accent}15`,
                       border: `1px solid ${colors.accent}25`,
                     }}>
-                      <Icon className="w-5 h-5" style={{ color: colors.accent }} />
+                      <Icon className="size-5" style={{ color: colors.accent }} />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-white tracking-wide" data-testid={`plan-name-${tierKey}`}>
@@ -330,7 +330,7 @@ export default function PricingPage() {
                     }}
                   >
                     {checkoutLoading === tierKey ? 'REDIRECTING...' : tierKey === 'enterprise' ? 'SUBSCRIBE' : 'SUBSCRIBE NOW'}
-                    {!checkoutLoading && <ArrowRight className="w-3 h-3 inline ml-2" />}
+                    {!checkoutLoading && <ArrowRight className="size-3 inline ml-2" />}
                   </button>
 
                   {/* Limits highlights */}
@@ -356,12 +356,12 @@ export default function PricingPage() {
                     {features.map((feat, fi) => (
                       <div key={fi} className="flex items-start gap-2.5">
                         {fi === 0 && tierKey !== 'starter' ? (
-                          <ChevronRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-white/55" />
+                          <ChevronRight className="size-3.5 mt-0.5 flex-shrink-0 text-white/55" />
                         ) : (
-                          <div className="w-3.5 h-3.5 mt-0.5 rounded-full flex items-center justify-center flex-shrink-0" style={{
+                          <div className="size-3.5 mt-0.5 rounded-full flex items-center justify-center flex-shrink-0" style={{
                             background: `${colors.accent}15`,
                           }}>
-                            <Check className="w-2 h-2" style={{ color: colors.accent }} />
+                            <Check className="size-2" style={{ color: colors.accent }} />
                           </div>
                         )}
                         <span className={`text-xs leading-relaxed ${fi === 0 && tierKey !== 'starter' ? 'font-semibold text-white/60' : 'text-white/70'}`}>
@@ -381,15 +381,15 @@ export default function PricingPage() {
           <p className="text-xs text-white/60 mb-3">All plans include 14-day free trial. No credit card required.</p>
           <div className="flex items-center justify-center gap-6 text-[10px] text-white/55">
             <div className="flex items-center gap-1.5">
-              <Shield className="w-3 h-3" />
+              <Shield className="size-3" />
               <span>SOC 2 Compliant</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Globe className="w-3 h-3" />
+              <Globe className="size-3" />
               <span>Canadian Infrastructure</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Brain className="w-3 h-3" />
+              <Brain className="size-3" />
               <span>Multi-Agent AI</span>
             </div>
           </div>
@@ -405,7 +405,7 @@ export default function PricingPage() {
             background: 'rgba(74,222,128,0.08)',
             border: '1px solid rgba(74,222,128,0.2)',
           }}>
-            <MonitorSmartphone className="w-3 h-3 text-[#4ade80]" />
+            <MonitorSmartphone className="size-3 text-[#4ade80]" />
             <span className="text-[10px] font-bold tracking-[2px] text-[#4ade80]">SITE MONITOR · ADD-ON</span>
           </div>
           <h2
@@ -430,7 +430,7 @@ export default function PricingPage() {
               }}
               data-testid="site-monitor-free-cta-btn"
             >
-              TRY FREE FOR 30 DAYS <ArrowRight className="w-3 h-3" />
+              TRY FREE FOR 30 DAYS <ArrowRight className="size-3" />
             </button>
           </div>
         </div>
@@ -507,18 +507,18 @@ export default function PricingPage() {
                     color: '#050507',
                     boxShadow: '0 4px 16px rgba(74,222,128,0.3)',
                   }}>
-                    <Star className="w-3 h-3" />
+                    <Star className="size-3" />
                     MOST POPULAR
                   </div>
                 </div>
               )}
               <div className={`p-7 ${sm.popular ? 'pt-9' : ''}`}>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+                  <div className="size-10 rounded-xl flex items-center justify-center" style={{
                     background: `${sm.accent}15`,
                     border: `1px solid ${sm.accent}25`,
                   }}>
-                    <MonitorSmartphone className="w-5 h-5" style={{ color: sm.accent }} />
+                    <MonitorSmartphone className="size-5" style={{ color: sm.accent }} />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white tracking-wide" data-testid={`sm-name-${sm.id}`}>
@@ -556,19 +556,19 @@ export default function PricingPage() {
                     border: `1px solid ${sm.accent}30`,
                   }}
                 >
-                  SUBSCRIBE <ArrowRight className="w-3 h-3 inline ml-2" />
+                  SUBSCRIBE <ArrowRight className="size-3 inline ml-2" />
                 </button>
 
                 <div className="space-y-2.5">
                   {sm.features.map((feat, fi) => (
                     <div key={fi} className="flex items-start gap-2.5">
                       {fi === 0 && sm.id !== 'site_monitor_lite' ? (
-                        <ChevronRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-white/55" />
+                        <ChevronRight className="size-3.5 mt-0.5 flex-shrink-0 text-white/55" />
                       ) : (
-                        <div className="w-3.5 h-3.5 mt-0.5 rounded-full flex items-center justify-center flex-shrink-0" style={{
+                        <div className="size-3.5 mt-0.5 rounded-full flex items-center justify-center flex-shrink-0" style={{
                           background: `${sm.accent}15`,
                         }}>
-                          <Check className="w-2 h-2" style={{ color: sm.accent }} />
+                          <Check className="size-2" style={{ color: sm.accent }} />
                         </div>
                       )}
                       <span className={`text-xs leading-relaxed ${fi === 0 && sm.id !== 'site_monitor_lite' ? 'font-semibold text-white/60' : 'text-white/70'}`}>
@@ -583,7 +583,7 @@ export default function PricingPage() {
         </div>
 
         <p className="text-center text-[11px] text-white/50 mt-10 max-w-lg mx-auto leading-relaxed">
-          Start with a <span className="text-[#4ade80]">7-day free trial</span> — 3 URLs, 15-min checks, email alerts.
+          Start with a <span className="text-[#4ade80]">7-day free trial</span>, 3 URLs, 15-min checks, email alerts.
           Upgrade anytime to unlock WhatsApp alerts, faster checks, and a public status page.
         </p>
       </section>

@@ -88,7 +88,7 @@ export default function EconomicTicker({ token, visible = true }) {
           className="absolute inset-0 flex items-center px-6 gap-4"
           style={{ width: '100%' }}
         >
-          <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C9A84C' }} />
+          <Icon className="size-3.5 flex-shrink-0" style={{ color: '#C9A84C' }} />
           <span
             className="text-[11px] font-semibold tracking-wide flex-1"
             style={{ color: '#C9A84C', fontFamily: 'Cinzel, Georgia, serif' }}
@@ -99,11 +99,11 @@ export default function EconomicTicker({ token, visible = true }) {
           {changePct !== null && changePct !== undefined && current.type === 'exchange' && (
             <span className="flex items-center gap-0.5 text-[10px] font-bold">
               {changePct > 0 ? (
-                <TrendingUp className="w-2.5 h-2.5 text-[#22C55E]" />
+                <TrendingUp className="size-2.5 text-[#22C55E]" />
               ) : changePct < 0 ? (
-                <TrendingDown className="w-2.5 h-2.5 text-[#EF4444]" />
+                <TrendingDown className="size-2.5 text-[#EF4444]" />
               ) : (
-                <Minus className="w-2.5 h-2.5 text-[#C9A84C]" />
+                <Minus className="size-2.5 text-[#C9A84C]" />
               )}
             </span>
           )}

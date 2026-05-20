@@ -105,8 +105,8 @@ export default function AnalyticsHub({ token }) {
     return (
       <div className="flex-1 flex items-center justify-center" style={{ background: 'var(--aurem-bg)' }} data-testid="analytics-hub-loading">
         <div className="flex items-center gap-3" style={{ color: 'var(--aurem-body-secondary)' }}>
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading analytics...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading analytics…</span>
         </div>
       </div>
     );
@@ -119,7 +119,7 @@ export default function AnalyticsHub({ token }) {
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-xl font-semibold text-[#e2c97e] tracking-wider mb-1">Analytics Hub</h1>
-            <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Business intelligence dashboard — real-time metrics, insights, and reports</p>
+            <p className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>Business intelligence dashboard, real-time metrics, insights, and reports</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex gap-1 bg-white/80 backdrop-blur-sm p-0.5 rounded-lg border border-[#FF6B00]/20">
@@ -139,7 +139,7 @@ export default function AnalyticsHub({ token }) {
               ))}
             </div>
             <button onClick={() => { /* Export analytics data */ }} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] border rounded-lg transition-colors" style={{ color: 'var(--aurem-body-secondary)', borderColor: 'var(--aurem-border)' }} data-testid="export-analytics-btn">
-              <Download className="w-3 h-3" />
+              <Download className="size-3" />
               Export
             </button>
           </div>
@@ -151,11 +151,11 @@ export default function AnalyticsHub({ token }) {
             <div key={idx} className="p-4 rounded-lg" style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-border)' }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <kpi.icon className="w-4 h-4" style={{ color: kpi.color }} />
+                  <kpi.icon className="size-4" style={{ color: kpi.color }} />
                   <span className="text-[9px] tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>{kpi.label}</span>
                 </div>
                 <div className={`flex items-center gap-0.5 text-[10px] ${kpi.up ? 'text-[#4ade80]' : 'text-[#ef4444]'}`}>
-                  {kpi.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {kpi.up ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
                   {kpi.change}
                 </div>
               </div>
@@ -169,7 +169,7 @@ export default function AnalyticsHub({ token }) {
           <div className="mb-8 p-5 rounded-xl" style={{ background: 'var(--aurem-card-bg)', border: '1px solid var(--aurem-border)' }} data-testid="revenue-forecast">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" style={{ color: '#D4AF37' }} />
+                <TrendingUp className="size-4" style={{ color: '#D4AF37' }} />
                 <h3 className="text-xs tracking-wider font-medium" style={{ color: 'var(--aurem-heading)' }}>REVENUE FORECAST</h3>
                 <span className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.1)', color: '#D4AF37' }}>
                   {forecast.methodology === 'ai_enhanced' ? 'AI Enhanced' : 'Projection'}
@@ -230,7 +230,7 @@ export default function AnalyticsHub({ token }) {
               {topAgents.map((agent, idx) => (
                 <div key={idx} className="flex items-center justify-between p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${agent.status === 'ACTIVE' ? 'bg-[#4ade80]' : 'bg-[#555]'}`} />
+                    <div className={`size-2 rounded-full ${agent.status === 'ACTIVE' ? 'bg-[#4ade80]' : 'bg-[#555]'}`} />
                     <span className="text-xs" style={{ color: 'var(--aurem-heading)' }}>{agent.name}</span>
                   </div>
                   <div className="flex items-center gap-4 text-[10px]">
@@ -249,8 +249,8 @@ export default function AnalyticsHub({ token }) {
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-xs tracking-wider" style={{ color: 'var(--aurem-body-secondary)' }}>CONVERSATION VOLUME (LAST 7 DAYS)</h3>
             <div className="flex items-center gap-4 text-[10px] text-[#555]">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#D4AF37]" /> AI Chat</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#D4AF37]/40" /> Total</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[#D4AF37]" /> AI Chat</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[#D4AF37]/40" /> Total</span>
             </div>
           </div>
           <div className="flex items-end gap-3 h-40">
@@ -290,7 +290,7 @@ export default function AnalyticsHub({ token }) {
               { insight: 'Scout Agent completed 18% more tasks this week. Consider scaling similar patterns', icon: TrendingUp, color: '#4ade80' }
             ].map((item, idx) => (
               <div key={idx} className="p-4 bg-white/60 rounded-lg border border-[#FF6B00]/20">
-                <item.icon className="w-4 h-4 mb-2" style={{ color: item.color }} />
+                <item.icon className="size-4 mb-2" style={{ color: item.color }} />
                 <p className="text-[11px] text-[#888] leading-relaxed">{item.insight}</p>
               </div>
             ))}

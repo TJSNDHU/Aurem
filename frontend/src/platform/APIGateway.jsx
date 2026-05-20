@@ -149,8 +149,8 @@ export default function APIGateway({ token }) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="api-gateway-loading">
         <div className="flex items-center gap-3 text-[#666]">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading API Gateway...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading API Gateway…</span>
         </div>
       </div>
     );
@@ -167,7 +167,7 @@ export default function APIGateway({ token }) {
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium bg-[#4ade80]/10 text-[#4ade80]">
-              <div className="w-1.5 h-1.5 bg-[#4ade80] rounded-full animate-pulse" />
+              <div className="size-1.5 bg-[#4ade80] rounded-full animate-pulse" />
               OPERATIONAL
             </div>
           </div>
@@ -184,7 +184,7 @@ export default function APIGateway({ token }) {
           ].map((stat, idx) => (
             <div key={idx} className="p-3.5 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
+                <stat.icon className="size-3.5" style={{ color: stat.color }} />
                 <span className="text-[9px] text-[#555] tracking-wider">{stat.label}</span>
               </div>
               <div className="text-xl font-semibold font-mono" style={{ color: stat.color }}>{stat.value}</div>
@@ -209,7 +209,7 @@ export default function APIGateway({ token }) {
                   : 'text-[#666] hover:text-[#555]'
               }`}
             >
-              <tab.icon className="w-3.5 h-3.5" />
+              <tab.icon className="size-3.5" />
               {tab.label}
             </button>
           ))}
@@ -219,7 +219,7 @@ export default function APIGateway({ token }) {
           <>
             {/* Search */}
             <div className="relative mb-6">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
+              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
               <input
                 type="text"
                 placeholder="Search endpoints..."
@@ -235,7 +235,7 @@ export default function APIGateway({ token }) {
               {filteredGroups.map((group, gIdx) => (
                 <div key={gIdx} className="bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-[#FF6B00]/20">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
+                    <div className="size-2 rounded-full" style={{ backgroundColor: group.color }} />
                     <h3 className="text-[11px] text-[#888] tracking-wider font-medium">{group.category.toUpperCase()}</h3>
                     <span className="text-[10px] text-[#555] ml-auto">{group.endpoints.length} endpoints</span>
                   </div>
@@ -255,12 +255,12 @@ export default function APIGateway({ token }) {
                         <code className="text-xs text-[#1A1A2E] font-mono flex-1">{ep.path}</code>
                         <span className="text-[10px] text-[#555] hidden group-hover:block">{ep.description}</span>
                         <span className="text-[10px] text-[#555] font-mono">{ep.rateLimit}</span>
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
+                        <div className="size-1.5 rounded-full bg-[#4ade80]" />
                         <button
                           onClick={(e) => { e.stopPropagation(); copyToClipboard(ep.path, `${gIdx}-${eIdx}`); }}
                           className="text-[#555] hover:text-[#D4AF37] transition-colors"
                         >
-                          {copied === `${gIdx}-${eIdx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copied === `${gIdx}-${eIdx}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                         </button>
                       </div>
                     ))}
@@ -280,7 +280,7 @@ export default function APIGateway({ token }) {
                 data-testid="add-webhook-btn"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-[#050505] font-semibold bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="size-3" />
                 Add Webhook
               </button>
             </div>
@@ -296,13 +296,13 @@ export default function APIGateway({ token }) {
                         ))}
                       </div>
                     </div>
-                    <div className="w-2 h-2 rounded-full bg-[#4ade80]" />
+                    <div className="size-2 rounded-full bg-[#4ade80]" />
                   </div>
                 ))}
               </div>
             ) : (
               <div className="p-10 text-center">
-                <Zap className="w-8 h-8 text-[#333] mx-auto mb-3" />
+                <Zap className="size-8 text-[#333] mx-auto mb-3" />
                 <p className="text-sm text-[#555]">No webhooks configured</p>
                 <p className="text-[11px] text-[#444] mt-1">Add a webhook to receive real-time event notifications</p>
               </div>
@@ -316,12 +316,12 @@ export default function APIGateway({ token }) {
               <div className="flex items-center gap-2">
                 <h3 className="text-xs text-[#555] tracking-wider">LIVE API REQUESTS</h3>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-[#4ade80]/10 text-[#4ade80]">
-                  <div className="w-1.5 h-1.5 bg-[#4ade80] rounded-full animate-pulse" />
+                  <div className="size-1.5 bg-[#4ade80] rounded-full animate-pulse" />
                   STREAMING
                 </div>
               </div>
               <button onClick={fetchRequestLogs} className="text-[#555] hover:text-[#D4AF37] transition-colors" data-testid="refresh-logs-btn">
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="size-3.5" />
               </button>
             </div>
             <div className="p-4 font-mono text-xs space-y-1.5 max-h-[400px] overflow-auto bg-white/60">
@@ -340,7 +340,7 @@ export default function APIGateway({ token }) {
                 );
               }) : (
                 <div className="text-center py-8 text-[#555]">
-                  <Activity className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                  <Activity className="size-6 mx-auto mb-2 opacity-50" />
                   <p className="text-xs">No request logs yet</p>
                 </div>
               )}
@@ -356,7 +356,7 @@ export default function APIGateway({ token }) {
             <div className="flex items-center justify-between p-5 border-b border-[#FF6B00]/20">
               <h3 className="text-sm font-medium text-[#1A1A2E]">Add Webhook</h3>
               <button onClick={() => setShowAddWebhook(false)} className="text-[#555] hover:text-[#555]">
-                <X className="w-5 h-5" />
+                <X className="size-5" />
               </button>
             </div>
             <div className="p-5 space-y-4">

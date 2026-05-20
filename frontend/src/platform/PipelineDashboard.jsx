@@ -107,7 +107,7 @@ function ExpandedRow({ run, token, onRetrigger }) {
           return (
             <div key={key} className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.6)', border: `1px solid ${color}33` }}>
               <div className="flex items-center gap-1.5 mb-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+                <div className="size-2.5 rounded-full" style={{ background: color }} />
                 <span className="text-xs font-semibold" style={{ color: 'var(--aurem-heading)' }}>{label}</span>
               </div>
               <div className="text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -136,7 +136,7 @@ function ExpandedRow({ run, token, onRetrigger }) {
       {run.final_status?.includes('abort') && (
         <div className="rounded-lg p-3 mb-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
           <div className="flex items-center gap-2 text-sm font-medium text-red-600">
-            <XCircle className="w-4 h-4" /> Aborted
+            <XCircle className="size-4" /> Aborted
           </div>
           {run.aborted_by && <div className="text-xs text-red-500 mt-1">By: {run.aborted_by}</div>}
           {run.aborted_at && <div className="text-xs text-red-500">At: {new Date(run.aborted_at).toLocaleString()}</div>}
@@ -150,7 +150,7 @@ function ExpandedRow({ run, token, onRetrigger }) {
           style={{ background: 'linear-gradient(135deg, #FF6B00, #22C55E)', color: '#fff' }}
           data-testid="pipeline-retrigger-btn"
         >
-          <Play className="w-3 h-3" /> Re-trigger
+          <Play className="size-3" /> Re-trigger
         </button>
       </div>
     </div>
@@ -250,7 +250,7 @@ export default function PipelineDashboard({ token }) {
           style={{ background: 'rgba(61,58,57,0.25)', color: 'var(--aurem-heading)' }}
           data-testid="pipeline-refresh-btn"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 
@@ -258,8 +258,8 @@ export default function PipelineDashboard({ token }) {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="aurem-glass-card p-4" data-testid="pipeline-active-count">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.15)' }}>
-              <Activity className="w-5 h-5" style={{ color: '#EAB308' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.15)' }}>
+              <Activity className="size-5" style={{ color: '#EAB308' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{activeRuns.length}</div>
@@ -269,8 +269,8 @@ export default function PipelineDashboard({ token }) {
         </div>
         <div className="aurem-glass-card p-4" data-testid="pipeline-completed-count">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
-              <CheckCircle className="w-5 h-5" style={{ color: '#22C55E' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
+              <CheckCircle className="size-5" style={{ color: '#22C55E' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{completedToday}</div>
@@ -280,8 +280,8 @@ export default function PipelineDashboard({ token }) {
         </div>
         <div className="aurem-glass-card p-4" data-testid="pipeline-aborted-count">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
-              <XCircle className="w-5 h-5" style={{ color: '#EF4444' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
+              <XCircle className="size-5" style={{ color: '#EF4444' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{abortedToday}</div>
@@ -340,11 +340,11 @@ export default function PipelineDashboard({ token }) {
 
         {loading && runs.length === 0 ? (
           <div className="flex items-center justify-center py-16" data-testid="pipeline-loading">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+            <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
           </div>
         ) : runs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16" data-testid="pipeline-empty">
-            <Activity className="w-10 h-10 mb-3" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.4 }} />
+            <Activity className="size-10 mb-3" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.4 }} />
             <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>No pipeline runs yet</p>
             <p className="text-xs mt-1" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.7 }}>
               Trigger a pipeline from Optimization or use the API
@@ -381,7 +381,7 @@ export default function PipelineDashboard({ token }) {
                   </div>
                   <StageBoxes stages={run.stages} />
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full" style={{ background: badge.color }} />
+                    <div className="size-2 rounded-full" style={{ background: badge.color }} />
                     <span className="text-xs font-medium" style={{ color: badge.color }}>{badge.label}</span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -393,16 +393,16 @@ export default function PipelineDashboard({ token }) {
                         data-testid={`pipeline-abort-${run.run_id}`}
                       >
                         {abortLoading === run.run_id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+                          <Loader2 className="size-3.5 animate-spin text-red-500" />
                         ) : (
-                          <Square className="w-3.5 h-3.5 text-red-500" />
+                          <Square className="size-3.5 text-red-500" />
                         )}
                       </button>
                     )}
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+                      <ChevronUp className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
                     ) : (
-                      <ChevronDown className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+                      <ChevronDown className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
                     )}
                   </div>
                 </div>

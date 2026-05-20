@@ -72,6 +72,7 @@ import AdminBusinessIds from './platform/AdminBusinessIds';
 import FrameworkMap from './platform/FrameworkMap';
 import SystemOverviewPublic from './platform/SystemOverviewPublic';
 import SEOAuditPage from './platform/SEOAuditPage';
+import FreeSeoAudit from './platform/FreeSeoAudit';
 import AdminRootCommand from './platform/AdminRootCommand';
 import AuditLiveDashboard from './platform/admin/AuditLiveDashboard';
 import AdminStemFix from './platform/AdminStemFix';
@@ -210,14 +211,14 @@ import ORAWidget from './components/ORAWidget';
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-[#050505] flex items-center justify-center">
     <div className="text-center">
-      <div className="relative w-16 h-16 mx-auto">
-        <div className="w-16 h-16 border-2 border-[#D4AF37]/20 rounded-full"></div>
-        <div className="absolute top-0 left-0 w-16 h-16 border-2 border-transparent border-t-[#D4AF37] rounded-full animate-spin"></div>
+      <div className="relative size-16 mx-auto">
+        <div className="size-16 border-2 border-[#D4AF37]/20 rounded-full"></div>
+        <div className="absolute top-0 left-0 size-16 border-2 border-transparent border-t-[#D4AF37] rounded-full animate-spin"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <div className="w-3 h-3 bg-[#D4AF37] rounded-full animate-pulse"></div>
+          <div className="size-3 bg-[#D4AF37] rounded-full animate-pulse"></div>
         </div>
       </div>
-      <p className="mt-4 text-sm text-[#666]">Initializing AUREM...</p>
+      <p className="mt-4 text-sm text-[#666]">Initializing AUREM…</p>
     </div>
   </div>
 );
@@ -274,6 +275,9 @@ function AppRouter() {
       
       {/* Pricing */}
       <Route path="/pricing" element={<PricingPage />} />
+
+      {/* Public revenue funnel — free audit → paid auto-fix */}
+      <Route path="/free-seo-audit" element={<FreeSeoAudit />} />
       
       {/* Legal & Compliance */}
       <Route path="/privacy" element={<PrivacyPolicy />} />

@@ -63,14 +63,14 @@ export default function Day7UpsellModal({ isOpen, onClose, trial, onUpgrade }) {
           className="absolute top-6 right-6 text-slate-400 hover:text-slate-200 transition-colors"
           data-testid="day7-close"
         >
-          <X className="w-6 h-6" />
+          <X className="size-6" />
         </button>
 
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="w-8 h-8 text-amber-400" />
+            <Sparkles className="size-8 text-amber-400" />
             <h2 className="text-3xl font-bold text-white">
-              Day 7 — half-way through your AUREM trial
+              Day 7, half-way through your AUREM trial
             </h2>
           </div>
           <p className="text-slate-300 text-lg ml-11">
@@ -97,7 +97,7 @@ export default function Day7UpsellModal({ isOpen, onClose, trial, onUpgrade }) {
               <ul className="space-y-3 mb-6 flex-grow">
                 {tier.features.map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-slate-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="size-5 text-emerald-400 flex-shrink-0 mt-0.5" />
                     <span className="text-sm">{feature}</span>
                   </li>
                 ))}

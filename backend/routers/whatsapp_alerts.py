@@ -190,18 +190,18 @@ async def send_whatsapp_media(phone: str, media_url: str, caption: str = "") -> 
 TEMPLATES = {
     "order_confirmed": """✨ *Order Confirmed* ✨
 
-Hi {name}! Your ReRoots order #{order_id} has been received.
+Hi {name}! Your AUREM order #{order_id} has been received.
 
 📦 *Items:* {items}
 💰 *Total:* ${total:.2f} CAD
 
 We're preparing your biotech skincare with care. You'll receive tracking info once shipped.
 
-Thank you for choosing ReRoots! 🌿""",
+Thank you for choosing AUREM! 🌿""",
 
     "order_shipped": """🚚 *Your Order Has Shipped!*
 
-Hi {name}! Great news — your ReRoots order #{order_id} is on the way!
+Hi {name}! Great news — your AUREM order #{order_id} is on the way!
 
 📦 *Carrier:* {carrier}
 🔗 *Track:* {tracking_link}
@@ -211,13 +211,13 @@ Questions? Reply to this message anytime.""",
 
     "order_delivered": """🎉 *Package Delivered!*
 
-Hi {name}! Your ReRoots order #{order_id} has been delivered.
+Hi {name}! Your AUREM order #{order_id} has been delivered.
 
 We hope you love your new skincare! For best results, follow the usage instructions included.
 
 💬 Questions about your products? Just reply here!
 
-Enjoying ReRoots? Share your glow: @rerootscanada""",
+Enjoying AUREM? Share your glow: @rerootscanada""",
 
     "abandoned_cart_1": """Hey {name} 👋
 
@@ -288,7 +288,7 @@ Action needed: Restock immediately.""",
 
 View details in admin panel.""",
 
-    "welcome": """🌿 *Welcome to ReRoots!*
+    "welcome": """🌿 *Welcome to AUREM!*
 
 Hi {name}! Thanks for joining our skincare family.
 
@@ -296,7 +296,7 @@ You've earned *{points} loyalty points* to start!
 
 Discover biotech skincare that works at the cellular level.
 
-👉 Explore: reroots.ca/app
+👉 Explore: aurem.live/app
 
 Questions? Just reply here!""",
 
@@ -307,7 +307,7 @@ It's your special day, and we have a gift!
 🎁 *{bonus_points} bonus points* added to your account
 
 Treat yourself to something special:
-👉 reroots.ca/app
+👉 aurem.live/app
 
 Have a wonderful birthday! 🎉""",
 
@@ -318,7 +318,7 @@ You've been upgraded to *{tier}* status!
 Your new perks:
 {perks}
 
-Thank you for being part of ReRoots! 🌿"""
+Thank you for being part of AUREM! 🌿"""
 }
 
 
@@ -342,7 +342,7 @@ class AbandonedCartAlertRequest(BaseModel):
     phone: str = Field(...)
     name: str = Field(default="there")
     items: str = Field(...)
-    cart_link: str = Field(default="https://reroots.ca/cart")
+    cart_link: str = Field(default="https://aurem.live/cart")
     sequence: int = Field(default=1, description="1=gentle, 2=discount, 3=urgency")
 
 
@@ -350,7 +350,7 @@ class PromoRequest(BaseModel):
     phones: List[str] = Field(..., description="List of phone numbers")
     headline: str = Field(...)
     message: str = Field(...)
-    link: str = Field(default="https://reroots.ca/app")
+    link: str = Field(default="https://aurem.live/app")
 
 
 class RestockAlertRequest(BaseModel):
@@ -358,7 +358,7 @@ class RestockAlertRequest(BaseModel):
     name: str = Field(default="there")
     product: str = Field(...)
     stock: int = Field(default=10)
-    link: str = Field(default="https://reroots.ca/app")
+    link: str = Field(default="https://aurem.live/app")
 
 
 class LowStockAdminRequest(BaseModel):
@@ -559,7 +559,7 @@ async def notify_restock_waitlist(product_id: str, product_name: str, stock: int
                     name=name,
                     product=product_name,
                     stock=stock,
-                    link=f"https://reroots.ca/app?product={product_id}"
+                    link=f"https://aurem.live/app?product={product_id}"
                 ))
                 
                 if result.get("success"):

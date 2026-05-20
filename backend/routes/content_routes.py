@@ -1,5 +1,5 @@
 """
-Content Routes for Reroots
+Content Routes for AUREM
 API endpoints for AI content generation
 """
 

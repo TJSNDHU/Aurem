@@ -18,9 +18,9 @@ const fmtDur = (s) => {
 };
 
 const sentimentIcon = (s) => {
-  if (s === 'positive') return <Smile className="w-4 h-4 text-green-500" />;
-  if (s === 'neutral') return <Meh className="w-4 h-4 text-yellow-500" />;
-  if (s === 'negative') return <Frown className="w-4 h-4 text-red-500" />;
+  if (s === 'positive') return <Smile className="size-4 text-green-500" />;
+  if (s === 'neutral') return <Meh className="size-4 text-yellow-500" />;
+  if (s === 'negative') return <Frown className="size-4 text-red-500" />;
   return <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>;
 };
 
@@ -70,7 +70,7 @@ export default function CallLogsFeed({ token }) {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Phone className="w-7 h-7 text-[#FF6B00]" />
+            <Phone className="size-7 text-[#FF6B00]" />
             <div>
               <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Call Logs</h1>
               <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -84,21 +84,21 @@ export default function CallLogsFeed({ token }) {
             style={{ background: 'rgba(255,107,0,0.12)', color: '#FF6B00' }}
             data-testid="call-logs-refresh"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
 
         <div className="grid grid-cols-4 gap-4 mb-6">
           <StatCard label="Completed (24h)" value={summary.completed_24h ?? 0} color="#16a34a" testid="call-stat-completed" />
-          <StatCard label="Active Now" value={summary.active ?? 0} color="#3b82f6" testid="call-stat-active" icon={<Radio className="w-4 h-4 text-blue-400 animate-pulse" />} />
+          <StatCard label="Active Now" value={summary.active ?? 0} color="#3b82f6" testid="call-stat-active" icon={<Radio className="size-4 text-blue-400 animate-pulse" />} />
           <StatCard label="Queued" value={summary.queued ?? 0} color="#eab308" testid="call-stat-queued" />
           <StatCard label="All Time" value={summary.total_all_time ?? 0} color="#FF6B00" testid="call-stat-total" />
         </div>
 
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--aurem-body-secondary)' }} />
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--aurem-body-secondary)' }} />
             <input
               type="text"
               placeholder="Search by phone or persona…"

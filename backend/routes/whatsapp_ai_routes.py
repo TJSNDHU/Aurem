@@ -76,7 +76,7 @@ class AISettings(BaseModel):
 
 
 class BrandVoiceConfig(BaseModel):
-    brand_name: str = "ReRoots"
+    brand_name: str = "AUREM"
     tone: str = "friendly and knowledgeable"
     personality_traits: List[str] = ["helpful", "skincare-expert", "warm"]
     key_phrases: List[str] = []

@@ -58,7 +58,7 @@ export default function CustomerReviews({ ctx }) {
           <button data-testid="review-refresh" onClick={load} style={iconBtn}><RefreshCw size={14}/></button>
         </div>
         {loading ? (
-          <p style={{fontSize:12,color:'#8A8070'}}>Loading...</p>
+          <p style={{fontSize:12,color:'#8A8070'}}>Loading…</p>
         ) : (data.reviews || []).length === 0 ? (
           <p style={{fontSize:12,color:'#8A8070'}}>No reviews yet. Click below to send review requests to your latest customers.</p>
         ) : (

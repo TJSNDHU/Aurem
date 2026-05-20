@@ -23,12 +23,12 @@ const StatCard = ({ label, value, sub, icon: Icon, color, pulse }) => (
   <div className="p-4 rounded-xl border relative overflow-hidden" style={{ background: 'var(--aurem-card-bg)', borderColor: 'var(--aurem-border)' }}
     data-testid={`stat-${label.toLowerCase().replace(/\s/g, '-')}`}>
     <div className="flex items-center justify-between mb-2">
-      <Icon className="w-4 h-4" style={{ color }} />
+      <Icon className="size-4" style={{ color }} />
       <span className="text-[9px] tracking-[0.15em] uppercase font-bold" style={{ color: 'var(--aurem-body-secondary)' }}>{label}</span>
     </div>
     <div className="text-2xl font-bold font-mono" style={{ color }}>{value}</div>
     {sub && <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: 'var(--aurem-body-secondary)' }}>
-      {pulse && <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: color }} />}
+      {pulse && <span className="size-1.5 rounded-full inline-block animate-pulse" style={{ background: color }} />}
       {sub}
     </p>}
   </div>
@@ -63,7 +63,7 @@ const TraceRow = ({ trace, expanded, onToggle }) => {
           </div>
         </td>
         <td className="px-4 py-3 text-[10px]" style={{ color: 'var(--aurem-body-secondary)' }}>{date} {time}</td>
-        <td className="px-4 py-3">{expanded ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#D4AF37' }} /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />}</td>
+        <td className="px-4 py-3">{expanded ? <ChevronDown className="size-3.5" style={{ color: '#D4AF37' }} /> : <ChevronRight className="size-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />}</td>
       </tr>
       {expanded && (
         <tr>
@@ -78,8 +78,8 @@ const TraceRow = ({ trace, expanded, onToggle }) => {
                 const stepOk = step.status === 'success';
                 return (
                   <div key={i} className="flex items-start gap-3 py-2 px-3 rounded-lg" style={{ background: stepOk ? 'rgba(34,197,94,0.03)' : 'rgba(239,68,68,0.05)' }}>
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: stepOk ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)' }}>
-                      {stepOk ? <CheckCircle className="w-3 h-3 text-green-400" /> : <XCircle className="w-3 h-3 text-red-400" />}
+                    <div className="size-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: stepOk ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)' }}>
+                      {stepOk ? <CheckCircle className="size-3 text-green-400" /> : <XCircle className="size-3 text-red-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ const AgentObservatory = ({ token }) => {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center" style={{ background: 'transparent' }}>
-      <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37]" />
+      <Loader2 className="size-8 animate-spin text-[#D4AF37]" />
     </div>
   );
 
@@ -173,7 +173,7 @@ const AgentObservatory = ({ token }) => {
             Agent Observatory
           </h1>
           <p className="text-xs mt-1" style={{ color: 'var(--aurem-body-secondary)' }}>
-            Production monitoring — auto-refreshes every 30s
+            Production monitoring, auto-refreshes every 30s
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -187,7 +187,7 @@ const AgentObservatory = ({ token }) => {
           <button onClick={() => { fetchAll(); fetchTraces(); }} data-testid="refresh-observatory-btn"
             className="p-2 rounded-lg border transition-all hover:scale-[1.02]"
             style={{ borderColor: 'var(--aurem-border)', color: 'var(--aurem-body-secondary)' }}>
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="size-3.5" />
           </button>
         </div>
       </div>
@@ -209,7 +209,7 @@ const AgentObservatory = ({ token }) => {
       {/* Activity Chart */}
       <div className="p-5 rounded-xl border" style={{ background: 'var(--aurem-card-bg)', borderColor: 'var(--aurem-border)' }} data-testid="activity-chart">
         <h3 className="text-sm font-bold tracking-widest uppercase mb-4" style={{ color: 'var(--aurem-body-secondary)' }}>
-          Pipeline Activity — Last 24 Hours
+          Pipeline Activity, Last 24 Hours
         </h3>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
@@ -259,7 +259,7 @@ const AgentObservatory = ({ token }) => {
               {traces.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-16 text-center" style={{ color: 'var(--aurem-body-secondary)' }}>
-                    <Eye className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                    <Eye className="size-8 mx-auto mb-3 opacity-30" />
                     <p className="text-sm font-medium mb-1">No traces yet</p>
                     <p className="text-[11px]">Click "Load Demo Data" or run a pipeline to see agent traces.</p>
                   </td>

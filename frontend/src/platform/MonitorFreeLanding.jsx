@@ -79,7 +79,7 @@ export default function MonitorFreeLanding() {
   return (
     <>
       <Helmet>
-        <title>Free Website Monitoring | AUREM — 7 Days, No Credit Card</title>
+        <title>Free Website Monitoring | AUREM, 7 Days, No Credit Card</title>
         <meta name="description" content="24×7 uptime monitoring for your website. Get email alerts when your site goes down. 7-day free trial, no credit card required." />
         <meta property="og:title" content="AUREM — Free Website Uptime Monitoring" />
         <meta property="og:description" content="24×7 monitoring with instant downtime alerts. Free 7-day trial." />

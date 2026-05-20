@@ -29,9 +29,9 @@ const PromoPopup = ({ settings }) => {
           {/* Close button */}
           <button 
             onClick={(e) => { e.stopPropagation(); setIsVisible(false); }}
-            className="absolute -top-2 -right-2 bg-black/80 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black z-10"
+            className="absolute -top-2 -right-2 bg-black/80 text-white rounded-full size-6 flex items-center justify-center hover:bg-black z-10"
           >
-            <X className="h-3 w-3" />
+            <X className="size-3" />
           </button>
           
           {/* Badge - Gold gradient for founding member */}
@@ -44,7 +44,7 @@ const PromoPopup = ({ settings }) => {
             >
               <div className="text-center text-[#2D2A2E]">
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="size-4" />
                   <p className="text-xs font-bold tracking-wider">FOUNDING</p>
                 </div>
                 <p className="text-xs font-bold tracking-wider mb-1">MEMBER</p>
@@ -73,14 +73,14 @@ const PromoPopup = ({ settings }) => {
             {/* Close button */}
             <button 
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsVisible(false); }}
-              className="absolute -top-2 -right-2 bg-black/80 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black z-10"
+              className="absolute -top-2 -right-2 bg-black/80 text-white rounded-full size-5 flex items-center justify-center hover:bg-black z-10"
             >
-              <X className="h-3 w-3" />
+              <X className="size-3" />
             </button>
             
             <div className="flex items-center gap-3">
               <div className="p-2 bg-black/10 rounded-lg">
-                <Sparkles className="h-5 w-5 text-[#2D2A2E]" />
+                <Sparkles className="size-5 text-[#2D2A2E]" />
               </div>
               <div>
                 <p className="text-xs font-bold text-[#2D2A2E] tracking-wide">FOUNDING MEMBER</p>
@@ -90,7 +90,7 @@ const PromoPopup = ({ settings }) => {
             
             <div className="flex items-center gap-1 bg-[#2D2A2E] text-white px-3 py-2 rounded-lg">
               <span className="text-xs font-bold">Join</span>
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="size-4" />
             </div>
           </div>
         </Link>

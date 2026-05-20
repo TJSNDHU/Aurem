@@ -1,5 +1,5 @@
 """
-ReRoots AI Platform - Commercial AI Crews Service
+AUREM AI Platform - Commercial AI Crews Service
 The all-in-one AI platform with Voice, WhatsApp, Email, Chat + AI Crews
 """
 

@@ -323,8 +323,8 @@ export default function AdminCaseStudy() {
           <div style={{ ...s.card, marginTop: 14 }}>
             <div style={s.cardHead}>Report Period</div>
             <select value={reportType} onChange={(e) => setReportType(e.target.value)} style={s.select} data-testid="cs-period-type">
-              <option value="monthly">Monthly — last 30 days</option>
-              <option value="quarterly">Quarterly — last 90 days</option>
+              <option value="monthly">Monthly, last 30 days</option>
+              <option value="quarterly">Quarterly, last 90 days</option>
               <option value="custom">Custom date range</option>
             </select>
             {reportType === "custom" && (

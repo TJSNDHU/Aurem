@@ -1,7 +1,7 @@
 """
 Web Search Service for WhatsApp AI Fallback
 ═══════════════════════════════════════════════════════════════════
-Searches the web for reroots.ca related content when RAG confidence is low.
+Searches the web for aurem.live related content when RAG confidence is low.
 Uses multiple fallback methods for reliability.
 ═══════════════════════════════════════════════════════════════════
 """
@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 # Search configuration
 SEARCH_TIMEOUT = 10  # seconds
 MAX_RESULTS = 3
-SITE_DOMAIN = "reroots.ca"
+SITE_DOMAIN = "aurem.live"
 
 # Static fallback knowledge for common queries
 STATIC_KNOWLEDGE = {
     "shipping": """
-ReRoots Shipping Policy:
+AUREM Shipping Policy:
 - FREE shipping on orders $75+ within Canada
 - Standard shipping: 5-7 business days
 - Express shipping: 2-3 business days (additional fee)
@@ -32,22 +32,22 @@ ReRoots Shipping Policy:
 - International shipping available (contact for rates)
 """,
     "return": """
-ReRoots Return Policy:
+AUREM Return Policy:
 - 30-day return window for unopened products
 - Products must be in original packaging
-- Contact support@reroots.ca to initiate return
+- Contact support@aurem.live to initiate return
 - Refunds processed within 5-7 business days
 - Opened products may be exchanged if defective
 """,
     "contact": """
-ReRoots Contact Information:
-- Email: support@reroots.ca
-- Website: https://reroots.ca
+AUREM Contact Information:
+- Email: support@aurem.live
+- Website: https://aurem.live
 - Business Hours: Mon-Fri 9am-6pm EST
 - Location: Canada
 """,
     "free shipping": """
-ReRoots offers FREE shipping on orders $75+ within Canada.
+AUREM offers FREE shipping on orders $75+ within Canada.
 Standard delivery takes 5-7 business days.
 """,
 }
@@ -55,7 +55,7 @@ Standard delivery takes 5-7 business days.
 
 async def search_web_for_reroots(query: str) -> str:
     """
-    Search for reroots.ca-related information.
+    Search for aurem.live-related information.
     
     Uses a cascading approach:
     1. Check static knowledge base for common queries
@@ -153,7 +153,7 @@ async def _searxng_search(query: str) -> List[Dict[str, Any]]:
                             "engines": "google,bing"
                         },
                         headers={
-                            "User-Agent": "Mozilla/5.0 (compatible; RerootsBot/1.0)"
+                            "User-Agent": "Mozilla/5.0 (compatible; AUREMBot/1.0)"
                         }
                     )
                     
@@ -215,10 +215,10 @@ def _get_fallback_guidance(query: str) -> str:
     
     # Detect intent and provide appropriate guidance
     if any(w in query_lower for w in ["ship", "deliver", "arrive"]):
-        return f"--- GENERAL GUIDANCE ---\nFor shipping questions, customers should check reroots.ca/shipping or email support@reroots.ca for specific delivery times."
+        return f"--- GENERAL GUIDANCE ---\nFor shipping questions, customers should check aurem.live/shipping or email support@aurem.live for specific delivery times."
     
     if any(w in query_lower for w in ["return", "refund", "exchange"]):
-        return f"--- GENERAL GUIDANCE ---\nFor returns or refunds, customers should email support@reroots.ca with their order number."
+        return f"--- GENERAL GUIDANCE ---\nFor returns or refunds, customers should email support@aurem.live with their order number."
     
     if any(w in query_lower for w in ["price", "cost", "pay"]):
         return f"--- GENERAL GUIDANCE ---\nFor pricing questions, refer to the product database. All prices are in CAD."

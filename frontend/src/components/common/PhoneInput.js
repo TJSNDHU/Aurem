@@ -198,7 +198,7 @@ const PhoneInput = ({
         >
           <span className="text-lg mr-1">{selectedCountry?.flag || '🌍'}</span>
           <span className="text-sm font-mono">{selectedCountry?.phoneCode || '+1'}</span>
-          <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+          <ChevronDown className="size-3 ml-1 opacity-50" />
         </Button>
 
         {/* Phone Number Input */}

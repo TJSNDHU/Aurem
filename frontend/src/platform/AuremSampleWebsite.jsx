@@ -172,7 +172,7 @@ const HeroAnimation = ({ kind, accent }) => {
     window.addEventListener('resize', onResize);
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); };
   }, [kind, accent]);
-  return <canvas ref={ref} className="absolute inset-0 w-full h-full pointer-events-none" />;
+  return <canvas ref={ref} className="absolute inset-0 size-full pointer-events-none" />;
 };
 
 const hexToRgb = (hex) => {
@@ -196,7 +196,7 @@ const DismissibleDemoBanner = ({ theme }) => {
         color: theme.accent,
         border: `1px solid ${theme.accent}55`,
       }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: theme.accent }} />
+      <span className="size-1.5 rounded-full" style={{ background: theme.accent }} />
       <span>PREVIEW</span>
       <button
         onClick={() => setVisible(false)}
@@ -321,7 +321,7 @@ const AuremSampleWebsite = () => {
               <p className="text-sm text-white/60 mb-4">
                 Hand-crafting <strong>{site?.business?.name || slug}</strong>. This takes 30–60 seconds.
               </p>
-              <div className="w-10 h-10 mx-auto rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin" />
+              <div className="size-10 mx-auto rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin" />
               <p className="text-xs text-white/40 mt-6">Auto-refreshing every 5s.</p>
             </>
           )}
@@ -333,7 +333,7 @@ const AuremSampleWebsite = () => {
   if (!site) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0A', color: '#fff' }} data-testid="sample-loading">
-        <div className="w-10 h-10 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin" />
+        <div className="size-10 rounded-full border-2 border-[#C9A227]/20 border-t-[#C9A227] animate-spin" />
       </div>
     );
   }
@@ -385,7 +385,7 @@ const AuremSampleWebsite = () => {
         <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-10 pt-20 pb-16 md:pt-28 text-center">
           <div className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] font-semibold mb-6"
             style={{ color: theme.accent, border: `1px solid ${theme.accent}55`, borderRadius: 999, padding: '6px 16px' }}>
-            <MapPin className="w-3 h-3" />
+            <MapPin className="size-3" />
             SERVING {(business.city || 'YOUR AREA').toUpperCase()} &amp; SURROUNDING AREAS
           </div>
           <h1 className="font-bold mb-5" style={{ fontSize: 'clamp(2.4rem, 7vw, 5rem)', lineHeight: 1.08 }}>
@@ -399,19 +399,19 @@ const AuremSampleWebsite = () => {
               <a href={`tel:${phoneClean}`} data-testid="hero-cta-call"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm tracking-wider transition-all hover:scale-[1.03]"
                 style={{ background: theme.accent, color: isDarkHex(theme.accent) ? '#fff' : '#000' }}>
-                <Phone className="w-4 h-4" /> CALL NOW
+                <Phone className="size-4" /> CALL NOW
               </a>
             )}
             {phoneClean && (
               <a href={`https://wa.me/${phoneClean.replace('+','')}`} target="_blank" rel="noopener noreferrer" data-testid="hero-cta-whatsapp"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm tracking-wider border transition-all hover:scale-[1.03]"
                 style={{ borderColor: theme.accent, color: theme.accent }}>
-                <MessageCircle className="w-4 h-4" /> WHATSAPP US
+                <MessageCircle className="size-4" /> WHATSAPP US
               </a>
             )}
           </div>
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce opacity-60">
-            <ChevronDown className="w-6 h-6" style={{ color: theme.accent }} />
+            <ChevronDown className="size-6" style={{ color: theme.accent }} />
           </div>
         </div>
       </section>
@@ -434,8 +434,8 @@ const AuremSampleWebsite = () => {
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.boxShadow = `0 12px 32px ${theme.accent}26`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = borderCol; e.currentTarget.style.boxShadow = 'none'; }}>
-                  <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-4" style={{ background: `${theme.accent}22` }}>
-                    <Icon className="w-6 h-6" style={{ color: theme.accent }} />
+                  <div className="size-12 rounded-lg flex items-center justify-center mb-4" style={{ background: `${theme.accent}22` }}>
+                    <Icon className="size-6" style={{ color: theme.accent }} />
                   </div>
                   <h3 className="font-bold text-lg mb-2">{s.name}</h3>
                   <p className="text-sm" style={{ color: muted }}>{s.description}</p>
@@ -459,9 +459,9 @@ const AuremSampleWebsite = () => {
               return (
                 <div key={i} data-testid={`why-${i}`} className="text-center p-5 rounded-xl border"
                   style={{ background: cardBg, borderColor: borderCol }}>
-                  <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-3"
+                  <div className="size-12 mx-auto rounded-full flex items-center justify-center mb-3"
                     style={{ background: `${theme.accent}22` }}>
-                    <Icon className="w-5 h-5" style={{ color: theme.accent }} />
+                    <Icon className="size-5" style={{ color: theme.accent }} />
                   </div>
                   <div className="text-sm font-semibold">{w.text}</div>
                 </div>
@@ -483,7 +483,7 @@ const AuremSampleWebsite = () => {
             {isVerifiedReviews && reviewsAggregate && (
               <div data-testid="reviews-verified-badge" className="mt-4 inline-flex items-center gap-2 text-[11px] tracking-[0.2em] font-semibold"
                 style={{ color: theme.accent, border: `1px solid ${theme.accent}55`, borderRadius: 999, padding: '6px 16px' }}>
-                <Check className="w-3 h-3" />
+                <Check className="size-3" />
                 VERIFIED
                 {reviewsAggregate.aggregate_rating && (
                   <span>· {reviewsAggregate.aggregate_rating}</span>
@@ -501,7 +501,7 @@ const AuremSampleWebsite = () => {
                 <div className="flex gap-0.5 mb-3 items-center justify-between">
                   <div className="flex gap-0.5">
                     {Array.from({ length: r.rating || 5 }).map((_, k) => (
-                      <Star key={k} className="w-4 h-4 fill-current" style={{ color: theme.accent }} />
+                      <Star key={k} className="size-4 fill-current" style={{ color: theme.accent }} />
                     ))}
                   </div>
                   {r.source === 'google' && (
@@ -533,7 +533,7 @@ const AuremSampleWebsite = () => {
             <div className="space-y-4">
               {business.location && (
                 <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 mt-1 shrink-0" style={{ color: theme.accent }} />
+                  <MapPin className="size-5 mt-1 shrink-0" style={{ color: theme.accent }} />
                   <div>
                     <div className="text-[10px] tracking-widest font-semibold mb-1" style={{ color: theme.accent }}>ADDRESS</div>
                     <div>{business.location}</div>
@@ -542,7 +542,7 @@ const AuremSampleWebsite = () => {
               )}
               {business.phone && (
                 <a href={`tel:${phoneClean}`} className="flex items-start gap-3 hover:opacity-80" data-testid="contact-phone">
-                  <Phone className="w-5 h-5 mt-1 shrink-0" style={{ color: theme.accent }} />
+                  <Phone className="size-5 mt-1 shrink-0" style={{ color: theme.accent }} />
                   <div>
                     <div className="text-[10px] tracking-widest font-semibold mb-1" style={{ color: theme.accent }}>PHONE</div>
                     <div>{business.phone}</div>
@@ -550,7 +550,7 @@ const AuremSampleWebsite = () => {
                 </a>
               )}
               <div className="flex items-start gap-3">
-                <Clock className="w-5 h-5 mt-1 shrink-0" style={{ color: theme.accent }} />
+                <Clock className="size-5 mt-1 shrink-0" style={{ color: theme.accent }} />
                 <div>
                   <div className="text-[10px] tracking-widest font-semibold mb-1" style={{ color: theme.accent }}>HOURS</div>
                   <div style={{ color: muted }}>Mon–Fri · 8am – 6pm<br />Sat · 9am – 4pm<br />Sun · Closed</div>
@@ -561,7 +561,7 @@ const AuremSampleWebsite = () => {
                   data-testid="contact-whatsapp"
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs tracking-wider transition-all hover:scale-[1.03] mt-3"
                   style={{ background: theme.accent, color: isDarkHex(theme.accent) ? '#fff' : '#000' }}>
-                  <MessageCircle className="w-4 h-4" /> MESSAGE US ON WHATSAPP
+                  <MessageCircle className="size-4" /> MESSAGE US ON WHATSAPP
                 </a>
               )}
             </div>

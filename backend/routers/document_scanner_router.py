@@ -1,5 +1,5 @@
 """
-ReRoots AI Document Scanner Router
+AUREM AI Document Scanner Router
 OCR and data extraction from documents, lab reports, invoices
 """
 

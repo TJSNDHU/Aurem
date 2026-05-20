@@ -1,5 +1,5 @@
 """
-Data Encryption Utilities for Reroots
+Data Encryption Utilities for AUREM
 Provides Fernet symmetric encryption for sensitive customer data.
 Uses ENCRYPTION_KEY from environment variables.
 """

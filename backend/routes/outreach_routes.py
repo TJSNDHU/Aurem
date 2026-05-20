@@ -1,5 +1,5 @@
 """
-Proactive Outreach Admin Routes for Reroots
+Proactive Outreach Admin Routes for AUREM
 Admin endpoints to test and manage proactive AI outreach.
 """
 

@@ -1,5 +1,5 @@
 """
-ReRoots AI RAG Knowledge Base Router
+AUREM AI RAG Knowledge Base Router
 =====================================
 API endpoints for managing the RAG Knowledge Base and AI Consultant.
 """

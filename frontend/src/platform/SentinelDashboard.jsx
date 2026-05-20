@@ -121,20 +121,20 @@ export default function SentinelDashboard({ token }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(61,58,57,0.15)' }}>
-              <Shield className="w-5 h-5 text-[#FF6B00]" />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(61,58,57,0.15)' }}>
+              <Shield className="size-5 text-[#FF6B00]" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-[#1A1A2E] tracking-wider" data-testid="sentinel-title">Sentinel</h1>
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-[#4ade80] animate-pulse' : 'bg-[#FF6B6B]'}`} />
+                <span className={`size-2 rounded-full ${isRunning ? 'bg-[#4ade80] animate-pulse' : 'bg-[#FF6B6B]'}`} />
                 <span className="text-[10px] text-[#888]">{isRunning ? 'Autonomous Loop Active' : 'Loop Stopped'}</span>
               </div>
             </div>
           </div>
           <button onClick={triggerCycle} disabled={triggering} data-testid="trigger-cycle-btn"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold bg-[#FF6B00] text-white hover:opacity-90 transition-all disabled:opacity-50">
-            <Play className={`w-3.5 h-3.5 ${triggering ? 'animate-spin' : ''}`} />
+            <Play className={`size-3.5 ${triggering ? 'animate-spin' : ''}`} />
             {triggering ? 'Running...' : 'Trigger Cycle'}
           </button>
         </div>
@@ -142,8 +142,8 @@ export default function SentinelDashboard({ token }) {
         {/* Tab Switcher */}
         <div className="flex gap-1 mb-6 p-1 bg-white/50 backdrop-blur-sm rounded-xl border border-white/40 w-fit" data-testid="sentinel-tabs">
           {[
-            { id: 'health', label: 'System Health', icon: <Shield className="w-3.5 h-3.5" /> },
-            { id: 'cost', label: 'Cost Savings', icon: <Zap className="w-3.5 h-3.5" /> },
+            { id: 'health', label: 'System Health', icon: <Shield className="size-3.5" /> },
+            { id: 'cost', label: 'Cost Savings', icon: <Zap className="size-3.5" /> },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} data-testid={`tab-${tab.id}`}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
@@ -158,16 +158,16 @@ export default function SentinelDashboard({ token }) {
 
         {loading ? (
           <div className="text-center py-12">
-            <Activity className="w-6 h-6 animate-spin text-[#888] mx-auto mb-2" />
-            <span className="text-xs text-[#888]">Loading Sentinel data...</span>
+            <Activity className="size-6 animate-spin text-[#888] mx-auto mb-2" />
+            <span className="text-xs text-[#888]">Loading Sentinel data…</span>
           </div>
         ) : !status ? (
           <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="sentinel-empty-state">
-            <Shield className="w-10 h-10 text-[#888]" style={{ opacity: 0.3 }} />
+            <Shield className="size-10 text-[#888]" style={{ opacity: 0.3 }} />
             <h2 className="text-lg font-bold mt-4 text-[#1A1A2E]">No data yet</h2>
             <p className="text-xs mt-1 text-[#888]">Sentinel monitoring data will appear here once the system starts collecting.</p>
             <button onClick={fetchAll} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-[#888] hover:text-[#1A1A2E] transition-colors" style={{ background: 'rgba(128,128,128,0.08)' }} data-testid="sentinel-retry-btn">
-              <RefreshCw className="w-3.5 h-3.5" /> Retry
+              <RefreshCw className="size-3.5" /> Retry
             </button>
           </div>
         ) : (
@@ -180,14 +180,14 @@ export default function SentinelDashboard({ token }) {
                 <HealthGauge score={healthScore} />
               </div>
               <div className="col-span-2 grid grid-cols-2 gap-3">
-                <StatCard icon={<RefreshCw className="w-4 h-4" />} label="Cycle" value={status?.cycle_number || 0} sub="Current cycle" color="#FF6B00" testid="cycle-count" />
-                <StatCard icon={<AlertTriangle className="w-4 h-4" />} label="Issues" value={status?.issues_count || 0} sub="Active issues" color={status?.issues_count > 0 ? '#FF6B6B' : '#4ade80'} testid="issues-count" />
-                <StatCard icon={<Zap className="w-4 h-4" />} label="Auto-Fixes" value={status?.total_auto_fixes || 0} sub="Total applied" color="#D4AF37" testid="fixes-count" />
-                <StatCard icon={<Database className="w-4 h-4" />} label="Known Fixes" value={status?.known_fixes_count || 0} sub="Learned patterns" color="#64C8FF" testid="known-count" />
-                <StatCard icon={<Clock className="w-4 h-4" />} label="Last Check"
+                <StatCard icon={<RefreshCw className="size-4" />} label="Cycle" value={status?.cycle_number || 0} sub="Current cycle" color="#FF6B00" testid="cycle-count" />
+                <StatCard icon={<AlertTriangle className="size-4" />} label="Issues" value={status?.issues_count || 0} sub="Active issues" color={status?.issues_count > 0 ? '#FF6B6B' : '#4ade80'} testid="issues-count" />
+                <StatCard icon={<Zap className="size-4" />} label="Auto-Fixes" value={status?.total_auto_fixes || 0} sub="Total applied" color="#D4AF37" testid="fixes-count" />
+                <StatCard icon={<Database className="size-4" />} label="Known Fixes" value={status?.known_fixes_count || 0} sub="Learned patterns" color="#64C8FF" testid="known-count" />
+                <StatCard icon={<Clock className="size-4" />} label="Last Check"
                   value={status?.last_check ? new Date(status.last_check).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
                   sub="Next in 60s" color="#888" testid="last-check" />
-                <StatCard icon={<Heart className="w-4 h-4" />} label="Status" value={isRunning ? 'ACTIVE' : 'STOPPED'}
+                <StatCard icon={<Heart className="size-4" />} label="Status" value={isRunning ? 'ACTIVE' : 'STOPPED'}
                   sub={isRunning ? 'Loop running 24/7' : 'Needs restart'} color={isRunning ? '#4ade80' : '#FF6B6B'} testid="loop-status" />
               </div>
             </div>
@@ -197,9 +197,9 @@ export default function SentinelDashboard({ token }) {
               <div className="mb-6 p-4 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid="git-backup-card">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    <div className="size-8 rounded-lg flex items-center justify-center"
                       style={{ background: gitBackup.status === 'current' ? 'rgba(34,197,94,0.1)' : gitBackup.status === 'behind' ? 'rgba(234,179,8,0.1)' : 'rgba(136,136,136,0.1)' }}>
-                      <Database className="w-4 h-4" style={{ color: gitBackup.status === 'current' ? '#22C55E' : gitBackup.status === 'behind' ? '#EAB308' : '#888' }} />
+                      <Database className="size-4" style={{ color: gitBackup.status === 'current' ? '#22C55E' : gitBackup.status === 'behind' ? '#EAB308' : '#888' }} />
                     </div>
                     <div>
                       <div className="text-xs font-bold" style={{ color: '#1A1A2E' }}>GitHub Backup</div>
@@ -231,7 +231,7 @@ export default function SentinelDashboard({ token }) {
             {pulses.length > 1 && (
               <div className="mb-6 p-4 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid="health-sparkline">
                 <div className="flex items-center gap-2 mb-3">
-                  <Activity className="w-4 h-4 text-[#FF6B00]" />
+                  <Activity className="size-4 text-[#FF6B00]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#1A1A2E] uppercase">Health Over Time</span>
                   <span className="text-[10px] text-[#888] ml-auto">{pulses.length} cycles</span>
                 </div>
@@ -251,7 +251,7 @@ export default function SentinelDashboard({ token }) {
             {/* Last Issue */}
             {status?.last_issue && (
               <div className="mb-4 p-4 rounded-xl flex items-center gap-3" style={{ background: 'rgba(255,107,107,0.04)', border: '1px solid rgba(255,107,107,0.12)' }} data-testid="last-issue">
-                <AlertTriangle className="w-5 h-5 text-[#FF6B6B] flex-shrink-0" />
+                <AlertTriangle className="size-5 text-[#FF6B6B] flex-shrink-0" />
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-xs font-bold text-[#1A1A2E]">{status.last_issue.service}</span>
@@ -266,7 +266,7 @@ export default function SentinelDashboard({ token }) {
             {modelRouting && (
               <div className="mb-4 p-4 rounded-xl" style={{ background: 'rgba(255,107,0,0.04)', border: '1px solid rgba(61,58,57,0.3)' }} data-testid="sovereign-brain">
                 <div className="flex items-center gap-2 mb-3">
-                  <Zap className="w-4 h-4 text-[#D4AF37]" />
+                  <Zap className="size-4 text-[#D4AF37]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#1A1A2E] uppercase">Sovereign Brain — {modelRouting.mode || '$0 FREE'}</span>
                   <span className="text-[8px] px-1.5 py-0.5 rounded font-bold" style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
                     {modelRouting.estimated_cost || '$0/mo'}
@@ -300,7 +300,7 @@ export default function SentinelDashboard({ token }) {
             {searchStats && searchStats.total_searches > 0 && (
               <div className="mb-4 p-4 rounded-xl" style={{ background: 'rgba(100,200,255,0.04)', border: '1px solid rgba(100,200,255,0.12)' }} data-testid="scout-search-stats">
                 <div className="flex items-center gap-2 mb-2">
-                  <Activity className="w-4 h-4 text-[#64C8FF]" />
+                  <Activity className="size-4 text-[#64C8FF]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#1A1A2E] uppercase">ScoutSearch</span>
                   <span className="text-[9px] text-[#888] ml-auto">Last: {searchStats.last_source || 'none'}</span>
                 </div>
@@ -328,7 +328,7 @@ export default function SentinelDashboard({ token }) {
             {/* Last Fix */}
             {status?.last_fix && status.last_fix.success && (
               <div className="mb-4 p-4 rounded-xl flex items-center gap-3" style={{ background: 'rgba(255,107,0,0.04)', border: '1px solid rgba(61,58,57,0.3)' }} data-testid="last-fix">
-                <CheckCircle className="w-5 h-5 text-[#4ade80] flex-shrink-0" />
+                <CheckCircle className="size-5 text-[#4ade80] flex-shrink-0" />
                 <div>
                   <span className="text-xs font-bold text-[#FF6B00]">Auto-Fixed: {status.last_fix.fix_type}</span>
                   <p className="text-[10px] text-[#888]">{status.last_fix.message}</p>
@@ -337,14 +337,14 @@ export default function SentinelDashboard({ token }) {
             )}
 
             {/* Expandable Sections */}
-            <ExpandSection title="Auto-Fix Log" icon={<Zap className="w-4 h-4" />} count={fixes.length} expanded={expandedSection === 'fixes'} onToggle={() => setExpandedSection(expandedSection === 'fixes' ? '' : 'fixes')} testid="fixes-section">
+            <ExpandSection title="Auto-Fix Log" icon={<Zap className="size-4" />} count={fixes.length} expanded={expandedSection === 'fixes'} onToggle={() => setExpandedSection(expandedSection === 'fixes' ? '' : 'fixes')} testid="fixes-section">
               {fixes.length === 0 ? (
                 <p className="text-xs text-[#888] py-4 text-center">No auto-fixes applied yet.</p>
               ) : (
                 <div className="space-y-2">
                   {fixes.map((f, i) => (
                     <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/40">
-                      {f.resolved ? <CheckCircle className="w-3.5 h-3.5 text-[#4ade80]" /> : <XCircle className="w-3.5 h-3.5 text-[#FF6B6B]" />}
+                      {f.resolved ? <CheckCircle className="size-3.5 text-[#4ade80]" /> : <XCircle className="size-3.5 text-[#FF6B6B]" />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold text-[#1A1A2E]">{f.service || f.check_name}</span>
@@ -359,7 +359,7 @@ export default function SentinelDashboard({ token }) {
               )}
             </ExpandSection>
 
-            <ExpandSection title="Alerts" icon={<AlertTriangle className="w-4 h-4" />} count={alerts.length} expanded={expandedSection === 'alerts'} onToggle={() => setExpandedSection(expandedSection === 'alerts' ? '' : 'alerts')} testid="alerts-section">
+            <ExpandSection title="Alerts" icon={<AlertTriangle className="size-4" />} count={alerts.length} expanded={expandedSection === 'alerts'} onToggle={() => setExpandedSection(expandedSection === 'alerts' ? '' : 'alerts')} testid="alerts-section">
               {alerts.length === 0 ? (
                 <p className="text-xs text-[#888] py-4 text-center">No alerts. All clear.</p>
               ) : (
@@ -379,14 +379,14 @@ export default function SentinelDashboard({ token }) {
               )}
             </ExpandSection>
 
-            <ExpandSection title="Known Fixes (Learned)" icon={<Database className="w-4 h-4" />} count={knownFixes.length} expanded={expandedSection === 'known'} onToggle={() => setExpandedSection(expandedSection === 'known' ? '' : 'known')} testid="known-section">
+            <ExpandSection title="Known Fixes (Learned)" icon={<Database className="size-4" />} count={knownFixes.length} expanded={expandedSection === 'known'} onToggle={() => setExpandedSection(expandedSection === 'known' ? '' : 'known')} testid="known-section">
               {knownFixes.length === 0 ? (
                 <p className="text-xs text-[#888] py-4 text-center">No learned patterns yet. Sentinel learns from every fix.</p>
               ) : (
                 <div className="space-y-2">
                   {knownFixes.map((kf, i) => (
                     <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-white/40">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: `rgba(45,122,74,${Math.min(kf.success_rate || 0.5, 1) * 0.15})`, color: '#FF6B00' }}>
+                      <div className="size-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: `rgba(45,122,74,${Math.min(kf.success_rate || 0.5, 1) * 0.15})`, color: '#FF6B00' }}>
                         {Math.round((kf.success_rate || 0) * 100)}%
                       </div>
                       <div className="flex-1 min-w-0">
@@ -410,7 +410,7 @@ export default function SentinelDashboard({ token }) {
               {/* Card 1 — Today */}
               <div className="p-5 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid="cost-today">
                 <div className="flex items-center gap-2 mb-3">
-                  <Zap className="w-4 h-4 text-[#4ade80]" />
+                  <Zap className="size-4 text-[#4ade80]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">Today's Savings</span>
                 </div>
                 <div className="text-2xl font-bold text-[#4ade80] mb-1">
@@ -426,7 +426,7 @@ export default function SentinelDashboard({ token }) {
               {/* Card 2 — Month */}
               <div className="p-5 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid="cost-month">
                 <div className="flex items-center gap-2 mb-3">
-                  <Activity className="w-4 h-4 text-[#D4AF37]" />
+                  <Activity className="size-4 text-[#D4AF37]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">This Month</span>
                 </div>
                 <div className="text-2xl font-bold text-[#D4AF37] mb-1">
@@ -442,7 +442,7 @@ export default function SentinelDashboard({ token }) {
               {/* Card 3 — All Time */}
               <div className="p-5 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl" data-testid="cost-alltime">
                 <div className="flex items-center gap-2 mb-3">
-                  <Database className="w-4 h-4 text-[#FF6B00]" />
+                  <Database className="size-4 text-[#FF6B00]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#888] uppercase">All Time</span>
                 </div>
                 <div className="text-2xl font-bold text-[#FF6B00] mb-1">
@@ -459,11 +459,11 @@ export default function SentinelDashboard({ token }) {
             {/* 7-Day Bar Chart */}
             <div className="p-5 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl mb-6" data-testid="cost-chart">
               <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-4 h-4 text-[#FF6B00]" />
+                <Activity className="size-4 text-[#FF6B00]" />
                 <span className="text-[10px] font-bold tracking-[1.5px] text-[#1A1A2E] uppercase">7-Day Query Breakdown</span>
                 <div className="flex items-center gap-3 ml-auto">
-                  <span className="flex items-center gap-1 text-[9px]"><span className="w-2.5 h-2.5 rounded-sm bg-[#4ade80]" /> Free</span>
-                  <span className="flex items-center gap-1 text-[9px]"><span className="w-2.5 h-2.5 rounded-sm bg-[#FF9500]" /> Paid</span>
+                  <span className="flex items-center gap-1 text-[9px]"><span className="size-2.5 rounded-sm bg-[#4ade80]" /> Free</span>
+                  <span className="flex items-center gap-1 text-[9px]"><span className="size-2.5 rounded-sm bg-[#FF9500]" /> Paid</span>
                 </div>
               </div>
               {costChart.length > 0 ? (
@@ -496,7 +496,7 @@ export default function SentinelDashboard({ token }) {
             {costAlltime?.model_rankings?.length > 0 && (
               <div className="p-5 bg-white/70 backdrop-blur-sm border border-white/40 rounded-xl mb-6" data-testid="model-performance">
                 <div className="flex items-center gap-2 mb-4">
-                  <Shield className="w-4 h-4 text-[#FF6B00]" />
+                  <Shield className="size-4 text-[#FF6B00]" />
                   <span className="text-[10px] font-bold tracking-[1.5px] text-[#1A1A2E] uppercase">Model Performance</span>
                 </div>
                 <div className="overflow-x-auto">
@@ -560,12 +560,12 @@ function ExpandSection({ title, icon, count, expanded, onToggle, children, testi
   return (
     <div className="mb-3" data-testid={testid}>
       <button onClick={onToggle} className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-white/70 backdrop-blur-sm border border-white/40 hover:bg-white/90 transition-all">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,107,0,0.05)' }}>
+        <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,107,0,0.05)' }}>
           {icon}
         </div>
         <span className="text-xs font-bold text-[#1A1A2E] tracking-wide flex-1 text-left">{title}</span>
         {count > 0 && <span className="text-[9px] font-bold text-[#888]">{count}</span>}
-        {expanded ? <ChevronDown className="w-4 h-4 text-[#888]" /> : <ChevronRight className="w-4 h-4 text-[#888]" />}
+        {expanded ? <ChevronDown className="size-4 text-[#888]" /> : <ChevronRight className="size-4 text-[#888]" />}
       </button>
       {expanded && <div className="mt-1 p-3 rounded-xl bg-white/50 border border-white/30">{children}</div>}
     </div>

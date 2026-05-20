@@ -381,7 +381,7 @@ async def audit_live_vs_built(auth: dict = Depends(verify_auth)):
     import httpx
     
     # Get the base URL (production or preview)
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://reroots.ca")
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://aurem.live")
     
     results = {}
     

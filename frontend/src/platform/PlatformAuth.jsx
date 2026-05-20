@@ -128,10 +128,10 @@ export const PlatformLogin = () => {
         <div className="relative">
           <Link to="/platform" className="inline-flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
-                <Target className="w-5 h-5 text-[#050505]" />
+              <div className="size-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
+                <Target className="size-5 text-[#050505]" />
               </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#009874] rounded-full animate-pulse"></div>
+              <div className="absolute -top-1 -right-1 size-3 bg-[#009874] rounded-full animate-pulse"></div>
             </div>
             <div>
               <span className="text-lg tracking-[0.15em]" style={{ fontFamily: "'Playfair Display', serif" }}>AUREM</span>
@@ -163,7 +163,7 @@ export const PlatformLogin = () => {
         </div>
 
         <div className="relative flex items-center gap-2 text-[#9ca3af]">
-          <Shield className="w-4 h-4 text-[#009874]" />
+          <Shield className="size-4 text-[#009874]" />
           <span className="text-xs tracking-wide">Enterprise-grade security. SOC 2 compliant.</span>
         </div>
       </div>
@@ -187,8 +187,8 @@ export const PlatformLogin = () => {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <Link to="/platform" className="inline-flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
-                <Target className="w-5 h-5 text-[#050505]" />
+              <div className="size-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
+                <Target className="size-5 text-[#050505]" />
               </div>
               <span className="text-lg tracking-[0.15em] text-white" style={{ fontFamily: "'Playfair Display', serif" }}>AUREM</span>
             </Link>
@@ -250,7 +250,7 @@ export const PlatformLogin = () => {
             <div>
               <label htmlFor="login-email" className="block text-xs text-[#F97316] tracking-[0.15em] uppercase mb-2">Email or BIN</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                 <input
                   id="login-email"
                   type="text"
@@ -269,7 +269,7 @@ export const PlatformLogin = () => {
             <div>
               <label className="block text-xs text-[#F97316] tracking-[0.15em] uppercase mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -286,7 +286,7 @@ export const PlatformLogin = () => {
                   aria-label="Toggle password visibility"
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#F97316] transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
@@ -296,7 +296,7 @@ export const PlatformLogin = () => {
             <div>
               <label htmlFor="login-bin" className="block text-xs text-[#F97316] tracking-[0.15em] uppercase mb-2">Business ID (BIN)</label>
               <div className="relative">
-                <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <Building className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                 <input
                   id="login-bin"
                   type="text"
@@ -318,7 +318,7 @@ export const PlatformLogin = () => {
             <div>
               <label htmlFor="login-pin" className="block text-xs text-[#F97316] tracking-[0.15em] uppercase mb-2">PIN (4–6 digits)</label>
               <div className="relative">
-                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#9ca3af]" />
                 <input
                   id="login-pin"
                   type={showPin ? 'text' : 'password'}
@@ -341,7 +341,7 @@ export const PlatformLogin = () => {
                   aria-label="Toggle PIN visibility"
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9ca3af] hover:text-[#F97316] transition-colors"
                 >
-                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPin ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
               <p className="mt-2 text-xs text-[#6b7280]">
@@ -361,11 +361,11 @@ export const PlatformLogin = () => {
               className="w-full py-3.5 bg-gradient-to-r from-[#F97316] to-[#8B7355] text-[#050505] rounded font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-all tracking-wide"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <>
                   {authMode === 'pin' ? 'Sign in with PIN' : 'Access Command Center'}
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="size-4" />
                 </>
               )}
             </motion.button>
@@ -508,10 +508,10 @@ export const PlatformSignup = () => {
         <div className="relative">
           <Link to="/platform" className="inline-flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center" style={{ boxShadow: '0 8px 24px rgba(212,175,55,0.4)' }}>
-                <Target className="w-5 h-5 text-[#050505]" />
+              <div className="size-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center" style={{ boxShadow: '0 8px 24px rgba(212,175,55,0.4)' }}>
+                <Target className="size-5 text-[#050505]" />
               </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#009874] rounded-full animate-pulse"></div>
+              <div className="absolute -top-1 -right-1 size-3 bg-[#009874] rounded-full animate-pulse"></div>
             </div>
             <div>
               <span className="text-lg tracking-[0.15em] text-[#F5E6C8]" style={{ fontFamily: "'Playfair Display', serif" }}>AUREM</span>
@@ -554,7 +554,7 @@ export const PlatformSignup = () => {
               'Real-time swarm monitoring'
             ].map((feature, i) => (
               <div key={i} className="flex items-center gap-3 text-sm text-[#C5BBA9]">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#F97316]" style={{ boxShadow: '0 0 8px #F97316' }}></div>
+                <div className="size-1.5 rounded-full bg-[#F97316]" style={{ boxShadow: '0 0 8px #F97316' }}></div>
                 {feature}
               </div>
             ))}
@@ -562,7 +562,7 @@ export const PlatformSignup = () => {
         </div>
 
         <div className="relative flex items-center gap-2 text-[#8B8170]">
-          <Shield className="w-4 h-4 text-[#009874]" />
+          <Shield className="size-4 text-[#009874]" />
           <span className="text-xs tracking-wide">Enterprise-grade security. SOC 2 compliant.</span>
         </div>
       </div>
@@ -578,8 +578,8 @@ export const PlatformSignup = () => {
         >
           <div className="lg:hidden text-center mb-8">
             <Link to="/platform" className="inline-flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
-                <Target className="w-5 h-5 text-[#050505]" />
+              <div className="size-10 rounded bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
+                <Target className="size-5 text-[#050505]" />
               </div>
               <span className="text-lg tracking-[0.15em] text-[#F5E6C8]" style={{ fontFamily: "'Playfair Display', serif" }}>AUREM</span>
             </Link>
@@ -622,7 +622,7 @@ export const PlatformSignup = () => {
               <div>
                 <label htmlFor="signup-name" className="block text-xs text-[#5C5C5C] dark:text-[#9CA3AF] tracking-[0.15em] uppercase mb-2">Operator Name</label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170] dark:text-[#666]" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170] dark:text-[#666]" />
                   <input
                     id="signup-name"
                     type="text"
@@ -640,7 +640,7 @@ export const PlatformSignup = () => {
               <div>
                 <label htmlFor="signup-org" className="block text-xs text-[#5C5C5C] dark:text-[#9CA3AF] tracking-[0.15em] uppercase mb-2">Organization</label>
                 <div className="relative">
-                  <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170] dark:text-[#666]" />
+                  <Building className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170] dark:text-[#666]" />
                   <input
                     id="signup-org"
                     type="text"
@@ -659,7 +659,7 @@ export const PlatformSignup = () => {
             <div>
               <label htmlFor="signup-email" className="block text-xs text-[#5C5C5C] dark:text-[#9CA3AF] tracking-[0.15em] uppercase mb-2">Work Email</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170] dark:text-[#666]" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170] dark:text-[#666]" />
                 <input
                   id="signup-email"
                   type="email"
@@ -677,7 +677,7 @@ export const PlatformSignup = () => {
             <div>
               <label htmlFor="signup-password" className="block text-xs text-[#5C5C5C] dark:text-[#9CA3AF] tracking-[0.15em] uppercase mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170] dark:text-[#666]" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170] dark:text-[#666]" />
                 <input
                   id="signup-password"
                   type={showPassword ? 'text' : 'password'}
@@ -696,7 +696,7 @@ export const PlatformSignup = () => {
                   aria-label="Toggle password visibility"
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8B8170] dark:text-[#666] hover:text-[#1A1A2E] dark:hover:text-[#F97316] transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
@@ -707,7 +707,7 @@ export const PlatformSignup = () => {
                 Quick-Login PIN <span className="text-[#8B8170] normal-case tracking-normal">(optional · 4–6 digits)</span>
               </label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170] dark:text-[#666]" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170] dark:text-[#666]" />
                 <input
                   id="signup-pin"
                   type={showPin ? 'text' : 'password'}
@@ -729,7 +729,7 @@ export const PlatformSignup = () => {
                   data-testid="signup-pin-toggle"
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8B8170] dark:text-[#666] hover:text-[#F97316] transition-colors"
                 >
-                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPin ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-[#8B8170] dark:text-[#777] leading-relaxed">
@@ -745,7 +745,7 @@ export const PlatformSignup = () => {
                 onChange={(e) => setFormData({ ...formData, terms_accepted: e.target.checked })}
                 required
                 data-testid="terms-checkbox"
-                className="mt-0.5 w-4 h-4 rounded border-[#A89F8C] dark:border-[#444] accent-[#F97316] cursor-pointer"
+                className="mt-0.5 size-4 rounded border-[#A89F8C] dark:border-[#444] accent-[#F97316] cursor-pointer"
               />
               <label htmlFor="terms_accepted" className="text-xs text-[#5C5C5C] dark:text-[#B8AE9F] leading-relaxed cursor-pointer">
                 I have read and agree to the{' '}
@@ -763,11 +763,11 @@ export const PlatformSignup = () => {
               className="w-full py-3.5 bg-gradient-to-r from-[#F97316] to-[#8B7355] text-[#050505] rounded font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-all tracking-wide"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <>
                   Initialize Swarm
-                  <Radio className="w-4 h-4" />
+                  <Radio className="size-4" />
                 </>
               )}
             </motion.button>

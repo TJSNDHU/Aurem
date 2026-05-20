@@ -77,7 +77,7 @@ function StatusBadge({ status, testId }) {
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold"
       style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}33` }}
     >
-      <Icon className="w-3 h-3" />
+      <Icon className="size-3" />
       {meta.label}
     </span>
   );
@@ -138,7 +138,7 @@ function PillarCard({ pillar, onOpen }) {
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
         <StatusBadge status={status} testId={`pillar-badge-${pillar.key}`} />
         <span className="text-xs text-gray-400 flex items-center gap-1 group-hover:text-gray-200">
-          Drill in <ExternalLink className="w-3 h-3" />
+          Drill in <ExternalLink className="size-3" />
         </span>
       </div>
     </button>
@@ -174,7 +174,7 @@ function CollectionModal({ pillar, onClose, onOpenCollection }) {
             className="text-gray-400 hover:text-gray-100 p-2"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -244,7 +244,7 @@ function CollectionModal({ pillar, onClose, onOpenCollection }) {
                       onClick={() => onOpenCollection(row)}
                       className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 ml-auto"
                     >
-                      Services <ExternalLink className="w-3 h-3" />
+                      Services <ExternalLink className="size-3" />
                     </button>
                   </td>
                 </tr>
@@ -338,14 +338,14 @@ function ServiceModal({ collection, onClose }) {
             className="text-gray-400 hover:text-gray-100 p-2"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
         <div className="overflow-y-auto p-5 space-y-6">
           {loading && (
             <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+              <Loader2 className="size-6 text-gray-400 animate-spin" />
             </div>
           )}
           {err && <div className="text-red-400 text-sm">{err}</div>}
@@ -354,14 +354,14 @@ function ServiceModal({ collection, onClose }) {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-2">
-                  <FileCode className="w-4 h-4 text-purple-400" />
+                  <FileCode className="size-4 text-purple-400" />
                   Services referencing this collection
                 </h3>
                 <span className="text-xs text-gray-500">{svcData.count || 0} files</span>
               </div>
               <div className="space-y-1 max-h-80 overflow-y-auto" data-testid="service-refs-list">
                 {(svcData.service_refs || []).length === 0 && (
-                  <div className="text-xs text-gray-500 py-4 text-center">No references found — may be a read-only log collection.</div>
+                  <div className="text-xs text-gray-500 py-4 text-center">No references found, may be a read-only log collection.</div>
                 )}
                 {(svcData.service_refs || []).map((h, i) => (
                   <div
@@ -382,7 +382,7 @@ function ServiceModal({ collection, onClose }) {
           {!loading && errData && (
             <div>
               <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <AlertTriangle className="size-4 text-amber-400" />
                 Recent errors touching this collection
               </h3>
               <div className="grid grid-cols-2 gap-3 text-xs">
@@ -411,14 +411,14 @@ function ServiceModal({ collection, onClose }) {
             onClick={() => navigate("/admin/stem-fix")}
             className="px-3 py-1.5 text-xs rounded bg-purple-600/20 text-purple-300 border border-purple-600/40 hover:bg-purple-600/30 flex items-center gap-1"
           >
-            <Zap className="w-3 h-3" /> Open Stem-Fix Queue
+            <Zap className="size-3" /> Open Stem-Fix Queue
           </button>
           <button
             data-testid="go-root-command-btn"
             onClick={() => navigate("/admin/root-command")}
             className="px-3 py-1.5 text-xs rounded bg-blue-600/20 text-blue-300 border border-blue-600/40 hover:bg-blue-600/30 flex items-center gap-1"
           >
-            <Activity className="w-3 h-3" /> Root Command
+            <Activity className="size-3" /> Root Command
           </button>
         </div>
       </div>
@@ -478,7 +478,7 @@ function WiresFlowMap({ wires, onOpenTrace }) {
                   }}
                 />
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full"
+                  className="absolute left-1/2 -translate-x-1/2 size-2 rounded-full"
                   style={{
                     background: WIRE_COLOR[w.status] || WIRE_COLOR.idle,
                     boxShadow: `0 0 8px ${WIRE_COLOR[w.status] || WIRE_COLOR.idle}`,
@@ -564,14 +564,14 @@ function WireTraceModal({ wire, onClose }) {
             className="text-gray-400 hover:text-gray-100 p-2"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="size-5" />
           </button>
         </div>
 
         <div className="overflow-y-auto p-5 space-y-5">
           {loading && (
             <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+              <Loader2 className="size-6 text-gray-400 animate-spin" />
             </div>
           )}
           {err && <div className="text-red-400 text-sm">{err}</div>}
@@ -827,7 +827,7 @@ function EndpointAuditPanel() {
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <FileCode className="w-4 h-4 text-blue-400" />
+          <FileCode className="size-4 text-blue-400" />
           <span className="text-xs uppercase tracking-widest text-blue-400 font-semibold">
             Endpoint Governance · Evidence Classifier
           </span>
@@ -918,7 +918,7 @@ function DevStackSection() {
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Server className="w-4 h-4 text-emerald-400" />
+          <Server className="size-4 text-emerald-400" />
           <span className="text-xs uppercase tracking-widest text-emerald-400 font-semibold">
             Dev Stack Health · Live (auto-refresh 20s)
           </span>
@@ -1061,11 +1061,11 @@ export default function AdminPillarsMap() {
               <BuildBadge />
             </div>
             <h1 className="text-3xl font-bold text-gray-100 mt-1 flex items-center gap-3">
-              <Database className="w-7 h-7 text-amber-400" />
+              <Database className="size-7 text-amber-400" />
               Pillars Map
             </h1>
             <p className="text-sm text-gray-400 mt-1">
-              Pillar <span className="text-gray-500">›</span> Collection <span className="text-gray-500">›</span> Service — silent-failure aware (15 min write window)
+              Pillar <span className="text-gray-500">›</span> Collection <span className="text-gray-500">›</span> Service, silent-failure aware (15 min write window)
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1075,7 +1075,7 @@ export default function AdminPillarsMap() {
               onClick={load}
               className="text-xs flex items-center gap-1 text-gray-300 hover:text-gray-100 px-3 py-1.5 rounded border border-gray-800 bg-gray-900/60"
             >
-              <RefreshCw className="w-3 h-3" /> Refresh
+              <RefreshCw className="size-3" /> Refresh
             </button>
             <button
               data-testid="sync-pillars-now-btn"
@@ -1084,7 +1084,7 @@ export default function AdminPillarsMap() {
               title="Purge cache + rebuild live snapshot — makes Console & Map agree instantly"
               className="text-xs flex items-center gap-1.5 text-amber-200 hover:text-amber-100 px-3 py-1.5 rounded border border-amber-700/50 bg-amber-900/20 disabled:opacity-50"
             >
-              <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`size-3 ${syncing ? "animate-spin" : ""}`} />
               {syncing ? "Syncing…" : "Sync Pillars Now"}
             </button>
           </div>
@@ -1218,7 +1218,7 @@ export default function AdminPillarsMap() {
 
         {loading && !snapshot && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+            <Loader2 className="size-6 text-gray-400 animate-spin" />
             <span className="ml-3 text-gray-400">Loading pillar telemetry…</span>
           </div>
         )}
@@ -1293,7 +1293,7 @@ export default function AdminPillarsMap() {
             </div>
 
             <div className="mt-5 text-xs text-gray-600 flex items-center gap-2">
-              <Server className="w-3 h-3" />
+              <Server className="size-3" />
               snapshot {snapshot.cached ? "cached" : "live"} · generated {formatRelative(snapshot.generated_at)} · auto-refresh {POLL_INTERVAL_MS / 1000}s
             </div>
           </>

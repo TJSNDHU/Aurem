@@ -29,7 +29,7 @@ Based on n8n/WhatsApp automation insights:
    - Converts everything to text for AI processing
 
 ### **Phase 2: Production Reliability**
-Based on Reroots battle-tested patterns:
+Based on AUREM battle-tested patterns:
 
 4. **Circuit Breaker System** (`/app/backend/services/circuit_breaker.py`)
    - 13 breakers protecting: Anthropic, OpenAI, Emergent LLM, Vapi, ElevenLabs, Twilio, WhatsApp, SendGrid, MongoDB, Redis, Stripe, OmniDimension, Weather

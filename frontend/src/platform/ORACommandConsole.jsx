@@ -315,7 +315,7 @@ const ApprovalsDrawerBody = React.memo(function ({ approvals, loading, onApprove
   }
   return (
     <div data-testid="approvals-body">
-      <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Review each item — approve or reject. Actions execute immediately.</div>
+      <div style={{ fontSize: 11, color: "#555", marginBottom: 16 }}>Review each item, approve or reject. Actions execute immediately.</div>
       {approvals.map((a) => {
         const id = a.id || a._id || a.approval_id;
         const isActing = actingId === id;
@@ -1313,7 +1313,7 @@ export default function ORACommandConsole() {
                     lineHeight: 1.5,
                   }}
                 >
-                  ⚠ LIVE MODE — real WhatsApp / SMS will go to every contact on this list. DNC auto-skipped.
+                  ⚠ LIVE MODE, real WhatsApp / SMS will go to every contact on this list. DNC auto-skipped.
                 </div>
               </div>
             )}
@@ -1348,7 +1348,7 @@ export default function ORACommandConsole() {
                 <button style={s.btnGhost()} onClick={() => setPrevData(null)}>Clear</button>
               </div>
               {previewData.length === 0 ? (
-                <div style={{ color: "#333", fontSize: 12 }}>No results — try broader industry or location.</div>
+                <div style={{ color: "#333", fontSize: 12 }}>No results, try broader industry or location.</div>
               ) : (
                 previewData.map((b, i) => (
                   <div key={i} style={s.preCard} data-testid={`preview-row-${i}`}>
@@ -1662,7 +1662,7 @@ export default function ORACommandConsole() {
           {commandHistory.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 12px", color: "#555", fontSize: 12 }}>
               No hunt commands locked yet.<br />
-              <span style={{ fontSize: 10, color: "#333" }}>Fire a Hunt, CSV upload, or Radius Search from the left panel — it'll appear here with timestamp and outcome.</span>
+              <span style={{ fontSize: 10, color: "#333" }}>Fire a Hunt, CSV upload, or Radius Search from the left panel, it'll appear here with timestamp and outcome.</span>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

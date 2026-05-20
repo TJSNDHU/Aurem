@@ -5,7 +5,7 @@ Filters AI responses to protect brand integrity.
 - Removes competitor brand mentions
 - Validates response compliance
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import re

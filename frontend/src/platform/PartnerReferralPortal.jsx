@@ -77,8 +77,8 @@ export default function PartnerReferralPortal({ token, user }) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="partner-portal-loading">
         <div className="flex items-center gap-3 text-[#666]">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading referral portal...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading referral portal…</span>
         </div>
       </div>
     );
@@ -95,7 +95,7 @@ export default function PartnerReferralPortal({ token, user }) {
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: `${currentTier.color}15`, color: currentTier.color }}>
-              <Award className="w-3 h-3" />
+              <Award className="size-3" />
               {currentTier.tier} Partner
             </div>
           </div>
@@ -113,7 +113,7 @@ export default function PartnerReferralPortal({ token, user }) {
                   data-testid="copy-referral-code"
                   className="p-2 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors"
                 >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                 </button>
               </div>
               <p className="text-[11px] text-[#5a5a72] mt-2">Share this code or link with other businesses</p>
@@ -124,14 +124,14 @@ export default function PartnerReferralPortal({ token, user }) {
                 data-testid="copy-referral-link"
                 className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-[#050505] bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg hover:opacity-90 transition-opacity"
               >
-                <Link2 className="w-3.5 h-3.5" />
+                <Link2 className="size-3.5" />
                 Copy Invite Link
               </button>
               <button
                 data-testid="share-referral"
                 className="flex items-center gap-2 px-4 py-2.5 text-xs text-[#D4AF37] border border-[#D4AF37]/30 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
               >
-                <Share2 className="w-3.5 h-3.5" />
+                <Share2 className="size-3.5" />
                 Share
               </button>
             </div>
@@ -148,7 +148,7 @@ export default function PartnerReferralPortal({ token, user }) {
           ].map((stat, idx) => (
             <div key={idx} className="p-4 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
+                <stat.icon className="size-4" style={{ color: stat.color }} />
                 <span className="text-[9px] text-[#555] tracking-wider">{stat.label}</span>
               </div>
               <div className="text-2xl font-semibold font-mono" style={{ color: stat.color }}>{stat.value}</div>
@@ -173,7 +173,7 @@ export default function PartnerReferralPortal({ token, user }) {
                   : 'text-[#666] hover:text-[#555]'
               }`}
             >
-              <tab.icon className="w-3.5 h-3.5" />
+              <tab.icon className="size-3.5" />
               {tab.label}
             </button>
           ))}
@@ -192,7 +192,7 @@ export default function PartnerReferralPortal({ token, user }) {
                   { step: 4, title: 'Tier Up', desc: 'More referrals unlock higher reward tiers', icon: TrendingUp }
                 ].map((item) => (
                   <div key={item.step} className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center text-xs font-bold text-[#D4AF37] flex-shrink-0">
+                    <div className="size-8 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex items-center justify-center text-xs font-bold text-[#D4AF37] flex-shrink-0">
                       {item.step}
                     </div>
                     <div>
@@ -208,8 +208,8 @@ export default function PartnerReferralPortal({ token, user }) {
             <div className="bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl p-6">
               <h3 className="text-xs text-[#555] tracking-wider mb-5">YOUR PROGRESS</h3>
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${currentTier.color}15` }}>
-                  <Award className="w-8 h-8" style={{ color: currentTier.color }} />
+                <div className="size-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${currentTier.color}15` }}>
+                  <Award className="size-8" style={{ color: currentTier.color }} />
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold" style={{ color: currentTier.color }}>{currentTier.tier}</h4>
@@ -242,7 +242,7 @@ export default function PartnerReferralPortal({ token, user }) {
 
               <div className="p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/10 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-4 h-4 text-[#D4AF37]" />
+                  <Zap className="size-4 text-[#D4AF37]" />
                   <span className="text-xs font-medium text-[#D4AF37]">Quick Tip</span>
                 </div>
                 <p className="text-[10px] text-[#888] leading-relaxed">
@@ -271,7 +271,7 @@ export default function PartnerReferralPortal({ token, user }) {
                   {isCurrent && (
                     <div className="text-[9px] font-bold tracking-wider text-[#D4AF37] mb-3">CURRENT TIER</div>
                   )}
-                  <Award className="w-8 h-8 mb-3" style={{ color: tier.color }} />
+                  <Award className="size-8 mb-3" style={{ color: tier.color }} />
                   <h3 className="text-sm font-semibold text-[#1A1A2E]">{tier.tier}</h3>
                   <p className="text-2xl font-bold mt-1" style={{ color: tier.color }}>{tier.reward}</p>
                   <p className="text-[10px] text-[#5a5a72] mt-1">per referral</p>
@@ -304,7 +304,7 @@ export default function PartnerReferralPortal({ token, user }) {
                 {data.referral_history.map((ref, idx) => (
                   <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-white/40">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[10px] font-semibold text-[#D4AF37]">
+                      <div className="size-8 rounded-full bg-[#D4AF37]/10 flex items-center justify-center text-[10px] font-semibold text-[#D4AF37]">
                         {(ref.name || 'R')[0]}
                       </div>
                       <div>
@@ -327,7 +327,7 @@ export default function PartnerReferralPortal({ token, user }) {
               </div>
             ) : (
               <div className="p-12 text-center">
-                <Users className="w-8 h-8 text-[#333] mx-auto mb-3" />
+                <Users className="size-8 text-[#333] mx-auto mb-3" />
                 <p className="text-sm text-[#555]">No referrals yet</p>
                 <p className="text-[11px] text-[#444] mt-1">Share your code to start earning rewards</p>
               </div>

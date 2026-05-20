@@ -1,5 +1,5 @@
 """
-ReRoots AI Live Broadcast Service
+AUREM AI Live Broadcast Service
 Production-Ready WebSocket Engine for Real-Time Sync
 
 Features:

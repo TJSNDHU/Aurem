@@ -526,7 +526,7 @@ TOOL_DEFS = [
     {"name": "free_geolocate_ip", "description": "IP geolocation — country, city, ISP, coordinates. No key.", "parameters": {"ip": "IP address"}},
     {"name": "free_validate_email", "description": "Validate email format + DNS MX check. Zero cost DIY.", "parameters": {"email": "Email to validate"}},
     {"name": "free_weather_alerts", "description": "Severe weather alerts (UV, precipitation). No key.", "parameters": {"lat": "Latitude", "lon": "Longitude"}},
-    {"name": "free_find_emails", "description": "Find emails for a company domain via Tomba.io. Replaces Hunter.io. Free 50/month.", "parameters": {"domain": "Company domain (e.g. reroots.ca)", "limit": "Max results (default: 10)"}},
+    {"name": "free_find_emails", "description": "Find emails for a company domain via Tomba.io. Replaces Hunter.io. Free 50/month.", "parameters": {"domain": "Company domain (e.g. aurem.live)", "limit": "Max results (default: 10)"}},
     {"name": "free_verify_email_tomba", "description": "Verify email deliverability via Tomba.io. Checks MX, disposable, score.", "parameters": {"email": "Email to verify"}},
     {"name": "free_validate_phone", "description": "Validate phone number via Numverify. Country, carrier, line type. Free 100/month.", "parameters": {"phone": "Phone number (E.164 or local format)"}},
     {"name": "free_geolocate_ip_rich", "description": "Rich IP geolocation via IPstack — country, currency, flag, languages. Free 100/month.", "parameters": {"ip": "IP address"}},

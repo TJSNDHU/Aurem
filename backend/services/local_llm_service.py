@@ -35,7 +35,7 @@ def _is_prod() -> bool:
         if os.environ.get("AUREM_ENV", "").strip().lower() == "production":
             return True
         app_url = (os.environ.get("APP_URL", "") or "").lower()
-        if "aurem.live" in app_url or "reroots.ca" in app_url:
+        if "aurem.live" in app_url or "aurem.live" in app_url:
             return True
         return False
 

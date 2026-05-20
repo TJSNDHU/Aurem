@@ -453,7 +453,7 @@
 > 2. **Bug 161** — `public_sites_router` — `/preview/{slug}/custom-url` and `/preview/{slug}/select-theme` now require admin auth. New `_is_safe_external_url()` SSRF guard rejects non-http(s) schemes and private / loopback / link-local / multicast / reserved IPs. AWS metadata exfiltration (`169.254.169.254`) closed.
 > 3. **Bug 162** — Removed `or payload.get("email")` admin-bypass from `subscription_router._require_admin`, `domain_router._verify_admin`, and `pillars_health_router._verify_admin`. Previously any authenticated customer became admin because every JWT carries an `email` claim. Three routers fixed; `/api/admin/tenants` confirmed rejects customer tokens with 403.
 > 4. **Bug 163** — `server_misc_routes.reset_password` — now `$set: {password_hash}` + `$unset: {password}`. Previously wrote bcrypt into the legacy `password` field, conflicting with plaintext writes from older registration paths and causing silent auth failures for post-reset users.
-> 5. **Bug 164** — `SENDGRID_FROM_EMAIL` default changed from `hello@reroots.ca` to `noreply@aurem.live` in `routes/automation_gaps.py`, `routes/automations.py`, `services/email_ai.py`. Customer-facing transactional email now matches AUREM brand.
+> 5. **Bug 164** — `SENDGRID_FROM_EMAIL` default changed from `hello@aurem.live` to `noreply@aurem.live` in `routes/automation_gaps.py`, `routes/automations.py`, `services/email_ai.py`. Customer-facing transactional email now matches AUREM brand.
 > 6. **Bug 159/160 (operational)** — Verified: production `JWT_SECRET` is a 64-char urlsafe secret (already rotated, not the public placeholder). No `.env.txt` committed to git. The email-allowlist admin paths in `admin_guard.py` are safe so long as `JWT_SECRET` stays secret — operator must continue to rotate quarterly.
 > 7. **Bug 158 (deferred)** — `lead_lifecycle_router._get_db()` TOCTOU race is theoretical under cold-start concurrency only. Already auth-gated in R18, attack surface is gone in practice. Deferred to refactor sprint.
 >
@@ -2106,7 +2106,7 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
   - Sidebar entry under HEALTH section + route `/admin/customer-health`
   - Morning Brief injects `customer_health` line from latest summary + 24h fix count
   - P4 worker hosts 34 schedulers (was 33)
-  - E2E: RERO-3DEJ → critical (root cause: legacy `users` collection has admin@reroots.ca but never created `platform_users` record → orphaned `aurem_onboarding` doc only); AURE-3M4G dogfood → healthy.
+  - E2E: RERO-3DEJ → critical (root cause: legacy `users` collection has admin@aurem.live but never created `platform_users` record → orphaned `aurem_onboarding` doc only); AURE-3M4G dogfood → healthy.
 
 - **2026-02-06 — Code Quality Report Round 2** — Re-triaged second drop of the report:
   - **NEW circular-import claim** `routes/mcp_routes.py ↔ services/mcp_extended_tools.py`: FALSE POSITIVE. Neither imports the other; `grep` of both files shows zero cross-imports.
@@ -2614,7 +2614,7 @@ Sovereign Truth founder mode, and BIN+PIN auth alongside standard creds.
       (verifier branch now reports unsupported), `startup_init.py`
       (skipped router name), `SecretVault.jsx` (Coinbase Commerce
       provider), `FrameworkMap.jsx` (L7 billing tile).
-  - **Removed La Vela Bianca (separate business — reroots.ca, not AUREM)**:
+  - **Removed La Vela Bianca (separate business — aurem.live, not AUREM)**:
     - Removed lavela import + 3 router includes from `registry.py`.
     - Stripped `.theme-lavela` CSS variables + overrides from
       `frontend/src/styles/brand-themes.css` (≈70 LOC removed).

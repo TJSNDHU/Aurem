@@ -273,8 +273,8 @@ export default function SecretVault({ token }) {
     return (
       <div className="flex-1 flex items-center justify-center bg-white/60" data-testid="secret-vault-loading">
         <div className="flex items-center gap-3 text-[#666]">
-          <RefreshCw className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading vault...</span>
+          <RefreshCw className="size-5 animate-spin" />
+          <span className="text-sm">Loading vault…</span>
         </div>
       </div>
     );
@@ -287,14 +287,14 @@ export default function SecretVault({ token }) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-xl font-semibold text-[#e2c97e] tracking-wider mb-1">Secret Vault</h1>
-            <p className="text-xs text-[#5a5a72]">BYON Compliance — AES-256 encrypted storage for your API keys and credentials</p>
+            <p className="text-xs text-[#5a5a72]">BYON Compliance, AES-256 encrypted storage for your API keys and credentials</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
             data-testid="add-secret-btn"
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#8B7355] rounded-lg text-[#050505] text-xs font-semibold hover:opacity-90 transition-opacity"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="size-3.5" />
             Store Secret
           </button>
         </div>
@@ -315,7 +315,7 @@ export default function SecretVault({ token }) {
                   : 'text-[#888] hover:text-[#555]'
               }`}
             >
-              <tab.icon className="w-3.5 h-3.5" />
+              <tab.icon className="size-3.5" />
               {tab.label}
             </button>
           ))}
@@ -325,8 +325,8 @@ export default function SecretVault({ token }) {
         {activeTab === 'secrets' && (
         <>
         <div className="flex items-center gap-4 p-4 bg-white/80 backdrop-blur-sm border border-[#4ade80]/20 rounded-xl mb-8">
-          <div className="w-10 h-10 rounded-lg bg-[#4ade80]/10 flex items-center justify-center flex-shrink-0">
-            <Shield className="w-5 h-5 text-[#4ade80]" />
+          <div className="size-10 rounded-lg bg-[#4ade80]/10 flex items-center justify-center flex-shrink-0">
+            <Shield className="size-5 text-[#4ade80]" />
           </div>
           <div className="flex-1">
             <h3 className="text-xs font-medium text-[#4ade80]">Vault-Level Security</h3>
@@ -334,11 +334,11 @@ export default function SecretVault({ token }) {
           </div>
           <div className="flex items-center gap-3 text-[10px]">
             <div className="flex items-center gap-1 text-[#4ade80]">
-              <Lock className="w-3 h-3" />
+              <Lock className="size-3" />
               <span>AES-256</span>
             </div>
             <div className="flex items-center gap-1 text-[#4ade80]">
-              <Shield className="w-3 h-3" />
+              <Shield className="size-3" />
               <span>At Rest</span>
             </div>
           </div>
@@ -353,7 +353,7 @@ export default function SecretVault({ token }) {
           ].map((stat, idx) => (
             <div key={idx} className="p-4 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
+                <stat.icon className="size-4" style={{ color: stat.color }} />
                 <span className="text-[9px] text-[#555] tracking-wider">{stat.label}</span>
               </div>
               <div className="text-2xl font-semibold font-mono" style={{ color: stat.color }}>{stat.value}</div>
@@ -363,7 +363,7 @@ export default function SecretVault({ token }) {
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
+          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
           <input
             type="text"
             placeholder="Search secrets..."
@@ -389,7 +389,7 @@ export default function SecretVault({ token }) {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold"
+                        className="size-10 rounded-lg flex items-center justify-center text-xs font-bold"
                         style={{ backgroundColor: `${typeConfig.color}15`, color: typeConfig.color }}
                       >
                         {typeConfig.logo}
@@ -401,7 +401,7 @@ export default function SecretVault({ token }) {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-[#4ade80]/10 text-[#4ade80] rounded-full">
-                        <Lock className="w-3 h-3" />
+                        <Lock className="size-3" />
                         Encrypted
                       </div>
                     </div>
@@ -424,7 +424,7 @@ export default function SecretVault({ token }) {
                               onClick={() => copyToClipboard(revealedValue, `${secret.id}-${field.key}`)}
                               className="text-[#555] hover:text-[#D4AF37] transition-colors"
                             >
-                              {copied === `${secret.id}-${field.key}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              {copied === `${secret.id}-${field.key}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                             </button>
                           )}
                         </div>
@@ -442,7 +442,7 @@ export default function SecretVault({ token }) {
                           : 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20 hover:bg-[#D4AF37]/20'
                       }`}
                     >
-                      {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      {isRevealed ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
                       {isRevealed ? 'Hide (30s auto-lock)' : 'Reveal'}
                     </button>
                     <button
@@ -450,14 +450,14 @@ export default function SecretVault({ token }) {
                       data-testid={`rotate-${secret.id}`}
                       className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-[#6C5CE7] bg-[#6C5CE7]/10 border border-[#6C5CE7]/20 rounded-lg hover:bg-[#6C5CE7]/20 transition-colors"
                     >
-                      <RefreshCw className="w-3 h-3" />
+                      <RefreshCw className="size-3" />
                       Rotate
                     </button>
                     <button
                       onClick={() => handleDeleteSecret(secret.id)}
                       className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-lg hover:bg-[#ef4444]/20 transition-colors"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="size-3" />
                       Delete
                     </button>
                   </div>
@@ -467,7 +467,7 @@ export default function SecretVault({ token }) {
           </div>
         ) : (
           <div className="p-16 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl text-center">
-            <Key className="w-10 h-10 text-[#333] mx-auto mb-4" />
+            <Key className="size-10 text-[#333] mx-auto mb-4" />
             <h3 className="text-sm font-medium text-[#1A1A2E] mb-2">Vault is empty</h3>
             <p className="text-[11px] text-[#5a5a72] mb-6">Store your first API credentials securely</p>
             <button
@@ -505,7 +505,7 @@ export default function SecretVault({ token }) {
             {auditSummary?.rotation_info?.length > 0 && (
               <div className="p-4 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl">
                 <h3 className="text-xs font-medium text-[#1A1A2E] mb-3 flex items-center gap-2">
-                  <RefreshCw className="w-3.5 h-3.5 text-[#6C5CE7]" />
+                  <RefreshCw className="size-3.5 text-[#6C5CE7]" />
                   Key Rotation Health
                 </h3>
                 <div className="space-y-2">
@@ -521,7 +521,7 @@ export default function SecretVault({ token }) {
                     return (
                       <div key={idx} className="flex items-center justify-between p-2.5 bg-white/60 rounded-lg">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ background: isStale ? '#ef4444' : '#4ade80' }} />
+                          <div className="size-2 rounded-full" style={{ background: isStale ? '#ef4444' : '#4ade80' }} />
                           <span className="text-xs text-[#1A1A2E]">{item.name}</span>
                           <span className="text-[10px] text-[#888]">({item.provider})</span>
                         </div>
@@ -544,7 +544,7 @@ export default function SecretVault({ token }) {
             {/* Audit Trail */}
             <div className="p-4 bg-white/80 backdrop-blur-sm border border-[#FF6B00]/20 rounded-xl">
               <h3 className="text-xs font-medium text-[#1A1A2E] mb-3 flex items-center gap-2">
-                <Shield className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <Shield className="size-3.5 text-[#D4AF37]" />
                 Audit Trail
               </h3>
               {auditLog.length > 0 ? (
@@ -555,7 +555,7 @@ export default function SecretVault({ token }) {
                       <div key={idx} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-white/40 transition-colors">
                         <div className="flex items-center gap-3">
                           <div
-                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            className="size-2 rounded-full flex-shrink-0"
                             style={{ background: actionColors[entry.action] || '#888' }}
                           />
                           <span className="text-xs font-medium uppercase" style={{ color: actionColors[entry.action] || '#888' }}>
@@ -586,16 +586,16 @@ export default function SecretVault({ token }) {
           <div className="bg-white/80 backdrop-blur-sm border border-[#6C5CE7]/20 rounded-2xl w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-[#6C5CE7]/20">
               <div className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-[#6C5CE7]" />
+                <RefreshCw className="size-4 text-[#6C5CE7]" />
                 <h3 className="text-sm font-medium text-[#1A1A2E]">Rotate: {rotateTarget.name}</h3>
               </div>
               <button onClick={() => { setRotateTarget(null); setRotateValues({}); }} className="text-[#555] hover:text-[#1A1A2E]">
-                <X className="w-5 h-5" />
+                <X className="size-5" />
               </button>
             </div>
             <div className="p-5 space-y-4">
               <div className="flex items-start gap-2 p-3 bg-[#6C5CE7]/5 border border-[#6C5CE7]/10 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-[#6C5CE7] mt-0.5 flex-shrink-0" />
+                <AlertCircle className="size-4 text-[#6C5CE7] mt-0.5 flex-shrink-0" />
                 <p className="text-[10px] text-[#888] leading-relaxed">
                   Enter new credentials to replace the current values. Old credentials will be permanently overwritten.
                 </p>
@@ -630,7 +630,7 @@ export default function SecretVault({ token }) {
                 data-testid="confirm-rotate-btn"
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-[#6C5CE7] rounded-lg hover:opacity-90 disabled:opacity-50"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${rotating ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`size-3.5 ${rotating ? 'animate-spin' : ''}`} />
                 {rotating ? 'Rotating...' : 'Rotate Keys'}
               </button>
             </div>
@@ -647,7 +647,7 @@ export default function SecretVault({ token }) {
                 {selectedType ? `Store ${selectedType.name} Credentials` : 'Choose Provider'}
               </h3>
               <button onClick={() => { setShowAddModal(false); setSelectedType(null); setFormValues({}); setSecretName(''); }} className="text-[#555] hover:text-[#555]">
-                <X className="w-5 h-5" />
+                <X className="size-5" />
               </button>
             </div>
 
@@ -662,7 +662,7 @@ export default function SecretVault({ token }) {
                       className="flex items-center gap-3 p-4 bg-white/50 border border-[#FF6B00]/15 rounded-xl hover:border-[#D4AF37]/30 transition-colors text-left"
                     >
                       <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold"
+                        className="size-10 rounded-lg flex items-center justify-center text-xs font-bold"
                         style={{ backgroundColor: `${type.color}15`, color: type.color }}
                       >
                         {type.logo}
@@ -701,7 +701,7 @@ export default function SecretVault({ token }) {
                     </div>
                   ))}
                   <div className="flex items-start gap-2 p-3 bg-[#D4AF37]/5 border border-[#D4AF37]/10 rounded-lg">
-                    <Shield className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
+                    <Shield className="size-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
                     <p className="text-[10px] text-[#888] leading-relaxed">
                       Credentials are encrypted with AES-256-GCM before storage. Only you can reveal them.
                     </p>

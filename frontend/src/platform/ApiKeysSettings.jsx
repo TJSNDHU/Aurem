@@ -72,7 +72,7 @@ export default function ApiKeysSettings({ token }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12" data-testid="api-keys-loading">
-        <RefreshCw className="w-5 h-5 animate-spin text-[#888]" />
+        <RefreshCw className="size-5 animate-spin text-[#888]" />
       </div>
     );
   }
@@ -80,7 +80,7 @@ export default function ApiKeysSettings({ token }) {
   return (
     <div data-testid="api-keys-settings">
       <div className="flex items-center gap-3 mb-5">
-        <Key className="w-5 h-5 text-[#FF6B00]" />
+        <Key className="size-5 text-[#FF6B00]" />
         <div>
           <h2 className="text-sm font-semibold text-white">API Keys</h2>
           <p className="text-[10px] text-[#888]">Connect external services by adding your API keys</p>
@@ -91,7 +91,7 @@ export default function ApiKeysSettings({ token }) {
         <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 text-xs ${
           message.type === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-[#4ade80]/10 text-[#4ade80]'
         }`}>
-          {message.type === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          {message.type === 'error' ? <AlertCircle className="size-3.5" /> : <CheckCircle className="size-3.5" />}
           {message.text}
         </div>
       )}
@@ -124,11 +124,11 @@ export default function ApiKeysSettings({ token }) {
                   <button onClick={() => handleSave(k.key)} disabled={saving}
                     data-testid={`api-key-save-${k.key}`}
                     className="p-1.5 text-[#4ade80] hover:bg-[#4ade80]/10 rounded-lg transition-colors disabled:opacity-50">
-                    <Save className="w-3.5 h-3.5" />
+                    <Save className="size-3.5" />
                   </button>
                   <button onClick={() => { setEditing(null); setEditValue(''); }}
                     className="p-1.5 text-[#888] hover:bg-white/5 rounded-lg transition-colors">
-                    <X className="w-3.5 h-3.5" />
+                    <X className="size-3.5" />
                   </button>
                 </div>
               ) : (
@@ -140,13 +140,13 @@ export default function ApiKeysSettings({ token }) {
                 <button onClick={() => { setEditing(k.key); setEditValue(''); }}
                   data-testid={`api-key-edit-${k.key}`}
                   className="p-1.5 text-[#888] hover:text-[#FF6B00] hover:bg-white/5 rounded-lg transition-colors">
-                  {k.configured ? <Edit2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                  {k.configured ? <Edit2 className="size-3.5" /> : <Plus className="size-3.5" />}
                 </button>
                 {k.configured && (
                   <button onClick={() => handleDelete(k.key)}
                     data-testid={`api-key-delete-${k.key}`}
                     className="p-1.5 text-[#888] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="size-3.5" />
                   </button>
                 )}
               </div>

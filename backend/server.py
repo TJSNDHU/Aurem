@@ -754,7 +754,7 @@ elif not _cors_raw_stripped:
     # Emergent preview URL is appended below via REACT_APP_BACKEND_URL.
     _cors_origins = [
         "https://aurem.live",
-        "https://reroots.ca",
+        "https://aurem.live",
         "http://localhost:3000",
     ]
 else:
@@ -1059,7 +1059,7 @@ async def startup_event():
     
     try:
         # Log immediate startup
-        logging.info("✓ ReRoots API starting...")
+        logging.info("✓ AUREM API starting...")
 
         # ═══ SMS KILL SWITCH (A2P 10DLC pending) ═══
         # Globally intercept twilio.rest.Client.messages.create so any direct
@@ -1803,7 +1803,7 @@ async def startup_event():
         except Exception as _e:
             print(f"[STARTUP] ✗ Orchestrator init failed: {_e}", flush=True)
 
-        logging.info(f"✅ ReRoots API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")
+        logging.info(f"✅ AUREM API startup complete in {time.time()-startup_start:.2f}s - ready to serve requests")
         
     except Exception as e:
         logging.error(f"❌ STARTUP FAILED: {e}")

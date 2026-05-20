@@ -4,7 +4,7 @@ Chat Widget API Routes
 REST API endpoints for the embeddable chat widget.
 Includes brand isolation middleware and cross-device memory support.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import logging

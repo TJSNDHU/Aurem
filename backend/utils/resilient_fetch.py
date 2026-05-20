@@ -158,7 +158,7 @@ async def resilient_fetch(url: str, timeout: float = 30.0) -> FetchResult:
         except Exception as e:
             last_error = e
 
-    # Strategy 5: Lowercase domain (Reroots.ca → reroots.ca)
+    # Strategy 5: Lowercase domain (AUREM.ca → aurem.live)
     # INTENTIONAL: scanning untrusted external websites — not our servers
     lower_url = url.lower()
     if lower_url != url:

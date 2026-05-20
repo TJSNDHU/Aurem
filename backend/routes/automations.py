@@ -56,7 +56,7 @@ FROM_NAME = os.environ.get("SENDGRID_FROM_NAME", "AUREM")
 TWILIO_SID = os.environ.get("TWILIO_ACCOUNT_SID")
 TWILIO_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 TWILIO_FROM = os.environ.get("TWILIO_PHONE_NUMBER")
-SITE_URL = "https://www.reroots.ca"
+SITE_URL = "https://www.aurem.live"
 
 sg = None
 twilio_client = None
@@ -123,7 +123,7 @@ def email_day25(customer_name: str, product: str, customer_email: str) -> dict:
     <a href="{SITE_URL}/shop" class="btn">Reorder Now</a>
     <hr class="divider">
     <div class="footer">
-      ReRoots · Premium Biotech Skincare · Canada<br>
+      AUREM · Premium Biotech Skincare · Canada<br>
       <a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color: #C4BAC0;">Unsubscribe</a>
     </div>
   </div>
@@ -183,7 +183,7 @@ def email_day28(customer_name: str, product: str, customer_email: str) -> dict:
     <a href="{SITE_URL}/shop/bundles" class="btn-secondary">View Bundle & Save</a>
     <hr class="divider">
     <div class="footer">
-      ReRoots · Premium Biotech Skincare · Canada<br>
+      AUREM · Premium Biotech Skincare · Canada<br>
       <a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color: #C4BAC0;">Unsubscribe</a>
     </div>
   </div>
@@ -238,7 +238,7 @@ def email_day35(customer_name: str, product: str, customer_email: str) -> dict:
     <p class="expiry">Offer expires in 7 days</p>
     <hr class="divider">
     <div class="footer">
-      ReRoots · Premium Biotech Skincare · Canada<br>
+      AUREM · Premium Biotech Skincare · Canada<br>
       <a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color: #C4BAC0;">Unsubscribe</a>
     </div>
   </div>
@@ -251,7 +251,7 @@ def email_day35(customer_name: str, product: str, customer_email: str) -> dict:
 def email_welcome(customer_name: str, product: str, customer_email: str) -> dict:
     """Day 1 — Welcome & PDRN education"""
     first = customer_name.split()[0] if customer_name else "there"
-    subject = f"Welcome to ReRoots, {first} — your PDRN journey starts now"
+    subject = f"Welcome to AUREM, {first} — your PDRN journey starts now"
     html = f"""
 <!DOCTYPE html>
 <html>
@@ -310,7 +310,7 @@ def email_welcome(customer_name: str, product: str, customer_email: str) -> dict
     <a href="{SITE_URL}/pdrn-guide" class="btn">Read the Full PDRN Guide</a>
     <hr class="divider">
     <div class="footer">
-      ReRoots · Premium Biotech Skincare · Canada<br>
+      AUREM · Premium Biotech Skincare · Canada<br>
       Questions? Reply to this email — we respond within 24 hours.<br><br>
       <a href="{SITE_URL}/unsubscribe?email={customer_email}" style="color: #C4BAC0;">Unsubscribe</a>
     </div>
@@ -329,11 +329,11 @@ def sms_day25(customer_name: str, product: str) -> str:
 
 def sms_day28(customer_name: str) -> str:
     first = customer_name.split()[0] if customer_name else "Hi"
-    return f"ReRoots: {first}, your 28-day PDRN cycle is complete! Start cycle 2: {SITE_URL}/shop · Reply STOP to unsubscribe"
+    return f"AUREM: {first}, your 28-day PDRN cycle is complete! Start cycle 2: {SITE_URL}/shop · Reply STOP to unsubscribe"
 
 def sms_day35(customer_name: str) -> str:
     first = customer_name.split()[0] if customer_name else "Hi"
-    return f"ReRoots: {first}, use code COMEBACK10 for 10% off. Your skin misses its routine: {SITE_URL}/shop · Reply STOP to unsubscribe"
+    return f"AUREM: {first}, use code COMEBACK10 for 10% off. Your skin misses its routine: {SITE_URL}/shop · Reply STOP to unsubscribe"
 
 
 # ─── SEND FUNCTIONS ──────────────────────────────────────────
@@ -560,7 +560,7 @@ async def send_test_sms(data: dict = Body(...)):
     """Send a test SMS. Body: { phone }"""
     try:
         phone = data.get("phone")
-        ok = await send_sms(phone, f"ReRoots test message — your automation system is working! {SITE_URL}")
+        ok = await send_sms(phone, f"AUREM test message — your automation system is working! {SITE_URL}")
         return {"success": ok, "sentTo": phone}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

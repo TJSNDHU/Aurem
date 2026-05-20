@@ -189,7 +189,7 @@ export default function LiveCampaignPipeline({ token }) {
               fontStyle: "italic",
             }}
           >
-            No campaigns yet — launch one from Campaign HQ to see live activity
+            No campaigns yet, launch one from Campaign HQ to see live activity
             here.
           </div>
         ) : (

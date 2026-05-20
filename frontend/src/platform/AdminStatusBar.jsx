@@ -81,7 +81,7 @@ const AdminStatusBar = ({ onSyncComplete }) => {
   if (loading) {
     return (
       <div className="h-12 bg-white/60 border-b border-[#151515] flex items-center justify-center">
-        <Loader2 className="w-4 h-4 text-[#333] animate-spin" />
+        <Loader2 className="size-4 text-[#333] animate-spin" />
       </div>
     );
   }
@@ -99,7 +99,7 @@ const AdminStatusBar = ({ onSyncComplete }) => {
       {/* Left: System Health */}
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full animate-pulse ${
+          <div className={`size-2 rounded-full animate-pulse ${
             status?.system_healthy ? 'bg-[#009874]' : 'bg-red-500'
           }`} />
           <span className={`text-xs tracking-wide ${
@@ -112,7 +112,7 @@ const AdminStatusBar = ({ onSyncComplete }) => {
         <div className="h-4 w-px bg-white/50" />
 
         <div className="flex items-center gap-2 text-xs text-[#555]">
-          <Activity className="w-3 h-3" />
+          <Activity className="size-3" />
           <span>{status?.active_missions || 0} Active Missions</span>
         </div>
 
@@ -142,12 +142,12 @@ const AdminStatusBar = ({ onSyncComplete }) => {
               }`}
               title={isOpen ? `${channel} active` : `${channel} tripped - ${cb.remaining_minutes}m remaining`}
             >
-              <Icon className="w-3 h-3" />
+              <Icon className="size-3" />
               <span>{channel}</span>
               {isOpen ? (
-                <CheckCircle className="w-3 h-3" />
+                <CheckCircle className="size-3" />
               ) : (
-                <XCircle className="w-3 h-3" />
+                <XCircle className="size-3" />
               )}
             </div>
           );
@@ -171,7 +171,7 @@ const AdminStatusBar = ({ onSyncComplete }) => {
               exit={{ scale: 0.8, opacity: 0 }}
               className="flex items-center gap-2 px-4 py-1.5 bg-[#009874]/20 border border-[#009874]/50 rounded"
             >
-              <CheckCircle className="w-4 h-4 text-[#009874]" />
+              <CheckCircle className="size-4 text-[#009874]" />
               <span className="text-xs text-[#009874] tracking-wide">Synced</span>
             </motion.div>
           ) : (
@@ -187,9 +187,9 @@ const AdminStatusBar = ({ onSyncComplete }) => {
               className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-[#D4AF37]/20 to-[#D4AF37]/10 border border-[#D4AF37]/50 rounded text-[#D4AF37] hover:from-[#D4AF37]/30 hover:to-[#D4AF37]/20 transition-all disabled:opacity-50"
             >
               {syncing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="size-4" />
               )}
               <span className="text-xs tracking-wider font-medium">
                 {syncing ? 'SYNCING...' : 'SYNC'}

@@ -169,7 +169,7 @@ export default function AdminSystemAudit() {
             {hc.ran_at && <span style={{fontSize:11,color:COLORS.textD}}>at {hc.ran_at.slice(11,19)}Z</span>}
           </div>
           {checklist.length === 0 ? (
-            <p style={{fontSize:12,color:COLORS.textD}}>No check data yet — press “Run Now”.</p>
+            <p style={{fontSize:12,color:COLORS.textD}}>No check data yet, press “Run Now”.</p>
           ) : (
             <ul style={{margin:0,padding:0,listStyle:'none'}}>
               {checklist.map((c,i) => (

@@ -1,6 +1,6 @@
 /**
- * ReRoots API Service Layer
- * Connects to reroots.ca Python backend
+ * AUREM API Service Layer
+ * Connects to aurem.live Python backend
  *
  * Base URL: Uses REACT_APP_BACKEND_URL for environment flexibility
  * Auth: JWT Bearer token stored in localStorage

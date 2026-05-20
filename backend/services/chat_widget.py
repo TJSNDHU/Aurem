@@ -4,7 +4,7 @@ Chat Widget Service
 Backend service for the embeddable chat widget.
 Handles sessions, messages, rate limiting, and audit logging.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os

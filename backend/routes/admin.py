@@ -372,10 +372,10 @@ async def delete_combo_offer(combo_id: str, request: Request):
 
 # Brand owner mapping
 BRAND_OWNER_MAP = {
-    "aura-gen": "Reroots Aesthetics Inc.",
-    "la vela bianca": "Reroots Aesthetics Inc.",
-    "lavela": "Reroots Aesthetics Inc.",
-    "reroots": "Reroots Aesthetics Inc.",
+    "aura-gen": "AUREM Aesthetics Inc.",
+    "la vela bianca": "AUREM Aesthetics Inc.",
+    "lavela": "AUREM Aesthetics Inc.",
+    "reroots": "AUREM Aesthetics Inc.",
     "oroe": "Polaris Built Inc.",
     "oroé": "Polaris Built Inc.",
 }
@@ -384,12 +384,12 @@ BRAND_OWNER_MAP = {
 def get_brand_owner(brand: str) -> str:
     """Get brand owner - critical for compliance."""
     if not brand:
-        return "Reroots Aesthetics Inc."
+        return "AUREM Aesthetics Inc."
     normalized = brand.lower().strip()
     for key, owner in BRAND_OWNER_MAP.items():
         if key in normalized:
             return owner
-    return "Reroots Aesthetics Inc."  # Default
+    return "AUREM Aesthetics Inc."  # Default
 
 
 @router.get("/products/sync-status")

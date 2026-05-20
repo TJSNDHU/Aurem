@@ -393,7 +393,7 @@ export default function OraChat() {
           <div style={{ color: TEXT_DIM, fontSize: 14, padding: 60,
                           textAlign: "center" }}>
             <Sparkles size={36} color={GOLD} /><br/><br/>
-            Bata ORA ko kya karna hai — code edit, deploy, debug, run on Legion,
+            Bata ORA ko kya karna hai, code edit, deploy, debug, run on Legion,
             check production health. <br/>
             <span style={{ fontSize: 12, color: TEXT_DIM }}>
               Safe tools chalti rahengi automatic; risky ke liye inline approve milega.
@@ -429,17 +429,17 @@ export default function OraChat() {
             </span>
             {busyElapsedS >= 20 && busyElapsedS < 90 && (
               <span style={{ color: TEXT_DIM, fontSize: 11, opacity: 0.8 }}>
-                · tool-loop usually 30–60 s on complex queries — hang tight
+                · tool-loop usually 30–60 s on complex queries, hang tight
               </span>
             )}
             {busyElapsedS >= 90 && busyElapsedS < 240 && (
               <span style={{ color: AMBER, fontSize: 11 }}>
-                · taking longer than usual — Legion / Groq may be slow
+                · taking longer than usual, Legion / Groq may be slow
               </span>
             )}
             {busyElapsedS >= 240 && (
               <span style={{ color: RED, fontSize: 11 }}>
-                · close to 5 min hard cap — will fail if no result
+                · close to 5 min hard cap, will fail if no result
               </span>
             )}
             {busyTools.length > 0 && (

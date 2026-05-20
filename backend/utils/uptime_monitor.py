@@ -17,17 +17,17 @@ SETUP INSTRUCTIONS:
 
 2. Create new monitor:
    - Monitor Type: HTTP(s)
-   - Friendly Name: ReRoots Production
-   - URL: https://reroots.ca/api/health
+   - Friendly Name: AUREM Production
+   - URL: https://aurem.live/api/health
    - Monitoring Interval: 5 minutes
 
 3. Add alert contacts:
-   - Email: tj@reroots.ca
+   - Email: tj@aurem.live
    - SMS: +1 416 886 9408 (requires Pro plan or use free email)
 
 4. Optional monitors to add:
-   - https://reroots.ca/api/ai/chat (AI service health)
-   - https://reroots.ca (frontend availability)
+   - https://aurem.live/api/ai/chat (AI service health)
+   - https://aurem.live (frontend availability)
 
 ALTERNATIVE FREE SERVICES:
 ═══════════════════════════════════════════════════════════════════
@@ -37,7 +37,7 @@ ALTERNATIVE FREE SERVICES:
 - Pingdom (free trial)
 
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 # This file is documentation only - UptimeRobot runs externally
@@ -47,21 +47,21 @@ UPTIME_CONFIG = {
     "service": "UptimeRobot",
     "monitors": [
         {
-            "name": "ReRoots Production Health",
-            "url": "https://reroots.ca/api/health",
+            "name": "AUREM Production Health",
+            "url": "https://aurem.live/api/health",
             "interval_minutes": 5,
-            "alert_contacts": ["tj@reroots.ca", "+16134000000"]
+            "alert_contacts": ["tj@aurem.live", "+16134000000"]
         },
         {
-            "name": "ReRoots AI Service",
-            "url": "https://reroots.ca/api/ai/chat",
+            "name": "AUREM AI Service",
+            "url": "https://aurem.live/api/ai/chat",
             "interval_minutes": 5,
             "method": "POST",
             "note": "Optional - monitors AI availability"
         },
         {
-            "name": "ReRoots Frontend",
-            "url": "https://reroots.ca",
+            "name": "AUREM Frontend",
+            "url": "https://aurem.live",
             "interval_minutes": 5,
             "note": "Optional - monitors website availability"
         }

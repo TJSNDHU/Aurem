@@ -226,7 +226,7 @@ const ShopifyAppManager = ({ token }) => {
 
   const PillarStatus = ({ name, icon: Icon, active, color, desc }) => (
     <div className="flex items-center gap-3 py-3" data-testid={`pillar-${name.toLowerCase()}`}>
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
+      <div className="size-9 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
         <Icon size={16} style={{ color }} />
       </div>
       <div className="flex-1">
@@ -234,7 +234,7 @@ const ShopifyAppManager = ({ token }) => {
         <div className="text-[10px]" style={{ color: 'var(--aurem-text-secondary)' }}>{desc}</div>
       </div>
       <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-[#666]'}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-400' : 'bg-[#555]'}`} style={active ? { boxShadow: '0 0 6px #4ade80' } : {}} />
+        <span className={`size-1.5 rounded-full ${active ? 'bg-emerald-400' : 'bg-[#555]'}`} style={active ? { boxShadow: '0 0 6px #4ade80' } : {}} />
         {active ? 'ACTIVE' : 'STANDBY'}
       </div>
     </div>
@@ -351,14 +351,14 @@ const ShopifyAppManager = ({ token }) => {
               <div className="flex items-center gap-3 mb-4">
                 <div className="relative">
                   <Wifi size={18} style={{ color: '#4ade80' }} />
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full" style={{ boxShadow: '0 0 8px #4ade80', animation: 'pulse 2s infinite' }} />
+                  <span className="absolute -top-0.5 -right-0.5 size-2.5 bg-emerald-400 rounded-full" style={{ boxShadow: '0 0 8px #4ade80', animation: 'pulse 2s infinite' }} />
                 </div>
                 <div>
                   <div className="text-xs font-black tracking-wider" style={{ color: 'var(--aurem-text)' }}>HARDWARE NODE</div>
                   <div className="text-[10px]" style={{ color: 'var(--aurem-text-secondary)' }}>{syncStatus?.hardware_node?.location || 'Local Node'} — {syncStatus?.hardware_node?.uptime || '99.97%'} uptime</div>
                 </div>
                 <div className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px #4ade80' }} />
+                  <span className="size-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px #4ade80' }} />
                   CONNECTED
                 </div>
               </div>
@@ -480,8 +480,8 @@ const ShopifyAppManager = ({ token }) => {
                 {/* Score + Revenue at Risk */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="aurem-glass-card p-6 rounded-2xl text-center" data-testid="pulse-health-score">
-                    <div className="relative w-28 h-28 mx-auto mb-3">
-                      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    <div className="relative size-28 mx-auto mb-3">
+                      <svg viewBox="0 0 100 100" className="size-full -rotate-90">
                         <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(128,128,128,0.1)" strokeWidth="8" />
                         <circle cx="50" cy="50" r="42" fill="none" strokeWidth="8" strokeLinecap="round"
                           stroke={pulseData.health_score >= 80 ? '#4ade80' : pulseData.health_score >= 50 ? '#f59e0b' : '#ef4444'}
@@ -508,7 +508,7 @@ const ShopifyAppManager = ({ token }) => {
                   <div className="space-y-2">
                     {(pulseData.issues || []).map((issue, i) => (
                       <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: issue.severity === 'high' ? 'rgba(239,68,68,0.06)' : issue.severity === 'medium' ? 'rgba(245,158,11,0.06)' : 'rgba(128,128,128,0.04)', border: `1px solid ${issue.severity === 'high' ? 'rgba(239,68,68,0.15)' : issue.severity === 'medium' ? 'rgba(245,158,11,0.15)' : 'rgba(128,128,128,0.1)'}` }}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: issue.severity === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)' }}>
+                        <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: issue.severity === 'high' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)' }}>
                           <AlertTriangle size={14} style={{ color: issue.severity === 'high' ? '#ef4444' : '#f59e0b' }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -546,7 +546,7 @@ const ShopifyAppManager = ({ token }) => {
 
                 {pulseData.mode === 'scaffold' && (
                   <div className="p-3 rounded-xl text-[10px]" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', color: '#f59e0b' }}>
-                    <AlertTriangle size={12} className="inline mr-1" /> Simulated scan — connect a real Shopify store for live data.
+                    <AlertTriangle size={12} className="inline mr-1" /> Simulated scan, connect a real Shopify store for live data.
                   </div>
                 )}
               </>
@@ -754,7 +754,7 @@ const ShopifyAppManager = ({ token }) => {
                   { time: 'Hour 24', channel: 'SMS', icon: Zap, color: '#f59e0b', desc: 'Final SMS reminder with urgency' },
                 ].map((step, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: `${step.color}08`, border: `1px solid ${step.color}20` }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${step.color}15` }}>
+                    <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${step.color}15` }}>
                       <step.icon size={14} style={{ color: step.color }} />
                     </div>
                     <div className="flex-1">
@@ -774,11 +774,11 @@ const ShopifyAppManager = ({ token }) => {
           <div className="space-y-4">
             <div className="aurem-glass-card rounded-2xl overflow-hidden flex flex-col" style={{ height: '500px' }}>
               <div className="p-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(128,128,128,0.1)' }}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)' }}>
+                <div className="size-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #D4B977, #B19A5E)' }}>
                   <span className="text-xs font-black text-[#0A0A00]">A</span>
                 </div>
                 <div>
-                  <p className="text-xs font-black" style={{ color: 'var(--aurem-text)' }}>AURA — Store Assistant</p>
+                  <p className="text-xs font-black" style={{ color: 'var(--aurem-text)' }}>AURA, Store Assistant</p>
                   <p className="text-[9px]" style={{ color: 'var(--aurem-text-secondary)' }}>Ask about your store's health, recovery, and revenue</p>
                 </div>
               </div>
@@ -867,7 +867,7 @@ const ShopifyAppManager = ({ token }) => {
                 <div className="space-y-2">
                   {connections.map(c => (
                     <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ border: '1px solid rgba(128,128,128,0.1)' }}>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px #4ade80' }} />
+                      <span className="size-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px #4ade80' }} />
                       <span className="text-xs font-bold flex-1" style={{ color: 'var(--aurem-text)' }}>{c.shop_domain}</span>
                       <span className="text-[10px]" style={{ color: 'var(--aurem-text-secondary)' }}>{c.connected_at?.slice(0, 10)}</span>
                     </div>
@@ -889,7 +889,7 @@ const ShopifyAppManager = ({ token }) => {
                 { step: 7, label: 'Submit to Shopify App Store', desc: 'Upload listing content + screenshots in Partner Dashboard', done: false },
               ].map(s => (
                 <div key={s.step} className="flex items-center gap-3 py-2.5">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${s.done ? 'bg-emerald-400 text-[#0A0A14]' : 'text-[#666]'}`}
+                  <div className={`size-6 rounded-full flex items-center justify-center text-[10px] font-black ${s.done ? 'bg-emerald-400 text-[#0A0A14]' : 'text-[#666]'}`}
                     style={!s.done ? { border: '1px solid rgba(128,128,128,0.2)' } : {}}>
                     {s.done ? <Check size={12} /> : s.step}
                   </div>
@@ -1149,7 +1149,7 @@ const ShopifyAppManager = ({ token }) => {
                 ].map((ext, i) => (
                   <div key={i} className="p-4 rounded-xl" style={{ border: '1px solid rgba(128,128,128,0.1)' }}>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${ext.color}15` }}>
+                      <div className="size-8 rounded-lg flex items-center justify-center" style={{ background: `${ext.color}15` }}>
                         <ext.icon size={15} style={{ color: ext.color }} />
                       </div>
                       <div className="flex-1">

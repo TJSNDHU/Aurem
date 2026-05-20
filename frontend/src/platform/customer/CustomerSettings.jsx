@@ -380,7 +380,7 @@ function BookingSection({ ctx }) {
       <h3 style={sectionH}><CalendarCheck size={14} style={{verticalAlign:'-2px',marginRight:8}}/>Booking Calendar</h3>
       <p style={{...sub, marginTop:-10, marginBottom:14}}>
         The AUREM widget includes a built-in booking modal. Visitors pick a service, date and slot, and the booking
-        lands in your <code style={{color:'#D4AF37'}}>bookings</code> collection — same one your dashboard reads.
+        lands in your <code style={{color:'#D4AF37'}}>bookings</code> collection, same one your dashboard reads.
       </p>
 
       <div style={{padding:'10px 14px', borderRadius:10, background:'rgba(0,0,0,0.4)',

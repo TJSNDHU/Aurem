@@ -96,7 +96,7 @@ const Demo = () => {
         </h1>
         <p style={{ fontSize: 16, color: '#9A9388', maxWidth: 640, margin: '0 auto 32px', lineHeight: 1.6 }}>
           Watch the 2-minute demo, then start a free 7-day trial. AUREM scans your real website
-          and ships SEO + speed + schema fixes automatically — no developer needed.
+          and ships SEO + speed + schema fixes automatically, no developer needed.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link to="/signup" data-testid="demo-cta-primary" style={ctaStyle}>
@@ -152,7 +152,7 @@ const Demo = () => {
                 or <code style={{ color: '#D4AF37' }}>REACT_APP_AUREM_DEMO_VIDEO</code> for direct mp4.
               </div>
               <Link to="/signup" data-testid="demo-fallback-cta" style={{ ...ctaStyle, marginTop: 22, fontSize: 12 }}>
-                Skip — start trial now <ArrowRight style={{ width: 12, height: 12 }} />
+                Skip, start trial now <ArrowRight style={{ width: 12, height: 12 }} />
               </Link>
             </div>
           )}
@@ -207,7 +207,7 @@ const Demo = () => {
         style={{ maxWidth: 1100, margin: '0 auto 100px', padding: '0 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ fontSize: 9, color: '#D4AF37', letterSpacing: '0.3em', marginBottom: 8 }}>
-            WHAT AUREM REPAIRS — AUTOMATICALLY
+            WHAT AUREM REPAIRS, AUTOMATICALLY
           </div>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 28, margin: 0 }}>
             No developer. No tickets. No waiting.
@@ -405,7 +405,7 @@ const ScannerWidget = () => {
       }}>
         <div style={{ textAlign: 'center', marginBottom: 26 }}>
           <div style={{ fontSize: 9, color: '#D4AF37', letterSpacing: '0.3em', marginBottom: 8 }}>
-            LIVE WEBSITE AUDIT — 30 SECONDS
+            LIVE WEBSITE AUDIT, 30 SECONDS
           </div>
           <h2 style={{ fontFamily: "'Cinzel',serif", fontSize: 26, margin: '0 0 10px' }}>
             Scan your site. See what AUREM would fix.
@@ -601,7 +601,7 @@ const ScannerWidget = () => {
                                 background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 11, color: '#9A9388', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Mail style={{ width: 13, height: 13, color: '#06B6D4' }} />
-                  Email me the full report — get the breakdown anytime.
+                  Email me the full report, get the breakdown anytime.
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <input type="email" required value={reportEmail}
@@ -637,7 +637,7 @@ const ScannerWidget = () => {
                 Activate AUREM to start fixing all of this.
               </div>
               <div style={{ fontSize: 11, color: '#9A9388', marginBottom: 14 }}>
-                Free 7-day trial — no credit card. Fixes activate after you sign up & install the AUREM tag.
+                Free 7-day trial, no credit card. Fixes activate after you sign up & install the AUREM tag.
               </div>
               <Link to="/signup" data-testid="scanner-result-cta" style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, padding: '11px 22px',

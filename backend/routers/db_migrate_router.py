@@ -37,7 +37,7 @@ def set_db(db) -> None:
 KEEP_EMAILS = {
     "teji.ss1986@gmail.com",
     "teji.ss1986+dogfood@gmail.com",
-    "admin@reroots.ca",
+    "admin@aurem.live",
 }
 
 SRC_EMAIL = "admin@aurem.live"

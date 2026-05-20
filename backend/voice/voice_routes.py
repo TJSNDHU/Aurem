@@ -3,7 +3,7 @@ Voice Agent API Routes
 ═══════════════════════════════════════════════════════════════════
 WebSocket and REST API endpoints for voice AI.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -83,7 +83,7 @@ async def voice_websocket(websocket: WebSocket, session_id: str):
     session = await agent.start_session(session_id, phone)
     
     # Send welcome message
-    welcome = "Hello! I'm Reroots AI Voice, your skincare advisor. How can I help you today?"
+    welcome = "Hello! I'm AUREM AI Voice, your skincare advisor. How can I help you today?"
     welcome_audio = await agent.synthesize_speech(welcome)
     
     await websocket.send_json({
@@ -207,7 +207,7 @@ async def inbound_call(request: Request, body: InboundCallRequest):
         "success": True,
         "session_id": session_id,
         "websocket_url": ws_url,
-        "greeting": "Hello! I'm Reroots AI Voice, your skincare advisor. How can I help you today?"
+        "greeting": "Hello! I'm AUREM AI Voice, your skincare advisor. How can I help you today?"
     }
 
 

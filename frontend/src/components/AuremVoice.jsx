@@ -35,7 +35,7 @@ const VibeBadge = ({ vibe, emotion, score }) => {
       className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-500"
       style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}
     >
-      <Icon className="w-3.5 h-3.5" />
+      <Icon className="size-3.5" />
       <span>{cfg.label}</span>
       {emotion && emotion !== 'neutral' && (
         <span className="opacity-70 ml-1">({emotion})</span>
@@ -90,9 +90,9 @@ const PanicOverridePanel = ({ panicEvent, onTakeControl, onResumeAI, isHumanCont
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {isHumanControlling ? (
-            <ShieldCheck className="w-4 h-4 text-green-400" />
+            <ShieldCheck className="size-4 text-green-400" />
           ) : (
-            <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
+            <AlertTriangle className="size-4 text-red-400 animate-pulse" />
           )}
           <span className={isHumanControlling ? 'text-green-300 font-semibold' : 'text-red-300 font-semibold'}>
             {isHumanControlling ? 'You are in control — AI paused' : 'Customer distress detected'}
@@ -553,10 +553,10 @@ const AuremVoice = ({ token, onClose }) => {
       <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid rgba(212,163,115,0.08)' }}>
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center"
+            className="size-10 rounded-full flex items-center justify-center"
             style={{ background: isCallActive ? 'rgba(74,222,128,0.12)' : 'rgba(212,163,115,0.08)' }}
           >
-            <Phone className={`w-5 h-5 ${isCallActive ? 'text-green-400' : 'text-[#D4A373]'}`} />
+            <Phone className={`size-5 ${isCallActive ? 'text-green-400' : 'text-[#D4A373]'}`} />
           </div>
           <div>
             <h3 className="text-sm font-bold text-[#E8E4DE]">AUREM V2V Engine</h3>
@@ -605,7 +605,7 @@ const AuremVoice = ({ token, onClose }) => {
         {error && (
           <div className="mt-3 p-2.5 rounded-lg flex items-center gap-2"
             style={{ background: 'rgba(220,38,38,0.10)', border: '1px solid rgba(220,38,38,0.25)' }}>
-            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <AlertCircle className="size-4 text-red-400 flex-shrink-0" />
             <span className="text-xs text-red-400">{error}</span>
           </div>
         )}
@@ -652,39 +652,39 @@ const AuremVoice = ({ token, onClose }) => {
             style={{ background: 'linear-gradient(135deg, #4CAF50, #2E7D32)', color: '#fff', border: 'none', cursor: isConnecting ? 'wait' : 'pointer' }}
           >
             {isConnecting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
+              <><Loader2 className="size-4 animate-spin" /> Connecting…</>
             ) : (
-              <><Phone className="w-4 h-4" /> Start V2V Call</>
+              <><Phone className="size-4" /> Start V2V Call</>
             )}
           </button>
         ) : (
           <>
             <button onClick={toggleMute} data-testid="mute-btn"
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
+              className="size-11 rounded-full flex items-center justify-center transition-all"
               style={{ background: isMuted ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(212,163,115,0.12)', cursor: 'pointer' }}>
-              {isMuted ? <MicOff className="w-4 h-4 text-red-400" /> : <Mic className="w-4 h-4 text-[#E8E4DE]" />}
+              {isMuted ? <MicOff className="size-4 text-red-400" /> : <Mic className="size-4 text-[#E8E4DE]" />}
             </button>
 
             {/* Barge-in / Interrupt */}
             {isSpeaking && (
               <button onClick={sendInterrupt} data-testid="interrupt-btn"
-                className="w-11 h-11 rounded-full flex items-center justify-center transition-all animate-pulse"
+                className="size-11 rounded-full flex items-center justify-center transition-all animate-pulse"
                 style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)', cursor: 'pointer' }}
                 title="Interrupt AI">
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <ShieldAlert className="size-4 text-amber-400" />
               </button>
             )}
 
             <button onClick={endCall} data-testid="end-call-btn"
-              className="w-14 h-14 rounded-full flex items-center justify-center transition-all"
+              className="size-14 rounded-full flex items-center justify-center transition-all"
               style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', border: 'none', cursor: 'pointer' }}>
-              <PhoneOff className="w-5 h-5 text-white" />
+              <PhoneOff className="size-5 text-white" />
             </button>
 
             <button onClick={toggleSpeaker} data-testid="speaker-btn"
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
+              className="size-11 rounded-full flex items-center justify-center transition-all"
               style={{ background: !isSpeakerOn ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(212,163,115,0.12)', cursor: 'pointer' }}>
-              {isSpeakerOn ? <Volume2 className="w-4 h-4 text-[#E8E4DE]" /> : <VolumeX className="w-4 h-4 text-red-400" />}
+              {isSpeakerOn ? <Volume2 className="size-4 text-[#E8E4DE]" /> : <VolumeX className="size-4 text-red-400" />}
             </button>
           </>
         )}

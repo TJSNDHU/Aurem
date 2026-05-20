@@ -1,5 +1,5 @@
 """
-ReRoots AI Browser Agent - PinchTab-style Browser Automation
+AUREM AI Browser Agent - PinchTab-style Browser Automation
 AI-controlled browser for admin panel actions, competitor monitoring, and data extraction
 """
 

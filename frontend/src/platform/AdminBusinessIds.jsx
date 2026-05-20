@@ -160,7 +160,7 @@ export default function AdminBusinessIds() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#6A6070' }}>Loading...</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#6A6070' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#6A6070' }}>No tenants found</td></tr>
             ) : (

@@ -106,12 +106,12 @@ export default function ForgotPin() {
           data-testid="forgot-pin-back"
           className="inline-flex items-center gap-2 text-xs text-[#B8AE9F] hover:text-[#F97316] mb-5"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to sign in
+          <ArrowLeft className="size-3.5" /> Back to sign in
         </Link>
 
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5 text-[#050505]" />
+          <div className="size-10 rounded-lg bg-gradient-to-br from-[#F97316] to-[#8B7355] flex items-center justify-center">
+            <ShieldCheck className="size-5 text-[#050505]" />
           </div>
           <div>
             <h1 className="text-xl text-[#F5E6C8]" style={{ fontFamily: "'Playfair Display', serif" }}>
@@ -139,7 +139,7 @@ export default function ForgotPin() {
                 BIN or Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170]" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170]" />
                 <input
                   id="fp-id"
                   data-testid="forgot-pin-identifier"
@@ -157,7 +157,7 @@ export default function ForgotPin() {
               data-testid="forgot-pin-send"
               className="w-full py-3.5 bg-gradient-to-r from-[#F97316] to-[#8B7355] text-[#050505] rounded font-medium flex items-center justify-center gap-2 disabled:opacity-50 tracking-wide"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Email me a code'}
+              {loading ? <Loader2 className="size-4 animate-spin" /> : 'Email me a code'}
             </button>
           </form>
         )}
@@ -184,7 +184,7 @@ export default function ForgotPin() {
                 New PIN (4–6 digits)
               </label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B8170]" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-[#8B8170]" />
                 <input
                   id="fp-new"
                   data-testid="forgot-pin-new"
@@ -204,7 +204,7 @@ export default function ForgotPin() {
               data-testid="forgot-pin-confirm"
               className="w-full py-3.5 bg-gradient-to-r from-[#F97316] to-[#8B7355] text-[#050505] rounded font-medium flex items-center justify-center gap-2 disabled:opacity-50 tracking-wide"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reset PIN'}
+              {loading ? <Loader2 className="size-4 animate-spin" /> : 'Reset PIN'}
             </button>
             <button
               type="button"

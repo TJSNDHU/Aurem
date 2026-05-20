@@ -9,10 +9,10 @@ function Section({ title, icon: Icon, color, children, defaultOpen = true }) {
     <div className="mb-3">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between py-2 px-1 hover:bg-[rgba(45,122,74,0.02)] transition-colors rounded">
         <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4" style={{ color }} />
+          <Icon className="size-4" style={{ color }} />
           <span className="text-sm font-semibold" style={{ color: 'var(--aurem-heading)' }}>{title}</span>
         </div>
-        {open ? <ChevronUp className="w-3.5 h-3.5" style={{ color: 'var(--aurem-body-secondary)' }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />}
+        {open ? <ChevronUp className="size-3.5" style={{ color: 'var(--aurem-body-secondary)' }} /> : <ChevronDown className="size-3.5" style={{ color: 'var(--aurem-body-secondary)' }} />}
       </button>
       {open && <div className="pl-6 mt-1">{children}</div>}
     </div>
@@ -40,7 +40,7 @@ function BriefCard({ brief, expanded, onToggle, token, onRefresh }) {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ background: isToday ? '#22C55E' : '#6B7280' }} />
+              <div className="size-2 rounded-full" style={{ background: isToday ? '#22C55E' : '#6B7280' }} />
               <h3 className="text-sm font-bold tracking-wide" style={{ color: 'var(--aurem-heading)' }}>
                 AUREM MORNING BRIEF
               </h3>
@@ -53,7 +53,7 @@ function BriefCard({ brief, expanded, onToggle, token, onRefresh }) {
               <span>Attention: <strong style={{ color: (stats.items_attention || 0) > 0 ? '#EF4444' : '#22C55E' }}>{stats.items_attention || 0}</strong></span>
             </div>
           </div>
-          {expanded ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />}
+          {expanded ? <ChevronUp className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} /> : <ChevronDown className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />}
         </div>
       </div>
 
@@ -73,7 +73,7 @@ function BriefCard({ brief, expanded, onToggle, token, onRefresh }) {
               <ul className="space-y-1.5">
                 {sections.handled_overnight.map((a, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>
-                    <Check className="w-3 h-3 mt-0.5 text-green-500 flex-shrink-0" />
+                    <Check className="size-3 mt-0.5 text-green-500 flex-shrink-0" />
                     <span>{a}</span>
                   </li>
                 ))}
@@ -89,13 +89,13 @@ function BriefCard({ brief, expanded, onToggle, token, onRefresh }) {
               <ul className="space-y-2">
                 {sections.needs_attention.map((a, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--aurem-heading)' }}>
-                    <AlertTriangle className="w-3 h-3 mt-0.5 text-red-500 flex-shrink-0" />
+                    <AlertTriangle className="size-3 mt-0.5 text-red-500 flex-shrink-0" />
                     <span>{a}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs" style={{ color: '#22C55E' }}>All clear — no items need attention</p>
+              <p className="text-xs" style={{ color: '#22C55E' }}>All clear, no items need attention</p>
             )}
           </Section>
 
@@ -120,7 +120,7 @@ function BriefCard({ brief, expanded, onToggle, token, onRefresh }) {
             <ol className="space-y-1.5">
               {(sections.priorities || []).map((p, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs">
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                  <span className="size-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                     style={{ background: i === 0 ? 'rgba(212,163,115,0.2)' : 'rgba(61,58,57,0.15)', color: i === 0 ? '#FF6B00' : 'var(--aurem-body-secondary)' }}>
                     {i + 1}
                   </span>
@@ -179,7 +179,7 @@ function SettingsModal({ settings, onSave, onClose, loading }) {
       <div className="w-full max-w-md rounded-xl p-6" style={{ background: '#fff', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold" style={{ color: 'var(--aurem-heading)' }}>Brief Settings</h3>
-          <button onClick={onClose}><X className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} /></button>
+          <button onClick={onClose}><X className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} /></button>
         </div>
 
         {/* Delivery Time */}
@@ -233,8 +233,8 @@ function SettingsModal({ settings, onSave, onClose, loading }) {
                 }}
                 data-testid={`section-${key}`}
               >
-                <div className="w-3 h-3 rounded-sm border flex items-center justify-center" style={{ borderColor: val ? '#22C55E' : '#ccc' }}>
-                  {val && <Check className="w-2 h-2" />}
+                <div className="size-3 rounded-sm border flex items-center justify-center" style={{ borderColor: val ? '#22C55E' : '#ccc' }}>
+                  {val && <Check className="size-2" />}
                 </div>
                 {key.replace(/_/g, ' ')}
               </button>
@@ -250,7 +250,7 @@ function SettingsModal({ settings, onSave, onClose, loading }) {
             style={{ background: local.auto_act_before_brief ? '#22C55E' : '#374151' }}
             data-testid="auto-act-toggle"
           >
-            <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm" style={{ left: local.auto_act_before_brief ? '22px' : '2px' }} />
+            <div className="absolute top-0.5 size-4 rounded-full bg-white transition-transform shadow-sm" style={{ left: local.auto_act_before_brief ? '22px' : '2px' }} />
           </button>
         </div>
 
@@ -258,7 +258,7 @@ function SettingsModal({ settings, onSave, onClose, loading }) {
           <button onClick={() => onSave(local)} disabled={loading}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all"
             style={{ background: 'linear-gradient(135deg, #FF6B00, #22C55E)', color: '#fff' }} data-testid="save-brief-settings">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Save
           </button>
           <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm" style={{ background: 'rgba(61,58,57,0.15)', color: 'var(--aurem-body-secondary)' }}>Cancel</button>
         </div>
@@ -344,12 +344,12 @@ export default function MorningBrief({ token }) {
           <button onClick={() => setShowSettings(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02]"
             style={{ background: 'rgba(61,58,57,0.15)', color: 'var(--aurem-body-secondary)' }} data-testid="brief-settings-btn">
-            <Settings className="w-4 h-4" />
+            <Settings className="size-4" />
           </button>
           <button onClick={generateNow} disabled={generating}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-[1.02]"
             style={{ background: 'linear-gradient(135deg, #FF6B00, #22C55E)', color: '#fff' }} data-testid="generate-now-btn">
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {generating ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
             Generate Now
           </button>
         </div>
@@ -358,7 +358,7 @@ export default function MorningBrief({ token }) {
       {/* Loading */}
       {loading ? (
         <div className="flex items-center justify-center py-20" data-testid="brief-loading">
-          <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
+          <Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} />
         </div>
       ) : (
         <>
@@ -375,7 +375,7 @@ export default function MorningBrief({ token }) {
             </div>
           ) : (
             <div className="aurem-glass-card p-8 text-center mb-6" data-testid="no-brief">
-              <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.4 }} />
+              <FileText className="size-10 mx-auto mb-3" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.4 }} />
               <p className="text-sm mb-3" style={{ color: 'var(--aurem-body-secondary)' }}>No brief for today yet</p>
               <button onClick={generateNow} disabled={generating}
                 className="px-4 py-2 rounded-lg text-sm font-bold" style={{ background: 'linear-gradient(135deg, #FF6B00, #22C55E)', color: '#fff' }}>

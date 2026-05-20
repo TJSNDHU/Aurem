@@ -11,7 +11,7 @@ Features:
 
 Daily automated audit runs at 7 AM EST.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -96,7 +96,7 @@ async def run_audit_now(background_tasks: BackgroundTasks):
     from services.site_audit import run_full_audit
     
     # Always use production URL for audits
-    base_url = "https://reroots.ca"
+    base_url = "https://aurem.live"
     
     # Run audit in background
     background_tasks.add_task(run_full_audit, base_url)

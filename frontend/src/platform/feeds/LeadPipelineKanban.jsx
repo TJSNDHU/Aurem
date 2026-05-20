@@ -115,7 +115,7 @@ export default function LeadPipelineKanban({ token }) {
         {/* Header + metrics */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Lead Pipeline — Kanban</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>Lead Pipeline, Kanban</h1>
             <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>
               Zero leads lost. Drag any card to change its lifecycle stage.
             </p>
@@ -126,18 +126,18 @@ export default function LeadPipelineKanban({ token }) {
             style={{ background: 'rgba(255,107,0,0.12)', color: '#FF6B00' }}
             data-testid="pipeline-refresh"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
 
         {/* Metrics strip */}
         {metrics && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5" data-testid="pipeline-metrics">
-            <MetricCard label="Total Leads" value={metrics.total_leads} icon={<Users className="w-4 h-4" />} color="#6b9fff" />
-            <MetricCard label="Active" value={metrics.active_leads} icon={<Zap className="w-4 h-4" />} color="#FF6B00" />
-            <MetricCard label="Pipeline Value" value={`$${(metrics.pipeline_value || 0).toLocaleString()}`} icon={<DollarSign className="w-4 h-4" />} color="#16a34a" />
-            <MetricCard label="Won" value={metrics.by_stage?.won || 0} icon={<Check className="w-4 h-4" />} color="#16a34a" />
-            <MetricCard label="Avg Days → Close" value={metrics.avg_days_to_close || 0} icon={<TrendingUp className="w-4 h-4" />} color="#ffab00" />
+            <MetricCard label="Total Leads" value={metrics.total_leads} icon={<Users className="size-4" />} color="#6b9fff" />
+            <MetricCard label="Active" value={metrics.active_leads} icon={<Zap className="size-4" />} color="#FF6B00" />
+            <MetricCard label="Pipeline Value" value={`$${(metrics.pipeline_value || 0).toLocaleString()}`} icon={<DollarSign className="size-4" />} color="#16a34a" />
+            <MetricCard label="Won" value={metrics.by_stage?.won || 0} icon={<Check className="size-4" />} color="#16a34a" />
+            <MetricCard label="Avg Days → Close" value={metrics.avg_days_to_close || 0} icon={<TrendingUp className="size-4" />} color="#ffab00" />
           </div>
         )}
 
@@ -164,7 +164,7 @@ export default function LeadPipelineKanban({ token }) {
               >
                 <div className="flex items-center justify-between mb-3 px-1">
                   <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                    <Icon className="size-4" style={{ color: meta.color }} />
                     <span className="text-sm font-bold" style={{ color: 'var(--aurem-heading)' }}>{meta.title}</span>
                   </div>
                   <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: meta.accent, color: meta.color }}>{count}</span>
@@ -235,7 +235,7 @@ function LeadCard({ lead, stage, meta, onDragStart, onClick }) {
         </div>
         {lead.flame_score > 50 && (
           <span title="Flame Score" className="text-xs font-bold flex items-center gap-0.5" style={{ color: '#ff1744' }}>
-            <Flame className="w-3 h-3" />{Math.round(lead.flame_score)}
+            <Flame className="size-3" />{Math.round(lead.flame_score)}
           </span>
         )}
       </div>
@@ -259,7 +259,7 @@ function LeadCard({ lead, stage, meta, onDragStart, onClick }) {
               t.channel === 'sms' ? MessageCircle :
               t.channel === 'call' ? Phone : Zap;
             const c = t.status === 'sent' ? '#16a34a' : t.status === 'failed' ? '#ef4444' : t.status === 'skipped_gated' ? '#64748b' : '#ffab00';
-            return <Icon key={i} className="w-3 h-3" style={{ color: c }} title={`${t.channel} · ${t.kind} · ${t.status}`} />;
+            return <Icon key={i} className="size-3" style={{ color: c }} title={`${t.channel} · ${t.kind} · ${t.status}`} />;
           })}
         </div>
       )}
@@ -328,7 +328,7 @@ function LeadDrawer({ lead, token, onClose, onRefresh }) {
               {meta.title}
             </span>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10"><X className="w-5 h-5 text-white" /></button>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10"><X className="size-5 text-white" /></button>
         </div>
 
         {/* Basic info */}
@@ -383,7 +383,7 @@ function LeadDrawer({ lead, token, onClose, onRefresh }) {
         {/* Add note */}
         <div className="mb-4">
           <div className="text-xs uppercase mb-2 flex items-center gap-1" style={{ color: '#888' }}>
-            <StickyNote className="w-3 h-3" /> Add note
+            <StickyNote className="size-3" /> Add note
           </div>
           <textarea
             value={note}
@@ -406,7 +406,7 @@ function LeadDrawer({ lead, token, onClose, onRefresh }) {
         {/* Manual blast */}
         <div className="mb-4">
           <div className="text-xs uppercase mb-2 flex items-center gap-1" style={{ color: '#888' }}>
-            <PhoneOutgoing className="w-3 h-3" /> Manual blast
+            <PhoneOutgoing className="size-3" /> Manual blast
           </div>
           <div className="flex gap-1 mb-2">
             {['whatsapp', 'email', 'sms'].map(ch => (

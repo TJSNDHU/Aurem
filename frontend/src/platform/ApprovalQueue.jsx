@@ -26,7 +26,7 @@ function RiskBadge({ status, countdown }) {
   const Icon = badge.icon;
   return (
     <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold" style={{ background: badge.bg, color: badge.color }} data-testid="risk-badge">
-      <Icon className="w-3 h-3" />
+      <Icon className="size-3" />
       {badge.label}
       {status === 'auto_cancel_pending' && countdown != null && (
         <span className="font-mono">{Math.ceil(countdown)}m</span>
@@ -64,10 +64,10 @@ function SettingsPanel({ settings, onUpdate, loading }) {
     <div className="aurem-glass-card overflow-hidden mb-4" data-testid="approval-settings">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-[rgba(255,107,0,0.03)] transition-colors">
         <div className="flex items-center gap-2">
-          <Settings className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />
+          <Settings className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />
           <span className="text-sm font-semibold" style={{ color: 'var(--aurem-heading)' }}>Approval Rules & Thresholds</span>
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} /> : <ChevronDown className="w-4 h-4" style={{ color: 'var(--aurem-body-secondary)' }} />}
+        {expanded ? <ChevronUp className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} /> : <ChevronDown className="size-4" style={{ color: 'var(--aurem-body-secondary)' }} />}
       </button>
 
       {expanded && (
@@ -125,7 +125,7 @@ function SettingsPanel({ settings, onUpdate, loading }) {
               style={{ background: localSettings.pattern_learning_enabled ? '#22C55E' : '#374151' }}
               data-testid="pattern-learning-toggle"
             >
-              <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm" style={{ left: localSettings.pattern_learning_enabled ? '22px' : '2px' }} />
+              <div className="absolute top-0.5 size-4 rounded-full bg-white transition-transform shadow-sm" style={{ left: localSettings.pattern_learning_enabled ? '22px' : '2px' }} />
             </button>
             <span className="text-xs" style={{ color: localSettings.pattern_learning_enabled ? '#22C55E' : 'var(--aurem-body-secondary)' }}>
               {localSettings.pattern_learning_enabled ? 'ON' : 'OFF'}
@@ -155,7 +155,7 @@ function SettingsPanel({ settings, onUpdate, loading }) {
 
           <button onClick={save} disabled={loading} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all hover:scale-[1.02]"
             style={{ background: 'linear-gradient(135deg, #FF6B00, #22C55E)', color: '#fff' }} data-testid="save-settings-btn">
-            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Save Settings
+            {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} Save Settings
           </button>
         </div>
       )}
@@ -172,7 +172,7 @@ function PatternCard({ patterns }) {
   return (
     <div className="aurem-glass-card p-4 mb-4" data-testid="pattern-learning-card">
       <div className="flex items-center gap-2 mb-3">
-        <Brain className="w-4 h-4" style={{ color: '#8B5CF6' }} />
+        <Brain className="size-4" style={{ color: '#8B5CF6' }} />
         <span className="text-sm font-semibold" style={{ color: 'var(--aurem-heading)' }}>Pattern Learning</span>
       </div>
       <p className="text-xs mb-3" style={{ color: 'var(--aurem-body-secondary)' }}>
@@ -291,7 +291,7 @@ export default function ApprovalQueue({ token }) {
         <button onClick={() => { setLoading(true); fetchData(); }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02]"
           style={{ background: 'rgba(61,58,57,0.25)', color: 'var(--aurem-heading)' }} data-testid="approval-refresh-btn">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 
@@ -299,8 +299,8 @@ export default function ApprovalQueue({ token }) {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="aurem-glass-card p-4" data-testid="pending-count-card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
-              <Shield className="w-5 h-5" style={{ color: '#EF4444' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
+              <Shield className="size-5" style={{ color: '#EF4444' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{stats?.pending || 0}</div>
@@ -310,8 +310,8 @@ export default function ApprovalQueue({ token }) {
         </div>
         <div className="aurem-glass-card p-4" data-testid="auto-today-card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
-              <CheckCircle className="w-5 h-5" style={{ color: '#22C55E' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
+              <CheckCircle className="size-5" style={{ color: '#22C55E' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{stats?.auto_approved_today || 0}</div>
@@ -321,8 +321,8 @@ export default function ApprovalQueue({ token }) {
         </div>
         <div className="aurem-glass-card p-4" data-testid="manual-today-card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.15)' }}>
-              <Clock className="w-5 h-5" style={{ color: '#EAB308' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.15)' }}>
+              <Clock className="size-5" style={{ color: '#EAB308' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{stats?.manual_today || 0}</div>
@@ -332,8 +332,8 @@ export default function ApprovalQueue({ token }) {
         </div>
         <div className="aurem-glass-card p-4" data-testid="automation-rate-card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
-              <Brain className="w-5 h-5" style={{ color: '#8B5CF6' }} />
+            <div className="size-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+              <Brain className="size-5" style={{ color: '#8B5CF6' }} />
             </div>
             <div>
               <div className="text-2xl font-bold" style={{ color: 'var(--aurem-heading)' }}>{stats?.automation_rate || 0}%</div>
@@ -400,10 +400,10 @@ export default function ApprovalQueue({ token }) {
           </div>
 
           {loading && pending.length === 0 ? (
-            <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} /></div>
+            <div className="flex items-center justify-center py-16"><Loader2 className="size-6 animate-spin" style={{ color: 'var(--aurem-body-secondary)' }} /></div>
           ) : filteredPending.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16" data-testid="no-pending">
-              <CheckCircle className="w-10 h-10 mb-3" style={{ color: '#22C55E', opacity: 0.4 }} />
+              <CheckCircle className="size-10 mb-3" style={{ color: '#22C55E', opacity: 0.4 }} />
               <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>No pending approvals</p>
               <p className="text-xs mt-1" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.7 }}>All actions are auto-approved or queue is clear</p>
             </div>
@@ -417,7 +417,7 @@ export default function ApprovalQueue({ token }) {
                 >
                   <input type="checkbox" checked={selectedIds.includes(a.approval_id)}
                     onChange={() => toggleSelect(a.approval_id)} onClick={e => e.stopPropagation()}
-                    className="w-4 h-4 rounded" data-testid={`select-${a.approval_id}`} />
+                    className="size-4 rounded" data-testid={`select-${a.approval_id}`} />
                   <div className="truncate font-medium" style={{ color: 'var(--aurem-heading)' }}>{a.action?.strategy || a.action_type}</div>
                   <div className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>{ACTION_LABELS[a.action_type] || a.action_type}</div>
                   <div className="text-xs truncate" style={{ color: 'var(--aurem-body-secondary)' }}>{a.reason}</div>
@@ -426,12 +426,12 @@ export default function ApprovalQueue({ token }) {
                     <button onClick={e => { e.stopPropagation(); handleApprove(a.approval_id); }}
                       className="p-1.5 rounded-md hover:bg-green-50 transition-colors" title="Approve"
                       data-testid={`approve-btn-${a.approval_id}`}>
-                      {actionLoading === a.approval_id ? <Loader2 className="w-4 h-4 animate-spin text-green-500" /> : <Check className="w-4 h-4 text-green-500" />}
+                      {actionLoading === a.approval_id ? <Loader2 className="size-4 animate-spin text-green-500" /> : <Check className="size-4 text-green-500" />}
                     </button>
                     <button onClick={e => { e.stopPropagation(); handleReject(a.approval_id); }}
                       className="p-1.5 rounded-md hover:bg-red-50 transition-colors" title="Reject"
                       data-testid={`reject-btn-${a.approval_id}`}>
-                      <X className="w-4 h-4 text-red-500" />
+                      <X className="size-4 text-red-500" />
                     </button>
                   </div>
                 </div>
@@ -473,7 +473,7 @@ export default function ApprovalQueue({ token }) {
 
           {history.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16" data-testid="no-history">
-              <Clock className="w-10 h-10 mb-3" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.4 }} />
+              <Clock className="size-10 mb-3" style={{ color: 'var(--aurem-body-secondary)', opacity: 0.4 }} />
               <p className="text-sm" style={{ color: 'var(--aurem-body-secondary)' }}>No approval history yet</p>
             </div>
           ) : (
@@ -484,9 +484,9 @@ export default function ApprovalQueue({ token }) {
                 <div className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>{ACTION_LABELS[h.action_type] || h.action_type}</div>
                 <div className="flex items-center gap-1">
                   {h.status === 'approved' || h.status === 'auto_approved' || h.status === 'auto_cancel_approved' ? (
-                    <><CheckCircle className="w-3.5 h-3.5 text-green-500" /><span className="text-xs text-green-600">Approved</span></>
+                    <><CheckCircle className="size-3.5 text-green-500" /><span className="text-xs text-green-600">Approved</span></>
                   ) : (
-                    <><XCircle className="w-3.5 h-3.5 text-red-500" /><span className="text-xs text-red-600">Rejected</span></>
+                    <><XCircle className="size-3.5 text-red-500" /><span className="text-xs text-red-600">Rejected</span></>
                   )}
                 </div>
                 <div className="text-xs" style={{ color: 'var(--aurem-body-secondary)' }}>{h.decided_by || (h.status?.includes('auto') ? 'Auto' : 'Manual')}</div>

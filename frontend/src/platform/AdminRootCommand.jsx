@@ -44,7 +44,7 @@ function Card({ title, icon: Icon, color = "#3b82f6", children, onDrill, drillLa
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Icon className="w-5 h-5" style={{ color }} />
+          <Icon className="size-5" style={{ color }} />
           <h3 className="text-sm font-semibold text-gray-100">{title}</h3>
         </div>
         {onDrill && (
@@ -53,7 +53,7 @@ function Card({ title, icon: Icon, color = "#3b82f6", children, onDrill, drillLa
             data-testid={`${testId}-drill`}
             className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300"
           >
-            {drillLabel || "Open"} <ExternalLink className="w-3 h-3" />
+            {drillLabel || "Open"} <ExternalLink className="size-3" />
           </button>
         )}
       </div>
@@ -155,7 +155,7 @@ export default function AdminRootCommand() {
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center" data-testid="root-command-loading">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <Loader2 className="size-8 text-blue-400 animate-spin" />
       </div>
     );
   }
@@ -165,7 +165,7 @@ export default function AdminRootCommand() {
       <div className="min-h-screen bg-gray-950 p-8" data-testid="root-command-error">
         <div className="max-w-2xl mx-auto rounded-lg border border-red-700 bg-red-900/30 p-6">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <AlertTriangle className="size-5 text-red-400" />
             <h2 className="text-lg font-bold text-red-300">Failed to load Root Command</h2>
           </div>
           <p className="text-sm text-red-200/80">{error}</p>
@@ -196,7 +196,7 @@ export default function AdminRootCommand() {
           <div>
             <h1 className="text-3xl font-bold text-gray-50 mb-1">Root Command</h1>
             <p className="text-gray-400 text-sm">
-              Unified Error Intelligence — Root Causes, not Symptoms
+              Unified Error Intelligence, Root Causes, not Symptoms
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -207,7 +207,7 @@ export default function AdminRootCommand() {
               className="flex items-center gap-2 px-3 py-1.5 bg-orange-900/30 border border-orange-700/40 text-orange-200 rounded text-sm hover:bg-orange-800/40"
               title="Open Audit Live Dashboard (SEO + Intelligence rollup)"
             >
-              <TrendingDown className="w-4 h-4" /> Audit Live
+              <TrendingDown className="size-4" /> Audit Live
             </button>
             <button
               onClick={() => window.location.assign("/admin/pillars-map")}
@@ -215,14 +215,14 @@ export default function AdminRootCommand() {
               className="flex items-center gap-2 px-3 py-1.5 bg-amber-900/30 border border-amber-700/40 text-amber-200 rounded text-sm hover:bg-amber-800/40"
               title="Open Pillars Map (Deep-Drill Diagnostic)"
             >
-              <Database className="w-4 h-4" /> Pillars Map
+              <Database className="size-4" /> Pillars Map
             </button>
             <button
               onClick={load}
               data-testid="root-command-refresh"
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded text-sm hover:bg-gray-700"
             >
-              <RefreshCw className="w-4 h-4" /> Refresh
+              <RefreshCw className="size-4" /> Refresh
             </button>
           </div>
         </div>
@@ -273,7 +273,7 @@ export default function AdminRootCommand() {
                 <div className="text-xs text-gray-500 mb-2">Latest Roots</div>
                 {auto.latest_pending.map((f) => (
                   <div key={f.id} className="text-xs text-gray-300 flex items-center gap-2 mb-1">
-                    <FileCode className="w-3 h-3 text-gray-500" />
+                    <FileCode className="size-3 text-gray-500" />
                     <span className="truncate">{f.title || f.category}</span>
                     {f.file && (
                       <span className="text-gray-500 font-mono text-[10px] flex-shrink-0">
@@ -356,7 +356,7 @@ export default function AdminRootCommand() {
               <div className="mt-3 pt-3 border-t border-gray-800">
                 {audit.red_flags.slice(0, 3).map((f, i) => (
                   <div key={i} className="text-xs text-amber-200 mb-1 flex gap-2">
-                    <TrendingDown className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                    <TrendingDown className="size-3 flex-shrink-0 mt-0.5" />
                     <span>{typeof f === "string" ? f : JSON.stringify(f).substring(0, 80)}</span>
                   </div>
                 ))}
@@ -404,7 +404,7 @@ export default function AdminRootCommand() {
               <div className="mt-3 pt-3 border-t border-gray-800">
                 {migrations.recent.map((m, i) => (
                   <div key={i} className="text-xs text-gray-300 mb-2">
-                    <CheckCircle className="w-3 h-3 text-green-400 inline-block mr-1" />
+                    <CheckCircle className="size-3 text-green-400 inline-block mr-1" />
                     <span className="font-mono text-[10px]">{m._id}</span>
                     <div className="text-gray-500 text-[10px]">
                       {m.ran_at ? new Date(m.ran_at).toLocaleString() : "—"}

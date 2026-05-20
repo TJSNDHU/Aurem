@@ -179,7 +179,7 @@ const ForensicUploader = ({ token }) => {
           }}
           title="Help ORA Fix This"
         >
-          <Bug className="w-7 h-7 text-white" />
+          <Bug className="size-7 text-white" />
         </button>
       )}
 
@@ -208,7 +208,7 @@ const ForensicUploader = ({ token }) => {
             justifyContent: 'space-between'
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
-              <Bug className="w-5 h-5 text-[#FF6B6B]" />
+              <Bug className="size-5 text-[#FF6B6B]" />
               <div>
                 <h3 style={{fontSize: 14, fontWeight: 600, color: '#F4F4F4'}}>
                   ORA Forensic Suite
@@ -231,7 +231,7 @@ const ForensicUploader = ({ token }) => {
                 padding: 4
               }}
             >
-              <X className="w-5 h-5" />
+              <X className="size-5" />
             </button>
           </div>
 
@@ -260,7 +260,7 @@ const ForensicUploader = ({ token }) => {
                 justifyContent: 'center'
               }}
             >
-              <Upload className="w-4 h-4" />
+              <Upload className="size-4" />
               Screenshot
             </button>
             <button
@@ -281,7 +281,7 @@ const ForensicUploader = ({ token }) => {
                 justifyContent: 'center'
               }}
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="size-4" />
               Error Log
             </button>
           </div>
@@ -330,7 +330,7 @@ const ForensicUploader = ({ token }) => {
                 }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="w-8 h-8 mx-auto mb-3 text-[#666]" />
+                <Upload className="size-8 mx-auto mb-3 text-[#666]" />
                 <p style={{fontSize: 13, color: '#AAA', marginBottom: 4}}>
                   Drag & drop screenshot here
                 </p>
@@ -391,12 +391,12 @@ const ForensicUploader = ({ token }) => {
                 >
                   {uploading ? (
                     <>
-                      <Loader className="w-4 h-4 animate-spin" />
-                      Analyzing...
+                      <Loader className="size-4 animate-spin" />
+                      Analyzing…
                     </>
                   ) : (
                     <>
-                      <Bug className="w-4 h-4" />
+                      <Bug className="size-4" />
                       Analyze Error
                     </>
                   )}
@@ -409,9 +409,9 @@ const ForensicUploader = ({ token }) => {
               <div style={{marginTop: 16, padding: 12, background: '#050505', border: '1px solid #1A1A1A', borderRadius: 8}}>
                 <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8}}>
                   {result.analysis?.confidence_score > 0.7 ? (
-                    <CheckCircle className="w-4 h-4 text-[#4A4]" />
+                    <CheckCircle className="size-4 text-[#4A4]" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-[#FA4]" />
+                    <AlertCircle className="size-4 text-[#FA4]" />
                   )}
                   <span style={{fontSize: 12, fontWeight: 600, color: '#F4F4F4'}}>
                     Analysis Complete
@@ -454,9 +454,9 @@ const ForensicUploader = ({ token }) => {
 
             {uploading && mode === 'screenshot' && (
               <div style={{marginTop: 16, textAlign: 'center'}}>
-                <Loader className="w-8 h-8 mx-auto mb-3 animate-spin text-[#FF6B6B]" />
+                <Loader className="size-8 mx-auto mb-3 animate-spin text-[#FF6B6B]" />
                 <p style={{fontSize: 12, color: '#888'}}>
-                  ORA is analyzing your screenshot...
+                  ORA is analyzing your screenshot…
                 </p>
               </div>
             )}

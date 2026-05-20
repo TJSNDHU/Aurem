@@ -1,5 +1,5 @@
 """
-AUREM AI Router — Completely Separate from ReRoots
+AUREM AI Router — Completely Separate from AUREM
 Brand: AUREM by Polaris Built Inc.
 Products: OROÉ only
 """
@@ -17,7 +17,7 @@ from pydantic import BaseModel
 # Load environment variables
 load_dotenv(override=False)
 
-# Import AUREM-specific prompt (separate from any ReRoots prompts)
+# Import AUREM-specific prompt (separate from any AUREM prompts)
 from utils.aurem_prompt import AUREM_SYSTEM_PROMPT, AUREM_WELCOME_MESSAGE, QUICK_OPTIONS
 
 # Import Emergent LLM integration

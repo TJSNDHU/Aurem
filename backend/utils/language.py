@@ -12,7 +12,7 @@ Features:
 
 Supported: 40+ languages including all RTL languages
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -289,7 +289,7 @@ Your task is to translate text to {target_name} ({target_native}).
 
 RULES:
 1. Maintain the same tone, style, and formatting
-2. Keep brand names unchanged (AURA-GEN, Reroots, etc.)
+2. Keep brand names unchanged (AURA-GEN, AUREM, etc.)
 3. Keep product names in English unless there's a standard translation
 4. For skincare terms, use the commonly accepted local terminology
 5. If the text is already in {target_name}, return it unchanged
@@ -326,7 +326,7 @@ RULES:
 async def translate_ai_response(
     response: str,
     customer_language: str,
-    brand_name: str = "Reroots"
+    brand_name: str = "AUREM"
 ) -> str:
     """
     Translate AI response to customer's language.
@@ -512,7 +512,7 @@ LANGUAGE REQUIREMENT: Respond in {lang_name} ({native_name})
 The customer is communicating in {lang_name}. You MUST:
 1. Respond ENTIRELY in {lang_name} ({native_name})
 2. Use natural, fluent {lang_name} - not robotic translation
-3. Keep brand names in English: AURA-GEN, Reroots, etc.
+3. Keep brand names in English: AURA-GEN, AUREM, etc.
 4. Use locally appropriate skincare terminology
 5. Match the customer's formality level{rtl_note}
 ═══════════════════════════════════════════════════════════════════"""
@@ -630,7 +630,7 @@ def get_country_name(country_code: str) -> str:
         return country_code
 
 
-def get_voice_greeting(language_code: str, brand_name: str = "Reroots") -> str:
+def get_voice_greeting(language_code: str, brand_name: str = "AUREM") -> str:
     """
     Get voice greeting in specified language.
     

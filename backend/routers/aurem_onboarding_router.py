@@ -381,7 +381,7 @@ async def pixel_verify(tenant_id: str, body: Dict[str, Any]):
     On success: marks aurem_onboarding.pixel_installed=true, completes
     install_pixel task, triggers first scan, and queues activation email.
 
-    Body: { "domain": "https://reroots.ca" }
+    Body: { "domain": "https://aurem.live" }
     """
     import httpx
     db = _get_db()

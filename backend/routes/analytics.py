@@ -1,5 +1,5 @@
 """
-ReRoots Admin Analytics Routes
+AUREM Admin Analytics Routes
 Extracted from server.py to reduce main file size
 """
 from fastapi import APIRouter, Depends, HTTPException

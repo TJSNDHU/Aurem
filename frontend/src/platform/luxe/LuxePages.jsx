@@ -1057,7 +1057,7 @@ const VoiceCard = ({ token }) => {
         <ol style={{ marginTop: 10, color: TEXT_MD, fontFamily: fontBody, fontSize: 12, lineHeight: 1.7, paddingLeft: 18 }}>
           <li>Sign in to <a href="https://www.retellai.com" target="_blank" rel="noreferrer" style={{ color: GOLD_HI }}>retellai.com</a> and create an API key.</li>
           <li>Open Emergent → Env Variables → add <code style={{ color: GOLD_HI }}>RETELL_API_KEY</code>.</li>
-          <li>Redeploy — ORA picks up calls 24×7.</li>
+          <li>Redeploy, ORA picks up calls 24×7.</li>
         </ol>
       )}
       <button data-testid="voice-refresh" onClick={refresh}
@@ -1088,7 +1088,7 @@ const BookingCard = ({ token }) => {
     <Card testid="settings-booking">
       <SectionLabel>Booking Widget</SectionLabel>
       <div style={{ color: TEXT_MD, fontFamily: fontBody, fontSize: 12, marginBottom: 10 }}>
-        Drop the AUREM widget on your site — visitors can book straight from the ORA chat (Name · Phone · Service · Slot).
+        Drop the AUREM widget on your site, visitors can book straight from the ORA chat (Name · Phone · Service · Slot).
       </div>
       <div data-testid="booking-snippet" style={{
         padding: 12, borderRadius: 10, background: 'rgba(0,0,0,0.45)',

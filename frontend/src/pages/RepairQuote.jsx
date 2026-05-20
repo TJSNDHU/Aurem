@@ -246,7 +246,7 @@ const RepairQuote = () => {
 
         <div className="mb-10">
           <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-400 mb-3">
-            <FileSearch className="w-3 h-3" /> AUREM Repair · Free Audit
+            <FileSearch className="size-3" /> AUREM Repair · Free Audit
           </div>
           <h1 className="text-4xl sm:text-5xl font-semibold leading-tight mb-3">
             Free 6-point audit of your website.
@@ -254,7 +254,7 @@ const RepairQuote = () => {
             <span className="text-amber-400">In 30 seconds.</span>
           </h1>
           <p className="text-zinc-400 text-base">
-            Drop your URL — we run SSL · speed · mobile · broken links · contact form ·
+            Drop your URL, we run SSL · speed · mobile · broken links · contact form ·
             social signals · copyright year. Report goes to your inbox + a fixed-price
             repair quote within 24h.
           </p>
@@ -342,11 +342,11 @@ const RepairQuote = () => {
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Auditing…
+                  <Loader2 className="size-4 animate-spin" /> Auditing…
                 </>
               ) : (
                 <>
-                  <FileSearch className="w-4 h-4" /> Run free audit
+                  <FileSearch className="size-4" /> Run free audit
                 </>
               )}
             </button>
@@ -370,7 +370,7 @@ const RepairQuote = () => {
                   />
                 </div>
                 <p className="text-[10.5px] text-zinc-500 text-center">
-                  Real audit in flight — Playwright + Google PageSpeed.
+                  Real audit in flight, Playwright + Google PageSpeed.
                 </p>
               </div>
             )}
@@ -390,8 +390,8 @@ const RepairQuote = () => {
               onClick={() => { setShowNoSite(true); setNwsResult(null); setNwsError(""); }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/15 text-amber-300 text-[13px] font-medium transition"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              I don't have a website — build me a free one (7-day trial)
+              <Sparkles className="size-3.5" />
+              I don't have a website, build me a free one (7-day trial)
             </button>
           </div>
         )}
@@ -406,7 +406,7 @@ const RepairQuote = () => {
             <div className="flex items-start justify-between gap-3 mb-2">
               <div>
                 <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-400 mb-1">
-                  <Sparkles className="w-3 h-3" /> Free Starter Site · 7-day Trial
+                  <Sparkles className="size-3" /> Free Starter Site · 7-day Trial
                 </div>
                 <h3 className="text-xl font-semibold">Build my website now</h3>
                 <p className="text-zinc-400 text-[13px] mt-1">
@@ -493,7 +493,7 @@ const RepairQuote = () => {
             {/* iter 322ad — retention fix #1: customer-supplied services */}
             <div>
               <label className="text-[11px] uppercase tracking-wider text-zinc-500">
-                Your Top Services <span className="text-zinc-600 normal-case tracking-normal">(optional — helps personalise your site)</span>
+                Your Top Services <span className="text-zinc-600 normal-case tracking-normal">(optional, helps personalise your site)</span>
               </label>
               <input
                 data-testid="nws-services"
@@ -512,7 +512,7 @@ const RepairQuote = () => {
             {/* iter 322ad — retention fix #4: brand-color extraction URL */}
             <div>
               <label className="text-[11px] uppercase tracking-wider text-zinc-500">
-                Existing Website or Facebook URL <span className="text-zinc-600 normal-case tracking-normal">(optional — we'll match your brand colors)</span>
+                Existing Website or Facebook URL <span className="text-zinc-600 normal-case tracking-normal">(optional, we'll match your brand colors)</span>
               </label>
               <input
                 data-testid="nws-website-url"
@@ -528,7 +528,7 @@ const RepairQuote = () => {
             {/* iter 322ae — direct review-source URL for instant real reviews */}
             <div>
               <label className="text-[11px] uppercase tracking-wider text-zinc-500">
-                Your Google Business or Birdeye URL <span className="text-zinc-600 normal-case tracking-normal">(optional — we'll pull your real reviews)</span>
+                Your Google Business or Birdeye URL <span className="text-zinc-600 normal-case tracking-normal">(optional, we'll pull your real reviews)</span>
               </label>
               <input
                 data-testid="nws-reviews-url"
@@ -601,7 +601,7 @@ const RepairQuote = () => {
               data-testid="nws-submit"
               className="w-full bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold py-3.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
             >
-              {nwsLoading ? (<><Loader2 className="w-4 h-4 animate-spin" /> Building your site…</>) : (<><Sparkles className="w-4 h-4" /> Build my free site</>)}
+              {nwsLoading ? (<><Loader2 className="size-4 animate-spin" /> Building your site…</>) : (<><Sparkles className="size-4" /> Build my free site</>)}
             </button>
           </form>
         )}
@@ -612,7 +612,7 @@ const RepairQuote = () => {
           <div data-testid="nws-result" className="mt-6 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-zinc-950/70 p-6 space-y-5">
             <div>
               <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest text-amber-300 mb-2">
-                <Check className="w-3 h-3" /> You're signed in
+                <Check className="size-3" /> You're signed in
               </div>
               <h3 className="text-2xl font-semibold">Welcome to AUREM 👋</h3>
               <p className="text-zinc-400 text-sm mt-2">
@@ -636,7 +636,7 @@ const RepairQuote = () => {
             </div>
 
             <div className="text-[12px] text-zinc-500 flex items-center gap-2">
-              <Loader2 className="w-3 h-3 animate-spin" />
+              <Loader2 className="size-3 animate-spin" />
               Auto-redirecting to your dashboard…
             </div>
 
@@ -648,7 +648,7 @@ const RepairQuote = () => {
                 data-testid="nws-view-site"
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/15 text-amber-300 font-medium transition"
               >
-                <Globe2 className="w-4 h-4" /> View my sample site
+                <Globe2 className="size-4" /> View my sample site
               </a>
               <button
                 type="button"
@@ -656,7 +656,7 @@ const RepairQuote = () => {
                 data-testid="nws-go-dashboard"
                 className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold transition"
               >
-                Go to dashboard now <ArrowRight className="w-4 h-4" />
+                Go to dashboard now <ArrowRight className="size-4" />
               </button>
             </div>
           </div>
@@ -696,7 +696,7 @@ const RepairQuote = () => {
                       data-testid={`repair-quote-breakdown-${key}`}
                       className="flex items-center gap-3 p-3 rounded-lg bg-black/40 border border-zinc-900"
                     >
-                      <Icon className="w-4 h-4 text-amber-400 shrink-0" />
+                      <Icon className="size-4 text-amber-400 shrink-0" />
                       <div className="flex-1">
                         <div className="text-[12px] text-zinc-300">{label}</div>
                         <div className="h-1.5 rounded-full bg-zinc-900 overflow-hidden mt-1.5">
@@ -778,8 +778,8 @@ const RepairQuote = () => {
                 data-testid="repair-quote-next-btn"
                 className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-300 hover:from-amber-400 hover:to-amber-200 text-black font-semibold transition shadow-lg shadow-amber-500/20"
               >
-                Next — Open my AUREM dashboard
-                <ArrowRight className="w-4 h-4" />
+                Next, Open my AUREM dashboard
+                <ArrowRight className="size-4" />
               </a>
 
               <div className="mt-3">

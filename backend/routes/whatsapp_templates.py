@@ -29,7 +29,7 @@ def generate_whatsapp_link(phone: str, message: str) -> str:
 
 def day_0_message(name: str, loyalty_balance: int) -> str:
     """DAY 0 — Welcome message"""
-    return f"""Hi {name}! 🌿 Welcome to ReRoots!
+    return f"""Hi {name}! 🌿 Welcome to AUREM!
 
 Your AURA-GEN PDRN+TXA Serum is on its way.
 
@@ -41,7 +41,7 @@ Here's what to expect:
 Your Roots balance: {loyalty_balance} Roots ✨
 
 Questions? Reply anytime 🙏
-- Tj, ReRoots Founder"""
+- Tj, AUREM Founder"""
 
 
 def day_7_message(name: str, loyalty_balance: int) -> str:
@@ -67,7 +67,7 @@ def day_14_message(name: str, loyalty_balance: int) -> str:
 2 weeks in! Early brightening should be
 visible as TXA activates ✨
 
-Tag @reroots.ca on Instagram
+Tag @aurem.live on Instagram
 and earn 50 Roots! 📸
 
 Your balance: {loyalty_balance} Roots"""
@@ -75,7 +75,7 @@ Your balance: {loyalty_balance} Roots"""
 
 def day_21_message(name: str, token: str, loyalty_balance: int) -> str:
     """DAY 21 — Review request message"""
-    review_url = f"reroots.ca/review/{token}"
+    review_url = f"aurem.live/review/{token}"
     return f"""Hi {name}! 🙏
 
 3 weeks — full PDRN cycle complete!
@@ -97,7 +97,7 @@ def day_25_message(name: str, loyalty_balance: int) -> str:
 Your AURA-GEN is likely running low.
 Don't break your skin cycle!
 
-Reorder now → reroots.ca 📦
+Reorder now → aurem.live 📦
 
 {loyalty_balance} Roots = ${loyalty_value:.2f} off 💰"""
 
@@ -110,7 +110,7 @@ def day_28_message(name: str, loyalty_balance: int) -> str:
 28 days — full biotech regeneration done!
 
 Ready for round 2?
-reroots.ca/bundles 📦
+aurem.live/bundles 📦
 
 Your Roots: {loyalty_balance}
 {goal}"""
@@ -120,12 +120,12 @@ def day_35_message(name: str, loyalty_balance: int, discount_code: str = "COMEBA
     """DAY 35 — Win-back message"""
     return f"""Hi {name}! 🌿
 
-Miss you at ReRoots.
+Miss you at AUREM.
 
 Personal offer: {discount_code} — {discount_pct}% off
 Valid 7 days 💙
 
-👉 reroots.ca
+👉 aurem.live
 
 Roots waiting: {loyalty_balance}"""
 
@@ -395,7 +395,7 @@ New balance: {new_balance} Roots
 
 {goal}
 
-View balance: reroots.ca/account 🌿"""
+View balance: aurem.live/account 🌿"""
 
 
 def redemption_confirmed_message(name: str, points_redeemed: int, discount: float, new_balance: int) -> str:
@@ -407,8 +407,8 @@ def redemption_confirmed_message(name: str, points_redeemed: int, discount: floa
 Remaining balance: {new_balance} Roots
 (${new_balance * 0.05:.2f} value)
 
-Thank you for shopping ReRoots 🌿
-reroots.ca"""
+Thank you for shopping AUREM 🌿
+aurem.live"""
 
 
 def gift_sent_message(name: str, points_gifted: int, recipient_email: str, new_balance: int, is_new: bool = False) -> str:
@@ -421,7 +421,7 @@ You gifted {points_gifted} Roots to {recipient_email}{bonus}
 Your new balance: {new_balance} Roots
 (${new_balance * 0.05:.2f} value)
 
-Thank you for sharing ReRoots 🌿"""
+Thank you for sharing AUREM 🌿"""
 
 
 def gift_received_message(name: str, points_gifted: int, new_balance: int) -> str:
@@ -433,7 +433,7 @@ def gift_received_message(name: str, points_gifted: int, new_balance: int) -> st
 
 Your balance: {new_balance} Roots
 
-Redeem at reroots.ca 🌿"""
+Redeem at aurem.live 🌿"""
 
 
 def review_thankyou_message(name: str, new_balance: int) -> str:
@@ -444,10 +444,10 @@ def review_thankyou_message(name: str, new_balance: int) -> str:
 New balance: {new_balance} Roots
 (${new_balance * 0.05:.2f} value)
 
-Love ReRoots? Leave a Google review too 💙
+Love AUREM? Leave a Google review too 💙
 {GOOGLE_REVIEW_LINK}
 
-reroots.ca 🌿"""
+aurem.live 🌿"""
 
 
 # ═══════════════════════════════════════════════════════════
@@ -458,14 +458,14 @@ def birthday_bonus_message(name: str, new_balance: int) -> str:
     """Birthday bonus notification."""
     return f"""🎂 Happy Birthday {name}!
 
-ReRoots is celebrating with you 🎉
+AUREM is celebrating with you 🎉
 We just added 100 Roots to your account!
 
 New balance: {new_balance} Roots
 (${new_balance * 0.05:.2f} value)
 
 Treat yourself today 🌿
-reroots.ca"""
+aurem.live"""
 
 
 def referral_bonus_message(name: str, new_balance: int) -> str:
@@ -476,8 +476,8 @@ You earned 500 Roots 🌟
 New balance: {new_balance} Roots
 (${new_balance * 0.05:.2f} value)
 
-Thank you for sharing ReRoots 💙
-reroots.ca 🌿"""
+Thank you for sharing AUREM 💙
+aurem.live 🌿"""
 
 
 async def notify_birthday_bonus(db, customer: dict, new_balance: int) -> str:

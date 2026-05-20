@@ -2,7 +2,7 @@
 /* This file provides CSS custom properties for brand-specific styling */
 
 :root {
-  /* Default brand colors (ReRoots) */
+  /* Default brand colors (AUREM) */
   --brand-primary: #F8A5B8;
   --brand-secondary: #4a7c59;
   --brand-accent: #E88DA0;
@@ -39,7 +39,7 @@
 
 /* ============================================
    LA VELA BIANCA THEME — REMOVED (iter 322ar cleanup)
-   La Vela was a separate business (reroots.ca), not AUREM. Theme
+   La Vela was a separate business (aurem.live), not AUREM. Theme
    removed completely. AUREM uses the Obsidian/Gold theme only.
    ============================================ */
 

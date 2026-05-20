@@ -54,7 +54,7 @@ class DatabaseReadinessMiddleware:
 
 
 # ============= BRAND DETECTION MIDDLEWARE =============
-# Multi-tenant: Detects brand from host header for lavelabianca.com vs reroots.ca
+# Multi-tenant: Detects brand from host header for lavelabianca.com vs aurem.live
 class BrandDetectionMiddleware:
     """Multi-tenant brand detection - Pure ASGI middleware"""
     

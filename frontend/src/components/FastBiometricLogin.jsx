@@ -140,9 +140,9 @@ const FastBiometricLogin = ({ onSuccess, onFallbackToPassword }) => {
         border: loading ? 'none' : '2px solid #333'
       }}>
         {loading ? (
-          <div className="w-10 h-10 border-3 border-[#050505] border-t-transparent rounded-full animate-spin" />
+          <div className="size-10 border-3 border-[#050505] border-t-transparent rounded-full animate-spin" />
         ) : (
-          <Fingerprint className="w-10 h-10 text-[#D4AF37]" />
+          <Fingerprint className="size-10 text-[#D4AF37]" />
         )}
       </div>
 
@@ -180,7 +180,7 @@ const FastBiometricLogin = ({ onSuccess, onFallbackToPassword }) => {
           gap: 8,
           width: '100%'
         }}>
-          <AlertCircle className="w-4 h-4 text-[#F44]" />
+          <AlertCircle className="size-4 text-[#F44]" />
           <span style={{ fontSize: 12, color: '#F88' }}>{error}</span>
         </div>
       )}
@@ -204,7 +204,7 @@ const FastBiometricLogin = ({ onSuccess, onFallbackToPassword }) => {
             gap: 8
           }}
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="size-5" />
           Use Password Instead
         </button>
       )}

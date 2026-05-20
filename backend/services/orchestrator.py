@@ -1,5 +1,5 @@
 """
-Central Orchestrator - The Brain of ReRoots Autonomous Systems
+Central Orchestrator - The Brain of AUREM Autonomous Systems
 ═══════════════════════════════════════════════════════════════════
 Unifies all 6 autonomous systems into one intelligent loop:
 - Auto-Heal (crash recovery)
@@ -11,7 +11,7 @@ Unifies all 6 autonomous systems into one intelligent loop:
 
 ONE brain. ONE loop. ONE WhatsApp message.
 ═══════════════════════════════════════════════════════════════════
-© 2025 Reroots Aesthetics Inc. All rights reserved.
+© 2025 AUREM Aesthetics Inc. All rights reserved.
 """
 
 import os
@@ -171,7 +171,7 @@ class Orchestrator:
         recovered = False
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                health_url = os.environ.get('FRONTEND_URL', 'https://reroots.ca')
+                health_url = os.environ.get('FRONTEND_URL', 'https://aurem.live')
                 r = await client.get(f"{health_url}/api/health")
                 recovered = r.status_code == 200
         except Exception:

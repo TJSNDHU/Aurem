@@ -1,5 +1,5 @@
 """
-Email Routes for Reroots
+Email Routes for AUREM
 API endpoints for email automation system
 """
 
@@ -153,7 +153,7 @@ async def get_email_logs_endpoint(
 
 
 @router.get("/preview/{email_type}")
-async def preview_email(request: Request, email_type: str, customer_email: str = "demo@reroots.ca"):
+async def preview_email(request: Request, email_type: str, customer_email: str = "demo@aurem.live"):
     """Preview email template with sample content"""
     user = await get_current_user(request)
     if not user or not (user.get("role") == "admin" or user.get("is_admin")):

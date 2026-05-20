@@ -39,8 +39,8 @@ const AnalyticsDashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading analytics...</p>
+          <div className="animate-spin rounded-full size-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading analytics…</p>
         </div>
       </div>
     );
@@ -92,7 +92,7 @@ const AnalyticsDashboard = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600">Total Leads</h3>
-              <Users className="w-5 h-5 text-pink-600" />
+              <Users className="size-5 text-pink-600" />
             </div>
             <p className="text-3xl font-bold text-gray-900">{insights.total_leads.toLocaleString()}</p>
             <p className="text-sm text-gray-500 mt-2">
@@ -108,7 +108,7 @@ const AnalyticsDashboard = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600">Industries</h3>
-              <Briefcase className="w-5 h-5 text-pink-600" />
+              <Briefcase className="size-5 text-pink-600" />
             </div>
             <p className="text-3xl font-bold text-gray-900">
               {Object.keys(insights.by_industry || {}).length}
@@ -119,7 +119,7 @@ const AnalyticsDashboard = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600">Countries</h3>
-              <Globe className="w-5 h-5 text-pink-600" />
+              <Globe className="size-5 text-pink-600" />
             </div>
             <p className="text-3xl font-bold text-gray-900">
               {Object.keys(insights.by_geography || {}).length}
@@ -133,7 +133,7 @@ const AnalyticsDashboard = () => {
           {/* Industry Breakdown */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Briefcase className="w-5 h-5 text-pink-600" />
+              <Briefcase className="size-5 text-pink-600" />
               <h3 className="text-lg font-semibold text-gray-900">Top Industries</h3>
             </div>
             
@@ -161,7 +161,7 @@ const AnalyticsDashboard = () => {
           {/* Geographic Distribution */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Globe className="w-5 h-5 text-pink-600" />
+              <Globe className="size-5 text-pink-600" />
               <h3 className="text-lg font-semibold text-gray-900">Top Countries</h3>
             </div>
             
@@ -191,7 +191,7 @@ const AnalyticsDashboard = () => {
         {insights.trending_topics && insights.trending_topics.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
             <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5 text-pink-600" />
+              <MessageSquare className="size-5 text-pink-600" />
               <h3 className="text-lg font-semibold text-gray-900">Trending Topics</h3>
             </div>
             
@@ -211,7 +211,7 @@ const AnalyticsDashboard = () => {
         {/* Privacy Notice */}
         <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
           <div className="flex gap-3">
-            <BarChart3 className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5" />
+            <BarChart3 className="size-5 text-gray-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-gray-700">
               <p className="font-semibold mb-1">Privacy-First Analytics</p>
               <p className="text-gray-600">

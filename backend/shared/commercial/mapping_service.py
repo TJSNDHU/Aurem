@@ -133,7 +133,7 @@ class AgentLookupTable:
             model="gpt-4o",  # Premium model for VIP
             temperature=0.6,
             welcome_message=(
-                "Good day! This is your personal skincare consultant from ReRoots. "
+                "Good day! This is your personal skincare consultant from AUREM. "
                 "I'm delighted to assist you with our PDRN treatments and premium skincare solutions."
             ),
             knowledge_base_ids=["kb_pdrn", "kb_skincare_products", "kb_treatments"],
@@ -149,14 +149,14 @@ class AgentLookupTable:
             voice_id="alloy",
             model="gpt-4o-mini",
             temperature=0.7,
-            welcome_message="Hello! Welcome to ReRoots. How can I help with your skincare needs today?",
+            welcome_message="Hello! Welcome to AUREM. How can I help with your skincare needs today?",
             knowledge_base_ids=["kb_pdrn", "kb_skincare_products"],
             can_transfer_to=["skincare_vip", "support"]
         )
         
         reroots_config = BusinessConfig(
             business_id="reroots",
-            name="ReRoots Skincare",
+            name="AUREM Skincare",
             vertical=BusinessVertical.SKINCARE,
             primary_agent=skincare_vip_agent,
             secondary_agents=[skincare_standard_agent],

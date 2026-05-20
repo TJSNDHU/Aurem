@@ -231,7 +231,7 @@ export default function AdminAntigravitySkills() {
       {/* Selection + broadcast */}
       {selCount > 0 && (
         <div data-testid="skills-selection-bar" style={{ position: "sticky", top: 10, zIndex: 9, marginBottom: 16, padding: "12px 16px", borderRadius: 12, background: `linear-gradient(135deg, rgba(212,175,55,0.18), rgba(255,107,0,0.10))`, border: `1px solid ${COLORS.accent}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span><strong>{selCount}</strong> skill(s) selected — ready to broadcast to all 28 agents</span>
+          <span><strong>{selCount}</strong> skill(s) selected, ready to broadcast to all 28 agents</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setSelected(new Set())} style={btnGhost} data-testid="skills-clear-sel">Clear</button>
             <button onClick={broadcast} disabled={busyBroadcast} style={btnAccent} data-testid="skills-broadcast-btn">

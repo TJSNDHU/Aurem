@@ -1,6 +1,6 @@
 """
-API Key Manager for Reroots AI
-Proprietary API key system for controlling access to Reroots AI endpoints.
+API Key Manager for AUREM AI
+Proprietary API key system for controlling access to AUREM AI endpoints.
 
 Features:
 - Create/revoke API keys for external clients
@@ -128,7 +128,7 @@ async def validate_api_key(api_key: str) -> Dict[str, Any]:
         return {
             "valid": True,
             "internal": True,
-            "client_name": "Reroots Internal",
+            "client_name": "AUREM Internal",
             "tier": "unlimited",
             "remaining": -1
         }
@@ -333,9 +333,9 @@ def require_api_key(func):
         from fastapi import HTTPException
         
         # Get API key from header
-        api_key = request.headers.get("X-Reroots-API-Key")
+        api_key = request.headers.get("X-AUREM-API-Key")
         
-        # Check for internal request (from reroots.ca frontend)
+        # Check for internal request (from aurem.live frontend)
         origin = request.headers.get("Origin", "")
         referer = request.headers.get("Referer", "")
         
@@ -343,8 +343,8 @@ def require_api_key(func):
         internal_origins = [
             "https://aurem.live",
             "https://www.aurem.live",
-            "https://reroots.ca",
-            "https://www.reroots.ca",
+            "https://aurem.live",
+            "https://www.aurem.live",
             "http://localhost:3000",
         ]
         
@@ -361,7 +361,7 @@ def require_api_key(func):
         if not api_key:
             raise HTTPException(
                 status_code=401,
-                detail="Missing X-Reroots-API-Key header. Contact reroots.ca for access."
+                detail="Missing X-AUREM-API-Key header. Contact aurem.live for access."
             )
         
         # Validate the key
@@ -370,7 +370,7 @@ def require_api_key(func):
         if not validation.get("valid"):
             raise HTTPException(
                 status_code=401,
-                detail=validation.get("error", "Invalid or expired Reroots AI API key. Contact reroots.ca for access.")
+                detail=validation.get("error", "Invalid or expired AUREM AI API key. Contact aurem.live for access.")
             )
         
         # Add key info to request state for tracking

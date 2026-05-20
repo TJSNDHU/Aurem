@@ -260,7 +260,7 @@ export default function AWBCockpit() {
         {recent.length === 0 && (
           <div style={{ color: '#7A7468', fontSize: 12, padding: 20,
                         textAlign: 'center', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>
-            Nothing built yet — fire a batch above.
+            Nothing built yet, fire a batch above.
           </div>
         )}
         <div data-testid="awb-recent-list" style={{ display: 'grid',

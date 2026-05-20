@@ -14,7 +14,7 @@
  *
  * Implementation notes:
  *   - useLayoutEffect fires BEFORE browser paint, so the scroll reset
- *     happens on the very first frame — no visible jump.
+ *     happens on the very first frame, no visible jump.
  *   - We walk up from the shell until we hit <body>, resetting scrollTop on
  *     every ancestor that can scroll (including overflow-hidden containers
  *     that Chrome silently scrolls via scrollIntoView on focused children).
