@@ -2391,6 +2391,13 @@ try:
     async def _wire_scout_diagnose():
         from server import db as _bound_db  # type: ignore
         _set_scout_diagnose_db(_bound_db)
+        # iter 324l — also wire the replenish-cron DB so /cron-trigger works.
+        try:
+            from services.scout_replenish_cron import set_db as _set_cron_db
+            _set_cron_db(_bound_db)
+        except Exception as _err:
+            import logging as _l2
+            _l2.getLogger(__name__).warning(f"[INLINE] scout_replenish_cron DB wire failed: {_err}")
 except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] scout_diagnose wire failed: {_e}")

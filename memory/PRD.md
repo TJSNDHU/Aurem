@@ -1,6 +1,29 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324l — SCOUT REPLENISH CRON (P1) (2026-05-20)**
+>
+> ## Shipped
+> - **`services/scout_replenish_cron.py`** — APScheduler job that auto-tops the campaign_leads queue using OSM hunts every 120 min. Walks an 8 city × 8 industry matrix one cell per tick. Skips when queue ≥ target (default 80). Logs each run to `scout_replenish_runs` with cursor stored in `scout_replenish_cursor`.
+> - **`routers/scout_diagnose_router.py`** — added 2 admin endpoints:
+>   - `GET  /api/admin/scout/cron-status` → config + queue depth + next cell + last 10 runs.
+>   - `POST /api/admin/scout/cron-trigger?force=true` → manually fire one tick.
+> - **`routers/registry.py`** — hooked `install_scheduler(aurem_scheduler)` after the Sentinel repair loop so the cron registers at boot alongside the other 67 jobs.
+> - **Config knobs (env)**: `AUREM_SCOUT_CRON_INTERVAL_MIN` (def 120), `AUREM_SCOUT_QUEUE_TARGET` (def 80), `AUREM_SCOUT_PER_RUN_CAP` (def 20), `AUREM_SCOUT_CITIES`, `AUREM_SCOUT_INDUSTRIES`.
+> - **`tests/test_scout_replenish_cron.py`** — 4/4 unit tests pass (config defaults, env override, no-db guard, scheduler install).
+>
+> ## E2E verification on preview
+> 1. `GET /api/admin/scout/cron-status` → `interval=120`, `target=80`, `matrix=64 cells`, `queue_depth=121`.
+> 2. `POST /cron-trigger?force=true` × 4 — cursor walked plumber → electrician → hvac → hair_salon → auto_repair across Mississauga in 2.2–5.9s each. All correctly logged to `scout_replenish_runs`.
+> 3. `POST /cron-trigger?force=false` with queue=119, target=80 → correctly skipped with reason `queue_depth 119 >= target 80`.
+> 4. `GET /api/admin/scheduler/count` → 68 jobs, includes `scout_replenish_cron`.
+>
+> ## What this fixes
+> Previously the auto-blast queue could starve to 0 (e.g. yesterday `zero_sent_streak: 333`) when leads ran out. Now the cron auto-refills before that happens. At 12 leads/cycle × 5 cycles/hour = 60 sends/hour → 80-lead target maintained autonomously.
+>
+> ---
+
+
 > **🟢 ITER 324j — CAMPAIGN ENGINE UNSTARVED (OSM EMERGENCY PATH) (2026-05-19)**
 >
 > ## Root cause of `zero_sent_streak: 333`

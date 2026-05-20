@@ -2778,6 +2778,18 @@ def register_all_routers(app, db):
         except Exception as sr_e:
             logger.warning(f"[REGISTRY] Sentinel repair loop schedule failed: {sr_e}")
 
+        # iter 324l — Scout Replenish Cron. Keeps campaign_leads queue topped
+        # up via OSM hunts every 2h so auto_blast_engine never starves.
+        try:
+            from services.scout_replenish_cron import (
+                install_scheduler as _install_scout_cron,
+                set_db as _set_scout_cron_db,
+            )
+            _set_scout_cron_db(db)
+            _install_scout_cron(aurem_scheduler)
+        except Exception as sc_e:
+            logger.warning(f"[REGISTRY] Scout replenish cron schedule failed: {sc_e}")
+
         # iter 323g — Pixel → ORA Bridge (5 min cron, no LLM call inside)
         try:
             from services.pixel_to_ora_bridge import PixelToOraBridge

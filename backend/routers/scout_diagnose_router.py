@@ -422,3 +422,51 @@ async def get_hunt_job(job_id: str):
     if not job:
         raise HTTPException(404, "Job not found")
     return job
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Replenish Cron — admin endpoints
+# ──────────────────────────────────────────────────────────────────────
+@router.get("/cron-status")
+async def cron_status():
+    """Return cron config + last 10 replenish runs + current queue depth."""
+    if _db is None:
+        raise HTTPException(503, "Database unavailable")
+
+    from services import scout_replenish_cron as cron
+
+    cities = cron._cities()
+    industries = cron._industries()
+    cursor = await cron._get_cursor()
+    queue_depth = await cron._current_queue_depth()
+
+    runs = []
+    async for r in _db.scout_replenish_runs.find(
+        {}, {"_id": 0, "summary": 0}
+    ).sort("started_at", -1).limit(10):
+        runs.append(r)
+
+    return {
+        "enabled": True,
+        "config": {
+            "interval_minutes": cron._interval_min(),
+            "queue_target": cron._queue_target(),
+            "per_run_cap": cron._per_run_cap(),
+            "cities": cities,
+            "industries": industries,
+            "matrix_size": len(cities) * len(industries),
+        },
+        "queue_depth_now": queue_depth,
+        "next_cell": {
+            "city": cities[cursor["city_idx"] % len(cities)],
+            "industry": industries[cursor["ind_idx"] % len(industries)],
+        },
+        "recent_runs": runs,
+    }
+
+
+@router.post("/cron-trigger")
+async def cron_trigger(force: bool = True):
+    """Manually fire one cron tick (bypasses queue-target check by default)."""
+    from services.scout_replenish_cron import replenish_tick
+    return await replenish_tick(force=force)
