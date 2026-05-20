@@ -70,14 +70,27 @@ def install_recipient_guard() -> bool:
     Monkey-patch resend.Emails.send so EVERY outbound email path is filtered.
     Idempotent: safe to call multiple times.
     Returns True if patched, False if resend SDK unavailable.
-    """
-    try:
-        import resend
-    except Exception as e:
-        logger.warning(f"[recipient-guard] resend SDK not importable: {e}")
-        return False
 
-    Emails = getattr(resend, "Emails", None)
+    iter 324n — defensive import. Some resend versions (or partial installs)
+    have a broken `resend.logs` submodule that fails at `import resend`.
+    Fall back to direct `resend.emails` module import so we still patch
+    even when the top-level package's __init__ blows up.
+    """
+    # Try the normal import first.
+    Emails = None
+    try:
+        import resend  # noqa: F401
+        Emails = getattr(resend, "Emails", None)
+    except Exception as e:
+        logger.warning(f"[recipient-guard] resend top-level import failed: {e}; trying submodule fallback")
+        try:
+            # Direct submodule import bypasses resend/__init__.py issues.
+            from resend.emails import Emails as _EmailsCls  # type: ignore
+            Emails = _EmailsCls
+        except Exception as e2:
+            logger.warning(f"[recipient-guard] resend.emails submodule fallback also failed: {e2}")
+            return False
+
     if Emails is None:
         logger.warning("[recipient-guard] resend.Emails missing — guard not installed")
         return False

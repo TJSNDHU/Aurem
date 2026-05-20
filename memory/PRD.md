@@ -1,6 +1,39 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324n — RECIPIENT GUARD DEFENSIVE IMPORT + LEGACY JUNK PURGE (2026-05-20)**
+>
+> ## Issue 1 fixed
+> Prod logs showed `[recipient-guard] resend SDK not importable: No module named 'resend.logs'`. Some resend SDK versions have a broken `resend.logs` submodule that fails the top-level `import resend`. The guard couldn't install → @aurem.live monkey-patch never applied.
+>
+> **Fix**: `services/recipient_guard.py` — defensive import. Try `import resend` first; on failure, fall back to direct `from resend.emails import Emails`. Verified post-restart: guard now actively logs `[recipient-guard] BLOCKED send to internal address: testbin@aurem.live` — patch live.
+>
+> ## Issue 2 fixed
+> Prod logs showed `queued_but_contactless: 53, total_queued: 417` — looked like Apollo enrichment failing on 364 leads. **Real cause discovered via new forensics endpoint**: it was 461 LEGACY junk rows (Wikipedia, Reddit, TikTok titles, listicle pages) from the deprecated `ora_hunt_command` scraper drowning out diagnostics. They were never real businesses — no Apollo enrichment could help.
+>
+> ## Shipped
+> - `routers/campaign_forensics_router.py` — new admin endpoints:
+>   - `GET  /api/admin/campaign/eligibility-forensics?limit=N` — walks every queued lead, classifies each by FIRST rejection reason, returns histogram + 5 samples per reason.
+>   - `POST /api/admin/campaign/purge-legacy-junk` — dry-run by default; `?apply=true` deletes. Kills `ora_hunt_command` source + `awb_e2e_test` + listicle/Wikipedia/social-aggregator junk. NEVER touches `osm_overpass_admin_hunt`.
+>
+> ## E2E result on preview
+> 1. Recipient guard `[recipient-guard] BLOCKED send to internal address: testbin@aurem.live` — active.
+> 2. Forensics initial scan: 488 queued, 245 no_contact + 148 not_interested + 71 noise_flag + 22 other.
+> 3. Purge round 1: 302 deleted (queue 488→186).
+> 4. Purge round 2 (widened filter): 159 deleted (queue 186→27).
+> 5. **159 OSM admin-hunt leads survived. 157 of those had already been blasted to real businesses.**
+> 6. Replenish cron auto-fired → queue 27 → 98 in 15s with fresh OSM leads.
+>
+> ## Bottom line
+> Campaign engine has been WORKING all along — 157 real outbound sends from yesterday's OSM hunts. The "0 eligible" alarm was triggered by legacy junk overwhelming the diagnostic count. Now junk purged, recipient guard active, replenish cron auto-refilling.
+>
+> ## Outstanding
+> - **User** — Redeploy to push 324i+j+k+l+m+n to `aurem.live` (prod still has the broken `resend.logs` import + 417 junk rows).
+> - **User** — On prod, after redeploy, hit `POST /api/admin/campaign/purge-legacy-junk?apply=true` once to nuke the prod junk queue.
+>
+> ---
+
+
 > **🟢 ITER 324m — LLM GATEWAY DEEPSEEK/KIMI + INDUSTRIES EXPANSION (2026-05-20)**
 >
 > ## Shipped

@@ -2402,6 +2402,22 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] scout_diagnose wire failed: {_e}")
 
+# iter 324n — Campaign Forensics Router (eligibility breakdown)
+try:
+    from routers.campaign_forensics_router import (
+        router as _campaign_forensics_router,
+        set_db as _set_campaign_forensics_db,
+    )
+    app.include_router(_campaign_forensics_router)
+
+    @app.on_event("startup")
+    async def _wire_campaign_forensics():
+        from server import db as _bound_db  # type: ignore
+        _set_campaign_forensics_db(_bound_db)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] campaign_forensics wire failed: {_e}")
+
 # /.well-known/ucp moved to bootstrap.wellknown_routes (iter 263 final surgery).
 
 # Serve standalone tracking pixel
