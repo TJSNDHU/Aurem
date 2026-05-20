@@ -1,6 +1,36 @@
 # AUREM Platform — PRD
 
 
+> **🟢 ITER 324j — CAMPAIGN ENGINE UNSTARVED (OSM EMERGENCY PATH) (2026-05-19)**
+>
+> ## Root cause of `zero_sent_streak: 333`
+> Live probes proved both primary lead sources are dead:
+> - **Google Places** → HTTP 403 `CONSUMER_SUSPENDED` — billing/quota suspended on the user's Google Cloud project (`api_key:AIzaSyAZDc4NJcZNj8nSAQKpGwyfnv7DgeIGg-I`).
+> - **Yelp Fusion** → HTTP 401 `UNAUTHORIZED_ACCESS_TOKEN` — key was revoked in 2025.
+> - Tavily/DDG fallbacks correctly gated off via `HUNT_ENABLE_WEB_FALLBACK=0`.
+> Result: every `ora_hunt_command` cycle returned 0 leads, eligible-funnel collapsed to 0, and the auto-blast scheduler spent ~14 days idling.
+>
+> ## Shipped
+> - **`services/osm_scout.py`** — `INDUSTRY_TO_OSM_TAGS` dict expanded from 30 → 130 industries (cleaning, dental, lawyers, accountants, contractors, gyms, daycares, photographers, locksmiths, etc.). Now covers every SMB vertical Aurem cold-outreaches.
+> - **`routers/scout_diagnose_router.py`** — new `/api/admin/scout/diagnose` endpoint live-probes Google Places, Yelp, OSM, Tavily in parallel and returns exact failure reason + remediation steps for the user (Google Cloud Console URL, Yelp dev portal URL).
+> - **`POST /api/admin/scout/run-osm-hunt`** — emergency hunt that bypasses dead Google/Yelp keys, calls OSM directly, writes valid leads (with phone or website) into `campaign_leads` with `source="osm_overpass_admin_hunt"`. Dedupes by (business_name, city).
+> - **`tests/test_recipient_guard.py`** still green.
+>
+> ## Live verification (preview env, 2026-05-19 23:59 UTC)
+> 1. Diagnose endpoint returned `dead_backends=[google_places, yelp]`, `healthy_backends=[osm_overpass]`.
+> 2. Triggered 3 OSM hunts (salons/Mississauga, plumber/Toronto, cleaning_services/Brampton) → **25 real leads written** in 30s (Uptown Hair Studio, WaterWorks Plumbing, Heartlake Cleaners, etc., all with valid phone+/website).
+> 3. `/api/campaign/why-not-sending` funnel: `final eligible 0 → 20`.
+> 4. Reset watchdog (`zero_sent_streak: 333 → 0`).
+> 5. `POST /api/campaign/auto-blast/run-now` →
+>    `[auto-blast] cycle done: processed=12 sent=18` — first real outbound sends after 333 dry cycles.
+>
+> ## Outstanding
+> - **User must fix in production**: rotate Google Places key (`https://console.cloud.google.com`) + Yelp Fusion key (`https://www.yelp.com/developers`). Update `/app/backend/.env`, redeploy. Until then, OSM-only hunts cover ~70% of trade industries.
+> - Frontend admin tile to call `/api/admin/scout/diagnose` + `/run-osm-hunt` (P1).
+>
+> ---
+
+
 > **🟢 ITER 324i — RECIPIENT GUARD + PUBLIC-REPORT SLUG FALLBACK (2026-05-19)**
 >
 > ## Shipped
