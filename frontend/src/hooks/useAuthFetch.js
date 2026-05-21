@@ -209,9 +209,16 @@ export function useLiveApi(path, options = {}) {
       const result = await apiJson(pathRef.current);
       if (!mounted.current) return;
       setData(result);
-      // Any success resets the failure streak AND clears stale error UI.
-      failStreak.current = 0;
-      setError(null);
+      // iter 325z — hysteresis instead of hard reset. Old code reset
+      // failStreak=0 on every success → if the endpoint hovered around
+      // 50/50 success rate during a partial outage, the UI blinked
+      // error↔ok every poll. Now we *decrement* by 1 per success so
+      // it takes 3 consecutive successes to fully clear a 3-strike
+      // failure state. No more flap.
+      failStreak.current = Math.max(failStreak.current - 1, 0);
+      if (failStreak.current === 0) {
+        setError(null);
+      }
     } catch (e) {
       if (!mounted.current) return;
       // iter 325s — debounce transient failures. Auth errors (4xx) are

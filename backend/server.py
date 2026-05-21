@@ -1139,6 +1139,17 @@ async def startup_event():
         except Exception as _pe:
             logging.debug(f"[ORA] Groq prewarm skipped: {_pe}")
 
+        # iter 325z — warm DeepSeek too. OpenRouter Novita has a ~30s
+        # cold-start on the first hit per pod; without this the founder's
+        # first ORA-CTO query times out and shows the "primary brain
+        # unreachable" graceful-degrade message even though DeepSeek is
+        # actually healthy. Fire-and-forget.
+        try:
+            from services.ora_agent import warm_deepseek
+            asyncio.create_task(warm_deepseek())
+        except Exception as _pe:
+            logging.debug(f"[ORA] DeepSeek prewarm skipped: {_pe}")
+
         # Validate required secrets first
         try:
             from utils.secrets import validate_all_secrets, scan_for_pymongo_antipatterns

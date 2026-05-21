@@ -73,11 +73,18 @@ HISTORY_CAP:           int = 40   # non-system messages kept per session
 # so asyncio never cancels a mid-flight httpx connection.
 _GROQ_HTTPX_TIMEOUT:  float = 18.0   # httpx connect+read
 _GROQ_WAIT_FOR:       float = 20.0   # asyncio.wait_for wrapper
-_CLAUDE_WAIT_FOR:     float = 15.0
-# iter 325j — DeepSeek V3.1 via OpenRouter (primary chat provider after
-# Legion daemon was retired). Same inner<outer rule as Groq.
-_DEEPSEEK_HTTPX_TIMEOUT: float = 22.0
-_DEEPSEEK_WAIT_FOR:      float = 25.0
+# iter 325z — bumped from 15s → 30s. Claude is the safety-net fallback
+# when DeepSeek is slow/cold; the old 15s budget often killed it before
+# Anthropic finished streaming, producing the spurious "Claude bhi reach
+# nahi ho raha" degrade message even though the provider was healthy.
+_CLAUDE_WAIT_FOR:     float = 30.0
+# iter 325j → iter 325z — DeepSeek V3.1 via OpenRouter (primary chat
+# provider). Bumped 22/25s → 42/45s. OpenRouter Novita endpoint cold-
+# starts can take 30-40s on the first hit per pod; old budget killed
+# perfectly healthy DeepSeek calls and triggered the "primary brain
+# unreachable" graceful-degrade message (founder report 2026-05-21).
+_DEEPSEEK_HTTPX_TIMEOUT: float = 42.0
+_DEEPSEEK_WAIT_FOR:      float = 45.0
 # Iter 322ex — production safety: Legion Ollama runs on the founder's
 # laptop via ngrok. When the tunnel is dead, the previous 120s wait made
 # ORA "silently scroll forever" before falling through. We honour
@@ -367,10 +374,29 @@ async def _llm_turn(
                 else:
                     _ollama_cb_record_success()
             elif provider in ("deepseek", "openrouter", "deepseek_v3"):
-                msg = await asyncio.wait_for(
-                    _deepseek_with_tools(messages, model=model),
-                    timeout=_DEEPSEEK_WAIT_FOR,
-                )
+                # iter 325z — DeepSeek is primary; one retry on the FIRST
+                # cold-start timeout so the chain doesn't immediately fall
+                # to Claude (which is slower) when the only issue was a
+                # 30-40s OpenRouter Novita route warm-up. Second attempt
+                # almost always succeeds in <8s because the socket is now
+                # warm. If both fail, we still fall through normally.
+                msg = None
+                for attempt in (1, 2):
+                    try:
+                        msg = await asyncio.wait_for(
+                            _deepseek_with_tools(messages, model=model),
+                            timeout=_DEEPSEEK_WAIT_FOR,
+                        )
+                        if msg is not None:
+                            break
+                    except asyncio.TimeoutError:
+                        if attempt == 1:
+                            logger.warning(
+                                "[ora-agent] deepseek attempt 1 timed out — "
+                                "retrying once (cold-start)"
+                            )
+                            continue
+                        raise
             elif provider == "groq":
                 msg = await asyncio.wait_for(
                     _groq_with_tools(messages, model=model), timeout=_GROQ_WAIT_FOR
@@ -457,6 +483,49 @@ async def _deepseek_with_tools(
         logger.warning(f"[ora-agent] deepseek error: {type(e).__name__}: {e}")
 
     return None
+
+
+async def warm_deepseek() -> bool:
+    """iter 325z — one-shot warmup ping at startup so the founder's first
+    ORA-CTO query doesn't pay the OpenRouter Novita cold-start tax
+    (~30s on first hit per pod). Sends a tiny tool-less ping with
+    `max_tokens=4` so it returns in <2 s once the route is warm.
+
+    Returns True on success, False otherwise. Failures are logged but
+    never raised — warmup is best-effort, not boot-blocking.
+    """
+    api_key = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
+    if not api_key:
+        return False
+    model_name = (
+        os.environ.get("DEEPSEEK_MODEL") or "deepseek/deepseek-chat-v3.1"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as c:
+            r = await c.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type":  "application/json",
+                    "HTTP-Referer":  "https://aurem.live",
+                    "X-Title":       "AUREM ORA Warmup",
+                },
+                json={
+                    "model":       model_name,
+                    "messages":    [{"role": "user", "content": "ping"}],
+                    "max_tokens":  4,
+                    "temperature": 0,
+                },
+            )
+            ok = r.status_code == 200
+            logger.info(
+                f"[ora-agent] DeepSeek warmup → {r.status_code}"
+                f"{' ✓ ready' if ok else ' (cold)'}"
+            )
+            return ok
+    except Exception as e:
+        logger.warning(f"[ora-agent] DeepSeek warmup failed: {type(e).__name__}: {e}")
+        return False
 
 
 async def _groq_with_tools(

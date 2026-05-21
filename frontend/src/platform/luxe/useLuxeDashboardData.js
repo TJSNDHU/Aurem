@@ -78,20 +78,30 @@ export const useLuxeDashboardData = (token) => {
         safeGet(`${API}/api/customer/inbox/threads?limit=20`, headers),
       ]);
 
-    // iter 325u — connection health computation. We treat the refresh as
-    // "broken" only when ≥80% of the core endpoints returned null
-    // (safeGet swallows errors → null). That filters single-endpoint hiccups
-    // (e.g. a router temporarily 502'ing) while still catching a real
-    // ingress / pod-restart outage where every call dies.
+    // iter 325u/325z — connection health computation with HYSTERESIS.
+    //
+    // The earlier rule reset `failStreak` to 0 the moment *any* success
+    // came through. That created a flap pattern: if the success rate was
+    // roughly 50/50 (e.g. one slow endpoint + ten fast ones during a
+    // sub-pod restart), the topbar pill blinked online↔degraded every
+    // 30 s — exactly the bug the founder kept re-reporting.
+    //
+    // Fix: treat the streak as a *bucket*. Each cycle:
+    //   • bad cycle (≥80% nulls) → +1
+    //   • good cycle             → -1 (clamped at 0)
+    // Pill thresholds unchanged:
+    //   ≥3 → offline (red)   |   ≥2 → degraded (yellow)   |   else → online
+    // Net effect: you need 3 GOOD cycles after an outage to fully clear,
+    // and 3 BAD cycles after recovery to flip red. No more 30-s blink.
     const probeResults = [leadStats, agentsStatus, repairLeaderboard, repairHistory,
                            scanEvents, subs, catalog, homeAgg,
                            resultsSummary, pipeline, inboxThreads];
     const failCount = probeResults.filter((r) => r === null).length;
     const failRatio = failCount / probeResults.length;
     if (failRatio >= 0.8) {
-      failStreak.current += 1;
+      failStreak.current = Math.min(failStreak.current + 1, 6);
     } else {
-      failStreak.current = 0;
+      failStreak.current = Math.max(failStreak.current - 1, 0);
     }
     const apiStatus = failStreak.current >= 3 ? 'offline'
                     : failStreak.current >= 2 ? 'degraded'
