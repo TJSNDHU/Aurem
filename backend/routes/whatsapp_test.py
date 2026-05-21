@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import httpx
 
-from pinchtab_browser import RerootsBrowser, BrowserToolkit, detect_intent, Intent
+from pinchtab_browser import AUREMBrowser, BrowserToolkit, detect_intent, Intent
 
 router = APIRouter(tags=["WhatsApp Test"])
 
@@ -18,13 +18,13 @@ class WATestRequest(BaseModel):
     customer_name: str = "Admin Test"
 
 # Global browser toolkit
-_wa_browser: Optional[RerootsBrowser] = None
+_wa_browser: Optional[AUREMBrowser] = None
 _wa_toolkit: Optional[BrowserToolkit] = None
 
 async def get_wa_toolkit() -> BrowserToolkit:
     global _wa_browser, _wa_toolkit
     if _wa_toolkit is None:
-        _wa_browser = RerootsBrowser()
+        _wa_browser = AUREMBrowser()
         await _wa_browser.start()
         _wa_toolkit = BrowserToolkit(_wa_browser)
     return _wa_toolkit

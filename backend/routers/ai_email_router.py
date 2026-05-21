@@ -35,10 +35,10 @@ def set_db(database):
     global _db
     _db = database
 
-# Initialize Resend SDK (defensive — some build environments fail to load
-# resend's transitive submodules like `resend.logs`; we fall back to a
-# no-op stub so this router still mounts and the rest of the email
-# pipeline works).
+# Initialize Resend SDK. iter 325l — current resend (2.27.0) exposes
+# `Emails` and `resend.logs` cleanly at the top level. We keep a no-op
+# stub fallback so this router still mounts even if a future resend
+# upgrade temporarily breaks `import resend` in a build environment.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 try:
     import resend

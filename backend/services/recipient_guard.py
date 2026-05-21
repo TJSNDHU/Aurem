@@ -71,25 +71,22 @@ def install_recipient_guard() -> bool:
     Idempotent: safe to call multiple times.
     Returns True if patched, False if resend SDK unavailable.
 
-    iter 324n — defensive import. Some resend versions (or partial installs)
-    have a broken `resend.logs` submodule that fails at `import resend`.
-    Fall back to direct `resend.emails` module import so we still patch
-    even when the top-level package's __init__ blows up.
+    iter 325l — resend 2.27.0 exposes ``Emails`` at the top-level package
+    and the ``resend.logs`` submodule is healthy. The historical
+    ``resend.emails`` submodule fallback was permanently broken because
+    in 2.27.0 that path is a sub-package (not a module) that does not
+    re-export the ``Emails`` class. We drop the dead fallback — if
+    ``import resend`` truly fails the install is corrupt and there is
+    nothing to rescue.
     """
-    # Try the normal import first.
-    Emails = None
     try:
         import resend  # noqa: F401
         Emails = getattr(resend, "Emails", None)
     except Exception as e:
-        logger.warning(f"[recipient-guard] resend top-level import failed: {e}; trying submodule fallback")
-        try:
-            # Direct submodule import bypasses resend/__init__.py issues.
-            from resend.emails import Emails as _EmailsCls  # type: ignore
-            Emails = _EmailsCls
-        except Exception as e2:
-            logger.warning(f"[recipient-guard] resend.emails submodule fallback also failed: {e2}")
-            return False
+        logger.warning(
+            f"[recipient-guard] resend import failed: {e} — guard not installed"
+        )
+        return False
 
     if Emails is None:
         logger.warning("[recipient-guard] resend.Emails missing — guard not installed")
