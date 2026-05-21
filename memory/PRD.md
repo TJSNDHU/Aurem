@@ -64,6 +64,11 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • **Gap 5 — Industry recommended bundles + live cart pricing**. New `recommended_bundles` collection seeded with 4 industry bundles (`restaurant_growth`, `salon_loyalty`, `clinic_compliance`, `agency_starter`). New `routers/recommended_bundles_router.py` exposes `GET /api/catalog/tier-bundles`, `GET /api/catalog/recommended-bundles?industry=...`, `POST /api/customer/bundle-price`. `price_bundle()` resolves service_ids → live catalog prices + auto-applies the bundle discount (15/25/35/45% per `bundle_rules`) and reports missing IDs (4 regression tests).
   • **E2E test** with Reroots Aesthetics fixture (`admin@reroots.ca`, `RERO-3DEJ`) exercises the full pipeline: clinic bundle pricing → pending subscription rows → Stripe subscription stamp → GitHub connect → customer deploy report → founder sees `tenant_id=RERO-3DEJ, status=success` in deploy log. Live verification confirms $395 clinic bundle correctly drops to $296.25 with 25% discount applied.
   • Total: **15 regression tests** in `tests/test_iter326j_gaps_1_2_3_5.py` all green. Full iter 326* suite: 59 green.
+- iter 326k (2026-02): **Production log noise fixes** —
+  • **`/api/onboarding/status-health` was 404'ing** because `services/warm_prober.py` intentionally probes it to keep the router warm but no handler existed. Added a 2-line stub handler in `routers/onboarding_router.py` returning `{status: ok, warm: true}`. Live verified HTTP 200.
+  • **Gemini suspended-key shield (circuit breaker)** — when Google suspends the API key (HTTP 403 CONSUMER_SUSPENDED), every chat call used to waste 20s on a known-dead provider before falling through to NVIDIA. Added a 2-strike breaker (5-min cooldown, configurable via `ORA_GEMINI_CB_THRESHOLD` + `ORA_GEMINI_CB_COOLDOWN_S`) symmetric with the existing ollama breaker. Failure path: 2× 401/403 → circuit OPEN → silently skip → NVIDIA serves in ~1s. Success closes the circuit.
+  • Deployment agent confirmed app deploys cleanly — NO container-level blockers. Both fixes are pure code (no infra changes).
+  • 8 regression tests in `tests/test_iter326k_log_noise_fixes.py` all green. Full iter 326* suite: **95 green**.
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

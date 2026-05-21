@@ -150,6 +150,49 @@ def _ollama_cb_record_success() -> None:
     _ollama_cb_until = 0.0
 
 
+# iter 326k — Gemini suspended-key shield (circuit breaker).
+# When Google suspends the GOOGLE_API_KEY (`Consumer ... has been
+# suspended`), every chat hit blows 20s on a known-dead provider before
+# falling through to NVIDIA. After 2 consecutive 403s we open the
+# circuit for 5 minutes (configurable). Reply time after suspension:
+# 20s → 1s.
+_GEMINI_CB_FAIL_THRESHOLD = int(os.environ.get("ORA_GEMINI_CB_THRESHOLD", "2"))
+_GEMINI_CB_COOLDOWN_S     = float(os.environ.get("ORA_GEMINI_CB_COOLDOWN_S", "300"))
+_gemini_cb_fails  = 0
+_gemini_cb_until  = 0.0
+
+
+def _gemini_cb_open() -> bool:
+    import time as _t
+    return _gemini_cb_until > _t.time()
+
+
+def _gemini_cb_record_failure(reason: str = "") -> None:
+    """Increment failure count; open circuit at threshold.
+
+    Only HTTP 403 / 401 (auth-level) failures count toward the breaker
+    — transient 5xx or timeouts use the normal retry path.
+    """
+    global _gemini_cb_fails, _gemini_cb_until
+    import time as _t
+    _gemini_cb_fails += 1
+    if _gemini_cb_fails >= _GEMINI_CB_FAIL_THRESHOLD:
+        _gemini_cb_until = _t.time() + _GEMINI_CB_COOLDOWN_S
+        logger.warning(
+            f"[ora-agent] gemini circuit OPEN for {_GEMINI_CB_COOLDOWN_S:.0f}s "
+            f"(fails={_gemini_cb_fails}, reason={reason[:80]!r}). "
+            "Routing to NVIDIA fallback."
+        )
+
+
+def _gemini_cb_record_success() -> None:
+    global _gemini_cb_fails, _gemini_cb_until
+    if _gemini_cb_fails or _gemini_cb_until:
+        logger.info("[ora-agent] gemini circuit CLOSED — success after failure")
+    _gemini_cb_fails = 0
+    _gemini_cb_until = 0.0
+
+
 # ── Tier policy ───────────────────────────────────────────────────────
 # RULE: a tool name must appear in EXACTLY ONE tier set.
 # tier_of() short-circuits on TIER_1 → TIER_2 → TIER_3 → default tier2.
@@ -451,10 +494,19 @@ async def _llm_turn(
                 )
             elif provider == "gemini":
                 # iter 326f — Google Gemini via OpenAI-compat endpoint.
-                msg = await asyncio.wait_for(
-                    _gemini_with_tools(messages, model=model),
-                    timeout=_GEMINI_WAIT_FOR,
-                )
+                # iter 326k — Skip if suspended-key circuit is open.
+                if _gemini_cb_open():
+                    continue  # silently fall through to next provider
+                try:
+                    msg = await asyncio.wait_for(
+                        _gemini_with_tools(messages, model=model),
+                        timeout=_GEMINI_WAIT_FOR,
+                    )
+                except Exception as _gex:
+                    _err_str = str(_gex)
+                    if "403" in _err_str or "401" in _err_str or "suspended" in _err_str.lower():
+                        _gemini_cb_record_failure(_err_str)
+                    raise
             elif provider == "nvidia":
                 # iter 326f — NVIDIA NIM via OpenAI-compat endpoint.
                 msg = await asyncio.wait_for(
@@ -730,7 +782,13 @@ async def _gemini_with_tools(
             if r.status_code == 200:
                 data = r.json()
                 logger.info(f"[ora-agent] gemini served by {model_name}")
+                _gemini_cb_record_success()
                 return (data.get("choices") or [{}])[0].get("message") or {}
+            # iter 326k — auth-level failures (suspended key / quota) feed
+            # the suspended-key circuit breaker so subsequent calls skip
+            # gemini immediately for cooldown window.
+            if r.status_code in (401, 403):
+                _gemini_cb_record_failure(f"HTTP {r.status_code}: {r.text[:120]}")
             logger.warning(f"[ora-agent] gemini {r.status_code}: {r.text[:240]}")
     except Exception as e:
         logger.warning(f"[ora-agent] gemini error: {type(e).__name__}: {e}")

@@ -29,6 +29,16 @@ ONBOARDING_STEPS = [
 ]
 
 
+# iter 326k — silence the 404 spam from services/warm_prober.py which
+# intentionally probes /api/onboarding/status-health to keep the router
+# warm. The probe doesn't care about the response — it just needs ANY
+# 2xx so the route is loaded. Without this, every warm tick logs
+# "404 Not Found" which pollutes prod log streams.
+@router.get("/status-health")
+async def status_health():
+    return {"status": "ok", "service": "onboarding", "warm": True}
+
+
 def _get_user_id(request: Request):
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
