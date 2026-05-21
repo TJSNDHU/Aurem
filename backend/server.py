@@ -1150,6 +1150,15 @@ async def startup_event():
         except Exception as _pe:
             logging.debug(f"[ORA] DeepSeek prewarm skipped: {_pe}")
 
+        # iter 326a — warm FreeLLMAPI proxy if configured (env var
+        # FREELLMAPI_BASE_URL). The helper itself no-ops when env is
+        # absent so this is safe to leave wired permanently.
+        try:
+            from services.ora_agent import warm_freellmapi
+            asyncio.create_task(warm_freellmapi())
+        except Exception as _pe:
+            logging.debug(f"[ORA] FreeLLMAPI prewarm skipped: {_pe}")
+
         # Validate required secrets first
         try:
             from utils.secrets import validate_all_secrets, scan_for_pymongo_antipatterns
@@ -2423,6 +2432,14 @@ try:
 except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] debug_tasks wire failed: {_e}")
+
+# iter 326a — ORA provider chain health watchdog endpoint
+try:
+    from routers.ora_providers_router import router as _ora_providers_router
+    app.include_router(_ora_providers_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] ora_providers wire failed: {_e}")
 
 # iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
 try:

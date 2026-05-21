@@ -85,6 +85,19 @@ _CLAUDE_WAIT_FOR:     float = 30.0
 # unreachable" graceful-degrade message (founder report 2026-05-21).
 _DEEPSEEK_HTTPX_TIMEOUT: float = 42.0
 _DEEPSEEK_WAIT_FOR:      float = 45.0
+
+# iter 326a — FreeLLMAPI (self-hosted proxy that aggregates 11 free
+# LLM providers behind one OpenAI-compatible /v1/chat/completions
+# endpoint with automatic failover). When the operator points
+# FREELLMAPI_BASE_URL at a running proxy, AUREM's ORA chain treats it
+# as a SINGLE upstream — but the proxy itself fails over across Google
+# Gemini, Groq, Cerebras, SambaNova, Mistral, OpenRouter, GitHub
+# Models, Cloudflare, Cohere, Z.ai, NVIDIA. Net effect: ORA can sustain
+# ~1B free tokens/month without ever showing "primary brain
+# unreachable". Repo: https://github.com/tashfeenahmed/freellmapi
+_FREELLMAPI_HTTPX_TIMEOUT: float = 35.0
+_FREELLMAPI_WAIT_FOR:      float = 40.0
+
 # Iter 322ex — production safety: Legion Ollama runs on the founder's
 # laptop via ngrok. When the tunnel is dead, the previous 120s wait made
 # ORA "silently scroll forever" before falling through. We honour
@@ -356,7 +369,13 @@ async def _llm_turn(
     Returns OpenAI-format message dict (may have tool_calls), or None if
     every provider failed.
     """
-    order_env = os.environ.get("ORA_AGENT_PROVIDER_ORDER", "deepseek,claude,legion_ollama,groq")
+    order_env = os.environ.get(
+        "ORA_AGENT_PROVIDER_ORDER",
+        # iter 326a — `freellmapi` inserted as #2 so a single proxy
+        # outage / DeepSeek slow-down can't down ORA. If FREELLMAPI_BASE_URL
+        # is unset, the provider function returns None and we skip cleanly.
+        "deepseek,freellmapi,claude,legion_ollama,groq",
+    )
     order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
     for provider in order:
@@ -400,6 +419,14 @@ async def _llm_turn(
             elif provider == "groq":
                 msg = await asyncio.wait_for(
                     _groq_with_tools(messages, model=model), timeout=_GROQ_WAIT_FOR
+                )
+            elif provider == "freellmapi":
+                # iter 326a — self-hosted OpenAI-compat proxy (FreeLLMAPI).
+                # When FREELLMAPI_BASE_URL isn't configured the helper
+                # returns None and we fall through with no logged error.
+                msg = await asyncio.wait_for(
+                    _freellmapi_with_tools(messages, model=model),
+                    timeout=_FREELLMAPI_WAIT_FOR,
                 )
             elif provider == "claude":
                 msg = await asyncio.wait_for(
@@ -483,6 +510,139 @@ async def _deepseek_with_tools(
         logger.warning(f"[ora-agent] deepseek error: {type(e).__name__}: {e}")
 
     return None
+
+
+async def _freellmapi_with_tools(
+    messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+) -> dict[str, Any] | None:
+    """FreeLLMAPI — self-hosted OpenAI-compatible proxy that aggregates
+    free-tier keys from ~11 LLM providers (Google Gemini, Groq, Cerebras,
+    SambaNova, Mistral, OpenRouter, GitHub Models, Cloudflare, Cohere,
+    Z.ai, NVIDIA) behind a single endpoint with automatic failover.
+
+    Repo: https://github.com/tashfeenahmed/freellmapi
+
+    Configuration (env):
+      FREELLMAPI_BASE_URL  — e.g. http://127.0.0.1:3001/v1
+      FREELLMAPI_API_KEY   — the unified `freellmapi-…` bearer token
+      FREELLMAPI_MODEL     — optional model pin (default "auto" → proxy
+                             picks best healthy upstream)
+
+    Returns None on missing config / non-200 / network — caller falls
+    through to the next provider in the ORA chain.
+    """
+    base = (os.environ.get("FREELLMAPI_BASE_URL") or "").strip().rstrip("/")
+    key  = (os.environ.get("FREELLMAPI_API_KEY")  or "").strip()
+    if not base or not key:
+        return None
+    model_name = model or os.environ.get("FREELLMAPI_MODEL") or "auto"
+    try:
+        async with httpx.AsyncClient(timeout=_FREELLMAPI_HTTPX_TIMEOUT) as c:
+            r = await c.post(
+                f"{base}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "model":       model_name,
+                    "messages":    messages,
+                    "tools":       all_agent_tool_schemas(),
+                    "tool_choice": "auto",
+                    "temperature": 0.25,
+                    "max_tokens":  1500,
+                },
+            )
+            if r.status_code == 200:
+                data = r.json()
+                served_by = r.headers.get("x-routed-via") or "unknown"
+                logger.info(f"[ora-agent] freellmapi served via {served_by}")
+                return (data.get("choices") or [{}])[0].get("message") or {}
+            logger.warning(f"[ora-agent] freellmapi {r.status_code}: {r.text[:240]}")
+    except Exception as e:
+        logger.warning(f"[ora-agent] freellmapi error: {type(e).__name__}: {e}")
+    return None
+
+
+async def freellmapi_health() -> dict[str, Any]:
+    """iter 326a — FreeLLMAPI watchdog probe used by the ORA-CTO health
+    panel and the pillars-map drill-down. Hits the proxy's GET /v1/models
+    (OpenAI-compat) which is cheap and tells us:
+      • is the proxy reachable?
+      • how many models are currently routable?
+      • what's the routing latency?
+
+    Never raises. Returns {ok, configured, status, models_total,
+    latency_ms, reason}.
+    """
+    base = (os.environ.get("FREELLMAPI_BASE_URL") or "").strip().rstrip("/")
+    key  = (os.environ.get("FREELLMAPI_API_KEY")  or "").strip()
+    if not base:
+        return {"ok": False, "configured": False,
+                "reason": "FREELLMAPI_BASE_URL not set"}
+    started = asyncio.get_event_loop().time()
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.get(
+                f"{base}/models",
+                headers={"Authorization": f"Bearer {key}"} if key else {},
+            )
+        elapsed_ms = int((asyncio.get_event_loop().time() - started) * 1000)
+        if r.status_code != 200:
+            return {
+                "ok": False, "configured": True, "status": r.status_code,
+                "latency_ms": elapsed_ms,
+                "reason": f"HTTP {r.status_code}: {r.text[:120]}",
+            }
+        body   = r.json()
+        models = body.get("data") if isinstance(body, dict) else []
+        return {
+            "ok": True, "configured": True, "status": 200,
+            "models_total": len(models or []),
+            "latency_ms":   elapsed_ms,
+            "reason":       f"{len(models or [])} models routable",
+        }
+    except Exception as e:
+        return {
+            "ok": False, "configured": True,
+            "reason": f"{type(e).__name__}: {str(e)[:140]}",
+        }
+
+
+async def warm_freellmapi() -> bool:
+    """iter 326a — fire-and-forget warmup so the proxy's first real call
+    isn't paying a cold socket. Mirrors warm_deepseek pattern. No-op if
+    FREELLMAPI_BASE_URL isn't configured."""
+    base = (os.environ.get("FREELLMAPI_BASE_URL") or "").strip().rstrip("/")
+    key  = (os.environ.get("FREELLMAPI_API_KEY")  or "").strip()
+    if not base or not key:
+        return False
+    warmup_model = (
+        os.environ.get("FREELLMAPI_MODEL") or "auto"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as c:
+            r = await c.post(
+                f"{base}/chat/completions",
+                headers={"Authorization": f"Bearer {key}",
+                         "Content-Type":  "application/json"},
+                json={"model":       warmup_model,
+                      "messages":    [{"role": "user", "content": "ping"}],
+                      "max_tokens":  4,
+                      "temperature": 0},
+            )
+            ok = r.status_code == 200
+            logger.info(
+                f"[ora-agent] FreeLLMAPI warmup → {r.status_code}"
+                f"{' ✓ ready' if ok else ' (cold)'}"
+            )
+            return ok
+    except Exception as e:
+        logger.warning(f"[ora-agent] FreeLLMAPI warmup failed: {type(e).__name__}: {e}")
+        return False
+
 
 
 async def warm_deepseek() -> bool:
