@@ -24,8 +24,8 @@ const Bar = ({ name, value, count }) => {
           position: 'absolute', bottom: 0, left: 0, right: 0,
           height: `${h}%`,
           background: hot
-            ? 'linear-gradient(180deg, #5E54E8 0%, #0A84FF 100%)'
-            : 'linear-gradient(180deg, rgba(94,84,232,0.45) 0%, rgba(10,132,255,0.25) 100%)',
+            ? 'linear-gradient(180deg, var(--dash-orange) 0%, var(--dash-gold-bright) 100%)'
+            : 'linear-gradient(180deg, rgba(255,107,0,0.45) 0%, rgba(201,168,76,0.30) 100%)',
         }} />
       </div>
       <div style={{ fontSize: 10, color: 'var(--dash-text-muted)', letterSpacing: '0.04em' }}>

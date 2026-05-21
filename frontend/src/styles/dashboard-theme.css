@@ -1,59 +1,94 @@
-/* AUREM Dashboard V2 theme tokens — iter 325n
- * Dark = default. Light overrides via [data-theme='light'].
- * All values exposed as CSS vars so JS-rendered cards stay theme-agnostic.
+/* AUREM Dashboard V2 theme tokens — iter 325p
+ *
+ * REPALETTED to match the aurem.live homepage (orange/gold luxury on near-black).
+ * Source palette (from /platform/AuremHomepage.jsx lines 83-86):
+ *   --void:#050508; --dark:#0A0A0F; --dark2:#0E0E16; --dark3:#13131F;
+ *   --card:#0F0F1A; --orange:#FF6B00; --orange2:#FF8C35; --gold:#C9A84C;
+ *   --gold2:#E8C86A; --white:#F0EDE8; --muted:#7A7590; --muted2:#4A4560;
+ *
+ * Original Apple-style purple/blue/iOS-green vars (--dash-purple etc.) are
+ * KEPT as alias names but point at the new orange/gold palette so every
+ * existing inline `var(--dash-purple)` reference re-skins without code edits.
+ * The semantic naming (purple = primary accent, blue = secondary accent,
+ * green = success) stays — just the values change.
+ *
+ * Light mode keeps the warm tone but on a cream paper background.
  */
 
 :root,
 [data-theme='dark'] {
-  --dash-bg:          #080810;
-  --dash-card:        rgba(255, 255, 255, 0.04);
-  --dash-card-hover:  rgba(255, 255, 255, 0.06);
-  --dash-border:      rgba(255, 255, 255, 0.07);
-  --dash-border-hi:   rgba(255, 255, 255, 0.12);
-  --dash-sidebar:     #06060d;
-  --dash-topbar:      rgba(8, 8, 16, 0.85);
-  --dash-text:        #ffffff;
-  --dash-text-muted:  rgba(255, 255, 255, 0.55);
-  --dash-text-faint:  rgba(255, 255, 255, 0.32);
-  --dash-divider:     rgba(255, 255, 255, 0.06);
-  --dash-track:       rgba(255, 255, 255, 0.06);
+  /* Surface */
+  --dash-bg:          #050508;
+  --dash-card:        #0F0F1A;
+  --dash-card-hover:  #13131F;
+  --dash-border:      rgba(255, 107, 0, 0.10);
+  --dash-border-hi:   rgba(201, 168, 76, 0.20);
+  --dash-sidebar:     #0A0A0F;
+  --dash-topbar:      rgba(5, 5, 8, 0.92);
+  --dash-text:        #F0EDE8;
+  --dash-text-muted:  #7A7590;
+  --dash-text-faint:  #4A4560;
+  --dash-divider:     rgba(201, 168, 76, 0.08);
+  --dash-track:       rgba(255, 107, 0, 0.08);
 
-  /* Accent card (Pulse) */
-  --dash-accent-bg:     linear-gradient(135deg, rgba(94, 84, 232, 0.18), rgba(74, 144, 217, 0.10));
-  --dash-accent-border: rgba(94, 84, 232, 0.25);
+  /* Accent (Pulse) card — homepage hero gradient */
+  --dash-accent-bg:     linear-gradient(135deg, rgba(255, 107, 0, 0.14), rgba(201, 168, 76, 0.10));
+  --dash-accent-border: rgba(255, 107, 0, 0.30);
 
-  /* Active nav state */
-  --dash-nav-active-bg:    rgba(94, 84, 232, 0.10);
-  --dash-nav-active-bar:   #5E54E8;
+  /* Active nav state — orange bar (homepage CTA color) */
+  --dash-nav-active-bg:    rgba(255, 107, 0, 0.10);
+  --dash-nav-active-bar:   #FF6B00;
 
-  /* Brand accents (same in both themes) */
-  --dash-purple:      #5E54E8;
-  --dash-purple-soft: #BF5AF2;
-  --dash-blue:        #0A84FF;
-  --dash-green:       #34C759;
-  --dash-amber:       #FF9F0A;
-  --dash-red:         #FF453A;
+  /* ── Brand accents (homepage palette) ────────────────────────
+     Var names retained for backward compat — values repointed. */
+  --dash-purple:      #FF6B00;   /* PRIMARY: orange CTA */
+  --dash-purple-soft: #FF8C35;   /* secondary orange */
+  --dash-blue:        #E8C86A;   /* SECONDARY: bright gold */
+  --dash-green:       #50C878;   /* success (homepage emerald) */
+  --dash-amber:       #C9A84C;   /* base gold */
+  --dash-red:         #FF6060;   /* error red */
+
+  /* Explicit homepage-named aliases for new code that wants clarity */
+  --dash-orange:      #FF6B00;
+  --dash-orange-2:    #FF8C35;
+  --dash-gold:        #C9A84C;
+  --dash-gold-bright: #E8C86A;
+  --dash-emerald:     #50C878;
 }
 
 [data-theme='light'] {
-  --dash-bg:          #f5f5f7;
-  --dash-card:        #ffffff;
-  --dash-card-hover:  #fbfbfd;
-  --dash-border:      rgba(0, 0, 0, 0.06);
-  --dash-border-hi:   rgba(0, 0, 0, 0.12);
-  --dash-sidebar:     #fafafa;
-  --dash-topbar:      rgba(245, 245, 247, 0.85);
-  --dash-text:        #1C1C1E;
-  --dash-text-muted:  #6C6C70;
-  --dash-text-faint:  #8E8E93;
-  --dash-divider:     rgba(0, 0, 0, 0.06);
-  --dash-track:       rgba(0, 0, 0, 0.06);
+  /* Cream-paper palette that still echoes the homepage warmth */
+  --dash-bg:          #FAF7F2;
+  --dash-card:        #FFFFFF;
+  --dash-card-hover:  #FDF8F0;
+  --dash-border:      rgba(255, 107, 0, 0.14);
+  --dash-border-hi:   rgba(201, 168, 76, 0.32);
+  --dash-sidebar:     #F5EFE6;
+  --dash-topbar:      rgba(250, 247, 242, 0.92);
+  --dash-text:        #1C1A14;
+  --dash-text-muted:  #6E6750;
+  --dash-text-faint:  #9A9384;
+  --dash-divider:     rgba(201, 168, 76, 0.15);
+  --dash-track:       rgba(255, 107, 0, 0.08);
 
-  --dash-accent-bg:     linear-gradient(135deg, rgba(94, 84, 232, 0.08), rgba(74, 144, 217, 0.05));
-  --dash-accent-border: rgba(94, 84, 232, 0.18);
+  --dash-accent-bg:     linear-gradient(135deg, rgba(255, 107, 0, 0.10), rgba(201, 168, 76, 0.08));
+  --dash-accent-border: rgba(255, 107, 0, 0.25);
 
-  --dash-nav-active-bg:    rgba(94, 84, 232, 0.10);
-  --dash-nav-active-bar:   #5E54E8;
+  --dash-nav-active-bg:    rgba(255, 107, 0, 0.10);
+  --dash-nav-active-bar:   #FF6B00;
+
+  --dash-purple:      #E55F00;   /* slightly darker orange for AA on cream */
+  --dash-purple-soft: #FF8C35;
+  --dash-blue:        #A88528;
+  --dash-green:       #2E9D4F;
+  --dash-amber:       #B68C28;
+  --dash-red:         #D14444;
+
+  --dash-orange:      #E55F00;
+  --dash-orange-2:    #FF8C35;
+  --dash-gold:        #A88528;
+  --dash-gold-bright: #C9A84C;
+  --dash-emerald:     #2E9D4F;
 }
 
 /* Root layout reset — edge-to-edge */

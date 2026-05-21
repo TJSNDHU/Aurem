@@ -145,10 +145,12 @@ def test_css_defines_both_theme_var_blocks():
 
 
 def test_css_uses_exact_spec_brand_colors():
+    """iter 325p — repalette: CSS must now use the AUREM homepage palette
+    (orange/gold luxury on near-black) instead of the legacy iOS purple/blue."""
     css = _read(THEME_CSS)
-    for color in ("#080810", "#06060d", "#5E54E8", "#0A84FF",
-                  "#34C759", "#FF9F0A", "#FF453A", "#BF5AF2"):
-        assert color in css, f"Spec brand color missing: {color}"
+    for color in ("#050508", "#0A0A0F", "#0F0F1A", "#FF6B00", "#FF8C35",
+                  "#C9A84C", "#E8C86A", "#50C878", "#FF6060"):
+        assert color in css, f"Homepage brand color missing: {color}"
 
 
 def test_css_uses_apple_font_stack():
@@ -257,11 +259,11 @@ def test_pulse_card_accent_background():
     pulse = _read(f"{COMPONENTS}/PulseCard.jsx")
     assert 'className="av2-card-accent"' in pulse
     css = _read(THEME_CSS)
-    # Spec accent gradient angles & alphas
+    # iter 325p — accent gradient now uses homepage orange + gold alphas
     assert re.search(
-        r"linear-gradient\(135deg,\s*rgba\(94,\s*84,\s*232,\s*0\.18\)",
+        r"linear-gradient\(135deg,\s*rgba\(255,\s*107,\s*0,\s*0\.\d+\)",
         css,
-    )
+    ), "Pulse accent gradient must use homepage orange (255,107,0)"
 
 
 def test_card_primitive_radius_and_border():

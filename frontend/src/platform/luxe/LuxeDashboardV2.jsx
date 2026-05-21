@@ -87,7 +87,7 @@ const Avatar = ({ user, size = 36 }) => {
   return (
     <div data-testid="user-avatar" style={{
       width: size, height: size, borderRadius: 10,
-      background: 'linear-gradient(135deg, #5E54E8, #0A84FF)',
+      background: 'linear-gradient(135deg, var(--dash-orange), var(--dash-gold-bright))',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       color: '#fff', fontWeight: 700, fontSize: size * 0.42, flexShrink: 0,
     }}>{initial}</div>
@@ -102,7 +102,7 @@ const Sidebar = ({ active, onNav, user, onLogout }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 18px' }}>
       <div style={{
         width: 28, height: 28, borderRadius: 8,
-        background: 'linear-gradient(135deg, #5E54E8, #0A84FF)',
+        background: 'linear-gradient(135deg, var(--dash-orange), var(--dash-gold-bright))',
       }} />
       <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.04em' }}>AUREM</span>
     </div>
@@ -195,7 +195,7 @@ const Topbar = ({ pageTitle, isMobile, theme, onToggleTheme, pulseActive }) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 22, height: 22, borderRadius: 6,
-            background: 'linear-gradient(135deg, #5E54E8, #0A84FF)',
+            background: 'linear-gradient(135deg, var(--dash-orange), var(--dash-gold-bright))',
           }} />
           <span style={{ fontSize: 14, fontWeight: 700 }}>AUREM</span>
         </div>

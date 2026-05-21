@@ -77,9 +77,9 @@ export const BusinessGrowthChart = ({ series = [] }) => {
             };
             return (
               <g key={r.m + i}>
-                {drawBar(r.revenue, 0, '#5E54E8')}
-                {drawBar(r.leads,   1, '#0A84FF')}
-                {drawBar(r.fixes,   2, '#34C759')}
+                {drawBar(r.revenue, 0, '#FF6B00')}
+                {drawBar(r.leads,   1, '#E8C86A')}
+                {drawBar(r.fixes,   2, '#50C878')}
               </g>
             );
           })}
