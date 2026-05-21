@@ -378,7 +378,7 @@ export const LuxeAuthOverlay = () => {
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
             {submitting && <Loader2 size={14} className="luxe-spin" />}
-            {submitLabel}
+            {submitting && mode === 'login' ? 'Signing in…' : submitLabel}
           </button>
         </div>
 

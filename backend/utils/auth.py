@@ -1,6 +1,7 @@
 """
 Authentication utilities: JWT, password hashing, token management.
 """
+import asyncio
 import jwt
 import bcrypt
 from datetime import datetime, timezone, timedelta
@@ -49,6 +50,22 @@ def verify_password(password: str, hashed: str) -> bool:
         return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:
         return False
+
+
+async def averify_password(password: str, hashed: str) -> bool:
+    """Async wrapper around verify_password. iter 325e — fixes the
+    "first login click is slow" bug. bcrypt.checkpw runs in a thread so
+    the event loop can keep responding to other inbound requests while
+    we burn ~50–100ms on the rounds=10 hash comparison."""
+    if not hashed:
+        return False
+    return await asyncio.to_thread(verify_password, password, hashed)
+
+
+async def ahash_password(password: str) -> str:
+    """Async wrapper around hash_password. Same reason as averify_password
+    — keeps the event loop responsive during signup / migration."""
+    return await asyncio.to_thread(hash_password, password)
 
 
 def create_token(user_id: str, is_admin: bool = False, email: str = None) -> str:

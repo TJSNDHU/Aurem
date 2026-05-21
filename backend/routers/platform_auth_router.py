@@ -11,6 +11,7 @@ import hashlib
 import bcrypt
 import os
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +81,34 @@ class TokenResponse(BaseModel):
     role: str
 
 def hash_password(password: str) -> str:
+    """Sync bcrypt hash — only call this directly from non-request code.
+    From inside async request handlers, prefer ``ahash_password()`` below
+    so we don't block the event loop for ~200–500ms (rounds=12)."""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+async def ahash_password(password: str) -> str:
+    """Async wrapper that runs bcrypt in a thread so the event loop stays
+    responsive. Iter 325e — fixes the "first login click is slow" bug
+    that came from running rounds=12 bcrypt synchronously in /login."""
+    return await asyncio.to_thread(hash_password, password)
+
 
 def verify_password_hash(password: str, stored_hash: str) -> bool:
     """Verify password — supports bcrypt and legacy SHA-256 with auto-migration."""
     if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
         return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
     return hashlib.sha256(password.encode()).hexdigest() == stored_hash
+
+
+async def averify_password_hash(password: str, stored_hash: str) -> bool:
+    """Async wrapper. Iter 325e — fixes the "first login click is slow"
+    bug. bcrypt.checkpw at rounds=12 takes ~50–100ms; on a freshly-spawned
+    uvicorn worker that's enough to time out the first browser fetch
+    before the event loop can even ack the request."""
+    if not stored_hash:
+        return False
+    return await asyncio.to_thread(verify_password_hash, password, stored_hash)
 
 def create_token(email: str, role: str = "user", *, extra: dict | None = None) -> str:
     import uuid as _uuid
@@ -181,10 +203,10 @@ async def login(request: LoginRequest):
                 if not stored:
                     for slot in ("ADMIN_PASSWORD_HASH_1", "ADMIN_PASSWORD_HASH_2"):
                         cand = os.getenv(slot, "").replace("$$", "$")
-                        if cand and verify_password_hash(request.password, cand):
+                        if cand and await averify_password_hash(request.password, cand):
                             stored = cand
                             break
-                if stored and verify_password_hash(request.password, stored):
+                if stored and await averify_password_hash(request.password, stored):
                     is_admin_flag = bool(
                         admin_row.get("is_admin")
                         or admin_row.get("is_super_admin")
@@ -217,7 +239,7 @@ async def login(request: LoginRequest):
     # Check in-memory admin users first (bcrypt from ENV)
     if email in ADMIN_USERS:
         user = ADMIN_USERS[email]
-        if user.get("password_hash") and verify_password_hash(request.password, user["password_hash"]):
+        if user.get("password_hash") and await averify_password_hash(request.password, user["password_hash"]):
             token = create_token(email, user.get("role", "admin"))
             return TokenResponse(
                 token=token,
@@ -231,11 +253,13 @@ async def login(request: LoginRequest):
     if db is not None:
         try:
             user = await db.platform_users.find_one({"email": email})
-            if user and verify_password_hash(request.password, user.get("password_hash", "")):
+            if user and await averify_password_hash(request.password, user.get("password_hash", "")):
                 user_role = (user.get("role") or "user").lower()
-                # Auto-migrate SHA-256 to bcrypt on successful login
+                # Auto-migrate SHA-256 to bcrypt on successful login.
+                # iter 325e — async-hash so we don't block the event loop
+                # for ~200-500ms on the user's first successful login.
                 if not user.get("password_hash", "").startswith("$2b$"):
-                    new_hash = hash_password(request.password)
+                    new_hash = await ahash_password(request.password)
                     await db.platform_users.update_one(
                         {"email": email},
                         {"$set": {"password_hash": new_hash}}

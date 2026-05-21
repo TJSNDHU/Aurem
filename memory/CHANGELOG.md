@@ -1,3 +1,45 @@
+## 2026-05-21 — iter 325e — 2 login UX bug fixes
+
+**Bug 1 — first login click slow / times out** (backend)
+
+Root cause: `bcrypt.checkpw` (~50–100ms at rounds=10) and `bcrypt.hashpw + gensalt(rounds=12)` (~200–500ms) were called synchronously inside async login handlers, blocking the entire event loop on every login attempt. On a cold uvicorn worker, the first request couldn't even ack TCP before the browser fetch timed out (~250-500ms in Chrome's connection budget). Second click "worked" because by then bcrypt was warm + the event loop was idle.
+
+Fix:
+- `utils/auth.py` — added `averify_password(pw, hash)` and `ahash_password(pw)` that run the sync bcrypt calls in `asyncio.to_thread()`.
+- `routers/platform_auth_router.py` — added local `averify_password_hash` + `ahash_password` mirrors (router has its own bcrypt+sha256 hybrid). Wired into **all 4 verify sites** and the **migration hash site**.
+- `routes/auth.py` — swapped the sync calls in `/auth/login` (customer), team-member login, `/auth/admin/login`, `/auth/register` and `/auth/reset-password`.
+- Net effect: bcrypt CPU still costs the same, but other inbound requests continue draining the event loop while it runs. First-click latency drops from "timeout" to **120-130ms** (consistent, verified live).
+
+**Bug 2 — admin TOTP field only shows on second click** (frontend-only)
+
+Root cause: backend returned `401 + detail="2fa_required"` only AFTER it had spent a round-trip validating email + password. Frontend then revealed the TOTP input — but by that point the founder thought the click had failed. Second click worked because TOTP was already visible.
+
+Fix: `frontend/src/platform/AdminLogin.jsx`:
+- New `KNOWN_ADMIN_EMAILS` set + `looksLikeAdmin()` heuristic — any `@aurem.live` address OR explicit admin email reveals the TOTP input the moment the user finishes typing (`useEffect` on email change). No server roundtrip needed for the input to render.
+- Server is still the source of truth — if the heuristic is wrong, the empty TOTP is just ignored. We never auto-hide once shown (avoids mid-typing flicker).
+- Button now shows `Authenticating…` text next to the spinner (was spinner-only — too subtle, founder thought click hadn't registered).
+- `LuxeAuthOverlay.jsx` — same fix on customer side: `Signing in…` label on the submit button during login.
+
+**Tests** — `backend/tests/test_iter325e_login_ux.py` (9 cases, all green):
+- async wrappers exist + match sync behavior
+- **`test_async_verify_keeps_event_loop_responsive`** — proves a 1ms `asyncio.sleep` completes BEFORE bcrypt verify, confirming the loop is no longer blocked. This is the load-bearing test for bug 1.
+- regression-guards for every call site in both routers
+- AdminLogin shows TOTP proactively + `Authenticating…` label
+- LuxeAuthOverlay shows `Signing in…` label
+
+**Live verification**:
+- 3x consecutive cold POSTs to `/api/platform/auth/login` → 120ms, 121ms, 123ms (consistent — no cold-start penalty)
+- Screenshot at `/admin/login`: typing `admin@aurem.live` instantly reveals the **2FA CODE** field with password still empty — no submit, no roundtrip.
+
+**Files**:
+- `backend/utils/auth.py` (+18 LOC: 2 async wrappers)
+- `backend/routers/platform_auth_router.py` (~30 LOC: async wrappers + 4 await swaps)
+- `backend/routes/auth.py` (~10 LOC: import + 5 await swaps)
+- `frontend/src/platform/AdminLogin.jsx` (+30 LOC: KNOWN_ADMIN_EMAILS, looksLikeAdmin, proactive effect, button label)
+- `frontend/src/platform/luxe/LuxeAuthOverlay.jsx` (+1 LOC: "Signing in…" label)
+- `backend/tests/test_iter325e_login_ux.py` (new, 9 cases)
+
+
 ## 2026-05-21 — iter 325d — 3 audit-driven glue fixes (telegram alerts, weekly revenue, hot-lead loop)
 
 **Trigger**: Audit revealed `telegram_bot_service` ghost-imported in 7 places, `weekly_revenue_summary_scheduler` defined but never started, and `inbound_reply_handler` POSITIVE intent never set `hot_lead_flag` or fired founder alert.

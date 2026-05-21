@@ -20,9 +20,41 @@ const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
+  // iter 325e — show TOTP input pre-emptively when the typed email
+  // looks like an admin account, so the founder can paste the password
+  // AND the 6-digit code in one go and submit ONCE. Previously the
+  // backend had to return 401(2fa_required) before the input rendered,
+  // which forced a second click.
   const [needTotp, setNeedTotp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Heuristic: admin emails are on the aurem.live domain OR explicitly
+  // listed below. False positives only cause an extra (empty) input to
+  // render — never block legit non-admin signin, because needTotp is
+  // gated to "show field" not "require field" on submit.
+  const KNOWN_ADMIN_EMAILS = new Set([
+    'admin@aurem.live',
+    'super@aurem.live',
+    'teji.ss1986@gmail.com',
+  ]);
+  const looksLikeAdmin = (val) => {
+    const v = (val || '').trim().toLowerCase();
+    if (!v) return false;
+    if (KNOWN_ADMIN_EMAILS.has(v)) return true;
+    // Domain match — anyone on the company domain gets the TOTP field.
+    return v.endsWith('@aurem.live');
+  };
+
+  useEffect(() => {
+    // Reveal TOTP as soon as the typed email looks admin-shaped.
+    // We never auto-HIDE the field after it appears (avoids flicker
+    // mid-typing) — the server is still the source of truth.
+    if (!needTotp && looksLikeAdmin(email)) {
+      setNeedTotp(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
 
   useEffect(() => {
     const token = getPlatformToken();
@@ -201,7 +233,10 @@ const AdminLogin = () => {
             style={{ background: 'linear-gradient(135deg, #D4AF37, #8B7355)', color: '#050507' }}
           >
             {loading ? (
-              <Loader2 className="size-4 animate-spin" />
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                <span>Authenticating…</span>
+              </>
             ) : (
               <>
                 Authenticate

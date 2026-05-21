@@ -20,7 +20,8 @@ from config import get_database, JWT_SECRET, JWT_ALGORITHM, RESEND_API_KEY
 from models.auth import UserCreate, UserLogin, User, TokenResponse, PasswordResetRequest, PasswordResetConfirm
 from utils.auth import (
     hash_password, verify_password, create_token, get_current_user,
-    require_auth, SUPER_ADMIN_PERMISSIONS
+    require_auth, SUPER_ADMIN_PERMISSIONS,
+    averify_password, ahash_password,
 )
 
 # Initialize router
@@ -241,7 +242,7 @@ async def register(user_data: UserCreate):
 
     user = User(email=email, first_name=first_name, last_name=last_name, phone=phone)
     user_dict = user.model_dump()
-    user_dict["password"] = hash_password(user_data.password)
+    user_dict["password"] = await ahash_password(user_data.password)
     user_dict["created_at"] = user_dict["created_at"].isoformat()
 
     # Bug-fix #17 — race condition: two concurrent /register calls with
@@ -468,7 +469,7 @@ async def login(credentials: UserLogin):
                     detail="This admin account requires Google SSO login. Please use 'Sign in with Google'."
                 )
     
-    if user and verify_password(credentials.password, user.get("password", "")):
+    if user and await averify_password(credentials.password, user.get("password", "")):
         clear_failed_logins(identifier)
         token = create_token(user["id"], user.get("is_admin", False), email=user.get("email"))
         _t["jwt_issued"] = _time.monotonic()
@@ -508,7 +509,7 @@ async def login(credentials: UserLogin):
             {"email": credentials.email.lower().strip()}, {"_id": 0}
         )
         if team_member and team_member.get("status") == "active":
-            if team_member.get("password_hash") and verify_password(
+            if team_member.get("password_hash") and await averify_password(
                 credentials.password, team_member["password_hash"]
             ):
                 clear_failed_logins(identifier)
@@ -663,8 +664,10 @@ async def admin_login(credentials: UserLogin, request: Request):
         # by diffing 401 vs 403.
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Password check
-    if not verify_password(credentials.password, user.get("password", "")):
+    # Password check (iter 325e — async to keep event loop responsive
+    # during the ~50–100ms bcrypt compare; this was the root cause of
+    # the "first admin login click times out" bug).
+    if not await averify_password(credentials.password, user.get("password", "")):
         _admin_fail_append(email)
         try:
             await get_auth_db().suspicious_ips.insert_one({
@@ -1277,7 +1280,7 @@ async def reset_password(request_data: PasswordResetConfirm):
     if not is_valid:
         raise HTTPException(status_code=400, detail=message)
 
-    new_hash = hash_password(request_data.new_password)
+    new_hash = await ahash_password(request_data.new_password)
 
     # Sync BOTH `password` and `password_hash` so admin/customer login flows
     # (which read different fields) stay in lockstep.
