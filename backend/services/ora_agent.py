@@ -371,10 +371,16 @@ async def _llm_turn(
     """
     order_env = os.environ.get(
         "ORA_AGENT_PROVIDER_ORDER",
-        # iter 326a — `freellmapi` inserted as #2 so a single proxy
-        # outage / DeepSeek slow-down can't down ORA. If FREELLMAPI_BASE_URL
-        # is unset, the provider function returns None and we skip cleanly.
-        "deepseek,freellmapi,claude,legion_ollama,groq",
+        # iter 326a/326f — chain order with Gemini + NVIDIA inserted ahead
+        # of FreeLLMAPI (which is now optional). Strategy:
+        #   1. DeepSeek (best reasoning, our primary)
+        #   2. Gemini   (huge free RPM, fast)
+        #   3. NVIDIA   (heavy-hitter fallback)
+        #   4. Claude   (Universal Key, paid but reliable)
+        #   5. FreeLLMAPI (only kicks in if operator deployed the proxy)
+        #   6. Ollama   (sovereign, laptop, usually offline)
+        #   7. Groq     (rate-limited safety net)
+        "deepseek,gemini,nvidia,claude,freellmapi,legion_ollama,groq",
     )
     order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
@@ -427,6 +433,18 @@ async def _llm_turn(
                 msg = await asyncio.wait_for(
                     _freellmapi_with_tools(messages, model=model),
                     timeout=_FREELLMAPI_WAIT_FOR,
+                )
+            elif provider == "gemini":
+                # iter 326f — Google Gemini via OpenAI-compat endpoint.
+                msg = await asyncio.wait_for(
+                    _gemini_with_tools(messages, model=model),
+                    timeout=_GEMINI_WAIT_FOR,
+                )
+            elif provider == "nvidia":
+                # iter 326f — NVIDIA NIM via OpenAI-compat endpoint.
+                msg = await asyncio.wait_for(
+                    _nvidia_with_tools(messages, model=model),
+                    timeout=_NVIDIA_WAIT_FOR,
                 )
             elif provider == "claude":
                 msg = await asyncio.wait_for(
@@ -642,6 +660,226 @@ async def warm_freellmapi() -> bool:
     except Exception as e:
         logger.warning(f"[ora-agent] FreeLLMAPI warmup failed: {type(e).__name__}: {e}")
         return False
+
+
+# ──────────────────────────────────────────────────────────────────────
+# iter 326f — Native Gemini + NVIDIA providers.
+#
+# We have GOOGLE_API_KEY + NVIDIA_NIM_API_KEY already in the AUREM env
+# (verified 2026-05-21). Wiring them directly into the ORA chain gives
+# us multi-provider failover WITHOUT the FreeLLMAPI proxy / VPS overhead.
+# Both providers expose OpenAI-compatible `/v1/chat/completions` endpoints
+# so the request shape (and tool-calling format) is identical to DeepSeek.
+# Pattern intentionally mirrors `_freellmapi_with_tools` for consistency.
+# ──────────────────────────────────────────────────────────────────────
+
+async def _gemini_with_tools(
+    messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+) -> dict[str, Any] | None:
+    """Google Gemini via the OpenAI-compatible endpoint at
+    `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`.
+
+    Free tier is the most generous of all free providers:
+      Gemini 2.5 Flash  →  ~15 RPM · 1M tokens/min · 1500 req/day
+
+    Configuration:
+      GOOGLE_API_KEY  — Google AI Studio key (already set in AUREM env)
+      GEMINI_MODEL    — optional override (default: gemini-2.5-flash)
+
+    Returns None when key missing or on any non-200 — caller falls
+    through to next provider in the chain.
+    """
+    key = (os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        return None
+    model_name = model or os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+    try:
+        async with httpx.AsyncClient(timeout=_GEMINI_HTTPX_TIMEOUT) as c:
+            r = await c.post(
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "model":       model_name,
+                    "messages":    messages,
+                    "tools":       all_agent_tool_schemas(),
+                    "tool_choice": "auto",
+                    "temperature": 0.25,
+                    "max_tokens":  1500,
+                },
+            )
+            if r.status_code == 200:
+                data = r.json()
+                logger.info(f"[ora-agent] gemini served by {model_name}")
+                return (data.get("choices") or [{}])[0].get("message") or {}
+            logger.warning(f"[ora-agent] gemini {r.status_code}: {r.text[:240]}")
+    except Exception as e:
+        logger.warning(f"[ora-agent] gemini error: {type(e).__name__}: {e}")
+    return None
+
+
+async def warm_gemini() -> bool:
+    """iter 326f — startup ping. No-op if GOOGLE_API_KEY missing."""
+    key = (os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        return False
+    model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as c:
+            r = await c.post(
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                headers={"Authorization": f"Bearer {key}",
+                         "Content-Type":  "application/json"},
+                json={"model":       model_name,
+                      "messages":    [{"role": "user", "content": "ping"}],
+                      "max_tokens":  4,
+                      "temperature": 0},
+            )
+            ok = r.status_code == 200
+            logger.info(
+                f"[ora-agent] Gemini warmup → {r.status_code}"
+                f"{' ✓ ready' if ok else ' (cold)'}"
+            )
+            return ok
+    except Exception as e:
+        logger.warning(f"[ora-agent] Gemini warmup failed: {type(e).__name__}: {e}")
+        return False
+
+
+async def gemini_health() -> dict[str, Any]:
+    """iter 326f — watchdog probe used by /api/admin/ora/providers/health."""
+    key = (os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if not key:
+        return {"ok": False, "configured": False, "reason": "GOOGLE_API_KEY missing"}
+    started = asyncio.get_event_loop().time()
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.get(
+                "https://generativelanguage.googleapis.com/v1beta/openai/models",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+        elapsed_ms = int((asyncio.get_event_loop().time() - started) * 1000)
+        if r.status_code != 200:
+            return {"ok": False, "configured": True, "status": r.status_code,
+                    "latency_ms": elapsed_ms,
+                    "reason": f"HTTP {r.status_code}"}
+        models = (r.json().get("data") or [])
+        return {"ok": True, "configured": True, "status": 200,
+                "models_total": len(models), "latency_ms": elapsed_ms,
+                "reason": f"{len(models)} models routable"}
+    except Exception as e:
+        return {"ok": False, "configured": True,
+                "reason": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
+async def _nvidia_with_tools(
+    messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+) -> dict[str, Any] | None:
+    """NVIDIA NIM via the OpenAI-compatible endpoint at
+    `https://integrate.api.nvidia.com/v1/chat/completions`.
+
+    Free tier: 1000 requests/day per model. Models include
+    `meta/llama-4-maverick-17b-128e-instruct`, `qwen/qwen3-235b-a22b`, etc.
+
+    Configuration:
+      NVIDIA_NIM_API_KEY — already set in AUREM env
+      NVIDIA_MODEL       — optional (default: meta/llama-4-maverick-17b-128e-instruct)
+    """
+    key = (os.environ.get("NVIDIA_NIM_API_KEY") or "").strip()
+    if not key:
+        return None
+    model_name = (
+        model
+        or os.environ.get("NVIDIA_MODEL")
+        or "meta/llama-4-maverick-17b-128e-instruct"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=_NVIDIA_HTTPX_TIMEOUT) as c:
+            r = await c.post(
+                "https://integrate.api.nvidia.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "model":       model_name,
+                    "messages":    messages,
+                    "tools":       all_agent_tool_schemas(),
+                    "tool_choice": "auto",
+                    "temperature": 0.25,
+                    "max_tokens":  1500,
+                },
+            )
+            if r.status_code == 200:
+                data = r.json()
+                logger.info(f"[ora-agent] nvidia served by {model_name}")
+                return (data.get("choices") or [{}])[0].get("message") or {}
+            logger.warning(f"[ora-agent] nvidia {r.status_code}: {r.text[:240]}")
+    except Exception as e:
+        logger.warning(f"[ora-agent] nvidia error: {type(e).__name__}: {e}")
+    return None
+
+
+async def warm_nvidia() -> bool:
+    key = (os.environ.get("NVIDIA_NIM_API_KEY") or "").strip()
+    if not key:
+        return False
+    model_name = (
+        os.environ.get("NVIDIA_MODEL")
+        or "meta/llama-4-maverick-17b-128e-instruct"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as c:
+            r = await c.post(
+                "https://integrate.api.nvidia.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}",
+                         "Content-Type":  "application/json"},
+                json={"model":       model_name,
+                      "messages":    [{"role": "user", "content": "ping"}],
+                      "max_tokens":  4,
+                      "temperature": 0},
+            )
+            ok = r.status_code == 200
+            logger.info(
+                f"[ora-agent] NVIDIA warmup → {r.status_code}"
+                f"{' ✓ ready' if ok else ' (cold)'}"
+            )
+            return ok
+    except Exception as e:
+        logger.warning(f"[ora-agent] NVIDIA warmup failed: {type(e).__name__}: {e}")
+        return False
+
+
+async def nvidia_health() -> dict[str, Any]:
+    key = (os.environ.get("NVIDIA_NIM_API_KEY") or "").strip()
+    if not key:
+        return {"ok": False, "configured": False, "reason": "NVIDIA_NIM_API_KEY missing"}
+    started = asyncio.get_event_loop().time()
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.get(
+                "https://integrate.api.nvidia.com/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+        elapsed_ms = int((asyncio.get_event_loop().time() - started) * 1000)
+        if r.status_code != 200:
+            return {"ok": False, "configured": True, "status": r.status_code,
+                    "latency_ms": elapsed_ms,
+                    "reason": f"HTTP {r.status_code}"}
+        models = (r.json().get("data") or [])
+        return {"ok": True, "configured": True, "status": 200,
+                "models_total": len(models), "latency_ms": elapsed_ms,
+                "reason": f"{len(models)} models routable"}
+    except Exception as e:
+        return {"ok": False, "configured": True,
+                "reason": f"{type(e).__name__}: {str(e)[:120]}"}
+
 
 
 

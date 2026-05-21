@@ -329,6 +329,8 @@ function SectionTitle({ icon: Icon, text }) {
 // upstreams.
 const PROVIDER_LABELS = {
   deepseek:      { name: "DeepSeek V3.1",  sub: "OpenRouter · primary" },
+  gemini:        { name: "Google Gemini",  sub: "AI Studio · 2.5 Flash · 1.5K req/day free" },
+  nvidia:        { name: "NVIDIA NIM",     sub: "Llama 4 · 1K req/day free" },
   freellmapi:    { name: "FreeLLMAPI",     sub: "self-hosted proxy · 11-provider failover" },
   claude:        { name: "Claude",         sub: "Emergent Universal Key · fallback" },
   legion_ollama: { name: "Legion (Ollama)",sub: "sovereign · laptop · optional" },

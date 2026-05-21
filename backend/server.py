@@ -1159,6 +1159,14 @@ async def startup_event():
         except Exception as _pe:
             logging.debug(f"[ORA] FreeLLMAPI prewarm skipped: {_pe}")
 
+        # iter 326f — warm Gemini + NVIDIA native providers.
+        try:
+            from services.ora_agent import warm_gemini, warm_nvidia
+            asyncio.create_task(warm_gemini())
+            asyncio.create_task(warm_nvidia())
+        except Exception as _pe:
+            logging.debug(f"[ORA] Gemini/NVIDIA prewarm skipped: {_pe}")
+
         # Validate required secrets first
         try:
             from utils.secrets import validate_all_secrets, scan_for_pymongo_antipatterns

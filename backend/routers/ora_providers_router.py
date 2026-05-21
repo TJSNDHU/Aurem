@@ -101,6 +101,17 @@ async def _check_freellmapi() -> dict[str, Any]:
     return await freellmapi_health()
 
 
+# iter 326f — Gemini + NVIDIA watchdog checks (helpers live in ora_agent)
+async def _check_gemini() -> dict[str, Any]:
+    from services.ora_agent import gemini_health
+    return await gemini_health()
+
+
+async def _check_nvidia() -> dict[str, Any]:
+    from services.ora_agent import nvidia_health
+    return await nvidia_health()
+
+
 async def _check_ollama() -> dict[str, Any]:
     """Legion Ollama (laptop/sovereign). Optional; commonly offline."""
     url = (os.environ.get("OLLAMA_BASE_URL") or "").strip()
@@ -129,6 +140,8 @@ async def _check_ollama() -> dict[str, Any]:
 _CHECKERS = {
     "deepseek":      _check_deepseek,
     "freellmapi":    _check_freellmapi,
+    "gemini":        _check_gemini,
+    "nvidia":        _check_nvidia,
     "claude":        _check_claude,
     "groq":          _check_groq,
     "legion_ollama": _check_ollama,
@@ -163,7 +176,7 @@ async def providers_health(authorization: Optional[str] = Header(None)):
 
     order_env = os.environ.get(
         "ORA_AGENT_PROVIDER_ORDER",
-        "deepseek,freellmapi,claude,legion_ollama,groq",
+        "deepseek,gemini,nvidia,claude,freellmapi,legion_ollama,groq",
     )
     order = [p.strip() for p in order_env.lower().split(",") if p.strip()]
     # De-dupe while preserving order
