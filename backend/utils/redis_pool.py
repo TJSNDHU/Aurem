@@ -4,12 +4,13 @@ AUREM Shared Redis Pool
 Single source of truth for Redis connections across the backend.
 
 Architecture:
-  ONE async ConnectionPool (max_connections=25) — every service calls
+  ONE async ConnectionPool (max_connections=10) — every service calls
   `get_async_redis()` and gets a `Redis` client bound to the same underlying
   pool. No service should ever call `aioredis.from_url()` directly.
 
-  Redis Cloud free tier caps at 30 clients. With 25 pooled + 1 pubsub + buffer,
-  we stay comfortably under the ceiling regardless of concurrency.
+  Redis Cloud free tier caps at 30 clients. With 10 async + 3 sync + 1
+  pubsub + buffer = ~14, we stay well under the ceiling regardless of
+  concurrency. Override via REDIS_MAX_CONNECTIONS env on paid tiers.
 
 Sync path:
   Same idea with `redis.ConnectionPool` shared across the single sync client.
@@ -54,17 +55,19 @@ _async_init_failed = False
 _async_init_failed_at = 0.0
 _ASYNC_RETRY_AFTER_SEC = 60.0  # circuit-breaker window
 
-MAX_CONNECTIONS = int(os.environ.get("REDIS_MAX_CONNECTIONS", "12"))
+MAX_CONNECTIONS = int(os.environ.get("REDIS_MAX_CONNECTIONS", "10"))
 SYNC_MAX_CONNECTIONS = int(os.environ.get("REDIS_SYNC_MAX_CONNECTIONS", "3"))
 
 
 def _build_async_pool():
     """Create the single async ConnectionPool. Caller must handle None.
 
-    iter 281.2 hardening (Redis Cloud free tier — 30-client global cap):
-      - max_connections lowered 25 → 12 (room for sync 3 + pubsub 1 + buffer)
+    iter 325k tuning (Redis Cloud free tier — 30-client global cap):
+      - max_connections lowered 12 → 10 (10 async + 3 sync + 1 pubsub
+        + buffer = 14 — comfortably under the 30-client ceiling)
       - socket_keepalive + retry_on_timeout for prompt stale-conn cleanup
       - timeout property so evicted pool members don't hang callers
+      - Override via REDIS_MAX_CONNECTIONS env if a paid tier is added.
     """
     redis_url = os.environ.get("REDIS_URL", "").strip()
     if not redis_url:

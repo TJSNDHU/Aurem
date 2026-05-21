@@ -128,6 +128,23 @@ def test_async_pool_bounded_max_connections():
     assert max_conn <= 50, f"Pool must be bounded; got max_connections={max_conn}"
 
 
+def test_default_async_cap_is_ten_or_less():
+    """iter 325k — defaults must stay <=10 to fit the 30-client free tier
+    (10 async + 3 sync + 1 pubsub + buffer = 14). Any future change that
+    raises the in-code default must consciously update this lock."""
+    import importlib
+    from utils import redis_pool
+    # Force re-read the module-level constant respecting the env override
+    importlib.reload(redis_pool)
+    assert redis_pool.MAX_CONNECTIONS <= 10, (
+        f"Async pool cap regressed: MAX_CONNECTIONS={redis_pool.MAX_CONNECTIONS}, "
+        f"must stay <=10 for Redis Cloud free tier"
+    )
+    assert redis_pool.SYNC_MAX_CONNECTIONS <= 3, (
+        f"Sync pool cap regressed: SYNC_MAX_CONNECTIONS={redis_pool.SYNC_MAX_CONNECTIONS}"
+    )
+
+
 def test_concurrent_callers_get_same_pool():
     """100 concurrent coroutines must share one pool instance (no thundering herd)."""
     from utils import redis_pool
