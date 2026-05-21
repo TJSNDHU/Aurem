@@ -1493,6 +1493,7 @@ def register_all_routers(app, db):
         ("routers.ai_repair_router", "AI Repair", None),
         ("routers.customer_pipeline_router", "Customer Pipeline", None),
         ("routers.seo_funnel_router", "SEO Funnel (public revenue)", None),
+        ("routers.system_health_full_router", "System Health Composite", None),
         ("routers.intelligence_router", "Intelligence", None),
         ("routers.voice_sales_agent", "Voice Sales Agent", None),
         ("routers.invisible_coach", "Invisible Coach", None),
@@ -2779,6 +2780,91 @@ def register_all_routers(app, db):
             logger.info("[REGISTRY] Sentinel repair loop scheduled (every 300s — was 60s, reduced to prevent event-loop pile-up)")
         except Exception as sr_e:
             logger.warning(f"[REGISTRY] Sentinel repair loop schedule failed: {sr_e}")
+
+        # iter 325f Phase 2 — ORA CTO Repair Agent. Polls pending_approvals
+        # every 5 minutes, asks the ORA CTO daemon for a proposed fix, and
+        # routes tier-1 fixes to auto-apply (with the 5-min cancel window
+        # baked into the row) or tier-2 to a Telegram founder approval.
+        try:
+            from services.ora_cto_repair_agent import (
+                run_repair_tick as _cto_repair_tick,
+            )
+            from apscheduler.triggers.interval import IntervalTrigger as _IT2
+            aurem_scheduler.add_job(
+                _cto_repair_tick,
+                _IT2(seconds=300, jitter=30),
+                id="ora_cto_repair_agent",
+                name="ORA CTO Repair Agent (pending_approvals → CTO → tier-1/2)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=120,
+            )
+            logger.info("[REGISTRY] ORA CTO repair agent scheduled (every 300s)")
+        except Exception as cto_e:
+            logger.warning(f"[REGISTRY] ORA CTO repair agent schedule failed: {cto_e}")
+
+        # iter 325f Phase 3a — Self-Audit auto-trigger (every 6h). Findings
+        # with severity HIGH flow to incident_bus so the rest of the stack
+        # can react. Previously manual-only.
+        try:
+            from services.self_audit_scheduler import run_self_audit_tick
+            from apscheduler.triggers.interval import IntervalTrigger as _IT3
+            aurem_scheduler.add_job(
+                run_self_audit_tick,
+                _IT3(hours=6, jitter=300),
+                id="self_audit_cron",
+                name="Self-Audit (6h auto-run → incident_bus on HIGH)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=300,
+            )
+            logger.info("[REGISTRY] Self-audit cron scheduled (every 6h)")
+        except Exception as sa_e:
+            logger.warning(f"[REGISTRY] Self-audit cron failed: {sa_e}")
+
+        # iter 325f Phase 4 — Shannon Autofix scheduler. Runs after every
+        # Shannon scan (poll-based: every 30 min). HIGH/CRITICAL findings
+        # already flow via shannon_security.ingest_report → pending_approvals.
+        # This scheduler covers LOW/MEDIUM gaps by asking ORA CTO for fix
+        # suggestions on un-proposed findings.
+        try:
+            from services.shannon_autofix import shannon_autofix_tick
+            from apscheduler.triggers.interval import IntervalTrigger as _IT4
+            aurem_scheduler.add_job(
+                shannon_autofix_tick,
+                _IT4(minutes=30, jitter=120),
+                id="shannon_autofix",
+                name="Shannon Autofix (LOW/MED findings → ORA CTO proposals)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=120,
+            )
+            logger.info("[REGISTRY] Shannon autofix scheduled (every 30 min)")
+        except Exception as sx_e:
+            logger.warning(f"[REGISTRY] Shannon autofix schedule failed: {sx_e}")
+
+        # iter 325f Phase 5 — React Doctor weekly monitor. Reads the
+        # latest react_doctor_runs row, compares against previous; >5-pt
+        # drop emits incident_bus, <50 absolute fires Telegram.
+        try:
+            from services.react_doctor_monitor import react_doctor_monitor_tick
+            from apscheduler.triggers.interval import IntervalTrigger as _IT5
+            aurem_scheduler.add_job(
+                react_doctor_monitor_tick,
+                _IT5(days=7, jitter=3600),
+                id="react_doctor_monitor",
+                name="React Doctor Monitor (weekly, score drop → incident_bus)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=3600,
+            )
+            logger.info("[REGISTRY] React Doctor monitor scheduled (weekly)")
+        except Exception as rd_e:
+            logger.warning(f"[REGISTRY] React Doctor monitor failed: {rd_e}")
 
         # iter 324l — Scout Replenish Cron. Keeps campaign_leads queue topped
         # up via OSM hunts every 2h so auto_blast_engine never starves.

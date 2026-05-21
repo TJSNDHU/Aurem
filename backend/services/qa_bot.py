@@ -225,6 +225,16 @@ async def run_pulse_once() -> Dict[str, Any]:
     # Alert check — any endpoint failed now + in previous run?
     await _maybe_alert(checks)
 
+    # iter 325f Phase 3b — QA Guardian streak detection. Any endpoint
+    # red for 3+ consecutive pulse runs gets escalated to incident_bus
+    # with auto_fixable=True so the repair stack can run a restart
+    # playbook. Independent of _maybe_alert (which only looks at 2 runs).
+    try:
+        from services.qa_guardian import run_guardian_tick
+        await run_guardian_tick(_db)
+    except Exception as e:
+        logger.debug(f"[QA_BOT] qa_guardian hook failed: {e}")
+
     # Latency Guardian — auto-heal slow-but-passing endpoints (iter 322f).
     # Pass `checks` directly so the guardian doesn't need to re-query.
     try:
@@ -275,6 +285,32 @@ async def _maybe_alert(current_checks: List[Dict[str, Any]]):
 
     if not to_alert:
         return
+
+    # iter 325f Phase 1.2 — emit each recurring failure to incident_bus
+    # so triage_brain can run a known playbook (e.g., restart pillar
+    # worker) and ora_cto_repair_agent can propose a code-level fix when
+    # the same endpoint stays red across 3+ consecutive sweeps.
+    try:
+        from services import incident_bus
+        # Build a lookup of the current failing check so we can pass the
+        # status code + URL into the bus payload.
+        fail_lookup = {c["id"]: c for c in current_checks if not c.get("passed")}
+        for ep_id in to_alert:
+            chk = fail_lookup.get(ep_id, {})
+            await incident_bus.report(
+                category="endpoint_failure",
+                signature=f"qa_bot:{ep_id}",
+                severity="medium",
+                source="qa_bot",
+                title=f"{ep_id} failed 2+ consecutive sweeps",
+                detail=f"status={chk.get('status_code')} url={chk.get('url')} note={chk.get('note')}",
+                metadata={"endpoint_id": ep_id,
+                          "fail_ratio": round(len(current_fails) / (len(current_checks) or 1), 3),
+                          "fail_count": len(current_fails)},
+                actor="qa_bot",
+            )
+    except Exception as e:
+        logger.debug(f"[QA_BOT] incident_bus emit skipped: {e}")
 
     # ────────────────────────────────────────────────────────────────
     # Iter 286.0 — Alert Suppression / Digest Mode

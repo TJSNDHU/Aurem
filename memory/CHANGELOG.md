@@ -1,3 +1,84 @@
+## 2026-05-21 — iter 325f + 325g — Complete autonomous fix stack (Phases 1-6) + DeepSeek wiring
+
+### Phase 1 — Wire 3 isolated scans to incident_bus
+- **1.1** `services/error_ledger.py:record_error()` → now emits `incident_bus.report(category='crash', signature=hash, severity='high', ...)` alongside the legacy a2a_bus emit. 14 LOC.
+- **1.2** `services/qa_bot.py:_maybe_alert()` → emits `incident_bus.report(category='endpoint_failure', signature=f'qa_bot:{ep_id}', severity='medium', ...)` for every endpoint that failed 2+ consecutive sweeps. Includes status_code + url + fail_count in metadata. 28 LOC.
+- **1.3** `services/shannon_security.py:ingest_report()` → for each HIGH/CRITICAL vulnerability, creates a `pending_approvals` row (tier=2, source=`shannon`) via the new helper. 30 LOC.
+- **New service** `services/pending_approvals.py` (~115 LOC) — shared write-helper for `db.pending_approvals`. 24h dedup window per fingerprint. Tier-1 rows include `auto_execute_at` (now + 5 min cancel window). Used by Shannon, Shannon Autofix, and any future "founder-approved fix" producer.
+
+### Phase 2 — ORA CTO Repair Agent (LLM-powered)
+- **New service** `services/ora_cto_repair_agent.py` (~270 LOC) — every 5 min polls `pending_approvals` for `crash | endpoint_failure | security_fix | code_error`, asks the LLM gateway for a proposed fix.
+- **LLM routing**: uses existing `services/llm_gateway_v2.route(task_type=...)`:
+  - **Non-sensitive** → `task_type="repair_diagnose"` → DeepSeek V3.1 via OpenRouter (~$0.0001/task)
+  - **Sensitive** (`auth`, `jwt`, `stripe`, `billing`, `kyc`, etc. keyword match on title+detail+source) → `task_type="auth_token_decision"` → gateway's SENSITIVE_TASKS guard strips DeepSeek/Kimi/Qwen and forces Claude Sonnet 4.5 (US-hosted via Emergent key)
+- **Tier classification** is keyword-based on the LLM response. Single-line/env-var edits at NON-high severity → Tier 1 (auto-apply after 5-min cancel window). Multi-file or HIGH/CRITICAL severity → Tier 2 (Telegram founder approval via existing `services/telegram_bot_service`).
+- **Legacy Legion path** preserved behind `ORA_CTO_USE_LEGION=true` env flag — defaults off. The `ORA_CTO_URL` env var is reserved for future Legion daemon integration.
+- **Proposal storage** (`db.ora_cto_proposals`): proposal_id, approval_id, type, signature, status (`pending_apply` | `awaiting_founder` | `llm_unavailable` | `cancelled`), tier, severity, llm_response, llm_provider, llm_model, llm_tokens_in/out, llm_latency_ms, sensitive (bool).
+- Scheduled in `registry.py`: id=`ora_cto_repair_agent`, 300s interval + 30s jitter.
+
+### Phase 3a — Self-audit auto-trigger
+- **New service** `services/self_audit_scheduler.py` (~65 LOC) — every 6h runs `services.self_audit.run_self_audit()`. Scores below `SELF_AUDIT_ALERT_THRESHOLD` (default 70) emit `incident_bus.report(category='self_audit_low_score', severity='high' if score<50 else 'medium')`.
+- Scheduled: `id=self_audit_cron`, 6h interval + 300s jitter.
+
+### Phase 3b — QA Guardian
+- **New service** `services/qa_guardian.py` (~110 LOC). After every QA Bot pulse sweep, groups failures by endpoint and detects "same endpoint failed 3+ runs in a row" — a stronger signal than QA Bot's 2-run alert. On streak: emits `incident_bus.report(category='endpoint_failure', signature=f'qa_guardian:{ep_id}:streak_3', severity='high', metadata={'auto_fixable': True})` AND writes a calendar-hour-bucketed row to `db.qa_guardian_alerts` (idempotent).
+- Wired into `services/qa_bot.run_pulse_once()` at end of sweep (3 LOC hook).
+
+### Phase 4 — Shannon Autofix
+- **New service** `services/shannon_autofix.py` (~120 LOC). Every 30 min:
+  - LOW/MEDIUM Shannon findings → quietly enqueued as Tier-1 `pending_approvals` rows for the ORA CTO repair agent to propose fixes against.
+  - HIGH/CRITICAL findings → single digest-shaped Telegram alert (fingerprinted on report timestamp so retries don't spam).
+- Note: HIGH/CRITICAL approval rows themselves are written upstream by Phase 1.3.
+- Scheduled: `id=shannon_autofix`, 30 min interval + 120s jitter.
+
+### Phase 5 — React Doctor runtime monitor
+- **New service** `services/react_doctor_monitor.py` (~100 LOC). Weekly job that reads `db.react_doctor_runs` and:
+  - Score drop > 5 points from previous run → `incident_bus.report(category='frontend_regression', severity='medium')`
+  - Absolute score < 50 → Telegram founder alert (`alert_type='react_doctor_low'`)
+- Collection schema documented: `{score, diagnostics_count, branch, commit_sha, ts}`. CI ingest endpoint can be added in a follow-up PR; for now an operator can `mongo insert` to populate.
+- Scheduled: `id=react_doctor_monitor`, 7-day interval + 1h jitter.
+
+### Phase 6 — Unified Health Composite endpoint
+- **New router** `routers/system_health_full_router.py` (~190 LOC). `GET /api/admin/system-health-full` (Admin JWT required) returns all 9 sections in one parallel-fetched call:
+  1. `qa_bot.last_pulse`
+  2. `error_ledger.open` + `recent[10]`
+  3. `incident_bus.open` + `recent[5]`
+  4. `shannon.score` + `severity_counts`
+  5. `autonomous_repair.pending` + `recent[5]`
+  6. `anomaly_detector.active` (last 1h)
+  7. `campaign.zero_sent_streak` + `eligible_leads`
+  8. `react_doctor.last_score`
+  9. `ora_cto.proposals_pending`
+- Each section wrapped in `_safe()` — one collection error degrades that section only, not the whole composite.
+- Registered in `registry.py` direct-routers list.
+
+### Iter 325g — DeepSeek wired into admin ORA CTO chat
+- `services/llm_gateway.py:_try_openrouter()` — the OLDER gateway used by `/api/ora-chat/ask` (admin CTO+Paw conversational endpoint) — primary model switched from `anthropic/claude-3.5-haiku` to **`deepseek/deepseek-chat-v3.1`** (~10× cheaper). Temperature lowered 0.4 → 0.3 (deterministic repair proposals).
+- Env override `ORA_CTO_OPENROUTER_MODEL` + `ORA_CTO_OPENROUTER_TEMP` — instant rollback path if DeepSeek degrades.
+- Claude Sonnet remains the next-tier fallback via the `_try_emergent` path so sensitive admin operations still hit US-hosted infra.
+- **Customer-facing stack untouched** per founder spec ("customers older stack good").
+
+### Tests
+- `backend/tests/test_iter325f_autonomous_stack.py` — **30/30 passing**. Coverage:
+  - Phase 1.1 (error_ledger → incident_bus), 1.2 (qa_bot → incident_bus), 1.3 (shannon → pending_approvals), pending_approvals helper exists, dedup window correct
+  - Phase 2: LLM unavailable handled gracefully, tier-1 classification, **HIGH severity forces tier-2 regardless of LLM response**, `_classify_tier` pure-function, **`_is_sensitive` keyword guard**, **sensitive path forces Claude (auth_token_decision)**, non-sensitive uses repair_diagnose, scheduler registered at 300s
+  - Phase 3a: emit on low score, skip on good score, scheduler registered at 6h
+  - Phase 3b: escalate on 3+ streak, no escalate without streak
+  - Phase 4: low/med enqueued, no reports clean return, scheduler registered
+  - Phase 5: incident on >5-pt drop, no runs clean return, no drop no incident, scheduler at 7d
+  - Phase 6: router prefix correct, admin JWT required (401 without), all 9 sections returned
+  - Iter 325g: openrouter defaults to deepseek-v3.1, env override works, temp = 0.3
+
+### Live verification
+- Backend boots clean (200 OK on `/api/platform/health`)
+- `/api/admin/system-health-full` returns 401 without auth (correct)
+- Direct scheduler simulation: all 4 new jobs register with correct intervals (300s, 6h, 30m, 7d)
+
+### Files (total: 6 new services + 1 new router + 1 new test file + 5 surgical edits)
+- New: `services/pending_approvals.py`, `services/ora_cto_repair_agent.py`, `services/self_audit_scheduler.py`, `services/qa_guardian.py`, `services/shannon_autofix.py`, `services/react_doctor_monitor.py`, `routers/system_health_full_router.py`, `backend/tests/test_iter325f_autonomous_stack.py`
+- Edited: `services/error_ledger.py` (+13 LOC), `services/qa_bot.py` (+34 LOC), `services/shannon_security.py` (+33 LOC), `services/llm_gateway.py` (~20 LOC swap), `routers/registry.py` (+85 LOC across 4 scheduler registrations + 1 router include)
+
+
 ## 2026-05-21 — iter 325e — 2 login UX bug fixes
 
 **Bug 1 — first login click slow / times out** (backend)

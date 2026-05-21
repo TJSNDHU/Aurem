@@ -113,6 +113,23 @@ async def record_error(
             ))
         except Exception:
             pass
+        # iter 325f Phase 1.1 — emit on the canonical incident_bus too so
+        # triage_brain + ora_cto_repair_agent can pick this up. Dedup happens
+        # on the bus side via fingerprint.
+        try:
+            from services import incident_bus
+            asyncio.create_task(incident_bus.report(
+                category="crash",
+                signature=h,
+                severity="high",
+                source="error_ledger",
+                title=f"{err_type}: {msg[:120]}",
+                detail=tb_str[:1500],
+                metadata={"path": path or "background"},
+                actor="error_ledger",
+            ))
+        except Exception:
+            pass
         return h
     except Exception as e:
         logger.warning(f"[error_ledger] persist failed: {e}")

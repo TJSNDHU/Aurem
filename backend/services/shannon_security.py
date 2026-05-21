@@ -113,6 +113,40 @@ async def ingest_report(report: Dict) -> Dict:
         pass
 
     logger.info(f"[Shannon] Report ingested: {target} → score {processed['security_score']}/100, {len(vulns)} vulnerabilities")
+
+    # iter 325f Phase 1.3 — every HIGH/CRITICAL Shannon finding is now
+    # pushed onto the founder approval queue so the auto-fix stack can
+    # propose remediation. Telegram alert is fired via the alert path
+    # below; the approval row holds the actual proposed fix.
+    try:
+        from services.pending_approvals import create_pending_approval
+        sev_high = {"critical", "high"}
+        for v in vulns:
+            sev = (v.get("severity") or "").lower()
+            if sev not in sev_high:
+                continue
+            title = (v.get("title") or v.get("name") or
+                     v.get("id") or "Security finding")
+            fix_hint = (v.get("fix_suggestion") or v.get("remediation")
+                        or v.get("recommendation") or "(no auto-fix suggestion)")
+            await create_pending_approval(
+                type="security_fix",
+                title=f"[{sev.upper()}] {title}",
+                detail=fix_hint,
+                severity=sev,
+                source="shannon",
+                fingerprint=f"shannon:{target}:{v.get('id') or title[:60]}",
+                tier=2,  # security always needs founder approval
+                metadata={
+                    "target": target,
+                    "vuln": {k: v.get(k) for k in
+                             ("id", "title", "severity", "verified", "exploitable", "cve")
+                             if v.get(k) is not None},
+                },
+            )
+    except Exception as e:
+        logger.warning(f"[Shannon] pending_approval enqueue failed: {e}")
+
     return processed
 
 

@@ -52,21 +52,36 @@ async def _try_sovereign(system_prompt: str, user_prompt: str,
 
 async def _try_openrouter(system_prompt: str, user_prompt: str,
                             max_tokens: int) -> Optional[str]:
-    """OpenRouter via the existing client (has its own emergent failover,
-    but we bypass that here — we call OpenRouter directly and let the
-    gateway sequence the emergent retry step explicitly)."""
+    """OpenRouter primary tier for admin ORA CTO / ORA Paw chat (iter 325g).
+
+    Model: DeepSeek V3.1 — ~$0.0001 per task, strong on code analysis.
+    Claude Sonnet remains the next-tier fallback in `_try_emergent`
+    for sensitive operations.
+
+    Override via env vars:
+        ORA_CTO_OPENROUTER_MODEL   — e.g. ``anthropic/claude-3.5-haiku``
+        ORA_CTO_OPENROUTER_TEMP    — float, default 0.3 (lower than the
+                                     legacy 0.4 because we want
+                                     deterministic repair proposals).
+    """
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not api_key:
         return None
+    model = (os.environ.get("ORA_CTO_OPENROUTER_MODEL", "").strip()
+             or "deepseek/deepseek-chat-v3.1")
+    try:
+        temperature = float(os.environ.get("ORA_CTO_OPENROUTER_TEMP", "0.3"))
+    except ValueError:
+        temperature = 0.3
     try:
         import httpx
         payload = {
-            "model":        "anthropic/claude-3.5-haiku",
+            "model":        model,
             "messages": [
                 {"role": "system", "content": system_prompt or ""},
                 {"role": "user",   "content": user_prompt},
             ],
-            "temperature": 0.4,
+            "temperature": temperature,
             "max_tokens":  max_tokens,
         }
         async with httpx.AsyncClient(timeout=30) as c:
@@ -87,7 +102,7 @@ async def _try_openrouter(system_prompt: str, user_prompt: str,
             msg = data.get("choices", [{}])[0].get("message", {})
             content = msg.get("content") or msg.get("reasoning") or ""
             if content:
-                logger.info(f"[llm_gateway] SERVED by openrouter ({len(content)} chars)")
+                logger.info(f"[llm_gateway] SERVED by openrouter/{model} ({len(content)} chars)")
                 return content.strip()
     except Exception as e:
         logger.debug(f"[llm_gateway] openrouter miss: {e}")
