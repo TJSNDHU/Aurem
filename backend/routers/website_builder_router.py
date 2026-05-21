@@ -839,32 +839,13 @@ async def sample_engaged(slug: str, request: Request):
 
 
 async def _fire_hot_lead_admin_alert(db, business_name: str, slug: str):
-    """WhatsApp the admin line — '🔥 HOT LEAD: X is on their sample page now!'"""
-    import httpx
-    phone = HOT_LEAD_ADMIN_PHONE.replace("+", "").replace("-", "").replace(" ", "")
-    if not phone:
-        return
-    whapi_token = os.environ.get("WHAPI_API_TOKEN", "")
-    whapi_url = os.environ.get("WHAPI_API_URL", "")
-    if not (whapi_token and whapi_url):
-        return
-    public_base = os.environ.get("PUBLIC_APP_URL", "https://aurem.live").rstrip("/")
-    msg = (
-        f"🔥 *HOT LEAD*\n\n"
-        f"*{business_name}* is on their sample page RIGHT NOW!\n\n"
-        f"👉 {public_base}/sample/{slug}\n\n"
-        f"Campaign HQ — react in the next 30 sec.\n"
-        f"_AUREM Intelligence_"
+    """Delegate to the shared service so the same alert path is used
+    by inbound email replies (services/inbound_reply_handler.py) and
+    sample-page visits. WhatsApp + Telegram both fire."""
+    from services.hot_lead_alerts import fire_hot_lead_admin_alert
+    await fire_hot_lead_admin_alert(
+        db, business_name=business_name, slug=slug, source="sample_page",
     )
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(
-                f"{whapi_url}/messages/text",
-                headers={"authorization": f"Bearer {whapi_token}", "content-type": "application/json"},
-                json={"to": f"{phone}@s.whatsapp.net", "body": msg},
-            )
-    except Exception as e:
-        logger.warning(f"[HotLead] admin WA error: {e}")
 
 
 # ─────────────────────────────────────────────────────────────

@@ -1582,6 +1582,14 @@ async def startup_event():
             import asyncio as _aio
             _aio.create_task(autopilot_tick_scheduler())
             _aio.create_task(evening_wrap_scheduler())  # iter 286.0
+            # iter 325d — weekly Monday revenue summary email/WhatsApp.
+            # Previously imported but never scheduled; now it actually fires.
+            try:
+                set_cron_db(db)
+                _aio.create_task(weekly_revenue_summary_scheduler())
+                logging.info("[STARTUP] Weekly revenue scheduler wired (iter 325d)")
+            except Exception as _wr_err:
+                logging.warning(f"[STARTUP] Weekly revenue scheduler failed: {_wr_err}")
             logging.info("[STARTUP] Master Autopilot + Evening Wrap wired (iter 285.8 + 286.0)")
         except Exception as _e:
             logging.warning(f"[STARTUP] Master Autopilot wiring failed: {_e}")

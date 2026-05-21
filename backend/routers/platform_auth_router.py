@@ -313,6 +313,31 @@ async def register(request: RegisterRequest, req: Request = None):
             user_data["pin_locked_until"] = None
         await db.platform_users.insert_one(user_data)
 
+        # iter 325d — founder Telegram ping on every successful signup.
+        # Non-blocking, best-effort. Email fingerprint prevents double-fire
+        # on a retried request.
+        try:
+            import asyncio as _asyncio
+            from services.telegram_bot_service import send_telegram_alert
+            company_for_alert = (
+                request.normalized_company() or "(no company)"
+            )
+            full_name_for_alert = request.normalized_full_name() or "(no name)"
+            phone_for_alert = (request.phone or "").strip() or "(no phone)"
+            _asyncio.create_task(send_telegram_alert(
+                message=(
+                    f"Email: {email}\n"
+                    f"Name:  {full_name_for_alert}\n"
+                    f"Company: {company_for_alert}\n"
+                    f"Phone: {phone_for_alert}\n\n"
+                    f"Dashboard: https://aurem.live/admin/customers"
+                ),
+                alert_type="new_signup",
+                fingerprint=email,
+            ))
+        except Exception as _tg_err:
+            logger.warning(f"[REGISTER] telegram new_signup alert skipped: {_tg_err}")
+
         # iter 322 — start 7-day trial via SSOT trial engine. This sets
         # plan, services_unlocked, usage_limits, trial_ends_at on the
         # platform_users row + aurem_billing.

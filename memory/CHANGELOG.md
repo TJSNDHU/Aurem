@@ -1,3 +1,52 @@
+## 2026-05-21 — iter 325d — 3 audit-driven glue fixes (telegram alerts, weekly revenue, hot-lead loop)
+
+**Trigger**: Audit revealed `telegram_bot_service` ghost-imported in 7 places, `weekly_revenue_summary_scheduler` defined but never started, and `inbound_reply_handler` POSITIVE intent never set `hot_lead_flag` or fired founder alert.
+
+### 1. `services/telegram_bot_service.py` (new, ~140 LOC)
+- Single canonical `send_telegram_alert(message, alert_type, fingerprint=None)` for all founder pages.
+- Plain text (no parse_mode), 4096-char auto-truncate, 5-minute in-process dedup per (alert_type+fingerprint).
+- Audit log to `db.telegram_alert_log` on every send.
+- Prefix dictionary maps alert_type → emoji+label (`campaign_zero`, `new_signup`, `server_down`, `hot_lead`).
+- **Wired into**:
+  - `services/ora_campaign_watchdog.py` — fires on every 10x escalation of `zero_sent_streak` (10, 20, 30…). Fingerprint = `streak_N` so each bucket pings once.
+  - `routers/platform_auth_router.py:register` — fires on every successful platform_users insert. Fingerprint = email, prevents retry double-fire. Non-blocking via `asyncio.create_task`.
+- **Live verification**: `Telegram result: {'ok': True, 'reason': 'sent', 'alert_type': 'generic'}` — message delivered to founder chat.
+
+### 2. Weekly Monday revenue email scheduler — actually starts now
+- `server.py` line 1587-1592 (inside Master Autopilot startup block): added `asyncio.create_task(weekly_revenue_summary_scheduler())` + `set_cron_db(db)`.
+- Function was already defined in `services/cron_schedulers.py:96` (Monday 9am EST loop, queries `db.orders` for 7-day revenue, WhatsApps the founder). Just never scheduled.
+- Backend boots clean post-change (200 OK on health endpoints).
+
+### 3. `services/hot_lead_alerts.py` (new, ~140 LOC) + inbound_reply_handler wiring
+- Extracted `_fire_hot_lead_admin_alert` from `routers/website_builder_router.py` into a shared service so the **same** founder alert fires from BOTH paths (sample-page visit + email reply).
+- Shared service fires WhatsApp (preserves the original WHAPI path) **AND** Telegram (new). Per-channel try/except so one failure never blocks the other.
+- `routers/website_builder_router.py:_fire_hot_lead_admin_alert` is now a 4-line delegate that calls the shared service. Old inline WHAPI logic deleted (no behavior change for sample-page path).
+- `services/inbound_reply_handler.py` POSITIVE intent now:
+  1. Sets `hot_lead_flag=True`, `hot_lead_source="email_reply"`, `status="interested"` on `campaign_leads` (the missing piece that left `followup_ora.py` blind).
+  2. Calls `fire_hot_lead_admin_alert(db, business_name, lead_id, source="email_reply", detail=preview)`.
+  3. Logs telegram_ok / whatsapp_ok back to the `inbound_replies` row for audit.
+  4. Old standalone `_send_telegram` call removed (subsumed by the shared service).
+
+### Tests — `backend/tests/test_iter325d_alerts.py` (10 cases, all green)
+- Telegram service: no-creds path, happy path with chat_id, 5-min dedup, 4096-char truncation
+- `server.py` regression-guard: confirms `weekly_revenue_summary_scheduler` is SCHEDULED, not just imported
+- Inbound handler: confirms `hot_lead_flag` set + shared alert called + `source="email_reply"`
+- Shared hot-lead service: confirms WhatsApp + Telegram both wired, separate try/except blocks
+- Website builder delegate: confirms it imports the shared service (no inline drift)
+- Watchdog: confirms `campaign_zero` alert + 10x throttle
+- Register: confirms `new_signup` alert + email fingerprint
+
+**Files**:
+- `backend/services/telegram_bot_service.py` (new)
+- `backend/services/hot_lead_alerts.py` (new)
+- `backend/services/ora_campaign_watchdog.py` (+25 LOC inside existing trip block)
+- `backend/services/inbound_reply_handler.py` (~50 LOC swap of old telegram-only ping for hot-lead-flag + shared alert)
+- `backend/routers/platform_auth_router.py` (+24 LOC after successful insert)
+- `backend/routers/website_builder_router.py` (replaced 28-line inline alert with 7-line delegate)
+- `backend/server.py` (+6 LOC inside Master Autopilot startup block)
+- `backend/tests/test_iter325d_alerts.py` (new, 10 cases)
+
+
 ## 2026-05-20 — iter 325c — react-doctor:fix codemod + branding purge + SEO funnel revenue path
 
 **Three deliverables in one push:**

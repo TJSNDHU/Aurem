@@ -416,43 +416,55 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
     # iter 282al-10 — Telegram hot-lead ping (positive intent only).
     # Fires regardless of auto-reply send outcome so the founder sees the
     # signal even if Resend hiccups.
+    # iter 325d — ALSO set hot_lead_flag on the lead row + fire the
+    # shared founder alert (WhatsApp + Telegram via services/hot_lead_alerts).
+    # The shared service replaces the old standalone autopilot telegram ping
+    # AND wires up the WhatsApp channel that previously only fired from
+    # sample-page visits.
     if intent == "positive":
+        # Mark the lead as hot so followup_ora.py auto-skips it (sequence
+        # pause) and the CRM badges the row.
+        if lead and db is not None:
+            try:
+                await db.campaign_leads.update_one(
+                    {"lead_id": lead["lead_id"]},
+                    {"$set": {
+                        "hot_lead_flag": True,
+                        "hot_lead_source": "email_reply",
+                        "hot_lead_at": received_at,
+                        "status": "interested",
+                    }},
+                )
+            except Exception as e:
+                logger.debug(f"[inbound] hot_lead_flag set failed: {e}")
+        # Founder alert across WhatsApp + Telegram (shared service).
         try:
-            from services.autopilot_brief_notifier import _send_telegram
-            biz = (lead.get("business_name") or "Unknown").strip()
-            city = (lead.get("city") or "").strip()
-            cat = (lead.get("category") or "").strip()
-            # Trim the inbound text for the ping — full text already in DB
+            from services.hot_lead_alerts import fire_hot_lead_admin_alert
             preview = (text or "").strip().replace("\n", " ")
             if len(preview) > 140:
                 preview = preview[:140].rstrip() + "…"
-            ping = (
-                "🔥 Hot lead replied!\n\n"
-                f"  • Business: {biz}"
-                + (f"\n  • Location: {city}" if city else "")
-                + (f" · {cat}" if cat else "")
-                + f"\n  • Intent: POSITIVE"
-                + (f"\n  • Auto-reply sent ✓" if send.get("ok")
-                   else f"\n  • Auto-reply: FAILED ({send.get('error','')[:60]})")
-                + (f"\n  • Site: {site_url}" if site_url else "")
-                + f"\n  • From: {from_addr}"
-                + f"\n  • Their words: \"{preview}\""
-                + "\n\nAct within 5 min — this is the warm window."
+            biz = (lead.get("business_name") if lead else None) or from_addr
+            alert_result = await fire_hot_lead_admin_alert(
+                db,
+                business_name=biz,
+                lead_id=(lead or {}).get("lead_id"),
+                source="email_reply",
+                detail=preview,
             )
-            tg = await _send_telegram(ping)
             if db is not None:
                 try:
                     await db.inbound_replies.update_one(
                         {"message_id": msg_id},
                         {"$set": {
-                            "telegram_pinged": bool(tg.get("ok")),
-                            "telegram_reason": tg.get("reason"),
+                            "founder_alert_fired": True,
+                            "founder_alert_telegram_ok": alert_result.get("telegram", {}).get("ok"),
+                            "founder_alert_whatsapp_ok": alert_result.get("whatsapp", {}).get("ok"),
                         }},
                     )
                 except Exception:
                     pass
         except Exception as e:
-            logger.debug(f"[inbound] telegram ping failed: {e}")
+            logger.debug(f"[inbound] hot_lead alert failed: {e}")
 
     return {
         "received": True, "intent": intent, "matched_lead": True,

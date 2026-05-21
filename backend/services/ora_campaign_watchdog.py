@@ -122,6 +122,25 @@ async def _check_once() -> dict:
                    "Check Council veto reasons + channel_gating fallback.",
             metadata={"zero_streak": zero_streak, "last_run_at": last_run},
         )
+        # iter 325d — ping founder Telegram on every 10x streak escalation
+        # (10, 20, 30, …) so a stuck pipeline can't go unnoticed for hours.
+        # Fingerprint uses the bucket so each escalation is one ping.
+        try:
+            if zero_streak % 10 == 0:
+                from services.telegram_bot_service import send_telegram_alert
+                await send_telegram_alert(
+                    message=(
+                        f"Auto-blast engine has sent ZERO leads for "
+                        f"{zero_streak} consecutive cycles.\n"
+                        f"Last run: {last_run or 'unknown'}\n\n"
+                        f"Check Council vetoes + channel_gating in:\n"
+                        f"/admin/pillars-map → campaign_health"
+                    ),
+                    alert_type="campaign_zero",
+                    fingerprint=f"streak_{zero_streak}",
+                )
+        except Exception as e:
+            logger.debug(f"[watchdog] telegram campaign_zero alert skipped: {e}")
 
     # ── Guard 3: Council veto-rate ──────────────────────────────────
     try:
