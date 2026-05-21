@@ -45,6 +45,20 @@ export function resolveAuthToken() {
 
 export default function useAuthFetch() {
   // apiFetch: returns the raw Response — use when you need headers/status.
+  //
+  // iter 325s — built-in retry on transient 5xx + network errors. Every
+  // ingress hop (K8s service mesh, CloudFront edge, ALB) occasionally
+  // serves a one-off 502/503/504 during pod swap or warm-up. Without
+  // retry, the single blip flips dashboard UI to "offline / network
+  // error" and triggers the online/offline blink users complained about.
+  //
+  // Retry rules:
+  //   • Only GET / HEAD requests are retried (POST/PATCH/DELETE could be
+  //     mutating; never auto-retry those).
+  //   • Trigger: network throw OR 502/503/504.
+  //   • Backoff: 250ms, then 700ms. Max 3 attempts total.
+  //   • 4xx (auth/validation/not-found) are NOT retried — those are
+  //     deterministic and the caller needs to see them.
   const apiFetch = useCallback(async (path, opts = {}) => {
     const token = resolveAuthToken();
     const isForm = opts.body instanceof FormData;
@@ -54,6 +68,32 @@ export default function useAuthFetch() {
       ...(opts.headers || {}),
     };
     const url = path.startsWith("http") ? path : `${API}${path}`;
+    const method = (opts.method || "GET").toUpperCase();
+    const isReadOnly = method === "GET" || method === "HEAD";
+    const RETRY_DELAYS_MS = isReadOnly ? [250, 700] : [];   // 1 try + 2 retries for reads
+
+    let lastErr = null;
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      try {
+        const r = await fetch(url, { credentials: "omit", ...opts, headers });
+        // Only retry on transient gateway codes
+        if ((r.status === 502 || r.status === 503 || r.status === 504)
+            && attempt < RETRY_DELAYS_MS.length) {
+          await new Promise((res) => setTimeout(res, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+        return r;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < RETRY_DELAYS_MS.length) {
+          await new Promise((res) => setTimeout(res, RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+        throw e;
+      }
+    }
+    // Exhausted retries on a non-throwing 5xx — return the last response
+    // by re-running once without retry so caller sees the final status.
     return fetch(url, { credentials: "omit", ...opts, headers });
   }, []);
 
@@ -138,6 +178,23 @@ export function useLiveApi(path, options = {}) {
   const timerRef = useRef(null);
   const mounted = useRef(true);
   const firstLoad = useRef(true);
+  // iter 325s — single-failure flap fix.
+  // A single transient 5xx / CDN-edge blip used to flip `error` state TRUE
+  // for one render → UI painted "offline / network error" → next 15s poll
+  // succeeded → flipped back → endless online/offline blink.
+  //
+  // Industry standard cure: require N consecutive failures before declaring
+  // the call broken. Any one success in between resets the streak. 3 misses
+  // at the default 15s cadence = ~45s of *sustained* downtime before the
+  // user sees a red error UI — long enough to filter pod-restart blips,
+  // short enough to surface a real outage promptly.
+  //
+  // FAILURE_THRESHOLD is per-hook-instance (each tab/component decides
+  // independently when it is "really" broken). The first-load failure is
+  // surfaced immediately so a permanently-broken endpoint shows the error
+  // on initial mount instead of silently waiting 45s.
+  const FAILURE_THRESHOLD = 3;
+  const failStreak = useRef(0);
 
   const pathRef = useRef(path);
   useEffect(() => { pathRef.current = path; }, [path]);
@@ -152,10 +209,26 @@ export function useLiveApi(path, options = {}) {
       const result = await apiJson(pathRef.current);
       if (!mounted.current) return;
       setData(result);
+      // Any success resets the failure streak AND clears stale error UI.
+      failStreak.current = 0;
       setError(null);
     } catch (e) {
       if (!mounted.current) return;
-      setError(e);
+      // iter 325s — debounce transient failures. Auth errors (4xx) are
+      // permanent for the current token and must surface immediately so
+      // the UI prompts re-login; only 5xx / network errors are debounced.
+      const isAuthError = e?.status === 401 || e?.status === 403;
+      if (isAuthError || firstLoad.current) {
+        // Always show auth errors and first-load failures immediately.
+        setError(e);
+      } else {
+        failStreak.current += 1;
+        if (failStreak.current >= FAILURE_THRESHOLD) {
+          setError(e);
+        }
+        // Otherwise: keep last-known-good `data` on screen, do NOT flip
+        // error state → no "offline" blink for single-poll glitches.
+      }
     } finally {
       if (mounted.current) {
         setLoading(false);
