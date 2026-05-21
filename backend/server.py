@@ -1016,6 +1016,35 @@ async def create_indexes():
         except Exception as e:
             logging.warning(f"[startup] build_verifier wiring failed (non-fatal): {e}")
 
+        # iter 326j Gaps 3+5 — seed tier bundles + industry bundles into
+        # subscription_plans + recommended_bundles. Idempotent.
+        try:
+            from services.recommended_bundles import (
+                seed_subscription_plans, seed_industry_bundles
+            )
+            r1 = await seed_subscription_plans(db)
+            r2 = await seed_industry_bundles(db)
+            logging.info(
+                f"[startup] tier bundles: {r1}  industry bundles: {r2}"
+            )
+        except Exception as e:
+            logging.warning(f"[startup] recommended-bundles seed failed (non-fatal): {e}")
+
+        # iter 326j Gap 2 + Gaps 3+5 — wire DB into routers AT STARTUP
+        # (not at import time when db is still None).
+        try:
+            from routers import customer_deploy_router as _cdr
+            _cdr.set_db(db)
+            logging.info("[startup] customer_deploy_router db wired")
+        except Exception as e:
+            logging.warning(f"[startup] customer_deploy_router wiring failed: {e}")
+        try:
+            from routers import recommended_bundles_router as _rbr
+            _rbr.set_db(db)
+            logging.info("[startup] recommended_bundles_router db wired")
+        except Exception as e:
+            logging.warning(f"[startup] recommended_bundles_router wiring failed: {e}")
+
         # Seed internal @aurem.live addresses into do_not_contact so any
         # legacy code paths that pre-check DNC also respect the block.
         try:
@@ -2468,6 +2497,24 @@ try:
 except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] ora_providers wire failed: {_e}")
+
+# iter 326j Gap 2 — Customer-side auto-deploy receiver +
+# admin list endpoint. DB wiring happens in startup_event (db is None at import-time).
+try:
+    from routers.customer_deploy_router import router as _customer_deploy_router
+    app.include_router(_customer_deploy_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] customer_deploy wire failed: {_e}")
+
+# iter 326j Gaps 3+5 — Tier bundles + industry recommended bundles +
+# live cart pricing endpoint. DB wiring happens in startup_event.
+try:
+    from routers.recommended_bundles_router import router as _rec_bundles_router
+    app.include_router(_rec_bundles_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] recommended_bundles wire failed: {_e}")
 
 # iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
 try:

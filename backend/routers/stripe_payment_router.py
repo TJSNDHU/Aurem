@@ -730,6 +730,63 @@ async def stripe_webhook(request: Request):
                     except Exception as e:
                         logger.warning(f"[Lifecycle] Stripe → won transition failed: {e}")
 
+        elif event_type in (
+            "customer.subscription.created",
+            "customer.subscription.updated",
+        ):
+            # iter 326j Gap 1 — bridge subscription lifecycle to
+            # customer_subscriptions. Without this branch, when Stripe
+            # creates the subscription BEFORE the checkout-session
+            # completes (rare race, or for migrated subs created via
+            # API not Checkout), the row stays at `status=pending` and
+            # `stripe_subscription_id=None` forever. Founder then has
+            # to manually reconcile in admin, every. single. time.
+            sub_id          = data_obj.get("id") if isinstance(data_obj, dict) else None
+            stripe_customer = data_obj.get("customer") if isinstance(data_obj, dict) else None
+            sub_status      = data_obj.get("status") if isinstance(data_obj, dict) else None
+            sub_metadata    = data_obj.get("metadata", {}) if isinstance(data_obj, dict) else {}
+            service_id      = (sub_metadata or {}).get("service_id")
+            cust_email      = (sub_metadata or {}).get("user_email")
+
+            if _db and sub_id:
+                # 1) Direct hit: row already has this stripe_subscription_id.
+                stamped = await _db.customer_subscriptions.update_one(
+                    {"stripe_subscription_id": sub_id},
+                    {"$set": {
+                        "status": "active" if sub_status in ("active", "trialing") else (sub_status or "pending"),
+                        "stripe_status": sub_status,
+                        "last_stripe_sync_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                )
+                # 2) Fallback path — row was inserted at checkout-time WITH
+                #    stripe_session_id but no stripe_subscription_id yet.
+                #    Stamp it now using (email, service_id) as the join key.
+                if stamped.matched_count == 0 and cust_email and service_id:
+                    await _db.customer_subscriptions.update_one(
+                        {
+                            "email": cust_email,
+                            "service_id": service_id,
+                            "status": {"$in": ["pending", "active"]},
+                            "$or": [
+                                {"stripe_subscription_id": None},
+                                {"stripe_subscription_id": {"$exists": False}},
+                                {"stripe_subscription_id": ""},
+                            ],
+                        },
+                        {"$set": {
+                            "stripe_subscription_id": sub_id,
+                            "stripe_customer_id":     stripe_customer,
+                            "stripe_status":          sub_status,
+                            "status": "active" if sub_status in ("active", "trialing") else "pending",
+                            "activated_at":           datetime.now(timezone.utc).isoformat() if sub_status == "active" else None,
+                            "last_stripe_sync_at":    datetime.now(timezone.utc).isoformat(),
+                        }},
+                    )
+                logger.info(
+                    f"[Stripe] subscription {event_type.rsplit('.', 1)[-1]}: "
+                    f"id={sub_id} status={sub_status} stamped={stamped.matched_count}"
+                )
+
         elif event_type == "customer.subscription.deleted":
             # Detect add-on vs combo plan by checking metadata
             customer_email = data_obj.get("customer_email") if isinstance(data_obj, dict) else getattr(data_obj, "customer_email", "")

@@ -12,6 +12,7 @@ Per-tenant GitHub token storage via nexus_credentials.
 import os
 import logging
 import secrets
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict
 import httpx
@@ -281,3 +282,179 @@ async def get_connection_status(tenant_id: str) -> Dict:
     if doc and doc.get("status") == "connected":
         return {"connected": True, "username": doc.get("github_username", ""), "connected_at": doc.get("connected_at")}
     return {"connected": False}
+
+
+# ─────────────────────────────────────────────────────────────────
+# iter 326j Gap 2 — Ship `.github/workflows/auto_deploy.yml` into
+# the customer's repo on first GitHub connect. Without this the
+# workflow file from iter 326i-2 doesn't exist in customer repos
+# and the auto-fix product loop dies on the first merged PR.
+# ─────────────────────────────────────────────────────────────────
+# iter 326j Gap 2 — Ship `.github/workflows/auto_deploy.yml` into
+# the customer's repo on first GitHub connect. Without this the
+# workflow file from iter 326i-2 doesn't exist in customer repos
+# and the auto-fix product loop dies on the first merged PR.
+# ─────────────────────────────────────────────────────────────────
+_AUREM_WORKFLOW_TEMPLATE_PATH = "/app/.github/workflows/auto_deploy.yml"
+_AUREM_WORKFLOW_DEST_PATH     = ".github/workflows/aurem_auto_deploy.yml"
+
+
+async def ship_auto_deploy_workflow(
+    tenant_id: str,
+    repo: str,
+    base_branch: str = "main",
+) -> Dict:
+    """Idempotently install AUREM's customer-facing auto-deploy workflow
+    into the customer repo.
+
+    Behaviour:
+      • If `.github/workflows/aurem_auto_deploy.yml` already exists on
+        the base branch → no-op, return {already_installed: True}.
+      • Otherwise → create branch `aurem/install-auto-deploy-<hex>`,
+        commit the canonical template (read from /app/.github/workflows/
+        auto_deploy.yml in this repo), open PR titled
+        `[AUREM] Install auto-deploy workflow` with label `aurem-autofix`.
+
+    Returns: {success, pr_url, pr_number} on success, {already_installed: True}
+    when the workflow is already present, or {success: False, error} otherwise.
+    """
+    token = await _get_tenant_github_token(tenant_id)
+    if not token:
+        return {"success": False, "error": "No GitHub token. Connect GitHub first."}
+    if not await _is_repo_authorized(tenant_id, repo):
+        return {"success": False, "error": f"Repo {repo} not authorized for this tenant"}
+
+    if not os.path.isfile(_AUREM_WORKFLOW_TEMPLATE_PATH):
+        return {"success": False,
+                "error": f"workflow template missing at {_AUREM_WORKFLOW_TEMPLATE_PATH}"}
+    with open(_AUREM_WORKFLOW_TEMPLATE_PATH, encoding="utf-8") as f:
+        workflow_yaml = f.read()
+
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # 1. Check if the destination file already exists on base_branch.
+        check_url = (
+            f"https://api.github.com/repos/{repo}/contents/"
+            f"{_AUREM_WORKFLOW_DEST_PATH}?ref={base_branch}"
+        )
+        check_resp = await client.get(check_url, headers=headers)
+        if check_resp.status_code == 200:
+            # Already installed — record it idempotently and return.
+            db = _get_db()
+            if db is not None:
+                await db.github_connections.update_one(
+                    {"tenant_id": tenant_id},
+                    {"$set": {
+                        "auto_deploy_workflow_installed":     True,
+                        "auto_deploy_workflow_installed_at":  datetime.now(timezone.utc).isoformat(),
+                        "auto_deploy_workflow_repo":          repo,
+                    }},
+                )
+            logger.info(f"[GitHub] auto-deploy workflow already present in {repo}")
+            return {"success": True, "already_installed": True, "repo": repo}
+
+        # 2. Use push_fix to create the branch + PR. Reuses existing flow.
+        result = await push_fix(
+            tenant_id=tenant_id,
+            repo=repo,
+            fix_title="Install auto-deploy workflow",
+            fix_description=(
+                "AUREM ships fixes to your repo as Pull Requests. "
+                "This workflow validates each AUREM PR's CI before merge "
+                "and triggers your production deploy after merge.\n\n"
+                "Required repo secrets (Settings → Secrets → Actions):\n"
+                "• AUREM_DEPLOY_HOOK_URL  — your deploy provider webhook\n"
+                "• AUREM_API_KEY          — your AUREM API key\n"
+                "• AUREM_DEPLOY_TARGET    — vercel | render | fly | hetzner | custom\n"
+                "• AUREM_NOTIFY_EMAIL     — recipient for deploy notifications\n\n"
+                "PR opened automatically by AUREM. Safe to merge — the workflow "
+                "only fires on PRs labeled `aurem-autofix`."
+            ),
+            file_path=_AUREM_WORKFLOW_DEST_PATH,
+            file_content=workflow_yaml,
+            base_branch=base_branch,
+        )
+
+        if result.get("success"):
+            db = _get_db()
+            if db is not None:
+                await db.github_connections.update_one(
+                    {"tenant_id": tenant_id},
+                    {"$set": {
+                        "auto_deploy_workflow_install_pr":    result.get("pr_url"),
+                        "auto_deploy_workflow_install_pr_at": datetime.now(timezone.utc).isoformat(),
+                        "auto_deploy_workflow_repo":          repo,
+                    }},
+                )
+        return result
+
+
+# ─────────────────────────────────────────────────────────────────
+# iter 326j Gap 2 — Receive deploy result from customer workflow.
+# The workflow in iter 326i-2 POSTs here after `deploy` job completes.
+# ─────────────────────────────────────────────────────────────────
+async def record_customer_deploy_report(
+    *,
+    api_key:       str,
+    commit:        str,
+    status:        str,
+    repo:          str,
+    deployed_at:   str | None = None,
+) -> Dict:
+    """Persist a customer-side deploy outcome.
+
+    Args:
+      api_key  — Bearer token from workflow's `AUREM_API_KEY` secret
+      commit   — sha that was deployed
+      status   — 'success' | 'failure' | 'cancelled'
+      repo     — owner/repo string
+
+    Returns: {ok, deployment_id, tenant_id} or {ok: False, error}.
+
+    Auth model: the customer sets `AUREM_API_KEY` in their repo secrets
+    when they connect GitHub. We look up the tenant by api_key.
+    """
+    db = _get_db()
+    if db is None:
+        return {"ok": False, "error": "db not ready"}
+    if not api_key or not commit or not repo:
+        return {"ok": False, "error": "api_key, commit, repo required"}
+
+    # Look up tenant by api_key. The api_key is stored alongside the
+    # github_connection when the customer connects.
+    conn = await db.github_connections.find_one(
+        {"customer_api_key": api_key, "status": "connected"},
+        {"_id": 0, "tenant_id": 1},
+    )
+    if not conn:
+        # Soft-record so the customer's deploy isn't silently dropped —
+        # founder can reconcile later. Mark `unauth=True`.
+        await db.github_deployments.insert_one({
+            "deployment_id":  uuid.uuid4().hex[:16],
+            "tenant_id":      None,
+            "repo":           repo,
+            "commit":         commit,
+            "status":         status,
+            "deployed_at":    deployed_at or datetime.now(timezone.utc).isoformat(),
+            "unauth":         True,
+            "received_at":    datetime.now(timezone.utc).isoformat(),
+        })
+        return {"ok": False, "error": "api_key not recognised", "soft_recorded": True}
+
+    deployment_id = uuid.uuid4().hex[:16]
+    doc = {
+        "deployment_id":  deployment_id,
+        "tenant_id":      conn["tenant_id"],
+        "repo":           repo,
+        "commit":         commit,
+        "status":         status,
+        "deployed_at":    deployed_at or datetime.now(timezone.utc).isoformat(),
+        "received_at":    datetime.now(timezone.utc).isoformat(),
+    }
+    await db.github_deployments.insert_one(doc)
+    logger.info(
+        f"[GitHub] customer deploy report: tenant={conn['tenant_id']} "
+        f"repo={repo} commit={commit[:7]} status={status}"
+    )
+    return {"ok": True, "deployment_id": deployment_id, "tenant_id": conn["tenant_id"]}
+
