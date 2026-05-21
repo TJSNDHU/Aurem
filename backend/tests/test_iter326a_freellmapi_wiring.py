@@ -106,11 +106,22 @@ def test_freellmapi_health_against_openrouter():
 # ─── Chain integration ────────────────────────────────────────────────
 
 def test_default_chain_includes_freellmapi():
-    """The default provider order baked into _llm_turn must include
-    freellmapi as #2 so it's used by default in deployments that
-    haven't customised ORA_AGENT_PROVIDER_ORDER."""
+    """iter 326g superseded the iter 326a contract: founder decided to
+    skip FreeLLMAPI proxy entirely and bake Gemini + NVIDIA directly
+    into the chain (both keys already in /app/backend/.env). The
+    `_freellmapi_with_tools` helper + provider branch must STILL exist
+    (so operators who set FREELLMAPI_BASE_URL still get it), but the
+    DEFAULT chain order no longer references freellmapi by default.
+    Operator can re-add via env: ORA_AGENT_PROVIDER_ORDER="...,freellmapi,..."
+    """
     src = open("/app/backend/services/ora_agent.py", encoding="utf-8").read()
-    assert '"deepseek,freellmapi,claude,legion_ollama,groq"' in src
+    # New iter 326g default chain
+    assert '"deepseek,gemini,nvidia,claude,groq"' in src, (
+        "iter 326g default chain missing"
+    )
+    # The freellmapi helper + branch MUST still be wired (opt-in via env)
+    assert "_freellmapi_with_tools" in src
+    assert 'elif provider == "freellmapi":' in src
 
 
 def test_provider_branch_exists():
