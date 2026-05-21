@@ -571,7 +571,7 @@ export const LuxeORA = () => {
     setConvo((c) => [...c, { role: 'user', content: text }]);
     setSending(true);
     try {
-      const { data } = await v2api.post('/api/public/ora/chat', { message: text });
+      const { data } = await v2api.post('/api/public/ora/chat', { text: text });
       setConvo((c) => [...c, { role: 'ora', content: data.reply || data.message || JSON.stringify(data) }]);
     } catch (e) {
       toast.error(`ORA chat error: ${e.response?.data?.detail || e.message}`);

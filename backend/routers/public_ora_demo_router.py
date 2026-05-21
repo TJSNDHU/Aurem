@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/public/ora", tags=["Public ORA Demo Chat"])
@@ -59,13 +59,33 @@ class DemoChatReq(BaseModel):
     # iter 322bp — raised 600 → 8000 so pasted content (snippets, errors,
     # JSON, emails) doesn't get silently rejected with 422 = empty body =
     # frontend one-liner fallback. 8000 covers ~1500 words / 2-page paste.
-    text: str = Field(..., min_length=1, max_length=8000)
+    #
+    # iter 325q — accept BOTH "text" and "message" as the prompt field. The
+    # V2 customer portal (and several widget callers) historically POST
+    # ``{message: "..."}``. Until now Pydantic rejected those with 422
+    # before the LLM call even fired — that's why "ORA always returns the
+    # same static reply" (the reply was the chat-widget's hardcoded HTML
+    # fallback, never an LLM response). Both fields are now optional at
+    # the schema layer; the validator below requires at least one.
+    text:    Optional[str] = Field(default=None, max_length=8000)
+    message: Optional[str] = Field(default=None, max_length=8000)
     session_id: Optional[str] = None
     source: Optional[str] = None   # "dev" → route through ORA dev skills
     # iter 282al-14 — Optional client-side emotion (face-api.js). The
     # video stream NEVER leaves the browser; only the label is sent.
     emotion: Optional[str] = Field(default=None, max_length=20)
     emotion_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+    @validator("message", always=True)
+    def _require_prompt(cls, v, values):  # noqa: N805
+        # Coalesce text/message → ``text``. Reject empty body.
+        prompt = (values.get("text") or v or "").strip()
+        if not prompt:
+            raise ValueError("must provide non-empty 'text' or 'message' field")
+        # Mirror onto text so the rest of the router can keep using
+        # ``request.text`` without further branching.
+        values["text"] = prompt
+        return v
 
 
 # ── Emotion → tone-adjustment context (iter 282al-14) ───────────────
