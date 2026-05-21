@@ -94,6 +94,56 @@ def _audit_static_counts() -> dict:
 _AUDIT_CACHE: dict = {}
 
 
+def _current_iteration_and_date() -> tuple[str, str]:
+    """iter 326d — Single source of truth for the System Overview header.
+
+    Strategy: scan multiple sources and pick the lexically-latest iter
+    string. Lex compare works because we follow the `NNNx[xx]` shape
+    where N is a 3-digit batch and x is a letter suffix.
+
+    Sources (in priority order — all are scanned):
+      1. `/app/backend/tests/test_iter*.py` — every shipped iter has a
+         regression test file by constitutional rule, so this is the
+         most up-to-date signal.
+      2. `/app/memory/CHANGELOG.md`
+      3. `/app/memory/PRD.md`
+
+    Returns (iter_string, "MAY 21, 2026" style date).
+    """
+    import re
+    import glob
+    from datetime import datetime as _dt
+    iter_re = re.compile(r"\b(?:iter|test_iter)[_\s]+?(\d{3}[a-z]{1,3})\b", re.IGNORECASE)
+    fname_re = re.compile(r"test_iter(\d{3}[a-z]{1,3})_", re.IGNORECASE)
+    latest_iter: str | None = None
+
+    # 1. Test files — strongest signal
+    try:
+        for path in glob.glob("/app/backend/tests/test_iter*.py"):
+            m = fname_re.search(os.path.basename(path))
+            if m:
+                candidate = m.group(1).lower()
+                if latest_iter is None or candidate > latest_iter:
+                    latest_iter = candidate
+    except Exception:
+        pass
+
+    # 2 + 3. Doc files
+    for path in ("/app/memory/CHANGELOG.md", "/app/memory/PRD.md"):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                text = fh.read()
+        except Exception:
+            continue
+        for m in iter_re.finditer(text):
+            candidate = m.group(1).lower()
+            if latest_iter is None or candidate > latest_iter:
+                latest_iter = candidate
+
+    today = _dt.utcnow().strftime("%b %-d, %Y").upper()
+    return (latest_iter or "326c", today)
+
+
 @router.get("/stats")
 async def get_system_overview(authorization: str = Header(None)):
     await _auth(authorization)
@@ -156,6 +206,10 @@ async def get_system_overview(authorization: str = Header(None)):
     except Exception:
         pass
 
+    # iter 326d — dynamic iter + date so the overview header never
+    # silently goes stale after a shipping batch.
+    current_iter, as_of_date = _current_iteration_and_date()
+
     return {
         "platform": {
             "uptime": uptime,
@@ -169,7 +223,8 @@ async def get_system_overview(authorization: str = Header(None)):
             "wired_routers": audit["wired_routers"],
             "endpoint_count": audit["endpoint_count"],
             "scheduler_jobs": audit["scheduler_jobs"],
-            "iteration": "322fa",
+            "iteration": current_iter,
+            "as_of":     as_of_date,
         },
         "audit": {
             "council_decisions": council_decisions,

@@ -631,7 +631,7 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '323r'} | MAY 18, 2026</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '326c'} | {p.as_of || 'MAY 21, 2026'}</p>
 
           {/* ═══ SHARE BUTTON ═══ */}
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -715,6 +715,86 @@ export default function SystemOverview() {
 
         {/* ═══ iter 323j — LIVE FULL SOVEREIGNTY SCORE ═══ */}
         <SovereigntyScoreTile />
+
+        {/* ═══ ITER 325 → 326 — MAY 21, 2026 — SOVEREIGNTY RESILIENCE BATCH ═══ */}
+        <div className="sov-card" style={{
+          padding: '24px 32px', marginBottom: 20,
+          border: `1px solid #C9A84C`, animation: 'sov-glow 5s ease-in-out infinite',
+          background: 'linear-gradient(135deg, #0D0D0D, #1A140A)',
+        }} data-testid="sov-iter326-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: GOLD }}>
+            ITER 325 → 326 · SOVEREIGNTY RESILIENCE BATCH · MAY 21, 2026
+          </div>
+          <p className="sov-body" style={{ fontSize: 12, color: '#A89060', marginBottom: 14, letterSpacing: '0.05em' }}>
+            BE-401 cascade killed · login decoupled · deploy fixes · APScheduler boot grace ·
+            ORA-CTO chat 92% faster · 11-provider FreeLLMAPI failover wired · agent constitution locked · provider watchdog panel live
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+            <FeatureGrid title="ORA-CTO PROVIDER PANEL (326c)" accent="#4ADE80" items={[
+              '/admin/ora?tab=cockpit → live 5-provider chain status',
+              'Polls /api/admin/ora/providers/health (15s server cache)',
+              'Per-provider: dot · latency · models · reason · primary badge',
+              'safeFetchJson — CDN HTML never crashes the panel',
+              'Founder sees the moment FreeLLMAPI flips green',
+            ]} />
+            <FeatureGrid title="AGENT CONSTITUTION (326b)" accent="#8B5CF6" items={[
+              '/app/.specify/memory/constitution.md — 15 hard rules',
+              'Spec-kit compatible path (Claude Code, Copilot, Cursor)',
+              'Hinglish only · production-always · no mocks · route-level',
+              'Regression tests mandatory · show proof · no patches',
+              'Forks auto-load these before responding',
+            ]} />
+            <FeatureGrid title="FREELLMAPI 11-PROVIDER (326a)" accent="#64C8FF" items={[
+              'tashfeenahmed/freellmapi proxy wired as ORA provider #2',
+              '_freellmapi_with_tools + freellmapi_health + warm helpers',
+              'New /api/admin/ora/providers/health watchdog endpoint',
+              'Chain: deepseek → freellmapi → claude → ollama → groq',
+              'Recipe: /app/memory/FREELLMAPI_INTEGRATION.md',
+            ]} />
+            <FeatureGrid title="ORA CHAT 92% FASTER (325z)" accent="#F59E0B" items={[
+              '_DEEPSEEK_WAIT_FOR 25s → 45s (Novita cold-start headroom)',
+              '_CLAUDE_WAIT_FOR 15s → 30s (fallback gets a real shot)',
+              'One auto-retry on DeepSeek timeout',
+              'Startup warm_deepseek + warm_freellmapi ping',
+              'Verified live: 34.5s → 2.6s for 5-word reply',
+            ]} />
+            <FeatureGrid title="ONLINE/OFFLINE NO-BLINK (325z)" accent="#4ADE80" items={[
+              'useLuxeDashboardData + useLiveApi → hysteresis',
+              'Success decrements failStreak, never resets to 0',
+              '3 strikes to flip red · 3 successes to clear',
+              'Founder report "blinking" — locked dead by route-level fix',
+              'Regression tests: 8 / 8 green',
+            ]} />
+            <FeatureGrid title="APSCHEDULER BOOT GRACE (325y)" accent="#C9A84C" items={[
+              'SCHED_BOOT_DELAY_S + 60s grace window in _backend_pulse()',
+              'Pillars-map shows YELLOW "booting · grace" not false RED',
+              'site_monitor heartbeat row when 0 active endpoints',
+              'No more "0/1 writers live" panic on every restart',
+              'Verified: T+6s yellow · T+90s green',
+            ]} />
+            <FeatureGrid title="DEPLOY FIXES (325x)" accent="#EF4444" items={[
+              'Playwright graceful skip when chromium binary missing',
+              'Filesystem probe — no "playwright install" ASCII banner',
+              'Startup MongoDB ping (5s budget) + redacted URL logs',
+              'Clear remediation banner for Atlas DNS failures',
+              'Hardcoded Atlas URL: zero in /app/backend Python',
+            ]} />
+            <FeatureGrid title="LOGIN DECOUPLE (325w)" accent="#8B5CF6" items={[
+              'PlatformAuth: removed legacy admin-fallback retry',
+              'Customer panel never silently hits admin endpoint',
+              'CDN 5xx → friendly banner (not "Unexpected token <")',
+              'Unified endpoint handles both admin + customer natively',
+              'Founder-reported coupling — eliminated at source',
+            ]} />
+            <FeatureGrid title="BE-401 CASCADE KILLED (325v)" accent="#F59E0B" items={[
+              'pillars_map_router._check_flow rewritten',
+              '401/403 on internal probe = GREEN with clear reason',
+              'No more "BE 401" red badges across 17/23 flows',
+              'safeFetchJson helper + 5 frontend defence tests',
+              'OraDevConsole + AdminPillarsMap migrated (10 raw fetches gone)',
+            ]} />
+          </div>
+        </div>
 
         {/* ═══ ITER 323 — MAY 17-18 2026 — SOVEREIGNTY HARDENING BATCH ═══ */}
         <div className="sov-card" style={{
