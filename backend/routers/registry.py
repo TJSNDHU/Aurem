@@ -2982,9 +2982,12 @@ def register_all_routers(app, db):
                 id="ora_proposal_bridge",
                 name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
                 replace_existing=True,
-                max_instances=1,
+                # iter 326e — bump from max_instances=1, prod logs were
+                # spamming "maximum number of running instances reached (1)"
+                # because tick latency can spike on cold-start DeepSeek calls.
+                max_instances=2,
                 coalesce=True,
-                misfire_grace_time=120,
+                misfire_grace_time=180,
             )
             logger.info("[REGISTRY] ORA proposal bridge scheduled (every 300s — was 60s)")
         except Exception as ob_e:

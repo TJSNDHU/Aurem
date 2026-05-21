@@ -799,9 +799,12 @@ async def ora_bridge_watchdog(db=None) -> Dict[str, Any]:
             id="ora_proposal_bridge",
             name="Autonomous ORA Proposal Bridge (sentinel/health → Dev Console)",
             replace_existing=True,
-            max_instances=1,
+            # iter 326e — bump tolerance so prod deploy logs stop spamming
+            # "maximum number of running instances reached (1)". The tick
+            # itself averages ~12 s but can hit 45 s on a cold DeepSeek call.
+            max_instances=2,
             coalesce=True,
-            misfire_grace_time=30,
+            misfire_grace_time=90,
         )
         restart_ok = True
     except Exception as e:

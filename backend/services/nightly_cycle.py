@@ -326,7 +326,7 @@ def register_nightly_jobs(scheduler, db):
     try:
         from services.pixel_event_buffer import periodic_flush, set_db as set_pb_db
         set_pb_db(db)
-        scheduler.add_job(periodic_flush, "interval", seconds=60, jitter=20, id="aurem_pixel_flush", replace_existing=True, max_instances=1, coalesce=True, misfire_grace_time=30)
+        scheduler.add_job(periodic_flush, "interval", seconds=60, jitter=20, id="aurem_pixel_flush", replace_existing=True, max_instances=2, coalesce=True, misfire_grace_time=90)
         logger.info("[NightlyCycle] Pixel event buffer flush scheduled (60s interval)")
     except Exception as e:
         logger.warning(f"[NightlyCycle] Pixel buffer not scheduled: {e}")

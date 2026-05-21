@@ -363,6 +363,22 @@ async def build_digest(db) -> dict:
     return {"body": body, "data": data}
 
 
+async def _send_whatsapp_digest(body: str, phone: Optional[str] = None) -> bool:
+    """iter 326e — thin shim used by `nightly_cycle.send_evening_brief`.
+
+    The evening brief job in `services/nightly_cycle.py` calls this name
+    via a runtime import. It was renamed when this module was refactored
+    around iter 320, leaving the nightly job logging:
+       [EveningBrief] send failed: cannot import name '_send_whatsapp_digest'
+       from 'services.morning_digest'
+    every single night. This shim restores the contract: deliver the
+    pre-formatted body to the founder's WHAPI phone using the same
+    `_wa_send` helper the morning digest uses. Returns True on success.
+    """
+    target = phone or os.environ.get("AUREM_HOT_LEAD_PHONE", "+16134000000")
+    return await _wa_send(target, body)
+
+
 async def send_morning_digest(db, to_phone: Optional[str] = None) -> dict:
     """Build + send the digest. Returns {sent, to, body_preview}."""
     data = await _collect_data(db)

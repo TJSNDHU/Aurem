@@ -16,26 +16,51 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-# Defensive resend import — production may have an older SDK build whose
-# transitive `resend.logs` submodule is missing, breaking module load and
-# cascading to "[bulk-wire] failed: No module named 'resend.logs'".
-# Falling back to a stub keeps the rest of the email pipeline alive.
+# iter 326e — Defensive resend import.
+# Production sometimes ships a slimmed resend wheel where `resend/__init__.py`
+# does `from . import logs` but the `logs.py` submodule is missing — bare
+# `import resend` then raises `ModuleNotFoundError: No module named
+# 'resend.logs'` and the entire email engine falls through to a stub
+# (every send errors with "Resend SDK not loaded" — observed in prod deploy
+# logs 2026-05-21).
+#
+# Fix: import the SDK in two passes.
+#   1) Try the full top-level import.
+#   2) If that explodes, build a minimal namespace by importing JUST the
+#      pieces email_engine actually uses (Emails class + api_key module
+#      attribute). This bypasses any optional-submodule failure in
+#      `resend.__init__`.
+import importlib
+import types
+
+resend: types.ModuleType  # type: ignore
 try:
-    import resend
-except Exception as _resend_err:  # pragma: no cover
-    logging.getLogger(__name__).warning(
-        f"[email_engine] resend SDK unavailable, using stub: {_resend_err}"
-    )
+    import resend  # type: ignore
+except Exception as _resend_err:
+    try:
+        # Reach past __init__ and pull the concrete classes directly.
+        _emails_mod = importlib.import_module("resend.emails._emails")
+        resend = types.ModuleType("resend")  # type: ignore
+        resend.api_key = None                # type: ignore[attr-defined]
+        resend.Emails  = _emails_mod.Emails  # type: ignore[attr-defined]
+        logging.getLogger(__name__).warning(
+            f"[email_engine] resend top-level import failed ({_resend_err}); "
+            "loaded Emails class directly — sends will still work."
+        )
+    except Exception as _inner:  # pragma: no cover
+        logging.getLogger(__name__).warning(
+            f"[email_engine] resend SDK completely unavailable, using stub: {_inner}"
+        )
 
-    class _ResendStub:
-        api_key = None
+        class _ResendStub:
+            api_key = None
 
-        class Emails:
-            @staticmethod
-            def send(*_a, **_kw):
-                raise RuntimeError("Resend SDK not loaded")
+            class Emails:
+                @staticmethod
+                def send(*_a, **_kw):
+                    raise RuntimeError("Resend SDK not loaded")
 
-    resend = _ResendStub()  # type: ignore
+        resend = _ResendStub()  # type: ignore
 
 logger = logging.getLogger(__name__)
 
