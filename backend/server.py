@@ -2405,6 +2405,14 @@ except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] startup_report wire failed: {_e}")
 
+# iter 325y — debug router for live asyncio task introspection
+try:
+    from routers.debug_tasks_router import router as _debug_tasks_router
+    app.include_router(_debug_tasks_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] debug_tasks wire failed: {_e}")
+
 # iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
 try:
     from routers.ghost_scout_router import (

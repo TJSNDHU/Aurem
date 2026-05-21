@@ -316,6 +316,26 @@ def _live_task_names() -> set[str]:
     return {t.get_name() for t in asyncio.all_tasks() if not t.done()}
 
 
+# iter 325y — Orchestrator boot grace.
+# `SCHED_BOOT_DELAY_S` (default 25s) is deliberate cold-boot breathing
+# room for the pillar workers — see server.py `_deferred_orch_run`.
+# During this window, no `p[1-4]:*` scheduler task is alive yet, so the
+# old watchdog flashed RED for ~30 seconds on every restart and the
+# admin saw scary "0/1 writers live" badges (e.g. user screenshot
+# 2026-05-21). Fix: until the orchestrator has had a chance to attach
+# (boot_delay + 60s settle window), report YELLOW with a clear reason
+# instead of RED.
+_PROCESS_STARTED_AT = datetime.now(timezone.utc)
+_ORCH_GRACE_SECONDS = (
+    float(os.environ.get("SCHED_BOOT_DELAY_S", "25")) + 60.0
+)
+
+
+def _in_boot_grace() -> bool:
+    elapsed = (datetime.now(timezone.utc) - _PROCESS_STARTED_AT).total_seconds()
+    return elapsed < _ORCH_GRACE_SECONDS
+
+
 def _backend_pulse(coll_name: str, pillar_live_count: int, live_names: set[str]) -> tuple[str, str]:
     """Compute backend-side status for a collection.
 
@@ -323,7 +343,8 @@ def _backend_pulse(coll_name: str, pillar_live_count: int, live_names: set[str])
     Rule:
       - If COLLECTION_WRITERS has entries:
           green = any mapped scheduler name in live_names
-          red   = none present
+          yellow = none present BUT we're inside the orchestrator boot grace
+          red   = none present AND grace has elapsed
       - Else (unmapped / admin-only collections):
           green if pillar_live_count > 0 else yellow
     """
@@ -335,6 +356,10 @@ def _backend_pulse(coll_name: str, pillar_live_count: int, live_names: set[str])
     alive = [w for w in writers if w in live_names]
     if alive:
         return "green", f"{len(alive)}/{len(writers)} writer(s) live"
+    # iter 325y — orchestrator boot grace: avoid red flash on restart.
+    if _in_boot_grace():
+        elapsed = int((datetime.now(timezone.utc) - _PROCESS_STARTED_AT).total_seconds())
+        return "yellow", f"booting · orchestrator grace ({elapsed}s / {int(_ORCH_GRACE_SECONDS)}s)"
     return "red", f"0/{len(writers)} writers live"
 
 

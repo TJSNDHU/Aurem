@@ -554,7 +554,26 @@ async def run_scan_tick() -> Dict[str, Any]:
         {"active": True}, {"_id": 0}
     )]
     if not endpoints:
-        return {"scanned": 0, "passed": 0, "failed": 0}
+        # iter 325y — ROUTE-LEVEL ROOT-CAUSE FIX for the "DB Side: no writes
+        # within 20 min (silent failure)" false positive on /admin/pillars-map.
+        # When no customers have signed up for site monitoring (or every endpoint
+        # is paused/expired), the scheduler runs every 5 min but `results=[]`
+        # so we wrote nothing → pillars-map watchdog flagged the *healthy*
+        # scheduler as a dead DB writer. Now we always emit a tiny heartbeat
+        # row so the watchdog can distinguish "writer alive, nothing to do"
+        # from "writer crashed/silent". The doc carries `kind=scheduler_heartbeat`
+        # so case_study_builder / pass-rate aggregations can $ne-filter it out.
+        try:
+            await _db.site_monitor_logs.insert_one({
+                "kind": "scheduler_heartbeat",
+                "ts": now_iso,
+                "endpoints_active": 0,
+                "passed": True,
+                "note": "tick ran, no active endpoints to probe",
+            })
+        except Exception as e:
+            logger.warning(f"[site-monitor] heartbeat insert failed: {e}")
+        return {"scanned": 0, "passed": 0, "failed": 0, "heartbeat": True}
 
     results = []
     # INTENTIONAL: scanning untrusted external customer websites — many have
@@ -624,8 +643,11 @@ async def admin_overview() -> Dict[str, Any]:
     ):
         mrr += s.get("price_monthly", 0)
 
-    # Recent scan
-    recent = await _db.site_monitor_logs.find({}, {"_id": 0}).sort("ts", -1).limit(100).to_list(length=100)
+    # Recent scan — iter 325y filter out scheduler_heartbeat rows so the
+    # pass-rate metric reflects real probe results only.
+    recent = await _db.site_monitor_logs.find(
+        {"kind": {"$ne": "scheduler_heartbeat"}}, {"_id": 0}
+    ).sort("ts", -1).limit(100).to_list(length=100)
     passed_recent = sum(1 for r in recent if r.get("passed"))
     recent_pass_rate = round(passed_recent / max(len(recent), 1) * 100, 1) if recent else None
 
