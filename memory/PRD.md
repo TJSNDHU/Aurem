@@ -32,6 +32,13 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • Stdout `[watchdog] tripped guards` print follows same dedup cadence.
   • **Topbar degraded-state pulse** — yellow when API streak ≥ 2, red when ≥ 3. Renders BEFORE the user sees a full red error UI.
   • 5 regression tests in `tests/test_iter325u_overload_fixes.py` all green.
+- iter 326g (2026-02): **ORA chain — FreeLLMAPI skipped, Gemini + NVIDIA baked in** —
+  • Default chain now `deepseek → gemini → nvidia → claude → groq` (FreeLLMAPI + Legion Ollama removed from default).
+  • Fixed `NameError` shield: `_GEMINI_HTTPX_TIMEOUT/WAIT_FOR` + `_NVIDIA_HTTPX_TIMEOUT/WAIT_FOR` were USED but never DECLARED — providers would have crashed on first call.
+  • `gemini_health()` now surfaces Google's structured error message (e.g. "Consumer ... has been suspended") instead of opaque "HTTP 403".
+  • Live-verified end-to-end: NVIDIA healthy (123 models, 124 ms latency); Gemini returns 403 because the current `GOOGLE_API_KEY` is suspended by Google — chain gracefully fell through to NVIDIA which served the reply via `meta/llama-4-maverick-17b-128e-instruct`.
+  • 9 regression tests in `tests/test_iter326g_chain_gemini_nvidia_bake.py` all green.
+  • **Action for founder**: rotate `GOOGLE_API_KEY` in `/app/backend/.env` (current one suspended) to unlock the fastest fallback in the chain. NVIDIA + Claude + Groq + DeepSeek already keep ORA fully operational.
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

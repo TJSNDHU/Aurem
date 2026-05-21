@@ -176,7 +176,7 @@ async def providers_health(authorization: Optional[str] = Header(None)):
 
     order_env = os.environ.get(
         "ORA_AGENT_PROVIDER_ORDER",
-        "deepseek,gemini,nvidia,claude,freellmapi,legion_ollama,groq",
+        "deepseek,gemini,nvidia,claude,groq",
     )
     order = [p.strip() for p in order_env.lower().split(",") if p.strip()]
     # De-dupe while preserving order

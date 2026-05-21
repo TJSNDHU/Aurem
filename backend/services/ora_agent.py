@@ -98,6 +98,15 @@ _DEEPSEEK_WAIT_FOR:      float = 45.0
 _FREELLMAPI_HTTPX_TIMEOUT: float = 35.0
 _FREELLMAPI_WAIT_FOR:      float = 40.0
 
+# iter 326f — Gemini + NVIDIA budgets. Both are OpenAI-compat endpoints
+# with very fast TTFB (Gemini Flash ~400-800 ms; NVIDIA NIM ~1-2 s).
+# Keep httpx slightly less than asyncio.wait_for so connections close
+# cleanly on cancellation (same invariant as DeepSeek/Groq).
+_GEMINI_HTTPX_TIMEOUT: float = 18.0
+_GEMINI_WAIT_FOR:      float = 20.0
+_NVIDIA_HTTPX_TIMEOUT: float = 22.0
+_NVIDIA_WAIT_FOR:      float = 25.0
+
 # Iter 322ex — production safety: Legion Ollama runs on the founder's
 # laptop via ngrok. When the tunnel is dead, the previous 120s wait made
 # ORA "silently scroll forever" before falling through. We honour
@@ -371,16 +380,19 @@ async def _llm_turn(
     """
     order_env = os.environ.get(
         "ORA_AGENT_PROVIDER_ORDER",
-        # iter 326a/326f — chain order with Gemini + NVIDIA inserted ahead
-        # of FreeLLMAPI (which is now optional). Strategy:
-        #   1. DeepSeek (best reasoning, our primary)
-        #   2. Gemini   (huge free RPM, fast)
+        # iter 326f — final chain (FreeLLMAPI proxy skipped per founder
+        # decision 2026-05-21). Both Gemini + NVIDIA already configured
+        # via GOOGLE_API_KEY + NVIDIA_NIM_API_KEY in /app/backend/.env,
+        # which gives us 3 independent free upstreams ahead of paid
+        # Claude. Order:
+        #   1. DeepSeek (primary — best reasoning, OpenRouter)
+        #   2. Gemini   (huge free RPM, sub-second)
         #   3. NVIDIA   (heavy-hitter fallback)
-        #   4. Claude   (Universal Key, paid but reliable)
-        #   5. FreeLLMAPI (only kicks in if operator deployed the proxy)
-        #   6. Ollama   (sovereign, laptop, usually offline)
-        #   7. Groq     (rate-limited safety net)
-        "deepseek,gemini,nvidia,claude,freellmapi,legion_ollama,groq",
+        #   4. Claude   (Universal Key safety net)
+        #   5. Groq     (rate-limited final fallback)
+        # Legion Ollama removed from default — usually offline; operator
+        # can re-add via env if their laptop daemon is live.
+        "deepseek,gemini,nvidia,claude,groq",
     )
     order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
@@ -764,9 +776,26 @@ async def gemini_health() -> dict[str, Any]:
             )
         elapsed_ms = int((asyncio.get_event_loop().time() - started) * 1000)
         if r.status_code != 200:
+            # iter 326g — surface Google's structured error so suspended
+            # keys / quota-blocked keys show the actual reason on the
+            # ORA-CTO health panel instead of an opaque "HTTP 403".
+            reason = f"HTTP {r.status_code}"
+            try:
+                body = r.json()
+                msg  = (
+                    (body.get("error") or {}).get("message")
+                    if isinstance(body, dict)
+                    else (body[0].get("error") or {}).get("message")
+                    if isinstance(body, list) and body
+                    else None
+                )
+                if msg:
+                    reason = f"HTTP {r.status_code}: {str(msg)[:160]}"
+            except Exception:
+                pass
             return {"ok": False, "configured": True, "status": r.status_code,
                     "latency_ms": elapsed_ms,
-                    "reason": f"HTTP {r.status_code}"}
+                    "reason": reason}
         models = (r.json().get("data") or [])
         return {"ok": True, "configured": True, "status": 200,
                 "models_total": len(models), "latency_ms": elapsed_ms,
