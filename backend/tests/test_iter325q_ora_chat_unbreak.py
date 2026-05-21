@@ -148,8 +148,10 @@ def test_empty_body_returns_clear_422():
     assert r.status_code == 422
     body = r.json()
     err_msg = str(body)
+    # The validator's error message must mention both accepted keys so
+    # future devs immediately see what to send.
     assert "text" in err_msg and "message" in err_msg, \
-        f"422 error must list both accepted keys, got: {err_msg}"
+        f"422 error must mention both accepted keys, got: {err_msg}"
 
 
 # ─────────────────────────────────────────────────────────────────
