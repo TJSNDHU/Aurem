@@ -997,7 +997,27 @@ async def _check_flow(flow: dict, live_names: set[str]) -> dict:
     elif be_status_code >= 500:
         be_side = "red"
         be_reason = f"HTTP {be_status_code}"
-    elif be_status_code >= 400 and be_status_code not in (401, 403):
+    elif be_status_code in (401, 403):
+        # iter 325v — ROUTE-LEVEL ROOT-CAUSE FIX.
+        # An auth-gated endpoint that responds 401/403 to an *un-authed*
+        # localhost probe is PROOF the server + router are alive (the
+        # request reached FastAPI and the auth middleware rejected it).
+        # The old code left be_reason="HTTP 401" which is technically
+        # correct but visually scary — admins on /admin/pillars-map saw
+        # "BE 401" badges everywhere and assumed everything was broken.
+        #
+        # New behavior: explicit green with a human reason. Scheduler
+        # checks below still run; if the scheduler is dead the flow
+        # still goes red — auth status alone never masks a real outage.
+        be_side = "green"
+        be_reason = f"auth-gated endpoint reachable (HTTP {be_status_code})"
+        if sched_missing:
+            be_side = "red"
+            be_reason = (
+                f"scheduler(s) dead: {','.join(sched_missing)} "
+                f"(endpoint itself is auth-gated reachable)"
+            )
+    elif be_status_code >= 400:
         be_side = "yellow"
         be_reason = f"HTTP {be_status_code}"
     elif sched_missing:

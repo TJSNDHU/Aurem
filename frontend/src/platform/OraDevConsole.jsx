@@ -19,6 +19,7 @@ import {
   RefreshCw,
   GitBranch,
 } from "lucide-react";
+import { safeFetchJson } from "../lib/safeFetchJson";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -377,20 +378,29 @@ const OraDevConsole = () => {
         filter === "all"
           ? "/api/admin/ora-dev/list?limit=100"
           : `/api/admin/ora-dev/list?status=${filter}&limit=100`;
+      // iter 325v — safeFetchJson never throws on non-JSON; isolates
+      // Cloudflare/ingress HTML 520 pages from looking like a JS parse
+      // bug. Auth failures surface a friendly banner instead of a stack.
       const [listRes, statsRes] = await Promise.all([
-        fetch(`${API}${path}`, { headers: { ...authHeaders() } }),
-        fetch(`${API}/api/admin/ora-dev/stats`, { headers: { ...authHeaders() } }),
+        safeFetchJson(`${API}${path}`, { headers: { ...authHeaders() } }),
+        safeFetchJson(`${API}/api/admin/ora-dev/stats`, { headers: { ...authHeaders() } }),
       ]);
-      if (listRes.status === 401 || listRes.status === 403) {
+      if (listRes.isAuthError) {
         setErr("Admin login required.");
         setItems([]);
         setStats(null);
         return;
       }
-      const list = await listRes.json();
-      const st = statsRes.ok ? await statsRes.json() : null;
-      setItems(list?.items || []);
-      setStats(st);
+      if (listRes.isGatewayError) {
+        setErr(`Backend temporarily unreachable (HTTP ${listRes.status || "—"}). Origin or CDN is dropping requests — retry in a few seconds.`);
+        return;
+      }
+      if (!listRes.ok) {
+        setErr(`Fetch failed: ${listRes.error}`);
+        return;
+      }
+      setItems(listRes.data?.items || []);
+      setStats(statsRes.ok ? statsRes.data : null);
     } catch (e) {
       setErr(`Fetch failed: ${e.message || e}`);
     } finally {
@@ -413,17 +423,16 @@ const OraDevConsole = () => {
     async (id, action) => {
       setBusyId(id);
       try {
-        const r = await fetch(`${API}/api/admin/ora-dev/${id}/${action}`, {
+        const res = await safeFetchJson(`${API}/api/admin/ora-dev/${id}/${action}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
         });
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          showToast(`✗ ${action}: ${body?.detail || r.status}`, "bad");
+        if (res.isGatewayError) {
+          showToast(`✗ ${action}: backend gateway down (HTTP ${res.status || "—"})`, "bad");
+        } else if (!res.ok) {
+          showToast(`✗ ${action}: ${res.error}`, "bad");
         } else if (action === "prepare-pr") {
-          // Special-case: copy commit message to clipboard so admin can
-          // paste into the platform's "Save to GitHub" feature.
-          const cm = body?.commit_message || "";
+          const cm = res.data?.commit_message || "";
           try {
             await navigator.clipboard.writeText(cm);
             showToast(`✓ commit copied: ${cm.slice(0, 60)}`, "good");
@@ -447,13 +456,12 @@ const OraDevConsole = () => {
   const onTranslate = useCallback(
     async (id) => {
       try {
-        const r = await fetch(`${API}/api/admin/ora-dev/${id}/translate`, {
+        const res = await safeFetchJson(`${API}/api/admin/ora-dev/${id}/translate`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
         });
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          showToast(`✗ translate: ${body?.detail || r.status}`, "bad");
+        if (!res.ok) {
+          showToast(`✗ translate: ${res.error}`, "bad");
         } else {
           showToast(`✓ translated (${id.slice(0, 8)})`, "good");
           fetchAll();

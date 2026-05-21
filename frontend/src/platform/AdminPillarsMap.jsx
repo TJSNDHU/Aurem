@@ -30,6 +30,7 @@ import EmpireHUDMap from "./EmpireHUDMap";
 import AutopilotMasterButton from "./AutopilotMasterButton";
 import OraDevConsole from "./OraDevConsole";
 import OraPhase25Panel from "./OraPhase25Panel";
+import { safeFetchJson } from "../lib/safeFetchJson";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_INTERVAL_MS = 10000;
@@ -276,13 +277,20 @@ function ServiceModal({ collection, onClose }) {
     (async () => {
       setLoading(true); setErr("");
       try {
-        const [s, e] = await Promise.all([
-          fetch(`${API}/api/admin/pillars-map/collection/${collection.collection}/services`,
-                { headers: authHeaders(), signal: ac.signal }).then(r => r.json()),
-          fetch(`${API}/api/admin/pillars-map/collection/${collection.collection}/errors`,
-                { headers: authHeaders(), signal: ac.signal }).then(r => r.json()),
+        // iter 325v — safeFetchJson never throws on HTML/non-JSON, so a
+        // single Cloudflare 520 page no longer takes down the modal.
+        const [sRes, eRes] = await Promise.all([
+          safeFetchJson(`${API}/api/admin/pillars-map/collection/${collection.collection}/services`,
+                        { headers: authHeaders(), signal: ac.signal }),
+          safeFetchJson(`${API}/api/admin/pillars-map/collection/${collection.collection}/errors`,
+                        { headers: authHeaders(), signal: ac.signal }),
         ]);
-        setSvcData(s); setErrData(e);
+        if (sRes.isGatewayError || eRes.isGatewayError) {
+          setErr(`Backend gateway unreachable (HTTP ${sRes.status || eRes.status}).`);
+          return;
+        }
+        if (!sRes.ok && !sRes.isAuthError) { setErr(sRes.error); return; }
+        setSvcData(sRes.data); setErrData(eRes.data);
       } catch (e2) {
         if (e2.name !== "AbortError") setErr(String(e2));
       } finally {
@@ -520,11 +528,17 @@ function WireTraceModal({ wire, onClose }) {
     (async () => {
       setLoading(true); setErr("");
       try {
-        const r = await fetch(`${API}/api/admin/pillars-map/wire/${wire.id}/trace`,
+        const res = await safeFetchJson(`${API}/api/admin/pillars-map/wire/${wire.id}/trace`,
                               { headers: authHeaders(), signal: ac.signal });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        setTrace(d);
+        if (!res.ok) {
+          if (res.isGatewayError) {
+            setErr(`Backend gateway unreachable (HTTP ${res.status || "—"})`);
+          } else {
+            setErr(res.error);
+          }
+          return;
+        }
+        setTrace(res.data);
       } catch (e) {
         if (e.name !== "AbortError") setErr(String(e));
       } finally {
@@ -806,13 +820,16 @@ function EndpointAuditPanel() {
   const [loading, setL] = React.useState(true);
 
   const load = React.useCallback(async () => {
-    try {
-      const r = await fetch(`${API}/api/admin/pillars-map/endpoint-audit/summary`, { headers: authHeaders() });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      setData(await r.json());
+    const res = await safeFetchJson(`${API}/api/admin/pillars-map/endpoint-audit/summary`, { headers: authHeaders() });
+    if (!res.ok) {
+      setErr(res.isGatewayError
+        ? `Backend gateway unreachable (HTTP ${res.status || "—"})`
+        : res.error);
+    } else {
+      setData(res.data);
       setErr("");
-    } catch (e) { setErr(String(e)); }
-    finally { setL(false); }
+    }
+    setL(false);
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
@@ -897,11 +914,9 @@ function DevStackSection() {
   React.useEffect(() => {
     let cancelled = false;
     const tick = async () => {
-      try {
-        const r = await fetch(`${API}/api/admin/dev-stack/health`, { headers: authHeaders() });
-        if (!cancelled && r.ok) setData(await r.json());
-      } catch { /* silent */ }
-      finally { if (!cancelled) setLoading(false); }
+      const res = await safeFetchJson(`${API}/api/admin/dev-stack/health`, { headers: authHeaders() });
+      if (!cancelled && res.ok) setData(res.data);
+      if (!cancelled) setLoading(false);
     };
     tick();
     const id = setInterval(tick, 20000);
@@ -983,16 +998,15 @@ export default function AdminPillarsMap() {
 
   const load = useCallback(async () => {
     setErr("");
-    try {
-      const r = await fetch(`${API}/api/admin/pillars-map/heartbeat`, { headers: authHeaders() });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const d = await r.json();
-      setSnapshot(d);
-    } catch (e) {
-      setErr(String(e));
-    } finally {
-      setLoading(false);
+    const res = await safeFetchJson(`${API}/api/admin/pillars-map/heartbeat`, { headers: authHeaders() });
+    if (!res.ok) {
+      setErr(res.isGatewayError
+        ? `Backend gateway unreachable (HTTP ${res.status || "—"}). Origin may be restarting — auto-retrying every 10s.`
+        : res.error);
+    } else {
+      setSnapshot(res.data);
     }
+    setLoading(false);
   }, []);
 
   // iter 280.3 — Force-sync: POST /sync purges cache, rebuilds live snapshot,
@@ -1000,20 +1014,22 @@ export default function AdminPillarsMap() {
   const forceSync = useCallback(async () => {
     setSyncing(true);
     try {
-      const r = await fetch(`${API}/api/admin/pillars-map/sync`, {
+      const res = await safeFetchJson(`${API}/api/admin/pillars-map/sync`, {
         method: "POST",
         headers: authHeaders(),
       });
-      if (!r.ok) throw new Error(`sync HTTP ${r.status}`);
-      const d = await r.json();
+      if (!res.ok) {
+        setErr(res.isGatewayError
+          ? `Sync failed: backend gateway HTTP ${res.status || "—"}`
+          : `sync ${res.error}`);
+        return;
+      }
       setLastSync({
         at: new Date().toISOString(),
-        overall: d.overall_status,
-        sentinel: d.sentinel_overlay,
+        overall: res.data.overall_status,
+        sentinel: res.data.sentinel_overlay,
       });
       await load();
-    } catch (e) {
-      setErr(String(e));
     } finally {
       setSyncing(false);
     }
