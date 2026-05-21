@@ -51,6 +51,12 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • **System prompt**: `SYSTEM_PROMPT` rule 16 — explicit BUILD MODE checklist (Plan → Wire → Test → Verify → Reply) with mandatory PROOF TABLE markdown format. Banned: ASCII boxes without 4 populated proof rows.
   • Existing 8 repair/watchdog modules NOT TOUCHED.
   • 16 regression tests in `tests/test_iter326i_build_mode.py` all green.
+- iter 326i-2 (2026-02): **Customer auto-deploy workflow refined** —
+  • Audit revealed `.github/workflows/auto_deploy.yml` was a bash dead-code-cleanup script with `.yml` extension — GitHub Actions couldn't parse it. Founder clarified the auto-deploy stack is a PRODUCT FEATURE for AUREM subscribers (not for aurem.live itself, which is manually deployed).
+  • **Preserved**: original bash script moved to `scripts/dead_code_cleanup.sh` (executable, shebang intact).
+  • **Refined**: `.github/workflows/auto_deploy.yml` is now the canonical CUSTOMER-FACING template AUREM commits into a subscriber's repo. Triggers: `workflow_dispatch` + push to main/master (with `paths-ignore: .aurem/**` to prevent loops) + PR labeled `aurem-autofix`. Two jobs: `pr_gate` (CI green BEFORE customer clicks merge) and `deploy` (post-merge rollout, fires deploy webhook, reports back to `https://aurem.live/api/customer/deploy/report`).
+  • Pairs with existing backend service `services/github_deploy_service.py::push_fix` which already opens PRs in customer repos with the `[AUREM] <fix-title>` convention.
+  • 9 regression tests in `tests/test_iter326i2_customer_auto_deploy_workflow.py` all green (YAML validity, trigger scope, paths-ignore, job structure, report-back URL, documented secrets).
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.
