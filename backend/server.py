@@ -1005,6 +1005,18 @@ async def create_indexes():
                 logging.info(f"[recipient-guard] seeded {seeded} internal addresses into do_not_contact")
         except Exception as e:
             logging.warning(f"[recipient-guard] DNC seed failed (non-fatal): {e}")
+
+        # iter 325m — idempotent brand purge. Rewrites any lingering
+        # ReRoots brand strings → AUREM in user/tenant collections so the
+        # customer sidebar never shows "REROOTS · AURE-ADMIN" again.
+        try:
+            from services.brand_purge_migration import run_brand_purge
+            purged = await run_brand_purge(db)
+            total = sum(purged.values()) if purged else 0
+            if total:
+                logging.info(f"[brand-purge] iter 325m rewrote ReRoots→AUREM in {total} doc(s)")
+        except Exception as e:
+            logging.warning(f"[brand-purge] non-fatal: {e}")
     except Exception as e:
         logging.warning(f"Index creation warning (may already exist): {e}")
 
