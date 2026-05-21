@@ -74,6 +74,10 @@ HISTORY_CAP:           int = 40   # non-system messages kept per session
 _GROQ_HTTPX_TIMEOUT:  float = 18.0   # httpx connect+read
 _GROQ_WAIT_FOR:       float = 20.0   # asyncio.wait_for wrapper
 _CLAUDE_WAIT_FOR:     float = 15.0
+# iter 325j — DeepSeek V3.1 via OpenRouter (primary chat provider after
+# Legion daemon was retired). Same inner<outer rule as Groq.
+_DEEPSEEK_HTTPX_TIMEOUT: float = 22.0
+_DEEPSEEK_WAIT_FOR:      float = 25.0
 # Iter 322ex — production safety: Legion Ollama runs on the founder's
 # laptop via ngrok. When the tunnel is dead, the previous 120s wait made
 # ORA "silently scroll forever" before falling through. We honour
@@ -337,14 +341,15 @@ async def _llm_turn(
     """One turn against the LLM provider chain.
 
     Provider order (overridable via ORA_AGENT_PROVIDER_ORDER env):
-        1. legion_ollama — sovereign, local qwen2.5 via Legion daemon
-        2. groq          — cloud, fast, daily TPD limit
-        3. claude        — plain-text fallback (no tools this turn)
+        1. deepseek      — DeepSeek V3.1 via OpenRouter (current primary)
+        2. legion_ollama — sovereign, local qwen2.5 via Legion daemon
+        3. groq          — cloud, fast, daily TPD limit
+        4. claude        — plain-text fallback (no tools this turn)
 
     Returns OpenAI-format message dict (may have tool_calls), or None if
     every provider failed.
     """
-    order_env = os.environ.get("ORA_AGENT_PROVIDER_ORDER", "legion_ollama,groq,claude")
+    order_env = os.environ.get("ORA_AGENT_PROVIDER_ORDER", "deepseek,claude,legion_ollama,groq")
     order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
     for provider in order:
@@ -361,6 +366,11 @@ async def _llm_turn(
                     _ollama_cb_record_failure()
                 else:
                     _ollama_cb_record_success()
+            elif provider in ("deepseek", "openrouter", "deepseek_v3"):
+                msg = await asyncio.wait_for(
+                    _deepseek_with_tools(messages, model=model),
+                    timeout=_DEEPSEEK_WAIT_FOR,
+                )
             elif provider == "groq":
                 msg = await asyncio.wait_for(
                     _groq_with_tools(messages, model=model), timeout=_GROQ_WAIT_FOR
@@ -388,6 +398,63 @@ async def _llm_turn(
             )
             if provider in ("legion_ollama", "ollama", "legion"):
                 _ollama_cb_record_failure()
+
+    return None
+
+
+async def _deepseek_with_tools(
+    messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+) -> dict[str, Any] | None:
+    """DeepSeek V3.1 via OpenRouter — current primary chat provider.
+
+    iter 325j — ORA chat was still routing to Legion Ollama (offline)
+    and falling through to a hardcoded "fix your laptop" message even
+    though the founder switched to DeepSeek. This wires DeepSeek into
+    the same OpenAI-style tool-call chain Groq/Claude already use, so
+    the chat agent gets the same brain the ORA CTO repair agent uses.
+
+    Returns None on missing key / non-200 / network — caller falls
+    through to the next provider.
+    """
+    api_key = (os.environ.get("OPENROUTER_API_KEY") or "").strip()
+    if not api_key:
+        return None
+
+    model_name = (
+        model
+        or os.environ.get("DEEPSEEK_MODEL")
+        or "deepseek/deepseek-chat-v3.1"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=_DEEPSEEK_HTTPX_TIMEOUT) as c:
+            r = await c.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type":  "application/json",
+                    "HTTP-Referer":  "https://aurem.live",
+                    "X-Title":       "AUREM ORA Agent",
+                },
+                json={
+                    "model":       model_name,
+                    "messages":    messages,
+                    "tools":       all_agent_tool_schemas(),
+                    "tool_choice": "auto",
+                    "temperature": 0.25,
+                    "max_tokens":  1500,
+                },
+            )
+            if r.status_code == 200:
+                data = r.json()
+                return (data.get("choices") or [{}])[0].get("message") or {}
+            logger.warning(
+                f"[ora-agent] deepseek {r.status_code}: {r.text[:240]}"
+            )
+    except Exception as e:
+        logger.warning(f"[ora-agent] deepseek error: {type(e).__name__}: {e}")
 
     return None
 
@@ -1203,13 +1270,13 @@ async def _continue_loop(
 
                     if age is None:
                         diag_lines.append(
-                            "🔴 Legion daemon: NEVER polled — "
-                            "laptop daemon start kar"
+                            "⚪ Legion daemon: never polled — "
+                            "ignore (DeepSeek is primary now)"
                         )
                     elif age < 60:
                         diag_lines.append(
                             f"🟢 Legion daemon alive ({int(age)}s ago) — "
-                            "Ollama inference failed, model evicted ho gaya hoga"
+                            "still available as sovereignty fallback"
                         )
                     elif age < 300:
                         diag_lines.append(
@@ -1217,8 +1284,8 @@ async def _continue_loop(
                         )
                     else:
                         diag_lines.append(
-                            f"🔴 Legion daemon OFFLINE ({int(age/60)} min) — "
-                            "laptop sleeping/closed"
+                            f"⚪ Legion daemon offline ({int(age/60)} min) — "
+                            "doesn't matter, DeepSeek + Claude carry chat"
                         )
 
                     # Campaign heartbeat
@@ -1267,8 +1334,8 @@ async def _continue_loop(
                 logger.warning(f"[ora-agent] degrade-stats failed: {_e}")
 
             reply_parts = [
-                "**Bhai ORA chat abhi local Ollama pe nahi pahuch paa raha,** "
-                "but tension nahi:"
+                "**Bhai ORA chat ka primary brain (DeepSeek V3.1) abhi "
+                "reach nahi ho raha,** but tension nahi:"
             ]
             if campaign_lines:
                 reply_parts += [""] + campaign_lines + [
@@ -1281,12 +1348,13 @@ async def _continue_loop(
                 + diag_lines
                 + [
                     "",
-                    "**Laptop pe quick checks:**",
-                    "1. Daemon: `tail -5 ~/legion_daemon.log`",
-                    "2. Ollama: `ollama list` (model loaded hai?)",
-                    "3. Restart: `pkill -9 -f legion_daemon.py && "
-                    "nohup python3 ~/legion_daemon.py "
-                    "> ~/legion_daemon.log 2>&1 &`",
+                    "**Cloud-side quick checks (laptop irrelevant):**",
+                    "1. OpenRouter key: `curl -s https://openrouter.ai/api/v1/models "
+                    "-H \"Authorization: Bearer $OPENROUTER_API_KEY\" | head -c 200`",
+                    "2. Emergent LLM key (Claude fallback): `echo $EMERGENT_LLM_KEY | head -c 12`",
+                    "3. Backend logs: `tail -n 50 /var/log/supervisor/backend.err.log`",
+                    "4. Force provider retry: `POST /api/admin/selfcheck/trigger` "
+                    "(nightly probe will flag the failed pillar + auto-route to repair queue)",
                 ]
             )
             reply = "\n".join(reply_parts)
