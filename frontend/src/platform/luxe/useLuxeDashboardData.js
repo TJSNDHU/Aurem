@@ -3,7 +3,7 @@
  * dashboard. Every number/series here is REAL data from the backend.
  * No mocks. No fake numbers.
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { BACKEND_URL } from '../../lib/api';
 
@@ -37,11 +37,20 @@ const DEFAULT = {
   pipelineTotal: 0,
   inboxThreads: [],
   inboxUnread: 0,
+  // iter 325u — connection health for Topbar pulse.
+  //   online   → green pulse
+  //   degraded → yellow pulse (streak ≥ 2)
+  //   offline  → red pulse  (streak ≥ 3)
+  apiStatus: 'online',
   lastUpdated: null,
 };
 
 export const useLuxeDashboardData = (token) => {
   const [data, setData] = useState(DEFAULT);
+  // iter 325u — track consecutive failed refresh cycles so the topbar
+  // can surface a "degraded" yellow pulse before the full red error UI.
+  // The threshold matches `useAuthFetch`'s 3-strike rule for symmetry.
+  const failStreak = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!token) {
@@ -68,6 +77,25 @@ export const useLuxeDashboardData = (token) => {
         safeGet(`${API}/api/customer/results-pipeline`, headers),
         safeGet(`${API}/api/customer/inbox/threads?limit=20`, headers),
       ]);
+
+    // iter 325u — connection health computation. We treat the refresh as
+    // "broken" only when ≥80% of the core endpoints returned null
+    // (safeGet swallows errors → null). That filters single-endpoint hiccups
+    // (e.g. a router temporarily 502'ing) while still catching a real
+    // ingress / pod-restart outage where every call dies.
+    const probeResults = [leadStats, agentsStatus, repairLeaderboard, repairHistory,
+                           scanEvents, subs, catalog, homeAgg,
+                           resultsSummary, pipeline, inboxThreads];
+    const failCount = probeResults.filter((r) => r === null).length;
+    const failRatio = failCount / probeResults.length;
+    if (failRatio >= 0.8) {
+      failStreak.current += 1;
+    } else {
+      failStreak.current = 0;
+    }
+    const apiStatus = failStreak.current >= 3 ? 'offline'
+                    : failStreak.current >= 2 ? 'degraded'
+                    : 'online';
 
     // Vanguard runs a live backlink scan that can take 10–30s on first hit.
     // Fetch in the background and patch state when ready — never blocks
@@ -233,6 +261,7 @@ export const useLuxeDashboardData = (token) => {
       inboxThreads:   inboxThreads?.threads || [],
       inboxUnread:    (inboxThreads?.threads || [])
                         .reduce((s, t) => s + (Number(t.unread) || 0), 0),
+      apiStatus,
       lastUpdated:    new Date().toISOString(),
     });
   }, [token]);

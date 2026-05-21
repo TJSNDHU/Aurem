@@ -113,15 +113,26 @@ async def _check_once() -> dict:
 
     if zero_streak >= SILENT_RUN_SENT_ZERO_CYCLES:
         snapshot["tripped"].append("zero_sent_streak")
-        await _emit(
-            category="unknown",
-            signature=f"campaign_stalled:zero_sent_streak:{zero_streak}",
-            severity="P1",
-            title=f"Auto-Blast silent: sent=0 for {zero_streak} cycles",
-            detail="Engine cycles complete but no leads are being sent. "
-                   "Check Council veto reasons + channel_gating fallback.",
-            metadata={"zero_streak": zero_streak, "last_run_at": last_run},
+        # iter 325u — incident noise fix. Old code emitted to incident_bus on
+        # every 60s cycle while tripped (streak=232 = 232 dup incidents). Now
+        # only emit on the *transition* (streak crosses threshold) and every
+        # 30x escalation thereafter (3, 30, 60, …) — matches the Telegram
+        # cadence philosophy and stops log/incident spam.
+        prev_streak = int(health.get("zero_sent_streak") or 0)
+        should_emit_incident = (
+            prev_streak < SILENT_RUN_SENT_ZERO_CYCLES   # entering trip state
+            or (zero_streak % 30 == 0)                  # every 30-cycle escalation
         )
+        if should_emit_incident:
+            await _emit(
+                category="unknown",
+                signature=f"campaign_stalled:zero_sent_streak:{zero_streak}",
+                severity="P1",
+                title=f"Auto-Blast silent: sent=0 for {zero_streak} cycles",
+                detail="Engine cycles complete but no leads are being sent. "
+                       "Check Council veto reasons + channel_gating fallback.",
+                metadata={"zero_streak": zero_streak, "last_run_at": last_run},
+            )
         # iter 325d — ping founder Telegram on every 10x streak escalation
         # (10, 20, 30, …) so a stuck pipeline can't go unnoticed for hours.
         # Fingerprint uses the bucket so each escalation is one ping.
@@ -197,10 +208,14 @@ async def watchdog_loop() -> None:
         try:
             snap = await _check_once()
             if snap.get("tripped"):
-                print(f"[watchdog] tripped guards: {snap['tripped']}  "
-                      f"last_sent={snap.get('last_run_sent')}  "
-                      f"streak={snap.get('zero_sent_streak')}  "
-                      f"veto_rate={snap.get('veto_rate_1h')}", flush=True)
+                # iter 325u — only print on transition + every 30x cycle so
+                # a long-running stalled campaign doesn't flood stdout.
+                streak = int(snap.get("zero_sent_streak") or 0)
+                if streak <= SILENT_RUN_SENT_ZERO_CYCLES or streak % 30 == 0:
+                    print(f"[watchdog] tripped guards: {snap['tripped']}  "
+                          f"last_sent={snap.get('last_run_sent')}  "
+                          f"streak={streak}  "
+                          f"veto_rate={snap.get('veto_rate_1h')}", flush=True)
         except asyncio.CancelledError:
             raise
         except Exception as e:

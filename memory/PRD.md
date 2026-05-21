@@ -22,7 +22,16 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
 - iter 325k: Redis pool cap lowered 12→10 for free-tier headroom.
 - iter 325l: resend + RerootsBrowser startup-import warnings eliminated.
 - iter 325m: Idempotent brand-purge migration (ReRoots strings → AUREM in Mongo on every boot).
-- iter 325n (current): **Customer Dashboard V2** — pixel-perfect Apple-style redesign with 11 components, 3 responsive breakpoints, auto dark/light mode, 18 contract tests passing, live-data wired via existing hook.
+- iter 325n: **Customer Dashboard V2** — pixel-perfect Apple-style redesign with 11 components, 3 responsive breakpoints, auto dark/light mode, 18 contract tests passing, live-data wired via existing hook.
+- iter 325s: Online/offline blink fix — useAuthFetch retry + useLiveApi 3-strike debounce.
+- iter 325t: requirements.txt slim (-3.4 GB ML/GPU bloat) + APScheduler ThreadPool 30 workers + 90s misfire grace.
+- iter 325u (current): **APScheduler overload + watchdog noise fix** —
+  • `warm_probe_tick` now fans out endpoints in parallel via `asyncio.gather` (was serial; 50s worst-case → ~5s).
+  • Warm-prober scheduler: `max_instances=2`, `misfire_grace_time=120` — absorbs single overlap, stops "max instances reached" warnings.
+  • `ora_campaign_watchdog` only emits to `incident_bus` on the *trip transition* and every 30x escalation (was every 60 s → 232 dup incidents in 4 hours).
+  • Stdout `[watchdog] tripped guards` print follows same dedup cadence.
+  • **Topbar degraded-state pulse** — yellow when API streak ≥ 2, red when ≥ 3. Renders BEFORE the user sees a full red error UI.
+  • 5 regression tests in `tests/test_iter325u_overload_fixes.py` all green.
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

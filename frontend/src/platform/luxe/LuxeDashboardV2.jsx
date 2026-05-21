@@ -188,51 +188,67 @@ const Sidebar = ({ active, onNav, user, onLogout }) => (
 // ────────────────────────────────────────────────────────────────
 // Topbar
 // ────────────────────────────────────────────────────────────────
-const Topbar = ({ pageTitle, isMobile, theme, onToggleTheme, pulseActive }) => (
-  <header className="av2-topbar" data-testid="topbar">
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-      {isMobile ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 22, height: 22, borderRadius: 6,
-            background: 'linear-gradient(135deg, var(--dash-orange), var(--dash-gold-bright))',
-          }} />
-          <span style={{ fontSize: 14, fontWeight: 700 }}>AUREM</span>
-        </div>
-      ) : (
-        <>
-          <div style={{ fontSize: 12, color: 'var(--dash-text-faint)' }}>
-            AUREM · Customer
+const Topbar = ({ pageTitle, isMobile, theme, onToggleTheme, pulseActive, apiStatus = 'online' }) => {
+  // iter 325u — degraded/offline visual states for the live pill.
+  // online   → green pulse · Live / Idle
+  // degraded → yellow pulse · Degraded  (transient backend wobble, streak=2)
+  // offline  → red pulse · Offline      (sustained outage, streak ≥ 3)
+  const pillClass = apiStatus === 'offline' ? 'av2-pill av2-pill-offline'
+                  : apiStatus === 'degraded' ? 'av2-pill av2-pill-degraded'
+                  : 'av2-pill av2-pill-live';
+  const dotClass  = apiStatus === 'offline'  ? 'av2-pulse-dot av2-pulse-dot--red'
+                  : apiStatus === 'degraded' ? 'av2-pulse-dot av2-pulse-dot--amber'
+                  : 'av2-pulse-dot';
+  const pillLabel = apiStatus === 'offline'  ? 'Offline'
+                  : apiStatus === 'degraded' ? 'Degraded'
+                  : (pulseActive ? 'Live' : 'Idle');
+  const testid    = `topbar-${apiStatus}`;
+  return (
+    <header className="av2-topbar" data-testid="topbar">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+        {isMobile ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: 6,
+              background: 'linear-gradient(135deg, var(--dash-orange), var(--dash-gold-bright))',
+            }} />
+            <span style={{ fontSize: 14, fontWeight: 700 }}>AUREM</span>
           </div>
-          <span style={{ color: 'var(--dash-text-faint)' }}>›</span>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--dash-text)' }}>
-            {pageTitle}
-          </h1>
-        </>
-      )}
-    </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {!isMobile && (
-        <>
-          <span className="av2-pill av2-pill-live" data-testid="topbar-live">
-            <span className="av2-pulse-dot" style={{ width: 6, height: 6 }} /> {pulseActive ? 'Live' : 'Idle'}
-          </span>
-          <span className="av2-pill av2-pill-ent">Enterprise · Active</span>
-        </>
-      )}
-      <button type="button" className="av2-icon-btn" aria-label="Search" data-testid="topbar-search">
-        <Search size={15} />
-      </button>
-      <button type="button" className="av2-icon-btn" aria-label="Notifications" data-testid="topbar-bell">
-        <Bell size={15} />
-      </button>
-      <button type="button" className="av2-icon-btn" aria-label="Toggle theme"
-              data-testid="theme-toggle" onClick={onToggleTheme}>
-        {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-      </button>
-    </div>
-  </header>
-);
+        ) : (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--dash-text-faint)' }}>
+              AUREM · Customer
+            </div>
+            <span style={{ color: 'var(--dash-text-faint)' }}>›</span>
+            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--dash-text)' }}>
+              {pageTitle}
+            </h1>
+          </>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {!isMobile && (
+          <>
+            <span className={pillClass} data-testid={testid}>
+              <span className={dotClass} style={{ width: 6, height: 6 }} /> {pillLabel}
+            </span>
+            <span className="av2-pill av2-pill-ent">Enterprise · Active</span>
+          </>
+        )}
+        <button type="button" className="av2-icon-btn" aria-label="Search" data-testid="topbar-search">
+          <Search size={15} />
+        </button>
+        <button type="button" className="av2-icon-btn" aria-label="Notifications" data-testid="topbar-bell">
+          <Bell size={15} />
+        </button>
+        <button type="button" className="av2-icon-btn" aria-label="Toggle theme"
+                data-testid="theme-toggle" onClick={onToggleTheme}>
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
+      </div>
+    </header>
+  );
+};
 
 // ────────────────────────────────────────────────────────────────
 // Home view
@@ -331,6 +347,7 @@ const Shell = () => {
             theme={effective}
             onToggleTheme={toggle}
             pulseActive={data?.pulse?.active}
+            apiStatus={data?.apiStatus}
           />
           <div className="av2-content av2-scroll" data-testid="page-content">
             {renderPage()}

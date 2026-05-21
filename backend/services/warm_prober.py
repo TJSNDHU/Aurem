@@ -36,8 +36,25 @@ WARM_ENDPOINTS = (
 WARM_INTERVAL_SECONDS = 90
 
 
+async def _probe_one(client, base: str, path: str) -> Dict[str, Any]:
+    t0 = asyncio.get_event_loop().time()
+    try:
+        r = await client.get(f"{base}{path}")
+        elapsed_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
+        return {"path": path, "status": r.status_code, "elapsed_ms": elapsed_ms}
+    except Exception as e:
+        return {"path": path, "status": "exception",
+                "error": f"{type(e).__name__}: {str(e)[:80]}"}
+
+
 async def warm_probe_tick() -> Dict[str, Any]:
-    """Hit every endpoint in WARM_ENDPOINTS once. Logs result if any are slow."""
+    """Hit every endpoint in WARM_ENDPOINTS once (in parallel).
+
+    iter 325t — was serial w/ 10s timeout per call → 5 endpoints × 10s = 50s
+    worst case → next 90s tick overlapped → APScheduler 'max instances reached'
+    warnings every cycle. Fix: parallel asyncio.gather + 5s timeout caps the
+    whole tick at ~5s regardless of how many endpoints are added.
+    """
     if os.environ.get("AUREM_WARM_PROBER_DISABLED", "").strip() in ("1", "true", "yes"):
         return {"ok": True, "skipped": True, "reason": "disabled_via_env"}
 
@@ -45,28 +62,13 @@ async def warm_probe_tick() -> Dict[str, Any]:
     base = "http://127.0.0.1:8001"  # internal, never ingress
 
     started = datetime.now(timezone.utc).isoformat()
-    results = []
-    slow = 0
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for path in WARM_ENDPOINTS:
-            t0 = asyncio.get_event_loop().time()
-            try:
-                r = await client.get(f"{base}{path}")
-                elapsed_ms = int((asyncio.get_event_loop().time() - t0) * 1000)
-                results.append({
-                    "path": path,
-                    "status": r.status_code,
-                    "elapsed_ms": elapsed_ms,
-                })
-                if elapsed_ms > 2000:
-                    slow += 1
-            except Exception as e:
-                results.append({
-                    "path": path,
-                    "status": "exception",
-                    "error": f"{type(e).__name__}: {str(e)[:80]}",
-                })
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        results = await asyncio.gather(
+            *[_probe_one(client, base, p) for p in WARM_ENDPOINTS],
+            return_exceptions=False,
+        )
 
+    slow = sum(1 for r in results if isinstance(r.get("elapsed_ms"), int) and r["elapsed_ms"] > 2000)
     if slow:
         logger.warning(
             f"[warm-prober] {slow}/{len(WARM_ENDPOINTS)} endpoints slow "
@@ -91,8 +93,9 @@ def install_scheduler(scheduler) -> Optional[str]:
         id="aurem_warm_prober",
         name="API Warm Prober",
         replace_existing=True,
-        max_instances=1,
+        max_instances=2,            # iter 325t — tolerate one overlapping tick
         coalesce=True,
+        misfire_grace_time=120,     # iter 325t — don't pile up missed runs
     )
     logger.info(
         f"[warm-prober] scheduled — every {WARM_INTERVAL_SECONDS}s, "

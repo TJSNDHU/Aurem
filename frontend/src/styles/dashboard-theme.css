@@ -138,6 +138,10 @@
 }
 .av2-pill-live { background: rgba(52, 199, 89, 0.12); color: var(--dash-green); border-color: rgba(52, 199, 89, 0.25); }
 .av2-pill-ent  { background: rgba(94, 84, 232, 0.12); color: var(--dash-purple); border-color: rgba(94, 84, 232, 0.25); }
+/* iter 325u — degraded (yellow) + offline (red) variants for the topbar
+   connection pill. Render before the user sees a full error UI. */
+.av2-pill-degraded { background: rgba(255, 184, 0, 0.14); color: #f5b400; border-color: rgba(255, 184, 0, 0.32); }
+.av2-pill-offline  { background: rgba(255, 69, 58, 0.14); color: #ff453a; border-color: rgba(255, 69, 58, 0.32); }
 
 /* Soft button */
 .av2-icon-btn {
@@ -167,6 +171,15 @@
   background: var(--dash-green);
   box-shadow: 0 0 12px rgba(52, 199, 89, 0.6);
   animation: av2-pulse 1.6s ease-in-out infinite;
+}
+/* iter 325u — degraded/offline dot tints (re-use same pulse animation). */
+.av2-pulse-dot.av2-pulse-dot--amber {
+  background: #f5b400;
+  box-shadow: 0 0 12px rgba(255, 184, 0, 0.65);
+}
+.av2-pulse-dot.av2-pulse-dot--red {
+  background: #ff453a;
+  box-shadow: 0 0 12px rgba(255, 69, 58, 0.7);
 }
 
 /* Bar chart bars rise on mount */
