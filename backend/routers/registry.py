@@ -1914,19 +1914,45 @@ def register_all_routers(app, db):
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
         from apscheduler.triggers.interval import IntervalTrigger
         from apscheduler.triggers.cron import CronTrigger
+        from apscheduler.executors.asyncio import AsyncIOExecutor
+        from apscheduler.executors.pool import ThreadPoolExecutor
         from utils.aurem_bug_engine import scheduled_bug_scan
         from utils.self_scan import run_self_scan
 
         aurem_scheduler = AsyncIOScheduler(
-            # [DEPLOY FIX iter 322ea] Global job defaults — prevent any
-            # job from running concurrently with itself, coalesce missed
-            # runs into a single fire, and tolerate a 30s misfire window
-            # so a slow tick doesn't cascade into a backlog warning that
-            # spams the logs and blocks future jobs.
+            # iter 325t — production thread starvation fix.
+            #
+            # Symptom on aurem.live: repeating warnings ──
+            #   "Execution of job X skipped: maximum number of running
+            #    instances reached (1)"
+            #   "Run time of job Y was missed by 0:01:01"
+            #
+            # Root cause: default APScheduler ThreadPoolExecutor has only
+            # 10 workers. We schedule ~50 background jobs (probes,
+            # watchdogs, scans, repairs). When a few I/O-bound jobs (HTTP
+            # probes, Mongo aggregates, LLM calls) block for 30-60s, the
+            # whole pool stalls and *every* other job misses its next
+            # tick. Compounds quickly.
+            #
+            # Fix: dedicated `AsyncIOExecutor` (default) for async
+            # coroutines + a 30-worker `ThreadPoolExecutor` for legacy
+            # sync jobs. Async jobs no longer compete with sync I/O for
+            # threads — coroutines yield naturally during awaits. With
+            # 30 threads + the async loop, a single slow probe no longer
+            # cascades into 5-job misses.
+            executors={
+                "default":     AsyncIOExecutor(),
+                "threadpool":  ThreadPoolExecutor(max_workers=30),
+            },
             job_defaults={
                 "max_instances": 1,
                 "coalesce": True,
-                "misfire_grace_time": 30,
+                # iter 325t — bumped 30 → 90s. The old window caused
+                # *every* slow tick to register as a "missed by 0:01:00"
+                # warning since most probes naturally take 5-20s. 90s
+                # tolerates real pod-warm-up + Atlas reconnects without
+                # spamming logs.
+                "misfire_grace_time": 90,
             }
         )
         # Expose at module level so /api/admin/system-audit can introspect job list + next-run times
