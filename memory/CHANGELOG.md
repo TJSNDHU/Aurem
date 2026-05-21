@@ -1,3 +1,51 @@
+## 2026-05-21 — iter 325h — Retell voice call bug fix (silent TypeError)
+
+**Confirmation query proved the bug**: `db.auto_call_log.count_documents({"result.error": {"$regex": "TypeError"}})` returned **141/141 rows** — every single historical closer_ora attempt failed with:
+```
+TypeError: _retell_create_phone_call() got an unexpected keyword argument 'lead_context'
+```
+The Retell account was healthy, the nightly probe was green, the API key worked — but zero calls went out because the function call shape was wrong and the exception was swallowed.
+
+### Root cause
+`services/agents/closer_ora.py:166` called:
+```python
+_retell_create_phone_call(to_number=phone, lead_context={...})
+```
+But the function in `routers/voice_agent_router.py:550` was `(agent_id, to_number)` — no `lead_context`, and `agent_id` was missing.
+
+### Fix (Option B per founder spec — widen, don't narrow)
+- **`routers/voice_agent_router.py`** — `_retell_create_phone_call` widened to `(agent_id, to_number, lead_context=None)`. Now returns a dict `{ok, call_id, error}` instead of a bare string. `lead_context` is stringified and passed into Retell's `retell_llm_dynamic_variables` so the AI prompt can address the prospect by name + reference their business. Backwards-compatible default (`None`) keeps the admin "Test Call" endpoint working.
+- **`routers/voice_agent_router.py`** — admin test-call handler updated to unpack the new dict shape and surface `result["call_id"]` on success / `result["error"]` on failure.
+- **`services/agents/closer_ora.py`** — now resolves `agent_id` from `lead.retell_agent_id` or `os.environ.get("RETELL_AGENT_ID")` and passes it explicitly as a kwarg. Added `import os`.
+
+### Live verification
+After fix, exercised the exact closer_ora call shape against a known-invalid 555 number:
+```
+Function returned: dict
+{'ok': False, 'call_id': '', 'error': 'Exception: Retell POST /v2/create-phone-call → 400: {"status":"error","message":"The number provided: +15555550100 is not a valid number...'}
+```
+Two proofs in one trace: (a) NO TypeError raised → bug fixed, (b) Retell actually answered with their own 400 → end-to-end reachability confirmed. With a real RETELL_AGENT_ID + real lead number, the call will ring.
+
+### Tests
+`backend/tests/test_iter325h_retell_fix.py` — **8/8 passing**:
+1. Signature now accepts `lead_context` (with default=None for back-compat)
+2. `lead_context` forwarded into `retell_llm_dynamic_variables`, all values stringified
+3. Missing `agent_id` → graceful error dict, no raise
+4. Missing `RETELL_FROM_NUMBER` → graceful error dict, no raise
+5. Regression-guard A: closer_ora source has `agent_id=agent_id` kwarg
+6. Regression-guard B: the buggy verbatim call pattern is GONE
+7. End-to-end: closer_ora call shape returns dict even on Retell error
+8. Admin test-call endpoint handles new dict shape
+
+### Files
+- `backend/routers/voice_agent_router.py` (+30 LOC widen + handler unpack)
+- `backend/services/agents/closer_ora.py` (+8 LOC: agent_id resolution + import os)
+- `backend/tests/test_iter325h_retell_fix.py` (new, 8 cases)
+
+### Follow-up requirement for prod activation
+Set `RETELL_AGENT_ID` in `/app/backend/.env` (or in per-tenant `voice_agent_configs.retell_agent_id`) so closer_ora has a real agent to dispatch against. Without it the function returns `{"ok": False, "error": "agent_id missing"}` and the closer attempt is cleanly logged as a config gap, not a crash.
+
+
 ## 2026-05-21 — iter 325f + 325g — Complete autonomous fix stack (Phases 1-6) + DeepSeek wiring
 
 ### Phase 1 — Wire 3 isolated scans to incident_bus

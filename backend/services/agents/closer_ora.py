@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
@@ -158,14 +159,24 @@ async def arm(payload: Dict[str, Any]) -> Dict[str, Any]:
                              lead_id=lead_id, metadata={"trigger": trigger})
         return {"ok": True, "queued": True, "scheduled_for": next_at.isoformat()}
 
-    # Fire the Retell call
+    # Fire the Retell call.
+    # iter 325h — fixed: was calling _retell_create_phone_call with
+    # `lead_context=` (kwarg that didn't exist) and no `agent_id` →
+    # every closer attempt was failing with TypeError, silently
+    # swallowed by the `except Exception` below. Now passes agent_id
+    # explicitly + uses lead_context for retell_llm_dynamic_variables.
     plan = ((verdict.get("votes") or {}).get("pricing") or {}).get(
         "reason", "starter")
     call_result: Dict[str, Any] = {}
+    agent_id = (
+        lead.get("retell_agent_id")
+        or os.environ.get("RETELL_AGENT_ID", "").strip()
+    )
     try:
         from routers.voice_agent_router import _retell_create_phone_call
         call_result = await asyncio.wait_for(
             _retell_create_phone_call(
+                agent_id=agent_id,
                 to_number=phone,
                 lead_context={
                     "business_name": lead.get("business_name"),

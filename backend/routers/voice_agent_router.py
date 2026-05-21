@@ -216,8 +216,15 @@ async def admin_test_call(body: TestCallRequest, admin: dict = Depends(_verify_s
     if not cfg:
         raise HTTPException(404, "config not found for this customer")
     try:
-        call_id = await _retell_create_phone_call(cfg.get("retell_agent_id"), body.phone_number)
-        return {"ok": True, "call_id": call_id}
+        # iter 325h — _retell_create_phone_call now returns a dict
+        # `{ok, call_id, error}`. Old call shape (string call_id) is
+        # gone; we surface the error message back to the admin tester.
+        result = await _retell_create_phone_call(cfg.get("retell_agent_id"), body.phone_number)
+        if not result.get("ok"):
+            raise HTTPException(500, f"test call failed: {result.get('error') or 'unknown'}")
+        return {"ok": True, "call_id": result.get("call_id")}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("[voice-agent] test call failed")
         raise HTTPException(500, f"test call failed: {e}")
@@ -547,14 +554,53 @@ async def _upsert_retell_agent(tenant_bin: str, cfg: Dict) -> Optional[str]:
     return agent_resp.get("agent_id")
 
 
-async def _retell_create_phone_call(agent_id: str, to_number: str) -> str:
-    """Trigger a test outbound call."""
+async def _retell_create_phone_call(
+    agent_id: str,
+    to_number: str,
+    lead_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Trigger an outbound Retell call.
+
+    Iter 325h — widened to accept ``lead_context`` so the closer agent
+    can pass the lead's name + business name + plan + trigger context.
+    Those are forwarded as ``retell_llm_dynamic_variables`` per Retell's
+    create-phone-call docs so the AI prompt can address the prospect by
+    name and reference their business.
+
+    Backwards-compatible:
+      - Old call sites that pass ``(agent_id, to_number)`` keep working.
+      - Old call sites that only used the returned ``call_id`` string
+        can use ``result["call_id"]`` from the dict.
+
+    Returns
+    -------
+    dict
+        ``{"ok": bool, "call_id": str, "error": Optional[str]}``.
+    """
     from_number = os.environ.get("RETELL_FROM_NUMBER", "").strip()
     if not from_number:
-        raise Exception("RETELL_FROM_NUMBER not set — purchase or import a phone number first")
-    resp = await _retell_request("POST", "/v2/create-phone-call", {
+        return {"ok": False, "call_id": "",
+                "error": "RETELL_FROM_NUMBER not set — purchase or import a phone number first"}
+    if not agent_id:
+        return {"ok": False, "call_id": "",
+                "error": "agent_id missing — set RETELL_AGENT_ID or tenant retell_agent_id"}
+
+    payload: Dict[str, Any] = {
         "from_number": from_number,
         "to_number": to_number,
         "override_agent_id": agent_id,
-    })
-    return resp.get("call_id", "")
+    }
+    if lead_context:
+        # Stringify every value — Retell only accepts string variables.
+        dyn = {k: ("" if v is None else str(v))
+               for k, v in lead_context.items()}
+        payload["retell_llm_dynamic_variables"] = dyn
+
+    try:
+        resp = await _retell_request("POST", "/v2/create-phone-call", payload)
+    except Exception as e:
+        return {"ok": False, "call_id": "", "error": f"{type(e).__name__}: {e}"}
+
+    call_id = resp.get("call_id", "") if isinstance(resp, dict) else ""
+    return {"ok": bool(call_id), "call_id": call_id,
+            "error": None if call_id else "no_call_id_in_response"}
