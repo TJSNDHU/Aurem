@@ -14,9 +14,9 @@ import {
 
 const TABS = [
   { k: 'home',       label: 'Home',     icon: HomeIcon },
-  { k: 'automation', label: 'Campaign', icon: CampaignIcon },
+  { k: 'crm',        label: 'CRM',      icon: CampaignIcon },
   { k: 'ora',        label: 'ORA',      icon: ORAIcon },
-  { k: 'inbox',      label: 'Inbox',    icon: InboxIcon },
+  { k: 'campaign',   label: 'Campaign', icon: InboxIcon },
   { k: 'settings',   label: 'Settings', icon: SettingsIcon },
 ];
 

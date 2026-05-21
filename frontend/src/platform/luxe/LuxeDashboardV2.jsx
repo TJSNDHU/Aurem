@@ -8,8 +8,8 @@
  */
 import React, { useState, useMemo } from 'react';
 import {
-  Home as HomeIcon, Activity, Shield, BarChart3,
-  Zap, Users, Send, Phone,
+  Home as HomeIcon, Activity,
+  Zap, Users,
   Sparkles, Bot, Settings as SettingsIcon,
   Bell, Sun, Moon, LogOut, Search,
 } from 'lucide-react';
@@ -22,9 +22,12 @@ import { useLuxeDashboardData } from './useLuxeDashboardData';
 import { useViewport } from './useViewport';
 import { useTheme } from './useTheme';
 import {
-  ProfilePage, LiveHealthPage, SecurityPage,
-  AutomationPage, CRMPage, ORAPage, SettingsPage, IntegrationsPage,
+  ProfilePage,
+  IntegrationsPage,
 } from './LuxePages';
+import {
+  LuxeLiveHealth, LuxeCRM, LuxeCampaign, LuxeORA, LuxeProfile, LuxeSettings,
+} from './LuxeV2Pages';
 
 import { PulseCard }            from './components/PulseCard';
 import { MetricRow }            from './components/MetricRow';
@@ -37,7 +40,8 @@ import { InboxCard }            from './components/InboxCard';
 import { BottomTabBar }         from './components/BottomTabBar';
 
 // ────────────────────────────────────────────────────────────────
-// Nav sections (desktop sidebar)
+// Nav sections (desktop sidebar) — iter 325o: merged to 6 items
+// No duplicates, every item maps to a real working page.
 // ────────────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
   {
@@ -45,38 +49,36 @@ const NAV_SECTIONS = [
     items: [
       { k: 'home',         label: 'Home',         icon: HomeIcon },
       { k: 'live-health',  label: 'Live Health',  icon: Activity },
-      { k: 'security',     label: 'Security',     icon: Shield },
-      { k: 'analytics',    label: 'Analytics',    icon: BarChart3 },
     ],
   },
   {
     title: 'Revenue',
     items: [
-      { k: 'automation',   label: 'Campaign',     icon: Zap },
       { k: 'crm',          label: 'CRM',          icon: Users },
-      { k: 'outreach',     label: 'Outreach',     icon: Send },
-      { k: 'voice',        label: 'Voice',        icon: Phone },
+      { k: 'campaign',     label: 'Campaign',     icon: Zap },
     ],
   },
   {
     title: 'System',
     items: [
       { k: 'ora',          label: 'ORA',          icon: Sparkles },
-      { k: 'integrations', label: 'Automation',   icon: Bot },
-      { k: 'settings',     label: 'Settings',     icon: SettingsIcon },
+      { k: 'profile',      label: 'Profile',      icon: SettingsIcon },
+      { k: 'settings',     label: 'Settings',     icon: Bot },
     ],
   },
 ];
 
-// Map nav key → page renderer. Keys without a custom page just show Home.
+// Map nav key → page renderer.
 const PAGE_RENDERERS = {
-  'live-health': () => <LiveHealthPage />,
-  'security':    () => <SecurityPage />,
-  'automation':  () => <AutomationPage />,
-  'crm':         () => <CRMPage />,
-  'ora':         () => <ORAPage />,
-  'settings':    () => <SettingsPage />,
-  'profile':     () => <ProfilePage />,
+  'live-health': () => <LuxeLiveHealth />,
+  'crm':         () => <LuxeCRM />,
+  'campaign':    () => <LuxeCampaign />,
+  'ora':         () => <LuxeORA />,
+  'profile':     () => <LuxeProfile />,
+  'settings':    () => <LuxeSettings />,
+  // Legacy fallbacks (in case BottomTabBar still references these)
+  'automation':  () => <LuxeCampaign />,
+  'inbox':       () => <LuxeCRM />,
   'integrations':() => <IntegrationsPage />,
 };
 
@@ -292,10 +294,10 @@ export const HomeView = ({ data }) => {
 // Page title resolver
 // ────────────────────────────────────────────────────────────────
 const TITLES = {
-  home: 'Home', 'live-health': 'Live Health', security: 'Security',
-  analytics: 'Analytics', automation: 'Campaign', crm: 'CRM',
-  outreach: 'Outreach', voice: 'Voice', ora: 'ORA',
-  integrations: 'Automation', settings: 'Settings', profile: 'Profile',
+  home: 'Home', 'live-health': 'Live Health',
+  crm: 'CRM', campaign: 'Campaign',
+  ora: 'ORA', profile: 'Profile', settings: 'Settings',
+  inbox: 'Inbox', automation: 'Campaign', integrations: 'Automation',
 };
 
 // ────────────────────────────────────────────────────────────────

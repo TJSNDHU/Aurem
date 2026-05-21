@@ -1491,6 +1491,7 @@ def register_all_routers(app, db):
         ("routers.live_scanner", "Live Scanner", None),
         ("routers.ora_repair_engine", "ORA Repair Engine", None),
         ("routers.ai_repair_router", "AI Repair", None),
+        ("routers.v2_customer_actions_router", "V2 Customer Actions", None),
         ("routers.customer_pipeline_router", "Customer Pipeline", None),
         ("routers.seo_funnel_router", "SEO Funnel (public revenue)", None),
         ("routers.system_health_full_router", "System Health Composite", None),

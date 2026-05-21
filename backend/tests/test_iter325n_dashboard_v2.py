@@ -67,8 +67,8 @@ def test_desktop_render_contract_has_required_testids():
     assert not missing, f"Missing literal data-testid: {missing}"
     # Template-literal testid `nav-${k}` — verify pattern + every nav key.
     assert "data-testid={`nav-${k}`}" in src, "nav-${k} testid pattern missing"
-    for key in ("home", "live-health", "security", "crm", "ora",
-                "automation", "settings"):
+    for key in ("home", "live-health", "crm", "ora", "campaign",
+                "profile", "settings"):
         assert f"k: '{key}'" in src, f"Nav key missing in NAV_SECTIONS: {key}"
 
 
@@ -109,9 +109,9 @@ def test_mobile_layout_css_contract():
 
 def test_bottom_tab_bar_has_5_tabs():
     bar = _read(f"{COMPONENTS}/BottomTabBar.jsx")
-    # Template-literal testid + 5 tab keys
+    # Template-literal testid + 5 tab keys (iter 325o merged set)
     assert "data-testid={`bottom-tab-${k}`}" in bar
-    for k in ("home", "automation", "ora", "inbox", "settings"):
+    for k in ("home", "crm", "ora", "campaign", "settings"):
         assert f"k: '{k}'" in bar, f"Missing bottom tab key: {k}"
 
 
@@ -229,11 +229,11 @@ def test_my_route_points_to_v2_dashboard():
 
 
 def test_internal_pages_still_routed():
-    """CRM / Settings / ORA / etc. must still mount their LuxePages."""
+    """V2 merged pages must all be wired into the shell."""
     main = _read(MAIN)
-    for page in ("LiveHealthPage", "SecurityPage", "AutomationPage",
-                 "CRMPage", "ORAPage", "SettingsPage"):
-        assert page in main, f"V2 shell must keep mounting {page}"
+    for page in ("LuxeLiveHealth", "LuxeCRM", "LuxeCampaign",
+                 "LuxeORA", "LuxeProfile", "LuxeSettings"):
+        assert page in main, f"V2 shell must mount {page}"
 
 
 # ─────────────────────────────────────────────────────────────────
