@@ -44,6 +44,13 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • **FIX 2**: `services/auto_blast_engine.py::_reset_zero_streak_on_success` — auto-resets `ora_campaign_health.zero_sent_streak = 0` and pulls `zero_sent_streak` out of `tripped` whenever a cycle delivers ≥1 send. Idempotent no-op when sent=0. Live verified: streak 205 → 0 after manual run.
   • **FIX 3**: `services/ensure_audit_log_ttl.py` — drops broken `ts_ttl_35d` (wrong field) and installs `ttl_timestamp_7d` (604800s) on the correct `timestamp` field of `api_audit_log`. Wired into server startup. Live TTL monitor already purged ~590k stale rows (1.4M → 803k; oldest now exactly 7 days old).
   • 10 regression tests in `tests/test_iter326h_3_critical_db_fixes.py` all green.
+- iter 326i (2026-02): **BUILD MODE for ORA-CTO — 3 minimal surfaces** —
+  • **Tool 1**: `services/ora_tools.py::run_pytest` (Tier-1 auto). Runs pytest against a path under `/app/backend/tests/`, returns structured envelope `{ok, passed, failed, duration_s, summary, tail}`. Path-guarded; PYTHONPATH wired so `services.*` imports resolve. Live verified.
+  • **Tool 2**: `services/ora_tools.py::verify_endpoint` (Tier-1 auto). Hits any `/api/` route via curl, asserts `expected_status` + optional `expected_substring`. Returns `{ok, http_status, matched_status, matched_substring, latency_ms, body_snippet}`. Live verified positive (HTTP 200 in 13 ms) + negative (HTTP 404, ok=false).
+  • **Service**: `services/build_verifier.py` (new). `record_proof(build_id, files, tests, endpoints)` persists to `build_proofs`; `reverify_one(build_id)` re-hits endpoints + pytest --collect-only and writes a `build_drift_events` row when verdict downgrades green→red. `reverify_tick()` fan-outs across all proofs <24h old. NOT wired into any APScheduler loop — operator routes can call `reverify_tick()` from the existing sovereign_watchdog or a `/api/admin/...` endpoint.
+  • **System prompt**: `SYSTEM_PROMPT` rule 16 — explicit BUILD MODE checklist (Plan → Wire → Test → Verify → Reply) with mandatory PROOF TABLE markdown format. Banned: ASCII boxes without 4 populated proof rows.
+  • Existing 8 repair/watchdog modules NOT TOUCHED.
+  • 16 regression tests in `tests/test_iter326i_build_mode.py` all green.
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

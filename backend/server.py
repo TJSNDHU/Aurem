@@ -1007,6 +1007,15 @@ async def create_indexes():
         except Exception as e:
             logging.warning(f"[startup] audit-log TTL setup failed (non-fatal): {e}")
 
+        # iter 326i — wire build_verifier DB so record_proof/reverify_one
+        # can persist BUILD MODE proof bundles + drift events.
+        try:
+            from services import build_verifier
+            build_verifier.set_db(db)
+            logging.info("[startup] build_verifier db wired")
+        except Exception as e:
+            logging.warning(f"[startup] build_verifier wiring failed (non-fatal): {e}")
+
         # Seed internal @aurem.live addresses into do_not_contact so any
         # legacy code paths that pre-check DNC also respect the block.
         try:

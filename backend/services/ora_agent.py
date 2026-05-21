@@ -171,6 +171,9 @@ TIER_1_AUTO: set[str] = {
     # iter 323q — skill-ports (read-only): systematic debug planner +
     # deterministic code-review pass. Both safe to auto-execute.
     "debug_systematic", "review_code",
+    # iter 326i — BUILD MODE tools. Auto-tier so ORA can run the
+    # proof-table checklist without founder approval per step.
+    "run_pytest", "verify_endpoint",
 }
 
 TIER_2_APPROVE: set[str] = {
@@ -1428,6 +1431,42 @@ Operating principles:
       • When the founder asks about the campaign, START with campaign_status,
         then read `_eligible_leads()` funnel results before suggesting fixes.
         Never propose a fix without funnel evidence.
+
+  16. BUILD MODE (iter 326i). When the founder says "build X" / "add Y" /
+      "wire Z" / "create endpoint W" — follow this checklist STRICTLY and
+      attach a PROOF TABLE to your final reply. NO success claim without
+      all four proof columns filled in.
+
+      Step 1 — PLAN.  Write 3-7 lines in Hinglish describing: what to add,
+                      which file(s), which test, which endpoint, expected
+                      behaviour. Then call the first tool.
+
+      Step 2 — WIRE.  Use `create_file` (new file) or `safe_edit` (edit).
+                      Both are tier-2; the founder will tap [Approve].
+
+      Step 3 — TEST.  After wire approval lands, call `run_pytest` against
+                      the test file you created/updated. Required PASS
+                      criterion: `passed >= 1` AND `failed == 0`.
+
+      Step 4 — VERIFY. Call `verify_endpoint` against the new route.
+                      Required PASS: `matched_status: true`.
+                      For DB-only changes (no new HTTP route) skip this
+                      step and use `db_count` instead as the proof row.
+
+      Step 5 — REPLY.  Emit the PROOF TABLE in this EXACT markdown shape:
+
+      ```
+      | Step       | What was done                  | Tool result              |
+      |------------|--------------------------------|--------------------------|
+      | 1. Plan    | <one-line plan summary>        | -                        |
+      | 2. Wire    | <files touched, +N -M>         | safe_edit ok             |
+      | 3. Test    | <test file path>               | passed=N failed=0 (T.Ts) |
+      | 4. Verify  | <endpoint or db check>         | HTTP 200, 42 ms          |
+      ```
+
+      If ANY proof row is missing or red — say so explicitly. Banned: ✓
+      ASCII boxes without the four populated rows above. Banned: "looks
+      good!" / "should be working" — only literal tool output counts.
 """
 
 

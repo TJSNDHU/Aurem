@@ -512,6 +512,184 @@ async def health_check() -> dict:
     return await curl_internal("/api/platform/health")
 
 
+# ─── iter 326i — Build Mode tools (run_pytest + verify_endpoint) ──────
+# These are Tier-1 tools (auto-execute, no founder approval) so ORA can
+# run the BUILD MODE checklist autonomously and attach a PROOF TABLE to
+# its reply. Both wrap existing primitives (pytest CLI + curl) with a
+# structured-output schema the proof aggregator expects.
+
+_PYTEST_BIN_CANDIDATES = (
+    "/root/.venv/bin/pytest",
+    "/opt/plugins-venv/bin/pytest",
+)
+
+
+async def run_pytest(path: str, timeout_s: int = 90) -> dict:
+    """Run pytest on a path under /app/backend/tests/.
+
+    Returns a structured envelope:
+      {
+        "ok":          true on exit_code in (0,5),  # 5 = no tests collected
+        "exit_code":   int,
+        "passed":      int,    # parsed from summary line
+        "failed":      int,
+        "errors":      int,
+        "warnings":    int,
+        "duration_s":  float,
+        "summary":     "5 passed in 0.45s",
+        "tail":        last 30 stdout lines (for debugging)
+      }
+
+    Hard-restricts the path to /app/backend/tests/ so ORA can't trick the
+    tool into running production code (e.g. /app/backend/server.py) as a
+    test suite. Single-file or directory; supports the same `path/test_x.py::test_y` syntax.
+    """
+    import shutil
+    if not isinstance(path, str) or not path.strip():
+        return {"ok": False, "error": "path required"}
+    abs_path = path.split("::")[0]
+    if not abs_path.startswith("/app/backend/tests"):
+        return {"ok": False, "error": "path must be under /app/backend/tests/"}
+    if not Path(abs_path).exists():
+        return {"ok": False, "error": f"not found: {abs_path}"}
+    try:
+        timeout_s = max(5, min(int(timeout_s), 180))
+    except (TypeError, ValueError):
+        timeout_s = 90
+
+    pytest_bin = (
+        shutil.which("pytest")
+        or next((p for p in _PYTEST_BIN_CANDIDATES if Path(p).is_file()), None)
+    )
+    if not pytest_bin:
+        return {"ok": False, "error": "pytest binary not found"}
+
+    started = _t_iso_now_ts()
+    try:
+        # PYTHONPATH ensures pytest subprocess can resolve `services.*`
+        # imports even when invoked from outside /app/backend.
+        env = os.environ.copy()
+        env["PYTHONPATH"] = "/app/backend" + (
+            os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+        )
+        r = await asyncio.to_thread(
+            subprocess.run,
+            [pytest_bin, "-q", "--tb=short", "--no-header", path],
+            cwd="/app/backend",
+            capture_output=True, text=True, timeout=timeout_s,
+            env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"pytest timed out after {timeout_s}s"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+    out = (r.stdout or "") + (r.stderr or "")
+    duration = round(_t_iso_now_ts() - started, 3)
+
+    # Parse the pytest summary line: "5 passed, 1 failed in 0.45s"
+    summary = ""
+    passed = failed = errors = warnings = 0
+    for line in (r.stdout or "").splitlines():
+        s = line.strip()
+        if (" passed" in s or " failed" in s or " error" in s) and " in " in s:
+            summary = s.lstrip("= ").rstrip("= ").strip()
+        m = re.search(r"(\d+)\s+passed", s)
+        if m:
+            passed = max(passed, int(m.group(1)))
+        m = re.search(r"(\d+)\s+failed", s)
+        if m:
+            failed = max(failed, int(m.group(1)))
+        m = re.search(r"(\d+)\s+error", s)
+        if m:
+            errors = max(errors, int(m.group(1)))
+        m = re.search(r"(\d+)\s+warning", s)
+        if m:
+            warnings = max(warnings, int(m.group(1)))
+
+    return {
+        "ok":          r.returncode in (0, 5),  # 5 = no tests collected
+        "exit_code":   r.returncode,
+        "passed":      passed,
+        "failed":      failed,
+        "errors":      errors,
+        "warnings":    warnings,
+        "duration_s":  duration,
+        "summary":     summary or f"exit={r.returncode}",
+        "tail":        "\n".join(out.strip().splitlines()[-30:]),
+    }
+
+
+def _t_iso_now_ts() -> float:
+    """Tiny shim — `time.time()` but with no extra import in hot path."""
+    import time as _t
+    return _t.time()
+
+
+async def verify_endpoint(
+    endpoint: str,
+    expected_status: int = 200,
+    expected_substring: str = "",
+) -> dict:
+    """Hit an internal /api/ endpoint and assert it's wired correctly.
+
+    Wraps `curl_internal` with assertion semantics so ORA's BUILD MODE
+    proof table gets a clean PASS/FAIL row.
+
+    Returns:
+      {
+        "ok":             bool,   # overall verdict
+        "endpoint":       str,
+        "http_status":    int,
+        "expected_status": int,
+        "matched_status": bool,
+        "expected_substring": str | None,
+        "matched_substring": bool,    # always True when no substring specified
+        "latency_ms":     int,
+        "body_snippet":   str,   # first 400 chars
+      }
+    """
+    if not isinstance(endpoint, str) or not endpoint.startswith("/api/"):
+        return {"ok": False, "error": "endpoint must start with /api/"}
+    try:
+        expected_status = int(expected_status)
+    except (TypeError, ValueError):
+        expected_status = 200
+
+    started = _t_iso_now_ts()
+    res = await curl_internal(endpoint, method="GET")
+    elapsed_ms = int((_t_iso_now_ts() - started) * 1000)
+
+    if not res.get("ok"):
+        return {
+            "ok": False, "endpoint": endpoint,
+            "http_status": 0, "expected_status": expected_status,
+            "matched_status": False, "matched_substring": False,
+            "latency_ms": elapsed_ms,
+            "error": res.get("error"),
+        }
+
+    http_status   = int(res.get("http_status") or 0)
+    body          = res.get("body") or ""
+    matched_stat  = (http_status == expected_status)
+    matched_sub   = (
+        True if not expected_substring
+        else (expected_substring in body)
+    )
+
+    return {
+        "ok":                  matched_stat and matched_sub,
+        "endpoint":            endpoint,
+        "http_status":         http_status,
+        "expected_status":     expected_status,
+        "matched_status":      matched_stat,
+        "expected_substring":  expected_substring or None,
+        "matched_substring":   matched_sub,
+        "latency_ms":          elapsed_ms,
+        "body_snippet":        body[:400],
+    }
+
+
 async def lint_python(path: str) -> dict:
     """Run ruff on a Python file. Read-only — no auto-fix."""
     if not _is_path_allowed(path):
@@ -2611,6 +2789,34 @@ TOOL_REGISTRY: dict[str, dict] = {
         "fn": health_check,
         "args_spec": {},
         "description": "Hit /api/platform/health — proves the backend is up.",
+    },
+    "run_pytest": {
+        "fn": run_pytest,
+        "args_spec": {
+            "path":      "str under /app/backend/tests/ (file or dir or test_x.py::test_y)",
+            "timeout_s": "int 5-180 (default 90)",
+        },
+        "description": (
+            "iter 326i — BUILD MODE step 3. Run pytest on a path under "
+            "/app/backend/tests/ and return a structured PASS/FAIL "
+            "envelope (passed, failed, errors, duration_s, summary, tail). "
+            "Use this RIGHT AFTER safe_edit / create_file to prove the new "
+            "code path is exercised by a test."
+        ),
+    },
+    "verify_endpoint": {
+        "fn": verify_endpoint,
+        "args_spec": {
+            "endpoint":           "str starting with /api/",
+            "expected_status":    "int (default 200)",
+            "expected_substring": "str (optional — body must contain this)",
+        },
+        "description": (
+            "iter 326i — BUILD MODE step 4. Hit an internal /api/ endpoint "
+            "and assert status + optional body substring. Returns a clean "
+            "PASS/FAIL row (matched_status, matched_substring, latency_ms) "
+            "that drops straight into the proof table. Use AFTER restart_service."
+        ),
     },
     "lint_python": {
         "fn": lint_python,
