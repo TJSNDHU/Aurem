@@ -119,20 +119,146 @@ async def _probe_twilio() -> Dict[str, Any]:
         return {"name": "twilio", "ok": False, "error": str(e)[:200]}
 
 
-async def _probe_retell() -> Dict[str, Any]:
-    key = os.environ.get("RETELL_API_KEY")
+async def _probe_retell(db=None) -> Dict[str, Any]:
+    """Deep Retell health probe — iter 325i.
+
+    Catches regressions that the old surface-only probe missed:
+      1. API reachable + key valid (list-agents 200)
+      2. Configured ``RETELL_AGENT_ID`` exists in the account
+      3. Configured ``RETELL_FROM_NUMBER`` exists in the account
+      4. ``_retell_create_phone_call`` accepts the kwargs the closer
+         actually uses (``agent_id``, ``to_number``, ``lead_context``) —
+         this catches the iter-325h-style signature drift that silently
+         failed every outbound call for weeks.
+      5. ``auto_call_log`` failure rate over the last 24h.
+
+    Flags ``ok=False`` on any structural/wiring break so the autoheal
+    layer can route a fix proposal to ORA CTO.
+    """
+    import inspect
+
+    result: Dict[str, Any] = {"name": "retell", "checks": {}}
+    checks = result["checks"]
+
+    # ── 1. Key + API reachability ────────────────────────────────────
+    key = (os.environ.get("RETELL_API_KEY") or "").strip()
     if not key:
-        return {"name": "retell", "ok": False, "error": "RETELL_API_KEY missing"}
+        return {"name": "retell", "ok": False, "error": "RETELL_API_KEY missing",
+                "checks": {"api_key": False}}
+    checks["api_key"] = True
+
+    agents: List[Dict[str, Any]] = []
+    phone_numbers: List[Dict[str, Any]] = []
     try:
         import httpx
         async with httpx.AsyncClient(timeout=8.0) as c:
-            r = await c.get(
-                "https://api.retellai.com/v2/list-phone-numbers",
-                headers={"Authorization": f"Bearer {key}"},
-            )
-        return {"name": "retell", "ok": r.status_code == 200, "status_code": r.status_code}
+            headers = {"Authorization": f"Bearer {key}"}
+            r1 = await c.get("https://api.retellai.com/list-agents", headers=headers)
+            checks["api_status"] = r1.status_code
+            checks["api_reachable"] = r1.status_code == 200
+            if r1.status_code == 200:
+                try:
+                    agents = r1.json() if isinstance(r1.json(), list) else []
+                except Exception:
+                    agents = []
+            r2 = await c.get("https://api.retellai.com/list-phone-numbers", headers=headers)
+            if r2.status_code == 200:
+                try:
+                    phone_numbers = r2.json() if isinstance(r2.json(), list) else []
+                except Exception:
+                    phone_numbers = []
     except Exception as e:
-        return {"name": "retell", "ok": False, "error": str(e)[:200]}
+        return {"name": "retell", "ok": False, "error": f"api unreachable: {str(e)[:160]}",
+                "checks": checks}
+
+    if not checks.get("api_reachable"):
+        return {"name": "retell", "ok": False,
+                "error": f"list-agents returned {checks.get('api_status')}",
+                "checks": checks}
+
+    # ── 2. Agent ID configured + exists in account ───────────────────
+    configured_agent = (os.environ.get("RETELL_AGENT_ID") or "").strip()
+    checks["agent_id_set"] = bool(configured_agent)
+    agent_ids = {a.get("agent_id") for a in agents if isinstance(a, dict)}
+    checks["agent_id_exists"] = configured_agent in agent_ids if configured_agent else False
+    checks["agents_in_account"] = len(agents)
+
+    # ── 3. From number configured + exists in account ────────────────
+    configured_from = (os.environ.get("RETELL_FROM_NUMBER") or "").strip()
+    checks["from_number_set"] = bool(configured_from)
+    phone_set = {p.get("phone_number") for p in phone_numbers if isinstance(p, dict)}
+    checks["from_number_exists"] = configured_from in phone_set if configured_from else False
+    checks["phone_numbers_in_account"] = len(phone_numbers)
+
+    # ── 4. Signature regression check ────────────────────────────────
+    # Confirms the closer's call site (services/agents/closer_ora.py)
+    # can still invoke `_retell_create_phone_call` with the kwargs it
+    # uses today. Catches the iter-325h bug class automatically.
+    expected_kwargs = {"agent_id", "to_number", "lead_context"}
+    try:
+        from routers.voice_agent_router import _retell_create_phone_call as _fn
+        sig = inspect.signature(_fn)
+        actual = set(sig.parameters.keys())
+        missing = expected_kwargs - actual
+        checks["signature_ok"] = not missing
+        if missing:
+            checks["signature_missing_kwargs"] = sorted(missing)
+    except Exception as e:
+        checks["signature_ok"] = False
+        checks["signature_error"] = str(e)[:160]
+
+    # ── 5. Recent outbound failure rate (24h) ────────────────────────
+    if db is not None:
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            total_24h = await db.auto_call_log.count_documents({"called_at": {"$gte": cutoff}})
+            failed_24h = await db.auto_call_log.count_documents({
+                "called_at": {"$gte": cutoff},
+                "$or": [
+                    {"call_id": None},
+                    {"call_id": ""},
+                    {"result.ok": False},
+                ],
+            })
+            checks["calls_24h"] = total_24h
+            checks["failed_24h"] = failed_24h
+            failure_rate = (failed_24h / total_24h) if total_24h else 0.0
+            checks["failure_rate_24h"] = round(failure_rate, 3)
+            # Healthy if no traffic, OR < 50% failures
+            checks["failure_rate_ok"] = total_24h == 0 or failure_rate < 0.5
+        except Exception as e:
+            checks["failure_rate_error"] = str(e)[:160]
+            checks["failure_rate_ok"] = True  # don't penalize on db read error
+
+    # ── Roll-up ──────────────────────────────────────────────────────
+    critical = [
+        checks.get("api_reachable"),
+        checks.get("agent_id_set"),
+        checks.get("agent_id_exists"),
+        checks.get("from_number_set"),
+        checks.get("from_number_exists"),
+        checks.get("signature_ok"),
+        checks.get("failure_rate_ok", True),
+    ]
+    ok = all(bool(c) for c in critical)
+
+    warning = None
+    if not checks.get("agent_id_exists"):
+        warning = f"configured RETELL_AGENT_ID ({configured_agent[:18]}…) not found in account"
+    elif not checks.get("from_number_exists"):
+        warning = f"configured RETELL_FROM_NUMBER ({configured_from}) not found in account"
+    elif not checks.get("signature_ok"):
+        missing = checks.get("signature_missing_kwargs") or []
+        warning = (f"_retell_create_phone_call signature drift — closer kwargs "
+                   f"{missing} not accepted (regression of iter-325h)")
+    elif not checks.get("failure_rate_ok", True):
+        warning = (f"high call failure rate: "
+                   f"{checks.get('failed_24h')}/{checks.get('calls_24h')} failed in 24h")
+
+    result["ok"] = ok
+    if warning:
+        result["warning"] = warning
+    return result
 
 
 def _probe_shopify() -> Dict[str, Any]:
@@ -405,8 +531,8 @@ async def run_selfcheck(db, slot: str = "nightly") -> Dict[str, Any]:
     pillars.append(await _probe_resend())
     # 5. Twilio
     pillars.append(await _probe_twilio())
-    # 6. Retell
-    pillars.append(await _probe_retell())
+    # 6. Retell (deep probe — catches signature drift + failure rate)
+    pillars.append(await _probe_retell(db))
     # 7. Shopify
     pillars.append(_probe_shopify())
     # 8. Scout queue
