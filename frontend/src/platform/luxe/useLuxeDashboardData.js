@@ -31,6 +31,13 @@ const DEFAULT = {
   oraRepair: { successPct: 0, healed: 0, attempts: 0, deltaPct: 0, series: [] },
   securityAlerts: { count: 0, items: [] },
   vanguard: { score: 0, platform: 0, site: 0, backlinks: 0, brokenLinks: 0, insecureLinks: 0, totals: null },
+  // iter 325n — V2 surfaces
+  resultsSummary: {},
+  pipelineStages: [],
+  pipelineTotal: 0,
+  inboxThreads: [],
+  inboxUnread: 0,
+  lastUpdated: null,
 };
 
 export const useLuxeDashboardData = (token) => {
@@ -43,7 +50,8 @@ export const useLuxeDashboardData = (token) => {
     }
     const headers = { Authorization: `Bearer ${token}` };
 
-    const [leadStats, agentsStatus, repairLeaderboard, repairHistory, scanEvents, subs, catalog, homeAgg] =
+    const [leadStats, agentsStatus, repairLeaderboard, repairHistory, scanEvents, subs, catalog, homeAgg,
+           resultsSummary, pipeline, inboxThreads] =
       await Promise.all([
         safeGet(`${API}/api/leads/stats`, headers),
         safeGet(`${API}/api/aurem/agents/status`, headers),
@@ -54,6 +62,11 @@ export const useLuxeDashboardData = (token) => {
         safeGet(`${API}/api/catalog/services`, headers),
         // iter 322bj — aggregated home payload (pulse bars + richer growth + sparkline + alerts)
         safeGet(`${API}/api/me/home/dashboard`, headers),
+        // iter 325n — V2 dashboard surfaces these at top level so the new
+        // MetricRow / PipelineCard / InboxCard render without extra hooks.
+        safeGet(`${API}/api/customer/results-summary`, headers),
+        safeGet(`${API}/api/customer/results-pipeline`, headers),
+        safeGet(`${API}/api/customer/inbox/threads?limit=20`, headers),
       ]);
 
     // Vanguard runs a live backlink scan that can take 10–30s on first hit.
@@ -213,6 +226,14 @@ export const useLuxeDashboardData = (token) => {
           msg: a.message || 'event',
         })).concat(alerts).slice(0, 6),
       },
+      // iter 325n — V2 top-level surfaces
+      resultsSummary: resultsSummary || {},
+      pipelineStages: pipeline?.stages || [],
+      pipelineTotal:  pipeline?.total  ?? 0,
+      inboxThreads:   inboxThreads?.threads || [],
+      inboxUnread:    (inboxThreads?.threads || [])
+                        .reduce((s, t) => s + (Number(t.unread) || 0), 0),
+      lastUpdated:    new Date().toISOString(),
     });
   }, [token]);
 

@@ -25,7 +25,7 @@ import AdminMissionControl from './platform/AdminMissionControl';
 import CustomSubscriptionBuilder from './platform/CustomSubscriptionBuilder';
 import AdminPlanManager from './platform/AdminPlanManager';
 import AdminLogin from './platform/AdminLogin';
-import LuxeDashboardPreview from './platform/preview/LuxeDashboardPreview';
+import LuxeDashboardPreview from './platform/luxe/LuxeDashboardV2';
 import LuxeServicesPreview from './platform/preview/LuxeServicesPreview';
 import Admin2FAEnroll from './platform/Admin2FAEnroll';
 import BoardroomPage from './platform/BoardroomPage';
