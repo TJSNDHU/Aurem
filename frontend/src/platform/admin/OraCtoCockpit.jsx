@@ -13,8 +13,9 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Crown, Activity, Shield, AlertTriangle, RefreshCw,
-  Zap, FileWarning, Hammer, CheckCircle,
+  Zap, FileWarning, Hammer, CheckCircle, Cpu,
 } from "lucide-react";
+import { safeFetchJson } from "../../lib/safeFetchJson";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_MS = 25000;
@@ -57,6 +58,9 @@ export default function OraCtoCockpit() {
   const [filterTool, setFilterTool] = useState("");
   const [onlyFails, setOnlyFails] = useState(false);
   const [error, setError] = useState(null);
+  // iter 326c — live provider chain (DeepSeek / FreeLLMAPI / Claude / Ollama / Groq)
+  const [providers, setProviders] = useState(null);
+  const [providersAt, setProvidersAt] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -76,6 +80,23 @@ export default function OraCtoCockpit() {
       if (b?.ok) setByTool(b.rows || []);
       if (o?.ok) setOverrides(o.rows || []);
       if (i?.ok) setInvocations(i.rows || []);
+
+      // iter 326c — provider chain health. Backend caches 15s so polling
+      // every 25s never hammers upstreams. safeFetchJson swallows HTML/5xx
+      // so a CDN wobble never crashes the panel.
+      const pr = await safeFetchJson(
+        `${API}/api/admin/ora/providers/health`,
+        { headers },
+      );
+      if (pr.ok) {
+        setProviders(pr.data);
+        setProvidersAt(new Date());
+      } else if (pr.isAuthError) {
+        // silent — admin token might still be loading
+      } else {
+        // Keep last-known state, just timestamp the failure.
+        setProvidersAt(new Date());
+      }
     } catch (e) {
       setError(String(e));
     }
@@ -137,6 +158,13 @@ export default function OraCtoCockpit() {
           <Tile testid="kpi-active" icon={Hammer}    label="Active tools 24h" value={summary.tools_active_24h} sub="distinct tools" />
         </div>
       )}
+
+      {/* iter 326c — Provider chain health (DeepSeek → FreeLLMAPI → Claude → Ollama → Groq) */}
+      <ProviderHealthPanel
+        data={providers}
+        checkedAt={providersAt}
+        loading={!providers && !error}
+      />
 
       {/* Quotas section intentionally removed (iter 322es). */}
 
@@ -292,3 +320,158 @@ function SectionTitle({ icon: Icon, text }) {
     </div>
   );
 }
+
+// iter 326c — ORA provider chain health panel.
+// Renders live state of every provider in the fallback chain so the founder
+// can see at a glance whether DeepSeek/FreeLLMAPI/Claude/Ollama/Groq are
+// reachable, how many models each one routes, and per-provider latency.
+// Backend caches the snapshot 15 s, so the 25 s panel poll never hammers
+// upstreams.
+const PROVIDER_LABELS = {
+  deepseek:      { name: "DeepSeek V3.1",  sub: "OpenRouter · primary" },
+  freellmapi:    { name: "FreeLLMAPI",     sub: "self-hosted proxy · 11-provider failover" },
+  claude:        { name: "Claude",         sub: "Emergent Universal Key · fallback" },
+  legion_ollama: { name: "Legion (Ollama)",sub: "sovereign · laptop · optional" },
+  ollama:        { name: "Ollama",         sub: "sovereign · optional" },
+  groq:          { name: "Groq",           sub: "safety net · rate-limited" },
+};
+
+function dotColor(p) {
+  if (!p?.configured) return TEXT_DIM;
+  if (p.ok)          return GREEN;
+  return RED;
+}
+
+function statusLabel(p) {
+  if (!p)              return "—";
+  if (!p.configured)   return "Not configured";
+  if (p.ok)            return "Online";
+  return "Offline";
+}
+
+function ProviderHealthPanel({ data, checkedAt, loading }) {
+  if (loading && !data) {
+    return (
+      <div style={{ ...GLASS, padding: 18, marginBottom: 18 }}>
+        <SectionTitle icon={Cpu} text="LLM provider chain · loading…" />
+      </div>
+    );
+  }
+  if (!data) return null;
+
+  const order = data.order || [];
+  const providers = data.providers || {};
+  const allOk = data.any_chat_provider_ok;
+  const primaryOk = data.primary_ok;
+  const cached = data.cached;
+
+  const headerTint = allOk ? GREEN : RED;
+  const headerStatus = !allOk
+    ? "All chat providers offline — ORA will degrade"
+    : primaryOk
+      ? `Primary (${PROVIDER_LABELS[data.primary]?.name || data.primary}) online`
+      : `Primary offline — fallback active`;
+
+  return (
+    <div
+      data-testid="provider-health-panel"
+      style={{
+        ...GLASS,
+        padding: 18,
+        marginBottom: 18,
+        borderColor: allOk ? BORDER : "rgba(255,118,118,0.32)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between",
+                    alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Cpu size={14} color={GOLD} />
+          <span style={{ fontWeight: 600, fontSize: 13 }}>
+            LLM provider chain · {order.length} configured
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10,
+                      fontSize: 11, color: TEXT_DIM }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            color: headerTint, fontWeight: 600,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: 999, background: headerTint,
+              boxShadow: `0 0 8px ${headerTint}`,
+            }} />
+            {headerStatus}
+          </span>
+          {checkedAt && (
+            <span data-testid="provider-checked-at">
+              checked {checkedAt.toLocaleTimeString()}
+              {cached ? " · cached" : ""}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "20px 1.5fr 110px 80px 110px 1fr",
+        gap: 6, padding: "4px 0", color: TEXT_DIM, fontSize: 11,
+        textTransform: "uppercase", borderBottom: `1px solid ${BORDER}`,
+      }}>
+        <div></div><div>Provider</div><div>Status</div><div>Latency</div>
+        <div>Models</div><div>Detail</div>
+      </div>
+
+      {order.map((key, i) => {
+        const p = providers[key] || {};
+        const label = PROVIDER_LABELS[key] || { name: key, sub: "" };
+        const isPrimary = i === 0;
+        return (
+          <div
+            key={key}
+            data-testid={`provider-row-${key}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "20px 1.5fr 110px 80px 110px 1fr",
+              gap: 6, padding: "10px 0", fontSize: 12.5,
+              borderBottom: `1px solid rgba(212,175,55,0.06)`,
+              background: isPrimary ? "rgba(212,175,55,0.04)" : "transparent",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: 999,
+                background: dotColor(p),
+                boxShadow: p.ok ? `0 0 8px ${dotColor(p)}` : "none",
+              }} />
+            </div>
+            <div>
+              <div style={{ fontWeight: isPrimary ? 700 : 500 }}>
+                {label.name}
+                {isPrimary && (
+                  <span style={{
+                    marginLeft: 6, fontSize: 10, fontWeight: 700,
+                    color: GOLD, letterSpacing: 0.5,
+                  }}>PRIMARY</span>
+                )}
+              </div>
+              <div style={{ color: TEXT_DIM, fontSize: 11 }}>{label.sub}</div>
+            </div>
+            <div style={{ color: dotColor(p), fontWeight: 600 }}>
+              {statusLabel(p)}
+            </div>
+            <div style={{ color: TEXT_DIM }}>
+              {p.latency_ms != null ? `${p.latency_ms} ms` : "—"}
+            </div>
+            <div style={{ color: TEXT_DIM }}>
+              {p.models_total != null ? p.models_total : "—"}
+            </div>
+            <div style={{ color: TEXT_DIM, fontSize: 11.5 }}>
+              {p.reason || "—"}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
