@@ -60,41 +60,35 @@ export const PlatformLogin = () => {
       const body = isPin
         ? { bin: (bin || '').trim().toUpperCase(), pin: (pin || '').trim() }
         : { identifier: email, password };
+      // iter 325w — DECOUPLED auth path.
+      // /api/platform/auth/login is the UNIFIED login endpoint (iter 322bg)
+      // that already accepts admin AND customer credentials natively against
+      // db.users + db.platform_users. The legacy "admin privileges → retry
+      // /api/auth/login" fallback created an unwanted coupling: if the admin
+      // route had ANY issue (rate limit, scheduler death, downstream check)
+      // the customer-facing form would silently retry it and surface the
+      // admin error to the customer. With the unified endpoint, that retry
+      // is dead code — and a real production foot-gun (per founder report
+      // 2026-05-21 "customer panel attached to admin panel"). Removed.
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON body (CDN 5xx / Cloudflare 520) — keep customer message
+        // generic so we never surface ingress HTML or admin-side errors.
+        setError('Backend temporarily unreachable. Please retry in a few seconds.');
+        return;
+      }
       if (res.ok) {
         onSuccess(data);
         return;
       }
-
-      // iter 322ax — Auto-promote admin login.
-      // Backend returns "This account has admin privileges. Sign in via the
-      // admin portal (/login) instead." → we silently retry against the admin
-      // endpoint with the same creds so the founder never sees a scary error.
-      const detail = String(data?.detail || '');
-      if (!isPin && /admin privileges/i.test(detail)) {
-        try {
-          const adminRes = await fetch(`${API_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-          });
-          const adminData = await adminRes.json();
-          if (adminRes.ok && adminData?.token) {
-            onSuccess(adminData);
-            return;
-          }
-          setError(formatErr(adminData?.detail) || 'Sign in failed. Please check your credentials.');
-        } catch (_) {
-          setError('Connection error. Please try again.');
-        }
-      } else {
-        setError(formatErr(data.detail));
-      }
+      setError(formatErr(data?.detail));
     } catch (err) {
       setError('Connection error. Please try again.');
     }
