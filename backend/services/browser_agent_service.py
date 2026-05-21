@@ -45,6 +45,81 @@ logger = logging.getLogger(__name__)
 
 _db = None
 
+# iter 325x — Playwright/Chromium browser availability cache.
+# Production Emergent K8s images do NOT ship the Playwright Chromium
+# binary (it adds ~280 MB). Calling `pw.chromium.launch()` without the
+# binary throws `BrowserType.launch: Executable doesn't exist at
+# /pw-browsers/...` for every single screenshot, spamming stderr and
+# tripping the deploy logs as "errors".
+#
+# Fix: probe the binary path ONCE per process. If missing, every call
+# into _launch_page() short-circuits with a clean None return so callers
+# (e.g. `screenshot_url`) log a single one-line warning and skip — no
+# stack trace, no log flood, no false-positive deploy failure.
+_BROWSER_AVAILABLE: Optional[bool] = None
+_BROWSER_AVAILABLE_REASON: str = ""
+
+
+def _probe_browser_available() -> bool:
+    """One-shot detection of usable Chromium binary. Cached after first call.
+
+    iter 325x — Pure filesystem probe (NO Playwright import) so we don't
+    trigger Playwright's "Please run playwright install" banner that
+    floods the deploy logs with ASCII art on every cold start.
+
+    Checks both PLAYWRIGHT_BROWSERS_PATH and the bundled default location
+    for any `chrome*` executable. Cached after first call.
+    """
+    global _BROWSER_AVAILABLE, _BROWSER_AVAILABLE_REASON
+    if _BROWSER_AVAILABLE is not None:
+        return _BROWSER_AVAILABLE
+    candidates = []
+    env_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
+    if env_path:
+        candidates.append(env_path)
+    # Bundled default (Python site-packages cache)
+    candidates.extend([
+        "/pw-browsers",
+        "/root/.cache/ms-playwright",
+        os.path.expanduser("~/.cache/ms-playwright"),
+        "/ms-playwright",
+    ])
+    found_at = None
+    for base in candidates:
+        if not base or not os.path.isdir(base):
+            continue
+        try:
+            for root, _dirs, files in os.walk(base):
+                for fn in files:
+                    if fn in ("chrome-headless-shell", "headless_shell", "chrome", "chromium"):
+                        candidate = os.path.join(root, fn)
+                        if os.access(candidate, os.X_OK):
+                            found_at = candidate
+                            break
+                if found_at:
+                    break
+        except Exception:
+            continue
+        if found_at:
+            break
+    if found_at:
+        _BROWSER_AVAILABLE = True
+        _BROWSER_AVAILABLE_REASON = f"chromium at {found_at}"
+    else:
+        _BROWSER_AVAILABLE = False
+        _BROWSER_AVAILABLE_REASON = (
+            f"chromium binary not found in any of {candidates} — "
+            "run `playwright install chromium` to enable screenshots "
+            "(screenshots will be silently skipped)"
+        )
+        logger.warning(f"[browser-agent] DISABLED — {_BROWSER_AVAILABLE_REASON}")
+    return _BROWSER_AVAILABLE
+
+
+def is_browser_available() -> bool:
+    """Public read for any caller that wants to skip screenshot logic upfront."""
+    return _probe_browser_available()
+
 
 def set_db(database) -> None:
     global _db
@@ -122,7 +197,12 @@ async def _launch_page(headless: bool = True, stealth: Optional[bool] = None,
     auto-enable stealth for known-fingerprinted hosts (LinkedIn, Google
     Maps, etc.). Stealth uses `rebrowser-playwright` which patches
     Chromium's automation flags + canvas/webgl/timezone fingerprints.
+
+    iter 325x — Returns (None, None, None) if Chromium binary is missing
+    so callers can detect-and-skip without try/except gymnastics.
     """
+    if not _probe_browser_available():
+        return None, None, None
     if stealth is None:
         stealth = _should_use_stealth(target_url)
     if stealth:
@@ -138,13 +218,27 @@ async def _launch_page(headless: bool = True, stealth: Optional[bool] = None,
     else:
         from playwright.async_api import async_playwright  # type: ignore
         pw = await async_playwright().start()
-    browser = await pw.chromium.launch(
-        headless=headless,
-        args=([
-            "--disable-blink-features=AutomationControlled",
-            "--no-sandbox",
-        ] if stealth else []),
-    )
+    try:
+        browser = await pw.chromium.launch(
+            headless=headless,
+            args=([
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+            ] if stealth else []),
+        )
+    except Exception as e:
+        # Defensive — probe said browsers were present but launch still
+        # failed (e.g. corrupted binary, permission issue). Don't crash
+        # the whole service; mark unavailable and degrade gracefully.
+        global _BROWSER_AVAILABLE, _BROWSER_AVAILABLE_REASON
+        _BROWSER_AVAILABLE = False
+        _BROWSER_AVAILABLE_REASON = f"chromium.launch failed at runtime: {e}"
+        logger.warning(f"[browser-agent] {_BROWSER_AVAILABLE_REASON}")
+        try:
+            await pw.stop()
+        except Exception:
+            pass
+        return None, None, None
     ctx = await browser.new_context(
         viewport={"width": 1440, "height": 900},
         user_agent=(
@@ -357,6 +451,16 @@ async def screenshot_url(
     pw = browser = None
     try:
         pw, browser, page = await _launch_page(target_url=url)
+        if page is None:
+            # iter 325x — browser binary missing. Skip cleanly so deploy
+            # logs stay clean and the rest of the API keeps serving.
+            result = {
+                "ok": False, "pending": False, "skipped": True,
+                "error": "browser_unavailable",
+                "reason": _BROWSER_AVAILABLE_REASON,
+            }
+            await _log_action("screenshot", url, result, triggered_by)
+            return result
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         if wait_ms:
             await page.wait_for_timeout(wait_ms)
@@ -421,6 +525,13 @@ async def extract_url(
     pw = browser = None
     try:
         pw, browser, page = await _launch_page(target_url=url)
+        if page is None:
+            # iter 325x — graceful skip when chromium binary missing.
+            return {
+                "ok": False, "pending": False, "skipped": True,
+                "error": "browser_unavailable",
+                "reason": _BROWSER_AVAILABLE_REASON,
+            }
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(800)
         if selector:

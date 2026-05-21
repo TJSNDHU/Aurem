@@ -1101,6 +1101,36 @@ async def startup_event():
         logging.info(f"[ENV] FRONTEND_URL: {os.environ.get('FRONTEND_URL', 'not set')}")
         logging.info(f"[ENV] SITE_URL: {os.environ.get('SITE_URL', 'not set')}")
         logging.info(f"[ENV] JWT_SECRET set: {'✓' if os.environ.get('JWT_SECRET') else '❌'}")
+
+        # iter 325x — Hard MongoDB reachability ping at startup with a TIGHT
+        # 5-second budget so deploy failures surface IMMEDIATELY in logs
+        # instead of cascading into per-route AutoReconnect spam an hour
+        # later. Logs the resolved host (with credentials redacted) +
+        # actionable remediation. Does NOT crash the pod — health endpoint
+        # stays up so liveness probes don't trigger a restart loop while
+        # the operator updates MONGO_URL.
+        try:
+            import re as _re
+            mu = os.environ.get("MONGO_URL", "") or ""
+            redacted = _re.sub(r"://[^@]*@", "://<REDACTED>@", mu)
+            logging.info(f"[STARTUP][mongo] connecting to {redacted or '<EMPTY>'} ...")
+            from motor.motor_asyncio import AsyncIOMotorClient as _MC
+            _probe = _MC(mu, serverSelectionTimeoutMS=5000)
+            await _probe.admin.command("ping")
+            _probe.close()
+            logging.info("[STARTUP][mongo] ✅ reachable + ping OK")
+        except Exception as _me:
+            logging.error(
+                "[STARTUP][mongo] ❌ UNREACHABLE — %s\n"
+                "    REMEDIATION:\n"
+                "    1. Verify MONGO_URL in deployment env vars\n"
+                "    2. If Atlas, ensure cluster IP whitelist includes "
+                "       Emergent K8s egress range\n"
+                "    3. Or switch to Emergent-managed MongoDB (recommended)\n"
+                "    App will continue booting — /api/health stays up, but "
+                "DB-dependent routes (login, etc.) will hang.",
+                str(_me).split("\n")[0][:200],
+            )
         
         # iter 322br — pre-warm Groq HTTP/2 socket (saves ~100ms first chat)
         try:
