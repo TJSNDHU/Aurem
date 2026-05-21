@@ -39,6 +39,11 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • Live-verified end-to-end: NVIDIA healthy (123 models, 124 ms latency); Gemini returns 403 because the current `GOOGLE_API_KEY` is suspended by Google — chain gracefully fell through to NVIDIA which served the reply via `meta/llama-4-maverick-17b-128e-instruct`.
   • 9 regression tests in `tests/test_iter326g_chain_gemini_nvidia_bake.py` all green.
   • **Action for founder**: rotate `GOOGLE_API_KEY` in `/app/backend/.env` (current one suspended) to unlock the fastest fallback in the chain. NVIDIA + Claude + Groq + DeepSeek already keep ORA fully operational.
+- iter 326h (2026-02): **3 critical DB bug fixes in one PR** —
+  • **FIX 1**: `services/founder_provision.py` now mirrors the founder into `admin_users.passwordHash` (camelCase, matching the RBAC `/auth/rbac/login` contract). Backfills from `users.password_hash` when no env seed is configured so existing prod accounts get healed automatically. Founder `teji.ss1986@gmail.com` can now log in via RBAC.
+  • **FIX 2**: `services/auto_blast_engine.py::_reset_zero_streak_on_success` — auto-resets `ora_campaign_health.zero_sent_streak = 0` and pulls `zero_sent_streak` out of `tripped` whenever a cycle delivers ≥1 send. Idempotent no-op when sent=0. Live verified: streak 205 → 0 after manual run.
+  • **FIX 3**: `services/ensure_audit_log_ttl.py` — drops broken `ts_ttl_35d` (wrong field) and installs `ttl_timestamp_7d` (604800s) on the correct `timestamp` field of `api_audit_log`. Wired into server startup. Live TTL monitor already purged ~590k stale rows (1.4M → 803k; oldest now exactly 7 days old).
+  • 10 regression tests in `tests/test_iter326h_3_critical_db_fixes.py` all green.
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

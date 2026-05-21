@@ -977,6 +977,10 @@ async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
             "sent": cycle_sent,
         })
 
+    # iter 326h — reset watchdog zero_sent_streak when this cycle delivered.
+    # Watchdog otherwise keeps the latched counter even after blasts resume.
+    await _reset_zero_streak_on_success(total_sent)
+
     return {
         "ok": True,
         "ran_at": ran_at_iso,
@@ -985,6 +989,40 @@ async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
         "total_sent": total_sent,
         "summaries": summaries,
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# Watchdog reset on success — iter 326h
+# ─────────────────────────────────────────────────────────────
+async def _reset_zero_streak_on_success(total_sent: int) -> None:
+    """Atomically reset `ora_campaign_health.zero_sent_streak` to 0 and
+    pull `zero_sent_streak` out of `tripped` whenever a cycle delivered
+    ≥1 send. Without this, the watchdog stays latched at high streaks
+    forever even after blasts resume — operator sees phantom
+    "campaign stalled" alerts and ORA-CTO autofix loop fires uselessly.
+
+    Idempotent / no-op when `total_sent <= 0`.
+    """
+    if total_sent <= 0:
+        return
+    db = _get_db()
+    if db is None:
+        return
+    try:
+        await db.ora_campaign_health.update_one(
+            {"_id": "global"},
+            {
+                "$set": {
+                    "zero_sent_streak": 0,
+                    "last_successful_send_at": datetime.now(timezone.utc).isoformat(),
+                    "last_successful_send_count": int(total_sent),
+                },
+                "$pull": {"tripped": "zero_sent_streak"},
+            },
+            upsert=True,
+        )
+    except Exception as e:
+        logger.warning(f"[auto-blast] watchdog reset failed: {e}")
 
 
 # ─────────────────────────────────────────────────────────────

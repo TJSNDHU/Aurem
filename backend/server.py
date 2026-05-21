@@ -996,6 +996,17 @@ async def create_indexes():
         except Exception as e:
             logging.warning(f"[startup] auth index setup failed (non-fatal): {e}")
 
+        # iter 326h — TTL retention on high-volume audit collections.
+        # `api_audit_log` grew to 1.4M rows because an existing TTL index
+        # was on the WRONG field. ensure_audit_log_ttl drops broken TTLs
+        # and installs a 7-day TTL on the correct timestamp field.
+        try:
+            from services.ensure_audit_log_ttl import ensure_audit_log_ttl
+            ttl_res = await ensure_audit_log_ttl(db)
+            logging.info(f"[startup] audit-log TTL ensured: {ttl_res}")
+        except Exception as e:
+            logging.warning(f"[startup] audit-log TTL setup failed (non-fatal): {e}")
+
         # Seed internal @aurem.live addresses into do_not_contact so any
         # legacy code paths that pre-check DNC also respect the block.
         try:

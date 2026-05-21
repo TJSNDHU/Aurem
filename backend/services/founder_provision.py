@@ -194,6 +194,40 @@ async def ensure_founders(db) -> dict:
             upsert=True,
         )
 
+        # ─── MIRROR INTO `admin_users` (RBAC `/auth/rbac/login` source-of-truth) ───
+        # iter 326h — the RBAC frontend (useAuth.js → /api/auth/rbac/login) hits
+        # `db.admin_users` and expects `passwordHash` (camelCase). Without this
+        # mirror, founders show up in admin_users with no password and get
+        # "Password not set. Use Google login or contact owner." even though
+        # /api/auth/login (users collection) accepts their password fine.
+        # Field name MUST stay camelCase to match the rbac.py auth check.
+        # Hash resolution priority for admin_users:
+        #   1. `new_hash` computed above (env-driven or seed-password)
+        #   2. Existing `users.password_hash` (already-bcrypt — safe to mirror)
+        #   3. Skip — leave existing admin_users row untouched
+        admin_hash = new_hash
+        if not admin_hash:
+            existing_user = await db.users.find_one(
+                {"email": email}, {"_id": 0, "password_hash": 1}
+            )
+            ph = (existing_user or {}).get("password_hash") or ""
+            if ph.startswith("$2"):  # bcrypt signature
+                admin_hash = ph
+        admin_set = {
+            "email": email,
+            "name": fdr.get("full_name") or "AUREM Founder",
+            "role": "owner",      # RBAC: founder = owner tier
+            "isActive": True,
+            "updated_at": now,
+        }
+        if admin_hash:
+            admin_set["passwordHash"] = admin_hash
+        await db.admin_users.update_one(
+            {"email": email},
+            {"$set": admin_set, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+
         # Also keep `aurem_users` (legacy customer-login fallback) in sync.
         # iter 322ar — `is_dogfood` was referenced but never defined → silent
         # ProvisioningFailed on every startup. Derive from the founder dict.
