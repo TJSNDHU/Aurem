@@ -2283,6 +2283,7 @@ async def run_turn(
     *,
     founder_email: str,
     progress_cb:   Any = None,
+    tenant_id:     str | None = None,
 ) -> dict[str, Any]:
     """Process one user message. Returns either:
       • {ok: True, reply: "...", history_len: N, done: True}
@@ -2291,12 +2292,24 @@ async def run_turn(
     iter 323l — `progress_cb` is an optional async callable
     `(tool_name: str) -> None` invoked right before each tool dispatch so
     the async job-runner can surface live tool progress to the UI.
+
+    iter 326ff — `tenant_id` (optional) lets us tune ORA's voice
+    (tone/formality/signature) per tenant. The voice preamble is
+    prepended to SYSTEM_PROMPT on the first turn of a new session.
     """
     await _expire_old()
     history = await _load_history(session_id)
 
     if not history:
-        history = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # iter 326ff — prepend tenant voice preamble so this session
+        # adopts the right register from turn 1.
+        voice_pre = ""
+        try:
+            from services.ora_voice_profile import build_voice_preamble
+            voice_pre = await build_voice_preamble(tenant_id)
+        except Exception as _e:
+            logger.debug(f"[ora-agent] voice preamble skipped: {_e}")
+        history = [{"role": "system", "content": voice_pre + SYSTEM_PROMPT}]
     history.append({"role": "user", "content": user_text})
 
     # iter 326v — reset this-turn cost so the footer reports only the

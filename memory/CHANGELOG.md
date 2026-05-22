@@ -9093,3 +9093,54 @@ before it bit a real campaign."
 - Full iter326 regression: **369 passing in 17 s**. Backend healthy;
   all three admin endpoints (`cost-summary`, `email-health`,
   `decisions`) confirmed live. Frontend lint clean on all 3 new cards.
+
+## 2026-02-XX — iter 326ff/gg/hh: Phase 3 P3.1–P3.3 — Voice + Brief + Skills
+
+### P3.1 — Multi-tenant ORA voice tuning (`services/ora_voice_profile.py`)
+- Per-tenant voice profile in `db.tenant_ora_voice`:
+  `{tone, formality, signature, industry}`.
+- 18 industry defaults (roofing → direct/casual, dental → warm/
+  professional, tax → precise/formal, etc.). When a tenant has no
+  saved profile, ORA falls back to the industry default based on
+  whatever's on the tenant doc.
+- `build_voice_preamble(tenant_id)` returns a 5-line system-prompt
+  prefix that ORA prepends to SYSTEM_PROMPT.
+- `ora_agent.run_turn` now accepts `tenant_id=...` and applies the
+  voice preamble on the FIRST turn of a new session so the LLM
+  adopts the right register from turn 1.
+
+### P3.2 — Mobile morning brief (`services/ora_morning_brief.py`)
+- `build_brief(tenant_id=None, founder_email=None)` aggregates:
+  yesterday's campaigns / revenue snapshot / open alerts / today's
+  warm leads / last 5 ORA decisions.
+- Pure read — never invents numbers. Empty collections → empty
+  sections, never 500.
+- Endpoint: `GET /api/admin/ora/morning-brief?tenant_id=...`
+  (admin-gated). Returns mobile-friendly JSON in one round trip.
+
+### P3.3 — Skills marketplace (`services/ora_skills.py`)
+- `db.ora_skills` — versioned catalog
+  `{skill_id, name, description, category, author_email, versions[],
+    latest_version, downloads, pricing, ...}`.
+- `db.tenant_installed_skills` — per-tenant install record
+  `{tenant_id, skill_id, version, installed_at, enabled}`.
+- Functions: `publish_skill`, `list_skills`, `get_skill`,
+  `install_skill` (idempotent, rejects unknown skill/version),
+  `list_installed_for_tenant`, `uninstall_skill` (soft delete).
+- Endpoints (7 total) under `/api/admin/ora/skills/...`.
+
+### Router & plumbing
+- New `routers/ora_phase3_router.py` carries all three feature surfaces.
+- Registered in `routers/registry.py` right after `admin_ora_router`.
+- Single `set_db` propagates to all three services.
+
+### Tests
+- New `tests/test_iter326ff_gg_hh_phase3_voice_brief_skills.py` — 20
+  tests covering: industry defaults, tone/formality validation, get
+  fallback, save/get round-trip, voice preamble shape, run_turn
+  signature + wiring, morning brief schema + endpoint + auth gate,
+  publish/install/uninstall lifecycle (incl. version append, unknown-
+  skill rejection, idempotent re-install, soft-delete), all 7
+  endpoints registered, single-hook set_db propagation.
+- Full iter326 regression: **389 passing in 17 s**. Backend healthy;
+  all 4 new admin endpoints respond 204 (auth-gated as designed).

@@ -733,6 +733,20 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] admin_ora_router not loaded: {e}")
 
+    # iter 326ff/gg/hh — Phase 3 P3: voice tuning, morning brief, skills marketplace
+    if not _should_skip("routers.ora_phase3_router"):
+        try:
+            from routers.ora_phase3_router import (
+                router as ora_phase3_router,
+                set_db as set_phase3_db,
+            )
+            app.include_router(ora_phase3_router)
+            if db is not None:
+                set_phase3_db(db)
+            logger.info("[REGISTRY] ora_phase3_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] ora_phase3_router not loaded: {e}")
+
     # iter 322r — Autonomous Stack façade for /admin/brain page
     if not _should_skip("routers.autonomous_stack_router"):
         try:
