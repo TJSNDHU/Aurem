@@ -748,20 +748,52 @@ async def _liveness_live():
 # would just be dead code.
 
 # ============= CORS - HARDENED FOR PRODUCTION =============
+# iter 326r — proactive CORS hardening.
+#
+# Past pain points this consolidates:
+#   1. aurem.live was listed twice (cosmetic, but the dup hid the fact
+#      that www.aurem.live was missing).
+#   2. www.aurem.live was NOT in the allowlist. Most users type
+#      "aurem.live" in the address bar; the host config redirects to
+#      www.aurem.live; every API call from that page CORS-failed.
+#   3. Emergent rotates preview subdomains during refreshed builds
+#      (`ai-platform-preview-3` → `ai-platform-preview-4`, etc). The
+#      old static allowlist broke each time a preview rotated.
+#   4. White-label customer subdomains (admin.aurem.live, app.aurem.live,
+#      tenant.aurem.live) had no path to authorisation without a deploy.
+#   5. CORS misfires were hard to diagnose because the final allowlist
+#      was never logged at startup — engineers had to re-read code.
+#
+# Approach:
+#   • Static `allow_origins` list covers the known production hosts and
+#     local dev. Wildcards still work via the explicit `CORS_ORIGINS=*`
+#     env opt-in.
+#   • `allow_origin_regex` (CORSMiddleware native feature) matches:
+#       - any preview subdomain on Emergent
+#       - any aurem.live subdomain (so a future admin.aurem.live or
+#         app.aurem.live works WITHOUT a redeploy)
+#     The regex is anchored — `^https://...$` — so it can't be tricked
+#     by an attacker registering `aurem.live.evil.com`.
+#   • One log line on startup prints the final allowlist + regex so
+#     ANY future CORS bug is debuggable in 5 seconds.
 _cors_raw = os.environ.get("CORS_ORIGINS", "")
 _cors_raw_stripped = _cors_raw.strip()
 if _cors_raw_stripped == "*":
-    # Explicit wildcard — operator opted-in to allow any origin (credentials
-    # must be disabled when origin is "*" per CORS spec, so we also flip
-    # allow_credentials below).
+    # Explicit wildcard — operator opted-in to allow any origin
+    # (credentials must be disabled when origin is "*" per CORS spec,
+    # so we also flip allow_credentials below).
     _cors_origins = ["*"]
 elif not _cors_raw_stripped:
-    # Unset → safe default allowlist for aurem.live + local dev. The production
-    # Emergent preview URL is appended below via REACT_APP_BACKEND_URL.
+    # Unset → safe default allowlist. Production Emergent preview URL
+    # and Hetzner deploys are appended below via REACT_APP_BACKEND_URL
+    # / APP_URL. The regex (`_cors_origin_regex` further down) catches
+    # rotated preview subdomains AND aurem.live subdomains without
+    # needing a redeploy.
     _cors_origins = [
         "https://aurem.live",
-        "https://aurem.live",
-        "http://localhost:3000",
+        "https://www.aurem.live",      # iter 326r — was missing, CORS-failed
+        "http://localhost:3000",       # local dev
+        "http://localhost:8001",       # local dev (backend self-call)
     ]
 else:
     _cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
@@ -776,13 +808,45 @@ _app_url = os.environ.get("APP_URL", "")
 if _cors_origins != ["*"] and _app_url and _app_url not in _cors_origins:
     _cors_origins.append(_app_url)
 
+# Also allow the PUBLIC_APP_URL (operator-set canonical URL for the deploy)
+_public_app_url = os.environ.get("PUBLIC_APP_URL", "")
+if _cors_origins != ["*"] and _public_app_url and _public_app_url not in _cors_origins:
+    _cors_origins.append(_public_app_url)
+
+# iter 326r — regex allowlist for dynamic / rotating origins.
+#   - `*.preview.emergentagent.com`   → handles Emergent's preview rotation
+#   - `*.aurem.live`                  → handles any future white-label or
+#                                       admin/app/tenant subdomain
+#   - `aurem.live` itself (with optional www)
+# The pattern is anchored so `aurem.live.attacker.com` is rejected.
+_cors_origin_regex = (
+    r"^https://("
+    r"(?:[a-z0-9-]+\.)*aurem\.live"             # aurem.live + any subdomain
+    r"|(?:[a-z0-9-]+\.)*preview\.emergentagent\.com"  # any Emergent preview
+    r")$"
+)
+
 # CORS spec: allow_credentials cannot be True when origin is "*".
 _allow_credentials = _cors_origins != ["*"]
+
+# iter 326r — one debuggable log line. Future CORS bugs are now 5
+# seconds away from being explained.
+import logging as _cors_logging
+_cors_logging.getLogger("aurem.cors").info(
+    f"[CORS] allow_origins={_cors_origins} "
+    f"regex={'ENABLED' if _cors_origins != ['*'] else 'DISABLED (wildcard mode)'} "
+    f"credentials={_allow_credentials}"
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=_allow_credentials,
     allow_origins=_cors_origins,
+    # When the wildcard is on, allow_origin_regex is ignored by Starlette,
+    # so we can safely always pass it. For everything else, it ADDS to the
+    # static allowlist — origins not in the list AND not matching the
+    # regex are rejected.
+    allow_origin_regex=None if _cors_origins == ["*"] else _cors_origin_regex,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["Cache-Control", "ETag", "Content-Encoding"],
