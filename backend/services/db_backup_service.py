@@ -18,13 +18,144 @@ Author: Aurem ops · 2026-02-08
 import os
 import time
 import logging
+import socket
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
+from urllib.parse import urlparse
 
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import PyMongoError
 
 logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────
+# iter 326m-stab.D — Production DNS-storm shield (deploy bug fix)
+# ─────────────────────────────────────────────────────────────────────
+# Production logs showed:
+#   pymongo.errors.AutoReconnect: customer-apps-shard-00-XX.djq3ym.
+#   mongodb.net:27017: [Errno -3] Temporary failure in name resolution
+#   APScheduler: maximum number of running instances reached
+#
+# Root cause: SECONDARY_MONGO_URL pointed to a STALE Atlas cluster.
+# Constructing `MongoClient(stale_url)` spawns a topology monitor
+# THREAD that retries forever, even after `client.close()` — close
+# only sets a flag; the thread has to finish its in-flight DNS
+# attempt (5–30s) before observing it. Daily DR run + repeated T3
+# escalation calls saturated the worker pool with these zombie
+# threads → APScheduler "max instances reached" cascade.
+#
+# Defense (this module + admin_dr_backup_router):
+#   1. PRE-FLIGHT DNS RESOLUTION before constructing MongoClient.
+#      `socket.getaddrinfo(host, 27017, ...)` with a short budget.
+#      If it fails, we NEVER call MongoClient(...) — no zombie thread.
+#   2. CIRCUIT BREAKER: 30-minute cooldown after any DNS failure.
+#      Subsequent calls return early with `status=skipped` until the
+#      cooldown elapses. Stops the per-cycle re-poll storm.
+# ─────────────────────────────────────────────────────────────────────
+_SECONDARY_DNS_FAIL_UNTIL: float = 0.0   # epoch-seconds; 0 = circuit closed
+_SECONDARY_DNS_FAIL_REASON: str = ""
+SECONDARY_DNS_COOLDOWN_S: int = 30 * 60  # 30 minutes
+SECONDARY_DNS_BUDGET_S: float = 3.0      # per host
+
+
+def _hosts_from_mongo_url(mongo_url: str) -> list[str]:
+    """Extract hostnames from a mongo URL. Handles both
+    `mongodb://h1,h2,h3:27017/...` (replica-set form) and the
+    `mongodb+srv://host/...` (SRV form) — for SRV we return the bare
+    SRV hostname; pymongo will do its own DNS but we still pre-check it
+    so an unreachable SRV record fails fast here too."""
+    try:
+        parsed = urlparse(mongo_url.replace("mongodb+srv://", "https://")
+                                    .replace("mongodb://", "https://"))
+        netloc = parsed.netloc or ""
+        # strip user:pass@
+        if "@" in netloc:
+            netloc = netloc.rsplit("@", 1)[1]
+        # split comma-separated hosts (replica-set form)
+        hosts = []
+        for piece in netloc.split(","):
+            piece = piece.strip()
+            if not piece:
+                continue
+            host = piece.split(":", 1)[0]
+            if host:
+                hosts.append(host)
+        return hosts
+    except Exception:
+        return []
+
+
+def _preflight_dns(mongo_url: str) -> tuple[bool, str]:
+    """Pre-resolve every host in the URL AND attempt a tight TCP connect.
+    Returns (ok, reason). Cheap, synchronous. NO MongoClient spawned
+    regardless of result.
+
+    Two-stage probe is critical: Atlas keeps DNS records alive even
+    when the cluster is paused/decommissioned, so a `getaddrinfo` pass
+    alone would happily return success for a dead cluster. The TCP
+    connect is what catches the actually-unreachable case."""
+    hosts = _hosts_from_mongo_url(mongo_url)
+    if not hosts:
+        return False, "no parseable hosts in URL"
+    for h in hosts:
+        # Stage 1 — name resolution.
+        try:
+            socket.setdefaulttimeout(SECONDARY_DNS_BUDGET_S)
+            addrinfo = socket.getaddrinfo(h, 27017, type=socket.SOCK_STREAM)
+        except socket.gaierror as e:
+            return False, f"DNS fail for {h}: {e}"
+        except socket.timeout:
+            return False, f"DNS timeout (> {SECONDARY_DNS_BUDGET_S}s) for {h}"
+        except Exception as e:
+            return False, f"DNS probe error for {h}: {type(e).__name__}: {e}"
+        finally:
+            socket.setdefaulttimeout(None)
+
+        # Stage 2 — TCP connect to first resolved address. Atlas DNS
+        # outliving the cluster is the EXACT shape of the production
+        # bug: name resolves, port 27017 doesn't accept. Without this
+        # stage, pymongo gets to spawn its zombie topology thread and
+        # the whole guard becomes a no-op.
+        if not addrinfo:
+            return False, f"DNS empty addrinfo for {h}"
+        family, socktype, proto, _canon, sockaddr = addrinfo[0]
+        sock = socket.socket(family, socktype, proto)
+        sock.settimeout(SECONDARY_DNS_BUDGET_S)
+        try:
+            sock.connect(sockaddr)
+        except (socket.timeout, OSError) as e:
+            return False, f"TCP connect fail for {h}:27017 — {type(e).__name__}: {e}"
+        except Exception as e:
+            return False, f"TCP probe error for {h}: {type(e).__name__}: {e}"
+        finally:
+            try:
+                sock.close()
+            except Exception:
+                pass
+    return True, "ok"
+
+
+def _secondary_circuit_open() -> tuple[bool, str]:
+    """True if the cooldown is still active. Caller should skip MongoClient
+    construction entirely to avoid zombie topology threads."""
+    if _SECONDARY_DNS_FAIL_UNTIL > time.time():
+        remaining = int(_SECONDARY_DNS_FAIL_UNTIL - time.time())
+        return True, (
+            f"circuit OPEN ({remaining}s left) — last fail: "
+            f"{_SECONDARY_DNS_FAIL_REASON}"
+        )
+    return False, ""
+
+
+def _trip_secondary_circuit(reason: str) -> None:
+    """Trip the breaker for SECONDARY_DNS_COOLDOWN_S seconds."""
+    global _SECONDARY_DNS_FAIL_UNTIL, _SECONDARY_DNS_FAIL_REASON
+    _SECONDARY_DNS_FAIL_UNTIL = time.time() + SECONDARY_DNS_COOLDOWN_S
+    _SECONDARY_DNS_FAIL_REASON = reason[:200]
+    logger.warning(
+        f"[DR-BACKUP] secondary circuit TRIPPED for "
+        f"{SECONDARY_DNS_COOLDOWN_S}s — {reason}"
+    )
 
 # ─────────────────────────────────────────────────────────────────────
 # WHITELIST mode (iter 322au, May 2026)
@@ -240,6 +371,32 @@ def run_backup(triggered_by: str = "scheduler") -> Dict[str, Any]:
             "SECONDARY_MONGO_URL not configured — DR backup disabled"
         )
         logger.warning(f"[DR-BACKUP] {run_id} skipped: SECONDARY_MONGO_URL missing")
+        return report
+
+    # iter 326m-stab.D — circuit breaker. If we recently determined the
+    # secondary is unreachable, skip CLEANLY. No MongoClient(...) call,
+    # no zombie topology thread, no log storm.
+    open_, reason = _secondary_circuit_open()
+    if open_:
+        report["status"] = "skipped"
+        report["error"] = f"secondary unreachable — {reason}"
+        report["finished_at"] = datetime.now(timezone.utc).isoformat()
+        logger.info(f"[DR-BACKUP] {run_id} skipped — {reason}")
+        return report
+
+    # iter 326m-stab.D — DNS pre-flight on the SECONDARY URL. If hostname
+    # doesn't resolve, fail fast and trip the circuit. We skip pymongo
+    # entirely so its topology monitor never spawns.
+    sec_ok, sec_reason = _preflight_dns(secondary_url)
+    if not sec_ok:
+        _trip_secondary_circuit(sec_reason)
+        report["status"] = "skipped"
+        report["error"] = f"secondary DNS pre-flight failed: {sec_reason}"
+        report["finished_at"] = datetime.now(timezone.utc).isoformat()
+        logger.warning(
+            f"[DR-BACKUP] {run_id} skipped — {sec_reason}. "
+            f"Update SECONDARY_MONGO_URL in deployment env vars."
+        )
         return report
 
     primary_client: Optional[MongoClient] = None

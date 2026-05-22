@@ -109,18 +109,36 @@ async def backup_status(authorization: str = None) -> Dict[str, Any]:
     sec_url = os.environ.get("SECONDARY_MONGO_URL")
     if sec_url:
         secondary_health["configured"] = True
-        try:
-            from pymongo import MongoClient
-            def _probe():
-                c = MongoClient(sec_url, serverSelectionTimeoutMS=4000)
+        # iter 326m-stab.D — gate behind the same DNS pre-flight + circuit
+        # breaker the daily backup uses, so the dashboard probe never
+        # spawns a zombie pymongo topology thread for an unreachable URL.
+        from services.db_backup_service import (
+            _preflight_dns, _secondary_circuit_open,
+            _trip_secondary_circuit,
+        )
+        circ_open, circ_reason = _secondary_circuit_open()
+        if circ_open:
+            secondary_health["reachable"] = False
+            secondary_health["error"] = circ_reason
+        else:
+            dns_ok, dns_reason = _preflight_dns(sec_url)
+            if not dns_ok:
+                _trip_secondary_circuit(dns_reason)
+                secondary_health["reachable"] = False
+                secondary_health["error"] = f"DNS: {dns_reason}"
+            else:
                 try:
-                    c.admin.command("ping")
-                    return True
-                finally:
-                    c.close()
-            secondary_health["reachable"] = await asyncio.to_thread(_probe)
-        except Exception as e:
-            secondary_health["error"] = f"{type(e).__name__}: {str(e)[:140]}"
+                    from pymongo import MongoClient
+                    def _probe():
+                        c = MongoClient(sec_url, serverSelectionTimeoutMS=4000)
+                        try:
+                            c.admin.command("ping")
+                            return True
+                        finally:
+                            c.close()
+                    secondary_health["reachable"] = await asyncio.to_thread(_probe)
+                except Exception as e:
+                    secondary_health["error"] = f"{type(e).__name__}: {str(e)[:140]}"
 
     last_ok = next((r for r in runs if r.get("status") == "ok"), None)
     return {
