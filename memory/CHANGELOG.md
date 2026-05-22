@@ -9235,3 +9235,48 @@ falls through to a real send instead of a runtime error.
   isn't registered in lean mode. Not user-facing; not a deployment
   blocker. Will address as a separate cleanup.
 - Other 401s — admin endpoints correctly rejecting unauth pings
+
+## 2026-02-XX — iter 326ll: Auth Interceptor Role Isolation (Login/Logout Fix)
+
+### Production bug
+Founder reported "login and logout not working in production". Backend
+JWT minting verified healthy in preview — both `/api/auth/login` and
+`/api/auth/admin/login` return valid tokens. The break was 100% frontend.
+
+### Root cause
+`/app/frontend/src/lib/api.js` had a `clearTokens()` helper that, on
+ANY 401 from an `/api/auth/*` endpoint OR a failed silent refresh,
+iterated `[customer, admin, legacy]` and wiped each from BOTH
+localStorage and sessionStorage. This defeats the iter 326o role
+separation. Real-world failure path:
+
+  1. Admin + customer both logged in same browser
+  2. Background poller fires an admin call whose access token expired
+  3. Interceptor tries refresh → refresh returns 401 (admin session
+     dead, e.g. cluster restarted, secret rotated, idle window)
+  4. `clearTokens()` wipes admin AND customer tokens
+  5. Customer instantly sees "logged out" — types creds — same chain
+     fires again → bounces back to login
+
+### Fix
+- Deleted `clearTokens()` (the role-blind wipe).
+- Added `_detectActiveSlot(token)` and `_clearSingleSlot(key)` helpers
+  that match the failing request's Authorization header back to its
+  origin slot, then clear ONLY that slot. Other role's session in
+  the same browser stays intact.
+- Applied at BOTH 401 paths: direct auth-endpoint 401, and the
+  refresh-attempt-failed fallback.
+
+### Tests
+- New `tests/test_iter326ll_auth_interceptor_role_isolation.py` —
+  6 tests: no `clearTokens` define or call (regression guard with
+  comment-stripping), role-aware helpers present, both 401 branches
+  use per-slot clear, 3 slot constants explicit, iter marker present.
+- Full iter326 regression: **415 passing in 16 s**.
+- Live admin + customer logins verified after the fix (both return
+  valid JWTs).
+
+### Watchdog mode reinforced
+Per WATCHDOG_MODE.md, ORA-CTO will own future auth audits; this fix
+was finished in-flight only because leaving the interceptor with an
+undefined `clearTokens()` would have brick'd the build.

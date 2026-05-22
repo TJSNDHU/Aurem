@@ -46,7 +46,22 @@ export const API = `${BACKEND_URL}/api`;
 // Components are encouraged to migrate to this client over time. Existing
 // raw fetch/axios calls keep working — this is purely additive.
 // ─────────────────────────────────────────────────────────────
-const TOKEN_KEYS = ['aurem_customer_token', 'aurem_admin_token', 'auth_token'];
+// iter 326ll — ROLE-AWARE TOKEN ACCESS for the 401 interceptor.
+// The OLD `TOKEN_KEYS = [...]` array combined with a blind
+// `clearTokens()` wiped admin + customer + legacy slots on any 401 from
+// `/api/auth/*`. That undid the iter 326o role separation: a single
+// expired admin refresh fired by a background poller would silently
+// kick out the customer session in the same browser. Net effect for
+// the founder: "login and logout broken in production" — even though
+// the backend was minting JWTs correctly.
+//
+// Fix: read tokens preferring the most recently-used slot; if we have
+// to clear on a hard auth failure, clear ONLY the slot the failing
+// request was using. Never touch the other role.
+const ADMIN_TOKEN_KEY    = 'aurem_admin_token';
+const CUSTOMER_TOKEN_KEY = 'aurem_customer_token';
+const LEGACY_TOKEN_KEY   = 'auth_token';
+const TOKEN_KEYS = [CUSTOMER_TOKEN_KEY, ADMIN_TOKEN_KEY, LEGACY_TOKEN_KEY];
 
 const readToken = () => {
   if (typeof window === 'undefined') return null;
@@ -59,14 +74,31 @@ const readToken = () => {
   return null;
 };
 
-const clearTokens = () => {
-  if (typeof window === 'undefined') return;
-  for (const k of TOKEN_KEYS) {
-    try {
-      localStorage.removeItem(k);
-      sessionStorage.removeItem(k);
-    } catch (_e) { /* ignore */ }
+// Identify which slot a token came from so we can clear *only* that slot
+// on a hard refresh failure. Falls back to the legacy slot.
+const _readSlot = (key) => {
+  try { return localStorage.getItem(key) || sessionStorage.getItem(key) || null; }
+  catch { return null; }
+};
+
+const _detectActiveSlot = (token) => {
+  if (!token) {
+    // Pick whichever slot has SOMETHING — admin first only if no customer.
+    if (_readSlot(CUSTOMER_TOKEN_KEY)) return CUSTOMER_TOKEN_KEY;
+    if (_readSlot(ADMIN_TOKEN_KEY))    return ADMIN_TOKEN_KEY;
+    return LEGACY_TOKEN_KEY;
   }
+  // Match the actual JWT string against each slot to pinpoint origin.
+  for (const k of TOKEN_KEYS) {
+    if (_readSlot(k) === token) return k;
+  }
+  return LEGACY_TOKEN_KEY;
+};
+
+const _clearSingleSlot = (key) => {
+  if (typeof window === 'undefined') return;
+  try { localStorage.removeItem(key); }   catch (_e) { /* ignore */ }
+  try { sessionStorage.removeItem(key); } catch (_e) { /* ignore */ }
 };
 
 const dispatchAuthExpired = () => {
@@ -104,7 +136,14 @@ apiClient.interceptors.response.use(
     }
     // Skip refresh attempts for the auth endpoints themselves to avoid loops.
     if ((originalReq.url || '').includes('/api/auth/')) {
-      clearTokens();
+      // iter 326ll — only clear the slot the FAILING request used.
+      // Never wipe both roles from one 401 (that's the regression that
+      // broke prod login/logout).
+      const failingTok = (originalReq.headers || {}).Authorization
+        ? String(originalReq.headers.Authorization).replace(/^Bearer\s+/i, '')
+        : null;
+      const slot = _detectActiveSlot(failingTok);
+      _clearSingleSlot(slot);
       dispatchAuthExpired();
       return Promise.reject(error);
     }
@@ -143,7 +182,16 @@ apiClient.interceptors.response.use(
     } catch (_e) {
       /* fall through to graceful sign-out */
     }
-    clearTokens();
+    // iter 326ll — refresh path is over; clear ONLY the slot the
+    // failing request used. Other role's token in the same browser
+    // stays untouched.
+    {
+      const failingTok = (originalReq.headers || {}).Authorization
+        ? String(originalReq.headers.Authorization).replace(/^Bearer\s+/i, '')
+        : null;
+      const slot = _detectActiveSlot(failingTok);
+      _clearSingleSlot(slot);
+    }
     dispatchAuthExpired();
     return Promise.reject(error);
   }
