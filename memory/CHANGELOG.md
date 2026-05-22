@@ -9144,3 +9144,49 @@ before it bit a real campaign."
   endpoints registered, single-hook set_db propagation.
 - Full iter326 regression: **389 passing in 17 s**. Backend healthy;
   all 4 new admin endpoints respond 204 (auth-gated as designed).
+
+## 2026-02-XX — iter 326ii/jj: ORA Cockpit + Skills Seed + 3 Admin UIs
+
+### iter 326ii — ORA Watchdog Cockpit + supporting admin surfaces (frontend)
+Founder ask: "Build cockpit. Bina cockpit ke sab kuch andheron mein hai."
+
+- **OraWatchdogCockpit.jsx** (`/admin/ora-watchdog`) — single-screen 2×2
+  grid that mounts the four watchdog cards built earlier:
+  DailySpend + EmailHealth + MorningBrief + RecentDecisions. Mobile
+  collapses to 1-column.
+- **MorningBriefCard.jsx** — desktop cockpit-grid sibling of the mobile
+  brief (5-min refresh, KPIs + alerts + focus leads).
+- **VoiceProfileEditor.jsx** (`/admin/ora-voice`) — load by tenant_id,
+  edit tone (6 chips) / formality (3 chips) / industry (19 options) /
+  signature, save with confirmation. Reads + writes
+  /api/admin/ora/voice-profile/{tenant_id}.
+- **SkillsMarketplace.jsx** (`/admin/ora-skills`) — browse seeded
+  catalog, filter by category, click a card to open install panel
+  (right-side on desktop, bottom-sheet on mobile), install per
+  tenant. Auto-refresh after install.
+- **MorningBriefMobile.jsx** (`/admin/morning-brief`) — standalone
+  mobile-first PWA route. No chrome, big tabular numbers, alerts
+  section only renders if non-empty, refresh button at the bottom.
+- 4 new routes registered in `App.js`.
+
+### iter 326jj — Skills marketplace seed (backend)
+- New `services/ora_skills_seed.py` with 5 reference skills, all free:
+    aurem-gst-hst-filing                  (tax)
+    aurem-wsib-compliance                 (compliance)
+    aurem-gta-seasonal-campaigns          (marketing)
+    aurem-roofer-snow-clearing-pack       (outreach)
+    aurem-dental-recall-reminders         (customer_success)
+- Hooked into `server.py` startup_event as a background async task
+  (`_bg_seed_skills`). Fire-and-forget, idempotent — every boot logs
+  `[STARTUP-BG] skills seed: created=X skipped=Y failed=Z`.
+- Verified live: empty `aurem_db.ora_skills` → after boot has 5 rows.
+  Second boot logs `created=0 skipped=5`.
+
+### Tests
+- New `tests/test_iter326ii_jj_cockpit_seed_and_frontend_surfaces.py`
+  — 15 tests covering: 5 stable skill IDs, required field shape, full
+  idempotency contract (insert→insert again→skip), startup wiring,
+  every frontend file's existence + endpoint + data-testids, App.js
+  routes + imports, admin-token usage on every fetch.
+- Full iter326 regression: **404 passing in 16 s**. Backend healthy;
+  all five new admin surfaces lint clean.

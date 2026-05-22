@@ -1450,6 +1450,25 @@ async def startup_event():
 
                 asyncio.create_task(_bg_atlas_init())
                 logging.info("[STARTUP] Atlas-touching probes scheduled in background")
+
+                # iter 326jj — Seed 5 reference skills so the marketplace
+                # isn't empty on day one. Idempotent — skips any skill_id
+                # that already exists. Fire-and-forget; failure must not
+                # block startup.
+                async def _bg_seed_skills():
+                    try:
+                        from services.ora_skills_seed import ensure_seed_skills
+                        from services import ora_skills
+                        if ora_skills._db is None:
+                            ora_skills.set_db(db)
+                        r = await ensure_seed_skills()
+                        logging.info(
+                            f"[STARTUP-BG] skills seed: created={r.get('created')} "
+                            f"skipped={r.get('skipped')} failed={r.get('failed')}"
+                        )
+                    except Exception as e:
+                        logging.warning(f"[STARTUP-BG] skills seed skipped: {e}")
+                asyncio.create_task(_bg_seed_skills())
                 # ════════════════════════════════════════════════════════════════
                 
         except Exception as e:

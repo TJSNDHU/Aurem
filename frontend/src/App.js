@@ -90,6 +90,10 @@ import CouncilAuditPage from './platform/admin/CouncilAuditPage';
 import DesignExtractStudio from './platform/admin/DesignExtractStudio';
 import OraOptimizer from './platform/admin/OraOptimizer';
 import OraCtoCockpit from './platform/admin/OraCtoCockpit';
+import OraWatchdogCockpit from './platform/admin/OraWatchdogCockpit';
+import VoiceProfileEditor from './platform/admin/VoiceProfileEditor';
+import SkillsMarketplace from './platform/admin/SkillsMarketplace';
+import MorningBriefMobile from './platform/admin/MorningBriefMobile';
 import GitCommitGate from './platform/admin/GitCommitGate';
 import OraChat from './platform/admin/OraChat';
 import OraSettings from './platform/admin/OraSettings';
@@ -347,6 +351,11 @@ function AppRouter() {
         <Route path="/admin/ora" element={<OraAdminUnified />} />
         <Route path="/admin/ora-optimize" element={<Navigate to="/admin/ora?tab=optimizer" replace />} />
         <Route path="/admin/ora-cto" element={<Navigate to="/admin/ora?tab=cockpit" replace />} />
+        {/* iter 326ii — Phase 3 watchdog cockpit + supporting admin surfaces */}
+        <Route path="/admin/ora-watchdog" element={<OraWatchdogCockpit />} />
+        <Route path="/admin/ora-voice" element={<VoiceProfileEditor />} />
+        <Route path="/admin/ora-skills" element={<SkillsMarketplace />} />
+        <Route path="/admin/morning-brief" element={<MorningBriefMobile />} />
         <Route path="/admin/git-gate" element={<GitCommitGate />} />
         <Route path="/admin/ora-chat" element={<Navigate to="/admin/ora?tab=chat" replace />} />
         <Route path="/admin/incident-ledger" element={<IncidentLedger />} />
