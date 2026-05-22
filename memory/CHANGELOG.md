@@ -9280,3 +9280,48 @@ separation. Real-world failure path:
 Per WATCHDOG_MODE.md, ORA-CTO will own future auth audits; this fix
 was finished in-flight only because leaving the interceptor with an
 undefined `clearTokens()` would have brick'd the build.
+
+## 2026-02-XX — iter 326mm: Recipient Guard Shim + Memoir Git Pre-Check
+
+### Production deploy log warnings addressed
+1. `[recipient-guard] resend import failed: No module named 'resend.logs'`
+   — guard not installed. Cause: file was missed by the iter 326x mass
+   migration. Fix: route through `services.email_engine` so the
+   iter 326kk HTTP fallback applies; guard now installs on every boot.
+
+2. `[memoir] init failed: memoir new exit=5: ... No such file or
+   directory: 'git'`. Cause: the memoir CLI shells out to git, and the
+   production container doesn't ship git. Fix: pre-check
+   `shutil.which("git")` before spawning the subprocess and raise
+   `"git binary not found in PATH"`. Net behaviour unchanged (init
+   returns False, app keeps running), but the log line is now self-
+   explanatory instead of a stack trace.
+
+3. `[email_engine] resend SDK completely unavailable, using stub:
+   No module named 'resend.logs'`. Already fixed by iter 326kk (HTTP
+   fallback). The deploy log was from the pre-iter-326kk bundle —
+   confirmed by inspecting preview source. User just needs to redeploy.
+
+### Other deploy log items (NOT code-level fixes)
+- `AUREM_ENCRYPTION_KEY not configured` — code correctly refuses to
+  use a default key in production. User must set the env var in the
+  Emergent panel for nexus_router and AI Repair to load.
+- `Council Verdict Auto-Apply ... was missed by 0:01:06` — job ran
+  long; APScheduler skipped one tick. Not a deploy blocker.
+- `ORA Tier 2 Auto-Executor skipped: maximum running instances
+  reached (1)` — one tick still running when the next fires; our
+  `max_instances=1 coalesce=True` config catches this exactly as
+  designed. Log noise, not a defect.
+- nginx 502 on `/api/docs` during pod boot — transient during the
+  20-40 s startup window, harmless.
+- `405 Method Not Allowed` on GET to `/api/auth/login` and
+  `/api/seo-audit/scan` — internal poller bug (uses GET on POST-only
+  endpoints). Will address as separate cleanup.
+
+### Tests
+- New `tests/test_iter326mm_recipient_guard_and_memoir_resilience.py`
+  — 7 tests covering: guard uses engine shim, no bare `import resend`
+  outside comments, warning message mentions "shim", memoir uses
+  `shutil.which("git")`, git pre-check runs before subprocess,
+  clear error message, module import smoke.
+- Full iter326 regression: **422 passing in 23 s**. Backend healthy.

@@ -80,6 +80,12 @@ def _ensure_store_dir() -> None:
     # to time out in read-only production containers.
     if not os.access(parent, os.W_OK):
         raise RuntimeError(f"parent {parent} is not writable")
+    # iter 326mm — pre-check for `git` so we fail clean in containers
+    # that don't ship git. memoir's `new` command shells out to git and
+    # would otherwise exit 5 with a stack trace in the logs.
+    import shutil as _shutil
+    if _shutil.which("git") is None:
+        raise RuntimeError("git binary not found in PATH — memoir store cannot be initialised in this container")
     try:
         r = subprocess.run(
             ["memoir", "new", _STORE_PATH],

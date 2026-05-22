@@ -80,11 +80,15 @@ def install_recipient_guard() -> bool:
     nothing to rescue.
     """
     try:
-        import resend  # noqa: F401
+        # iter 326mm — route through the defensive engine shim. On the
+        # production wheel `import resend` raises ModuleNotFoundError on
+        # 'resend.logs'; the engine shim falls through to a direct
+        # Emails class or HTTP fallback, so the guard CAN install.
+        from services.email_engine import resend  # iter 326mm defensive
         Emails = getattr(resend, "Emails", None)
     except Exception as e:
         logger.warning(
-            f"[recipient-guard] resend import failed: {e} — guard not installed"
+            f"[recipient-guard] resend shim import failed: {e} — guard not installed"
         )
         return False
 
