@@ -3460,7 +3460,15 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
         try:
             result = await fn(**args)
         except TypeError as e:
-            result = {"ok": False, "error": f"bad args for {name}: {str(e)[:120]}"}
+            # iter 326ss — surface the tool's args_spec on bad-args so
+            # the LLM brain can self-correct on the next iteration
+            # instead of retrying with the same wrong shape and
+            # tripping the consecutive-failure ceiling.
+            meta = TOOL_REGISTRY.get(name) or {}
+            result = {"ok": False,
+                       "error": f"bad args for {name}: {str(e)[:120]}",
+                       "args_spec": meta.get("args_spec") or {},
+                       "args_passed": sorted(args.keys())}
         except Exception as e:
             result = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
 

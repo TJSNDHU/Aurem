@@ -73,7 +73,7 @@ EXPIRY_MINUTES:        int = int(os.environ.get("ORA_APPROVAL_EXPIRY_MIN", "60")
 # high-risk) is NOT auto-executed — founder must still click approve.
 TIER2_AUTO_EXECUTE_SECONDS: int = 30
 MAX_TOOL_ITERATIONS:   int = 8
-MAX_LOOP_WALL_SECONDS: int = int(os.environ.get("ORA_MAX_LOOP_S", "150"))
+MAX_LOOP_WALL_SECONDS: int = int(os.environ.get("ORA_MAX_LOOP_S", "300"))
 PENDING_COLLECTION:    str = "ora_pending_actions"
 HISTORY_COLLECTION:    str = "ora_agent_history"
 HISTORY_CAP:           int = 40   # non-system messages kept per session
