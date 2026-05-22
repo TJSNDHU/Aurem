@@ -354,11 +354,19 @@ def test_system_prompt_has_build_mode_directive():
     for marker in ("Step 1 — PLAN", "Step 2 — WIRE", "Step 3 — TEST",
                    "Step 4 — VERIFY", "Step 5 — REPLY"):
         assert marker in SYSTEM_PROMPT, f"missing marker: {marker}"
-    # Proof table format must be specified
-    assert "PROOF TABLE" in SYSTEM_PROMPT
-    assert "| 3. Test" in SYSTEM_PROMPT  # markdown table row
+    # iter 326n — verification tools are still mandatory; only the
+    # founder-facing reply format changed (plain English summary first,
+    # technical proof on demand instead of mandated PROOF TABLE).
     assert "run_pytest" in SYSTEM_PROMPT
     assert "verify_endpoint" in SYSTEM_PROMPT
+    # Pass criteria for both must still be hard-wired into the prompt.
+    assert "passed >= 1" in SYSTEM_PROMPT and "failed == 0" in SYSTEM_PROMPT
+    assert "matched_status" in SYSTEM_PROMPT
+    # Anti-hallucination guard rails still in force.
+    assert "looks good" in SYSTEM_PROMPT  # banned phrase reference
+    # "should be working" appears across a line wrap in the prompt source,
+    # so match the literal substring as it lands in the rendered string.
+    assert "should\n      be working" in SYSTEM_PROMPT or "should be working" in SYSTEM_PROMPT
 
 
 def test_server_startup_wires_build_verifier_db():

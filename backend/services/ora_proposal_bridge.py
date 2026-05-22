@@ -141,30 +141,41 @@ def _classify_tier(action_kind: Optional[str], confidence: float) -> Tuple[str, 
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Plain-Hinglish translation layer (iter 322t)
+# Plain-English translation layer (iter 322t / iter 326n)
 # ─────────────────────────────────────────────────────────────────────
 # Every proposal carries a `plain_language` dict that the founder UI
 # renders by default. Technical detail (proposal_text) is hidden behind
 # a "Details" toggle. Translation is best-effort — if the LLM is slow
 # or unavailable, we store a safe fallback so proposal creation never
 # fails because of i18n.
+#
+# iter 326n — switched output language Hinglish → plain English at the
+# founder's explicit request: "I'm a non-tech founder vibecoder, reply
+# to me in english human language". Schema field names and call sites
+# unchanged — only the LLM-facing instructions changed.
 _TRANSLATE_TIMEOUT_S = 10
 _TRANSLATE_SYSTEM = (
     "You translate technical software-engineering proposals into simple "
-    "Hinglish (Hindi-English mix in Latin script) so a non-technical "
-    "business owner can decide approve/reject. Output STRICT JSON only.\n\n"
+    "plain English so a non-technical business owner can decide "
+    "approve/reject. Output STRICT JSON only.\n\n"
     "Schema (no markdown, no prose, no fences):\n"
     "{\n"
-    '  "problem_found":      "1-2 line Hinglish — what problem was found",\n'
-    '  "what_will_change":   "1-2 line Hinglish — what will change",\n'
-    '  "impact_if_approved": "1-2 line Hinglish — business benefit if approved",\n'
-    '  "risk_if_rejected":   "1-2 line Hinglish — risk if rejected"\n'
+    '  "problem_found":      "1-2 line plain English — what problem was found",\n'
+    '  "what_will_change":   "1-2 line plain English — what will change",\n'
+    '  "impact_if_approved": "1-2 line plain English — business benefit if approved",\n'
+    '  "risk_if_rejected":   "1-2 line plain English — risk if rejected"\n'
     "}\n\n"
     "Rules:\n"
     "• Each value max 2 lines. No technical jargon (file paths, function names, "
-    "code snippets) — replace with the user-facing thing it controls.\n"
-    "• Use natural Hinglish: 'Tera checkout page pe error aa raha hai', "
-    "not formal Hindi.\n"
+    "code snippets, framework names like FastAPI/React/MongoDB) — replace "
+    "with the user-facing thing it controls.\n"
+    "• Plain English only. NO Hindi, NO Hinglish, NO Punjabi — even if the "
+    "proposal text is in another language, the OUTPUT must be plain English.\n"
+    "• Translate technical terms: database → 'your records', endpoint → 'this "
+    "feature', deploy → 'publish to your live site', env var → 'a setting', "
+    "connection pool → 'doors to the database'.\n"
+    "• Friendly co-founder voice. Example good: 'Your checkout page has been "
+    "showing an error to customers — this fix makes the Pay button work again.'\n"
     "• If you cannot understand the proposal, return all fields as "
     "'Translation unavailable — see technical details below.'"
 )
