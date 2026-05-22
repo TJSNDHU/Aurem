@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Constants ─────────────────────────────────────────────────────────
-EXPIRY_MINUTES:        int = 30
+EXPIRY_MINUTES:        int = int(os.environ.get("ORA_APPROVAL_EXPIRY_MIN", "60"))
 
 # iter 326w — 30-second cancel window for Tier 2 actions. Founder
 # chose this UX so they don't have to click [Approve] on every safe-edit
@@ -2387,9 +2387,13 @@ async def resume_after_decision(
     )
 
     if not row:
+        # iter 326rr — surface a structured error_code so the UI can
+        # render distinct, friendlier messaging per cause without
+        # parsing the English string.
         return {
-            "ok":    False,
-            "error": "action not found, already processed, or expired",
+            "ok":         False,
+            "error":      "action not found, already processed, or expired",
+            "error_code": "expired_or_missing",
         }
 
     # Session ownership check
@@ -2399,7 +2403,8 @@ async def resume_after_decision(
             {"_id": action_id},
             {"$set": {"status": "pending"}},
         )
-        return {"ok": False, "error": "session mismatch"}
+        return {"ok": False, "error": "session mismatch",
+                "error_code": "session_mismatch"}
 
     # Founder email ownership check — prevents cross-user approval
     stored_email = row.get("founder_email")
@@ -2408,7 +2413,8 @@ async def resume_after_decision(
             {"_id": action_id},
             {"$set": {"status": "pending"}},
         )
-        return {"ok": False, "error": "not authorized to approve this action"}
+        return {"ok": False, "error": "not authorized to approve this action",
+                "error_code": "not_authorized"}
 
     history = await _load_history(session_id)
 

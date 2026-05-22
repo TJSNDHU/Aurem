@@ -305,14 +305,9 @@ export default function OraChat() {
 
   const decide = async (approved, note = "") => {
     if (!pending) return;
+    const actionSummary = pending.summary;
+    const actionTier    = pending.tier;
     setBusy(true); setError(null);
-    // Echo decision into history
-    setHistory((h) => [...h, {
-      role: "decision",
-      content: `${approved ? "✓ Approved" : "✗ Rejected"}: ${pending.summary}`,
-      tier: pending.tier,
-      ts: Date.now(),
-    }]);
     try {
       const endpoint = approved ? "approve" : "reject";
       const r = await fetch(`${API}/api/ora/agent/${endpoint}`, {
@@ -325,8 +320,40 @@ export default function OraChat() {
         }),
       });
       const j = await safeJson(r);
-      applyTurnResult(j);
+      // iter 326rr — UX bug fix. Whether the decide() API succeeded or
+      // failed (expired / already processed / session mismatch / not
+      // authorized), the approval card is DEAD either way. Always clear
+      // `pending` here so the UI never leaves a zombie card on screen
+      // and the bottom-bar "decide first" lockout lifts immediately.
+      // Echo the decision into history AFTER we know the outcome — never
+      // pre-emptively (that produced a false "✓ Approved" line when the
+      // backend later returned ok:false).
+      const ok = j && j.ok !== false;
+      const verb = ok
+        ? (approved ? "✓ Approved" : "✗ Rejected")
+        : (approved ? "⚠️ Approval failed" : "⚠️ Reject failed");
+      setHistory((h) => [...h, {
+        role: "decision",
+        content: `${verb}: ${actionSummary}`,
+        tier: actionTier,
+        ts: Date.now(),
+      }]);
+      setPending(null);
+      if (!ok) {
+        const msg = (j && (j.error || j.detail))
+          || `HTTP ${j && j._http_status}`;
+        // Friendlier wording for the most common case: row expired
+        // between propose and click (default 30-min window).
+        const friendly = /not found|already processed|expired/i.test(msg)
+          ? "Yeh approval expire ho gayi (30 min window). " +
+            "ORA ko dobara bolo — fresh action banegi."
+          : msg;
+        setError(friendly);
+      } else if (j.reply) {
+        applyTurnResult(j);
+      }
     } catch (e) {
+      setPending(null);  // network error also kills the card
       setError(String(e));
     } finally {
       setBusy(false);
