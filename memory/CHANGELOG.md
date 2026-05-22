@@ -8852,3 +8852,27 @@ total security regression tests passing** (8 suites).
 ### Test suite
 - New: `/app/backend/tests/test_round16_round17_fixes.py` — 21 tests, all
   pass. Full security regression: **145 tests across 8 suites, all green**.
+
+## 2026-02-XX — iter 326v: Token Cost Transparency (Phase 1 wrap-up)
+
+Founder ask: "I'm in the dark — no clue if a turn costs me $0.02 or $2."
+
+### What shipped
+- `_PROVIDER_PRICING_USD_PER_M_TOKENS` table for all 8 chain providers
+  (deepseek, gemini, nvidia, claude, groq, ollama, legion_ollama, freellmapi).
+  Free providers report exactly $0.
+- `_estimate_call_cost_usd(provider, prompt_chars, response_chars)` — pure
+  Python cost estimator using tokens ≈ chars/4.
+- `_SESSION_COST_USD` module-level dict tracks `turn_total` + `session_total`
+  per session_id.
+- `_reset_turn_cost()` called at the start of every user message; only
+  clears turn_total, never session_total.
+- `_track_session_cost()` wired into `_llm_turn` via `__ora_provider__`,
+  `__ora_prompt_chars__`, `__ora_resp_chars__` keys on the winning msg.
+- `_format_cost_footer()` renders `_(This turn: $0.003 · Session: $0.018)_`
+  on every final assistant reply. Sub-cent values shown as `<$0.001`.
+- Operator kill-switch: set `ORA_AGENT_SHOW_COST=0` to hide the footer.
+
+### Tests
+- New `tests/test_iter326v_token_cost_transparency.py` — 19 tests, all green.
+- Full iter326 regression suite: **262 passing in 13s**.
