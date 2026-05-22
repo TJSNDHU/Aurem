@@ -1390,6 +1390,18 @@ async def _gemini_with_tools(
             # gemini immediately for cooldown window.
             if r.status_code in (401, 403):
                 _gemini_cb_record_failure(f"HTTP {r.status_code}: {r.text[:120]}")
+                # iter 326pp — silent-failure alert: Gemini key suspended
+                # or quota burnt mid-autonomous-loop. Dedup is per provider.
+                try:
+                    from services.silent_failure_alerts import alert_autonomous_401
+                    alert_autonomous_401(
+                        context="ora_agent.gemini_call",
+                        status_code=r.status_code,
+                        detail=r.text[:300],
+                        provider="gemini",
+                    )
+                except Exception:
+                    pass
             logger.warning(f"[ora-agent] gemini {r.status_code}: {r.text[:240]}")
     except Exception as e:
         logger.warning(f"[ora-agent] gemini error: {type(e).__name__}: {e}")

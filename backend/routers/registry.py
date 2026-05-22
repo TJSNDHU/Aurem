@@ -2801,6 +2801,34 @@ def register_all_routers(app, db):
         aurem_scheduler.start()
         logger.info("[REGISTRY] AUREM Bug Engine scheduler started (every 10 min)")
 
+        # iter 326pp — silent-failure alerts: any scheduled job that
+        # raises now fires a single Telegram ping (dedup 5 min per
+        # job_id+exception). Previously a job could crash quietly and
+        # the only trace was in backend.err.log. Listener swallows all
+        # errors so a bad alert never kills the scheduler itself.
+        try:
+            from apscheduler.events import EVENT_JOB_ERROR
+            from services.silent_failure_alerts import alert_scheduler_crash
+
+            def _on_job_error(event):
+                try:
+                    job = aurem_scheduler.get_job(event.job_id)
+                    name = job.name if job else event.job_id
+                    tb = event.traceback if hasattr(event, "traceback") else None
+                    alert_scheduler_crash(
+                        job_id=event.job_id,
+                        job_name=name,
+                        exception=event.exception,
+                        tb_str=tb,
+                    )
+                except Exception as _le:
+                    logger.warning(f"[REGISTRY] scheduler error-listener failed: {_le}")
+
+            aurem_scheduler.add_listener(_on_job_error, EVENT_JOB_ERROR)
+            logger.info("[REGISTRY] Scheduler crash-alert listener attached")
+        except Exception as _le:
+            logger.warning(f"[REGISTRY] Could not attach scheduler error listener: {_le}")
+
         # iter 322 — Sentinel A2A → Council → ORA repair loop. Picks up
         # NEW client_errors every 60s, auto-heals known patterns, and
         # autonomously diagnoses the top N unique AI-eligible signatures

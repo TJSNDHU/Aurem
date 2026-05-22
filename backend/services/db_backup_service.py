@@ -371,6 +371,11 @@ def run_backup(triggered_by: str = "scheduler") -> Dict[str, Any]:
             "SECONDARY_MONGO_URL not configured — DR backup disabled"
         )
         logger.warning(f"[DR-BACKUP] {run_id} skipped: SECONDARY_MONGO_URL missing")
+        try:
+            from services.silent_failure_alerts import alert_backup_failure
+            alert_backup_failure(run_id, "fail", report["error"], triggered_by)
+        except Exception:
+            pass
         return report
 
     # iter 326m-stab.D — circuit breaker. If we recently determined the
@@ -487,6 +492,11 @@ def run_backup(triggered_by: str = "scheduler") -> Dict[str, Any]:
         report["finished_at"] = datetime.now(timezone.utc).isoformat()
         logger.exception(f"[DR-BACKUP] {run_id} failed: {e}")
         _send_failure_email(str(e), run_id)
+        try:
+            from services.silent_failure_alerts import alert_backup_failure
+            alert_backup_failure(run_id, "fail", report["error"], triggered_by)
+        except Exception:
+            pass
     finally:
         # Persist run report to PRIMARY (for ops dashboard); never throw.
         try:
