@@ -667,6 +667,11 @@ TIER_2_APPROVE: set[str] = {
     "create_file", "delete_file",
     # iter 322g — local git checkpoint (push still needs founder click)
     "git_commit_local",
+    # iter 326y — Phase 2 P1: real browser tool. External URLs go to
+    # tier 2 so they get the 30-second cancel window (iter 326w). Cost
+    # is non-trivial (~3s per call) and we never want ORA crawling a
+    # site by mistake without founder visibility.
+    "browser_get_text", "browser_screenshot",
 }
 
 TIER_3_HIGH_RISK: set[str] = {
@@ -2014,8 +2019,10 @@ Three risk tiers govern tool execution:
     git_bisect, campaign_status, force_blast_cycle, channel_gating_reseed.
     These execute IMMEDIATELY when you call them — no approval needed.
   • TIER 2 (approve) — safe_edit, restart_service, propose_commit, save_to_github,
-    create_file, delete_file, ora_rollback_list, rollback, git_commit_local.
-    These pause for the founder to tap [Approve] in the chat UI.
+    create_file, delete_file, ora_rollback_list, rollback, git_commit_local,
+    browser_get_text, browser_screenshot.
+    These pause for the founder to tap [Approve] in the chat UI (or auto-execute
+    after a 30-second cancel window for tier 2 — see iter 326w).
   • TIER 3 (high risk) — legion_exec, supervisor_restart_all, prod env edits,
     stripe_charge, send_bulk_email. These ALSO pause for approval, marked red.
 

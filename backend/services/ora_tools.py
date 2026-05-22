@@ -2718,6 +2718,77 @@ async def _ora_git_bisect(
 
 
 
+# ── iter 326y — Phase 2 P1: Real Browser Tool (Playwright) ─────────────
+# Wraps the existing services/browser_agent_service.py so ORA-CTO can
+# scrape dynamic pages (Yelp menus, Google Search Console, Shopify
+# settings, competitor pricing). Two surfaces:
+#
+#   browser_get_text    — navigate + extract text (optional CSS selector)
+#   browser_screenshot  — navigate + capture screenshot (PNG)
+#
+# Both honor ORA's tier system (browser_screenshot/get_text are TIER_2 so
+# external URLs get the 30-second cancel window from iter 326w). The
+# inner approval queue in browser_agent_service is bypassed by passing
+# requires_approval=False — ORA's own tier gate is the founder approval.
+async def browser_get_text(
+    url: str,
+    selector: str | None = None,
+    multiple: bool = False,
+    wait_ms: int = 800,
+) -> dict:
+    """Navigate to URL with a real Chromium browser and return rendered
+    text. Useful for pages that need JS to render (SPAs, dashboards
+    behind auth, Yelp business pages, GSC, etc.).
+
+    Args:
+      url:      full http(s) URL
+      selector: optional CSS selector — return text inside matching el(s)
+      multiple: if true with selector, return list of matches
+      wait_ms:  extra wait after domcontentloaded (for late JS)
+    """
+    if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+        return {"ok": False, "error": "url must start with http:// or https://"}
+    try:
+        from services.browser_agent_service import extract_url
+    except Exception as e:
+        return {"ok": False, "error": f"browser_agent_service import failed: {e}"}
+    res = await extract_url(
+        url,
+        selector=selector,
+        multiple=bool(multiple),
+        requires_approval=False,  # ORA tier gate is the approval
+        reason=f"ora-cto browser_get_text({selector or 'body'})",
+        triggered_by="ora_cto",
+    )
+    return res
+
+
+async def browser_screenshot(
+    url: str,
+    full_page: bool = True,
+    wait_ms: int = 1500,
+) -> dict:
+    """Navigate to URL with a real Chromium browser and capture a PNG
+    screenshot. Returned image_url is either an R2 public URL or a
+    local /tmp path the static-proxy can serve.
+    """
+    if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+        return {"ok": False, "error": "url must start with http:// or https://"}
+    try:
+        from services.browser_agent_service import screenshot_url
+    except Exception as e:
+        return {"ok": False, "error": f"browser_agent_service import failed: {e}"}
+    res = await screenshot_url(
+        url,
+        full_page=bool(full_page),
+        wait_ms=int(wait_ms),
+        requires_approval=False,
+        reason="ora-cto browser_screenshot",
+        triggered_by="ora_cto",
+    )
+    return res
+
+
 TOOL_REGISTRY: dict[str, dict] = {
     "grep_codebase":  {
         "fn": grep_codebase,
@@ -2725,6 +2796,37 @@ TOOL_REGISTRY: dict[str, dict] = {
                       "root": "/app/{backend,frontend,memory,ora_skills}",
                       "max_results": "int 1-200, default 40"},
         "description": "Real grep -rn over the codebase. Returns matched lines with file:line:body.",
+    },
+    # iter 326y — Phase 2 P1: Real Browser Tool (Playwright)
+    "browser_get_text": {
+        "fn": browser_get_text,
+        "args_spec": {
+            "url":      "str http(s) URL (required)",
+            "selector": "str CSS selector — optional, default returns <body> text",
+            "multiple": "bool — true to return list of matches for selector",
+            "wait_ms":  "int — extra wait after domcontentloaded, default 800",
+        },
+        "description": (
+            "iter 326y — Drive a real Chromium browser to a URL and return "
+            "rendered text. Use this for pages that need JS to render: "
+            "Yelp business pages, GSC dashboards, Shopify admin, competitor "
+            "pricing pages, social profiles, etc. Returns the visible text "
+            "of <body> or a CSS-selected element."
+        ),
+    },
+    "browser_screenshot": {
+        "fn": browser_screenshot,
+        "args_spec": {
+            "url":       "str http(s) URL (required)",
+            "full_page": "bool — capture entire scrollable page, default true",
+            "wait_ms":   "int — extra wait after domcontentloaded, default 1500",
+        },
+        "description": (
+            "iter 326y — Drive a real Chromium browser to a URL and capture "
+            "a PNG screenshot. Returns an R2 image URL (or a local /tmp path "
+            "served via the static proxy). Useful for visual evidence in lead "
+            "research, competitor analysis, and bug reports."
+        ),
     },
     "view_file": {
         "fn": view_file,

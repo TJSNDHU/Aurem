@@ -8948,3 +8948,34 @@ rolling redeploy (new pod still booting). With 200+ routers and many
 schedulers, AUREM backend takes 20-40 s to bind port 8001 — within a
 deploy window nginx will record "Connection refused" until the new pod
 is ready. Not a code defect.
+
+## 2026-02-XX — iter 326y: Phase 2 P1 — Real Browser Tool (Playwright)
+
+### Capability jump
+ORA-CTO can now drive a real Chromium browser, not just curl static HTML.
+Unlocks: Yelp business pages, Google Search Console, Shopify admin,
+competitor pricing pages, JS-rendered SPAs, social profiles — anything
+that needs JS to render is now in scope.
+
+### What shipped
+- New tools in `services/ora_tools.py`:
+  - `browser_get_text(url, selector=None, multiple=False, wait_ms=800)`
+  - `browser_screenshot(url, full_page=True, wait_ms=1500)`
+- Both delegate to the existing `services/browser_agent_service.py`
+  (Chromium via Playwright, R2 upload for screenshots).
+- Both classified as **TIER_2_APPROVE** in `services/ora_agent.py`, so
+  external URLs auto-execute after the 30-second cancel window (iter
+  326w). ORA's tier gate IS the founder approval — inner approval queue
+  bypassed with `requires_approval=False`.
+- System prompt updated to advertise both tools.
+- URL validation: refuses anything that isn't http(s) without launching
+  the browser (defence against `javascript:`, `file://`, etc.).
+
+### Tests
+- New `tests/test_iter326y_playwright_browser_tool.py` — 21 tests
+  covering: registration, list_tools visibility, tier classification,
+  URL whitelist, delegation contract (must pass `requires_approval=False`),
+  failure surfacing through `invoke_tool`.
+- Full iter326 regression: **325 passing in 12 s**. Backend healthy
+  with both tools live in the tier2 list (verified via
+  `/api/ora/agent/_/health`).
