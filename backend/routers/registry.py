@@ -2914,6 +2914,31 @@ def register_all_routers(app, db):
         except Exception as wp_e:
             logger.warning(f"[REGISTRY] Warm prober schedule failed: {wp_e}")
 
+        # iter 326w — Tier 2 Auto-Executor. Every 5 s, atomically claims
+        # any tier2 pending action whose 30-second cancel window has
+        # elapsed and runs the standard approve path. Tier 3 actions
+        # are NEVER touched — those still need an explicit founder click.
+        try:
+            from services.ora_agent import auto_execute_due_tier2
+            from apscheduler.triggers.interval import IntervalTrigger as _IT_T2
+            async def _tier2_auto_exec_tick():
+                try:
+                    await auto_execute_due_tier2()
+                except Exception as _e:
+                    logger.debug(f"[tier2-auto-exec] tick error: {_e}")
+            aurem_scheduler.add_job(
+                _tier2_auto_exec_tick,
+                _IT_T2(seconds=5),
+                id="tier2_auto_executor",
+                name="ORA Tier 2 Auto-Executor (30s cancel window)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+            )
+            logger.info("[REGISTRY] tier2 auto-executor scheduled (every 5s)")
+        except Exception as t2_e:
+            logger.warning(f"[REGISTRY] tier2 auto-executor schedule failed: {t2_e}")
+
         # iter 323g — Pixel → ORA Bridge (5 min cron, no LLM call inside)
         try:
             from services.pixel_to_ora_bridge import PixelToOraBridge

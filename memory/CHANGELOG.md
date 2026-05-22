@@ -8876,3 +8876,38 @@ Founder ask: "I'm in the dark — no clue if a turn costs me $0.02 or $2."
 ### Tests
 - New `tests/test_iter326v_token_cost_transparency.py` — 19 tests, all green.
 - Full iter326 regression suite: **262 passing in 13s**.
+
+## 2026-02-XX — iter 326w: 30s Cancel Window + Daily Spend Dashboard
+
+### Watchdog mode adopted
+- Founder directive: ORA-CTO does the work, E1 main agent acts as
+  watchdog (terse review + regression tests). Policy saved to
+  `/app/memory/WATCHDOG_MODE.md`.
+
+### 30-second cancel window for Tier 2 (founder choice)
+- New constant `TIER2_AUTO_EXECUTE_SECONDS = 30` in `services/ora_agent.py`.
+- `_persist_pending` now stamps `auto_execute_at = now + 30s` for tier2
+  actions only. **Tier 3 stays None** — irreversible actions still
+  require an explicit founder click.
+- New `auto_execute_due_tier2()` async function: atomically claims any
+  overdue tier2 row (pending → auto_executing) and runs the standard
+  approve path via `resume_after_decision()`.
+- Hooked into `routers/registry.py` scheduler: ticks every 5 seconds,
+  job id `tier2_auto_executor`.
+- Action-required response now carries `auto_execute_in_seconds` and
+  `cancel_window_seconds` so the UI can render the countdown.
+
+### Daily LLM spend dashboard
+- `_track_session_cost` fires a best-effort insert into
+  `db.ora_llm_costs` ({session_id, provider, cost_usd, ts, day})
+  whenever cost > 0. Zero-cost free-provider calls don't pollute the
+  collection.
+- New endpoint `GET /api/admin/ora/cost-summary?days=7` returns total
+  cost, calls, daily breakdown, and per-provider rollup. Powers the
+  "watchdog before overnight autonomy" view.
+
+### Tests
+- New `tests/test_iter326w_cancel_window_and_cost_dashboard.py` — 7
+  tests covering: constants, tier2/tier3 persistence diff, atomic
+  auto-executor scoping, cost row persistence, zero-cost skip.
+- Full iter326 regression: **269 passing in 12s**.

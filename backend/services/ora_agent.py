@@ -63,6 +63,15 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────
 EXPIRY_MINUTES:        int = 30
+
+# iter 326w — 30-second cancel window for Tier 2 actions. Founder
+# chose this UX so they don't have to click [Approve] on every safe-edit
+# / restart / status-write. The action lands as pending with an
+# `auto_execute_at` 30 s in the future; if no /reject within that
+# window, the auto-executor (see auto_execute_due_tier2) calls the
+# normal approve path and ORA proceeds. Tier 3 (irreversible /
+# high-risk) is NOT auto-executed — founder must still click approve.
+TIER2_AUTO_EXECUTE_SECONDS: int = 30
 MAX_TOOL_ITERATIONS:   int = 8
 MAX_LOOP_WALL_SECONDS: int = int(os.environ.get("ORA_MAX_LOOP_S", "150"))
 PENDING_COLLECTION:    str = "ora_pending_actions"
@@ -551,7 +560,11 @@ def _estimate_call_cost_usd(
 def _track_session_cost(session_id: str, provider: str, cost_usd: float) -> None:
     """Add a successful call's cost to the running session total AND
     the current-turn total. The agent loop resets turn-cost back to 0
-    after each user message (see `reset_turn_cost`)."""
+    after each user message (see `reset_turn_cost`).
+
+    iter 326w — also fires a fire-and-forget Mongo insert into the
+    `ora_llm_costs` collection so the daily-spend dashboard has data.
+    """
     if not session_id:
         return
     bucket = _SESSION_COST_USD.setdefault(
@@ -560,6 +573,32 @@ def _track_session_cost(session_id: str, provider: str, cost_usd: float) -> None
     bucket["session_total"] += cost_usd
     bucket["turn_total"] += cost_usd
     bucket["last_provider"] = provider  # type: ignore[assignment]
+    # iter 326w — persist per-call cost so the daily-spend dashboard
+    # has real numbers. Best-effort: a Mongo hiccup must never break
+    # the reply path.
+    try:
+        if _db is not None and cost_usd > 0:
+            asyncio.create_task(_persist_llm_cost(session_id, provider, cost_usd))
+    except Exception:
+        pass
+
+
+async def _persist_llm_cost(
+    session_id: str, provider: str, cost_usd: float,
+) -> None:
+    """Fire-and-forget cost log for the daily-spend dashboard."""
+    if _db is None:
+        return
+    try:
+        await _db.ora_llm_costs.insert_one({
+            "session_id": session_id,
+            "provider":   provider,
+            "cost_usd":   round(cost_usd, 6),
+            "ts":         _now(),
+            "day":        _now().strftime("%Y-%m-%d"),
+        })
+    except Exception as e:
+        logger.debug(f"[ora-cost] persist skipped: {e}")
 
 
 def _reset_turn_cost(session_id: str) -> None:
@@ -679,6 +718,12 @@ async def _persist_pending(
 ) -> None:
     if _db is None:
         return
+    # iter 326w — Tier 2 actions auto-execute after the 30-second
+    # cancel window. Tier 3 stays manual (None) — irreversible work
+    # always needs an explicit founder approve.
+    auto_exec_at = None
+    if tier == "tier2_approve":
+        auto_exec_at = _now() + timedelta(seconds=TIER2_AUTO_EXECUTE_SECONDS)
     await _db[PENDING_COLLECTION].insert_one({
         "_id":           action_id,   # always a server-generated uuid4 (FIX #5)
         "session_id":    session_id,
@@ -690,6 +735,7 @@ async def _persist_pending(
         "status":        "pending",
         "created_at":    _now(),
         "expires_at":    _now() + timedelta(minutes=EXPIRY_MINUTES),
+        "auto_execute_at": auto_exec_at,
         "decided_at":    None,
         "decided_by":    None,
         "result":        None,
@@ -2712,6 +2758,13 @@ async def _continue_loop(
                 "summary":            summary,
                 "preamble":           content or "ORA wants to run this:",
                 "expires_in_minutes": EXPIRY_MINUTES,
+                # iter 326w — surface 30 s cancel window to UI (tier2 only).
+                "auto_execute_in_seconds": (
+                    TIER2_AUTO_EXECUTE_SECONDS if tier == "tier2_approve" else None
+                ),
+                "cancel_window_seconds": (
+                    TIER2_AUTO_EXECUTE_SECONDS if tier == "tier2_approve" else 0
+                ),
             },
             "iterations": iterations,
             "done":       False,
@@ -2759,5 +2812,62 @@ async def list_pending(session_id: str | None = None) -> list[dict[str, Any]]:
             "summary":    d.get("summary"),
             "created_at": _iso(d.get("created_at")),
             "expires_at": _iso(d.get("expires_at")),
+            "auto_execute_at": _iso(d.get("auto_execute_at")),
         })
     return rows
+
+
+# ── iter 326w — Tier 2 auto-executor ──────────────────────────────────
+# Called every 5 s by the scheduler. Atomically claims any tier2
+# pending action whose auto_execute_at has passed and runs the standard
+# approve path for it. Tier 3 actions are NEVER touched here.
+async def auto_execute_due_tier2(now: datetime | None = None) -> dict[str, Any]:
+    """Auto-execute tier2 actions whose 30 s cancel window elapsed.
+
+    Returns a tiny summary so the scheduler can log activity. Safe to
+    call concurrently — find_one_and_update atomically claims each row.
+    """
+    if _db is None:
+        return {"ok": False, "executed": 0, "error": "DB not wired"}
+    cutoff = now or _now()
+    executed = 0
+    failed   = 0
+    while True:
+        # Atomic claim: pending → auto_executing in one shot, so two
+        # concurrent ticks never run the same action twice.
+        row = await _db[PENDING_COLLECTION].find_one_and_update(
+            {
+                "status":          "pending",
+                "tier":            "tier2_approve",
+                "auto_execute_at": {"$lte": cutoff, "$ne": None},
+            },
+            {"$set": {
+                "status":     "auto_executing",
+                "decided_at": _now(),
+                "decided_by": "system:auto_execute_30s",
+            }},
+            return_document=True,
+            projection={"_id": 1, "session_id": 1, "founder_email": 1},
+        )
+        if not row:
+            break
+        try:
+            await resume_after_decision(
+                row.get("session_id", ""),
+                action_id=row["_id"],
+                approved=True,
+                note="auto-executed after 30 s cancel window",
+                founder_email=row.get("founder_email") or "system:auto_execute_30s",
+            )
+            executed += 1
+        except Exception as e:
+            logger.warning(f"[ora-agent] auto-execute failed for {row['_id']}: {e}")
+            failed += 1
+            # mark failed so we don't loop on it forever
+            await _db[PENDING_COLLECTION].update_one(
+                {"_id": row["_id"]},
+                {"$set": {"status": "auto_execute_failed",
+                          "result": {"error": str(e)}}},
+            )
+    return {"ok": True, "executed": executed, "failed": failed}
+

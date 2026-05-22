@@ -94,6 +94,76 @@ class AskReq(BaseModel):
     question: str
 
 
+@router.get("/api/admin/ora/cost-summary")
+async def admin_ora_cost_summary(request: Request, days: int = 7):
+    """iter 326w — Daily LLM spend dashboard.
+
+    Returns last N days of ORA chat costs grouped by day and provider,
+    plus running totals. Powers the founder's "watchdog before going
+    autonomous overnight" need — spot a spend spike before it hits the bill.
+    """
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    days = max(1, min(days, 90))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    pipeline = [
+        {"$match": {"ts": {"$gte": cutoff}}},
+        {"$group": {
+            "_id": {"day": "$day", "provider": "$provider"},
+            "cost_usd": {"$sum": "$cost_usd"},
+            "calls":    {"$sum": 1},
+        }},
+        {"$project": {
+            "_id":      0,
+            "day":      "$_id.day",
+            "provider": "$_id.provider",
+            "cost_usd": {"$round": ["$cost_usd", 4]},
+            "calls":    1,
+        }},
+        {"$sort": {"day": 1, "provider": 1}},
+    ]
+    by_day_provider: List[Dict[str, Any]] = []
+    async for r in _db.ora_llm_costs.aggregate(pipeline):
+        by_day_provider.append(r)
+
+    # Roll up totals per day for the simple sparkline view
+    by_day: Dict[str, Dict[str, float]] = {}
+    by_provider: Dict[str, Dict[str, float]] = {}
+    total_cost  = 0.0
+    total_calls = 0
+    for r in by_day_provider:
+        d = r["day"]; p = r["provider"]; c = float(r["cost_usd"]); n = int(r["calls"])
+        by_day.setdefault(d, {"cost_usd": 0.0, "calls": 0})
+        by_day[d]["cost_usd"] += c
+        by_day[d]["calls"]    += n
+        by_provider.setdefault(p, {"cost_usd": 0.0, "calls": 0})
+        by_provider[p]["cost_usd"] += c
+        by_provider[p]["calls"]    += n
+        total_cost  += c
+        total_calls += n
+
+    daily = sorted(
+        [{"day": d, "cost_usd": round(v["cost_usd"], 4), "calls": v["calls"]}
+         for d, v in by_day.items()],
+        key=lambda x: x["day"],
+    )
+    providers = sorted(
+        [{"provider": p, "cost_usd": round(v["cost_usd"], 4), "calls": v["calls"]}
+         for p, v in by_provider.items()],
+        key=lambda x: -x["cost_usd"],
+    )
+    return {
+        "ok":           True,
+        "window_days":  days,
+        "total_cost_usd": round(total_cost, 4),
+        "total_calls":  total_calls,
+        "daily":        daily,
+        "by_provider":  providers,
+        "by_day_provider": by_day_provider,
+    }
+
+
 @router.post("/api/admin/ora/ask")
 async def admin_ora_ask(body: AskReq, request: Request):
     """Claude-backed Q&A grounded on the admin telemetry pool. Useful for:
