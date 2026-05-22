@@ -9190,3 +9190,48 @@ Founder ask: "Build cockpit. Bina cockpit ke sab kuch andheron mein hai."
   routes + imports, admin-token usage on every fetch.
 - Full iter326 regression: **404 passing in 16 s**. Backend healthy;
   all five new admin surfaces lint clean.
+
+## 2026-02-XX — iter 326kk: Resend HTTP Fallback (Production Deploy Fix)
+
+### What broke in production (2026-05-22 deploy logs)
+```
+WARNING:services.onboarding_reminder:[onboarding-reminder] send failed
+for ora.platform.test...: Resend SDK not loaded
+```
+Multiple email senders started reporting "Resend SDK not loaded" —
+both fallback paths in the iter 326e shim were failing on the
+production wheel (likely an older `resend` version where neither
+`import resend` nor `resend.emails._emails` works).
+
+### Fix
+Replaced the final `_ResendStub` (which just raised
+`RuntimeError("Resend SDK not loaded")`) with a real **HTTP-only
+fallback** that POSTs directly to `https://api.resend.com/emails`.
+Resend's API is a stable JSON endpoint — we don't need their Python
+SDK at all. Now:
+
+1. `import resend`            — preferred path
+2. `resend.emails._emails`    — direct class import
+3. **HTTP fallback** (NEW)    — `urllib.request → api.resend.com`
+
+Any path that worked before keeps working. Any path that didn't now
+falls through to a real send instead of a runtime error.
+
+### Tests
+- New `tests/test_iter326kk_resend_http_fallback.py` — 5 tests:
+  shim Emails.send is always callable, `_HttpEmails` class present
+  in source, `api.resend.com/emails` referenced, no `"Resend SDK
+  not loaded"` regression marker remains, onboarding_reminder uses
+  the engine shim.
+- Updated `tests/test_iter326e_prod_deploy_fixes.py` to assert
+  `_HttpEmails` (the new fallback) instead of `_ResendStub` (deleted).
+- Full iter326 regression: **409 passing in 16 s**. Backend healthy.
+
+### Note on the other deploy log noise
+- `[onboarding-reminder] send failed` — root caused above, now fixed
+- `[auto-blast] cycle done: 0 sent` — normal; queue had no
+  eligible-with-contactinfo leads
+- `/api/repair/*` 404s — internal poller calling an endpoint that
+  isn't registered in lean mode. Not user-facing; not a deployment
+  blocker. Will address as a separate cleanup.
+- Other 401s — admin endpoints correctly rejecting unauth pings

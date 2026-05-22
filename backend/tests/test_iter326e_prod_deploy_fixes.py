@@ -62,7 +62,10 @@ def test_email_engine_handles_missing_resend_logs():
     assert "resend.emails._emails" in src, (
         "fallback must import the concrete Emails class directly"
     )
-    assert "_ResendStub" in src, "final stub branch must still exist"
+    assert "_HttpEmails" in src, (
+        "iter 326kk — final fallback must be the HTTP-only sender, "
+        "not the old RuntimeError stub."
+    )
 
     from services.email_engine import resend as _r
     assert hasattr(_r, "Emails")

@@ -37,30 +37,71 @@ resend: types.ModuleType  # type: ignore
 try:
     import resend  # type: ignore
 except Exception as _resend_err:
+    _engine_logger = logging.getLogger(__name__)
+    _engine_logger.warning(
+        f"[email_engine] resend top-level import failed: {_resend_err} — "
+        f"trying direct Emails import"
+    )
     try:
         # Reach past __init__ and pull the concrete classes directly.
         _emails_mod = importlib.import_module("resend.emails._emails")
         resend = types.ModuleType("resend")  # type: ignore
         resend.api_key = None                # type: ignore[attr-defined]
         resend.Emails  = _emails_mod.Emails  # type: ignore[attr-defined]
-        logging.getLogger(__name__).warning(
-            f"[email_engine] resend top-level import failed ({_resend_err}); "
-            "loaded Emails class directly — sends will still work."
+        _engine_logger.warning(
+            "[email_engine] loaded Emails via resend.emails._emails fallback"
         )
-    except Exception as _inner:  # pragma: no cover
-        logging.getLogger(__name__).warning(
-            f"[email_engine] resend SDK completely unavailable, using stub: {_inner}"
+    except Exception as _inner:
+        # iter 326kk — last-resort HTTP fallback. Resend's `POST /emails`
+        # endpoint is a stable JSON API; we don't need their Python SDK
+        # at all. This keeps prod sending mail even when the wheel is
+        # missing submodules or otherwise unloadable.
+        _engine_logger.warning(
+            f"[email_engine] resend SDK completely unavailable ({_inner}); "
+            f"switching to direct HTTP fallback to api.resend.com/emails"
         )
 
-        class _ResendStub:
-            api_key = None
+        class _HttpEmails:
+            @staticmethod
+            def send(payload: dict) -> dict:
+                import json as _json
+                import urllib.request as _ur
+                import urllib.error as _ue
+                api_key = getattr(resend, "api_key", None) or \
+                          os.environ.get("RESEND_API_KEY", "")
+                if not api_key:
+                    raise RuntimeError(
+                        "Resend HTTP fallback active but no api_key set"
+                    )
+                req = _ur.Request(
+                    "https://api.resend.com/emails",
+                    data=_json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type":  "application/json",
+                    },
+                    method="POST",
+                )
+                try:
+                    with _ur.urlopen(req, timeout=15) as resp:
+                        body = resp.read().decode("utf-8", errors="replace")
+                        try:
+                            return _json.loads(body)
+                        except Exception:
+                            return {"raw": body}
+                except _ue.HTTPError as e:
+                    body = e.read().decode("utf-8", errors="replace")
+                    raise RuntimeError(
+                        f"Resend HTTP fallback {e.code}: {body[:300]}"
+                    ) from e
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Resend HTTP fallback error: {e}"
+                    ) from e
 
-            class Emails:
-                @staticmethod
-                def send(*_a, **_kw):
-                    raise RuntimeError("Resend SDK not loaded")
-
-        resend = _ResendStub()  # type: ignore
+        resend = types.ModuleType("resend")          # type: ignore[assignment]
+        resend.api_key = None                        # type: ignore[attr-defined]
+        resend.Emails  = _HttpEmails                 # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
