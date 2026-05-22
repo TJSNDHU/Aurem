@@ -1,12 +1,21 @@
 # ════════════════════════════════════════════════════════════════════════
 # AUREM — Hetzner Production Stack
 # iter 323i — full self-hosted prod compose
+# iter 326m-stab — added ulimits to backend (it holds the Mongo pool).
 #
 # Assumes:
 #   - Server: Hetzner CX32 (4 vCPU, 8GB RAM, Ubuntu 24.04)
 #   - Repo cloned at /opt/aurem
 #   - /opt/aurem/.env (gitignored) has all secrets
 #   - Nginx terminates SSL via certbot, proxies to ports below
+#
+# MongoDB topology
+# ─────────────────
+# This stack does NOT run a local mongod. Backend connects to the shared
+# AUREM mongo cluster at `mongo-internal.aurem.live:27017` (deployed via
+# the `legion/docker-compose.yml` stack on a separate host). The mongo
+# FD ceiling is enforced THERE — see `legion/docker-compose.yml`
+# `aurem-mongodb.ulimits.nofile`.
 # ════════════════════════════════════════════════════════════════════════
 version: "3.8"
 
@@ -33,6 +42,18 @@ services:
     depends_on:
       aurem-redis:
         condition: service_healthy
+    # iter 326m-stab — backend holds the mongo connection pool (Motor).
+    # Even though mongo runs on a different host, the BACKEND's own FD
+    # budget caps how many concurrent sockets it can keep open to mongo
+    # + redis + outbound HTTP. Default Docker soft limit is 1024 which
+    # was throttling the multi-pillar worker cycle. 65536 is comfortable
+    # headroom for production traffic.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    sysctls:
+      net.core.somaxconn: 4096
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s

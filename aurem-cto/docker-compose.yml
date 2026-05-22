@@ -1,6 +1,13 @@
 # aurem-cto Hybrid Standalone — Legion Sovereign Stack
 # Survives Emergent outages. Shares Atlas MongoDB. Cloudflare-tunnelled.
 # iter 322ew
+# iter 326m-stab — added ulimits to api (it holds the Atlas pool).
+#
+# MongoDB topology
+# ─────────────────
+# This stack does NOT run a local mongod. The `api` service connects to
+# MongoDB Atlas (managed cloud — Atlas enforces its own FD limits server
+# side). Only the CLIENT side ulimit matters here, applied to `api`.
 
 services:
   api:
@@ -22,6 +29,15 @@ services:
       - ./api:/app:ro
     networks:
       - aurem-cto-net
+    # iter 326m-stab — api holds the Atlas mongo pool + outbound HTTP
+    # to integrations. Default Docker nofile=1024 was insufficient under
+    # multi-tenant load. 65536 = comfortable production headroom.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    sysctls:
+      net.core.somaxconn: 4096
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
       interval: 30s
