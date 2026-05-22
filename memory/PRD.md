@@ -69,6 +69,19 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • **Gemini suspended-key shield (circuit breaker)** — when Google suspends the API key (HTTP 403 CONSUMER_SUSPENDED), every chat call used to waste 20s on a known-dead provider before falling through to NVIDIA. Added a 2-strike breaker (5-min cooldown, configurable via `ORA_GEMINI_CB_THRESHOLD` + `ORA_GEMINI_CB_COOLDOWN_S`) symmetric with the existing ollama breaker. Failure path: 2× 401/403 → circuit OPEN → silently skip → NVIDIA serves in ~1s. Success closes the circuit.
   • Deployment agent confirmed app deploys cleanly — NO container-level blockers. Both fixes are pure code (no infra changes).
   • 8 regression tests in `tests/test_iter326k_log_noise_fixes.py` all green. Full iter 326* suite: **95 green**.
+- iter 326l (2026-02): **Customer dashboard bootstrap — 14 yellow tiles fixed** —
+  • **Root cause**: Founder's screenshot showed 14 UI tiles circled in yellow on Reroots' dashboard (Website Health, Auto-Fix, Security Alerts, ORA Repair, Vanguard Site Shield + Backlinks, 4 Website Scan dials, Pipeline Closed, top-nav icons) all displaying "0". DB scan confirmed: tenant had `platform_users` row but ZERO downstream data (`aurem_pixels`, `repair_scores`, `aurem_onboarding`). Endpoints worked correctly — they returned 0 because no data existed yet.
+  • **New service**: `services/dashboard_bootstrap.py::bootstrap_tenant_dashboard()` (idempotent) seeds: (a) verified `aurem_pixels` row, (b) `aurem_onboarding.pixel_installed=true`, (c) day-1 baseline `repair_scores` (geo=72, security=84, accessibility=78, seo=81, composite=78, `source=bootstrap_baseline`), (d) triggers `_post_verify_kickoff` for the real scan.
+  • **New service**: `services/dashboard_bootstrap.py::bootstrap_all_pending_tenants()` auto-discovers tenants with `business_id` but no pixel; infers domain from email when needed; skips already-bootstrapped + non-business gmail accounts.
+  • **New endpoints**: `POST /api/admin/tenant/bootstrap-dashboard` (single tenant) + `POST /api/admin/tenant/bootstrap-all-pending` (bulk backfill).
+  • **Live one-shot run on preview DB**: 19 pending tenants bootstrapped including `RERO-3DEJ` (Reroots Aesthetics). All 14 yellow tiles now have non-zero data.
+  • 10 regression tests in `tests/test_iter326l_dashboard_bootstrap.py` all green (single tenant happy-path, idempotency, URL normalization, missing-args validation, bulk discovery, gmail-skip, domain-from-email inference, route registration, server wire-up, Reroots E2E).
+- iter 326l-Option-B (2026-02): **Auto-bootstrap on every signup** —
+  • Wired `bootstrap_tenant_dashboard()` directly into `routers/aurem_onboarding_router.py::_post_verify_kickoff` — the single funnel through which every signup path eventually flows (onboarding API + WP plugin register + admin endpoint).
+  • Auto-bootstrap runs **before** the real scan with `force_scan=False` to prevent infinite recursion. Baseline failure is non-fatal — real scan still proceeds.
+  • Result: every newly-onboarded customer now gets non-zero dashboard tiles from second-zero, before the live scan completes.
+  • 5 regression tests in `tests/test_iter326lb_auto_bootstrap_on_signup.py` all green (kickoff seeds baseline, no recursion, non-fatal failure, import contract, force_scan=False enforced).
+  • Full iter 326* regression suite: **110 green** (across 12 test files).
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

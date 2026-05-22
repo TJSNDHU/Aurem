@@ -506,8 +506,43 @@ async def pixel_verify(tenant_id: str, body: Dict[str, Any]):
 
 
 async def _post_verify_kickoff(db, tenant_id: str, domain: str):
-    """D + E — first scan + activation email after pixel verified."""
+    """D + E — first scan + activation email after pixel verified.
+
+    iter 326l/Option-B — this kickoff is the SINGLE funnel through which
+    every signup path eventually flows (onboarding API, WP plugin
+    register, admin endpoint). By bootstrapping baseline scores HERE,
+    every newly-onboarded customer gets non-zero dashboard tiles
+    automatically, without needing the admin endpoint.
+    """
     from datetime import datetime as _dt, timezone as _tz
+    # ── iter 326l — Auto-bootstrap baseline so dashboard tiles render
+    # non-zero from second-zero (before real scan completes). Idempotent
+    # and intentionally synchronous: we want the baseline visible BEFORE
+    # the scan kicks off so the customer's first dashboard load is green.
+    # Pass force_scan=False to avoid recursing back into this function.
+    try:
+        from services.dashboard_bootstrap import bootstrap_tenant_dashboard
+        bs_email = None
+        try:
+            onb_row = await db.aurem_onboarding.find_one(
+                {"tenant_id": tenant_id}, {"_id": 0, "email": 1, "business_name": 1}
+            ) or {}
+            bs_email = onb_row.get("email")
+            bs_name  = onb_row.get("business_name")
+        except Exception:
+            bs_email, bs_name = None, None
+        await bootstrap_tenant_dashboard(
+            db,
+            tenant_id=tenant_id,
+            domain=domain,
+            email=bs_email,
+            business_name=bs_name,
+            force_scan=False,  # IMPORTANT — prevents recursion
+        )
+    except Exception as _e:
+        # Baseline failure must NEVER block the real scan from starting.
+        logger.warning(f"[pixel/verify] auto-bootstrap failed (non-fatal): {_e}")
+
     try:
         # Trigger scan via existing customer scanner
         try:
