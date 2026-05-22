@@ -120,3 +120,44 @@ See `/app/memory/test_credentials.md`.
 - `frontend/src/platform/luxe/components/*.jsx` — 9 modular dashboard cards.
 - `frontend/src/styles/dashboard-theme.css` — Theme tokens, 3 breakpoints.
 - `frontend/src/platform/luxe/useTheme.js` — auto-detect dark/light + localStorage.
+
+## Phase 2 + Phase 3 capability jump (iter 326v → 326oo, May 2026)
+
+Shipped (all behind 430-test pytest regression):
+
+**ORA-CTO autonomy upgrades**
+- Token-cost transparency: every LLM call now logs prompt/completion/cost per tenant.
+- 30-second cancel window (Watchdog Mode): ORA broadcasts intended action, founder has 30s to abort before execution. Decisions persisted in `ora_decisions`.
+- Job checkpoints: long-running campaigns resumable after crash via `ora_job_checkpoints`.
+- Vector decision memory: ORA recalls past similar decisions to bias future ones.
+- Semantic codebase search: meaning-based code retrieval (not just grep).
+- Real browser tool: Playwright registered for dynamic-page scraping + visual diff.
+
+**Admin Cockpit (frontend)**
+- ORA-CTO Cockpit page composing: Recent Decisions panel, Campaign Checkpoints, Daily Spend Card, Email Health Card.
+- Skills Marketplace UI + 5 seeded skills (`ora_skills` collection).
+- Mobile Morning Brief + multi-tenant voice tuning surfaced.
+
+**Auth + Deploy hardening**
+- Axios interceptor role-wiping bug fixed (`frontend/src/lib/api.js`).
+- Legacy-token redirect loop fixed (`frontend/src/utils/secureTokenStore.js` + `AdminLogin.jsx` checks `payload.exp`).
+- `clearAdminAuth` / `clearCustomerAuth` clear legacy mirror role-aware only.
+- Resend SDK defensive import + HTTP fallback to `api.resend.com/emails`.
+- Cloudflare 1010 on Resend HTTP fallback: UA changed to `resend-python/0.7.0` (matches official SDK signature, bypasses bot rules).
+- Generated `AUREM_ENCRYPTION_KEY` (founder must set on prod env).
+
+**Stability (iter 326m-stab)**
+- MongoDB FD exhaustion fixed: process-wide pool guard (`maxPoolSize=5`), per-request client leaks removed from `pwa_router` + `broadcast_service`, mongod soft FD limit raised 1024 → 65536.
+- Campaign watchdog false-alarm fixed: empty-queue cycles no longer increment `zero_sent_streak`.
+
+**Key DB collections added**
+- `ora_decisions`, `ora_skills`, `ora_job_checkpoints`.
+
+**Pytest status**: 430 passing in 17s (full iter326 suite).
+
+## DR backup status (as of context refresh)
+- `SECONDARY_MONGO_URL` configured → `backupmy.uxvf9mh.mongodb.net`.
+- APScheduler cron: daily 03:00 UTC (registered in `routers/registry.py`).
+- Last successful scheduler run logged in `db_backup_runs`: **2026-05-19 03:00 UTC**.
+- One pytest-triggered run on 2026-05-22 04:42 UTC marked `fail` (test fixture, not prod path).
+- Manual trigger available: `POST /api/admin/backup/trigger` (super_admin only).
