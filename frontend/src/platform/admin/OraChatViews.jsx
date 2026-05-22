@@ -69,6 +69,10 @@ export function classifyResult(toolName, result) {
 export function SmartToolResult({ tool, result }) {
   const kind = useMemo(() => classifyResult(tool, result), [tool, result]);
   const r = result || {};
+  // iter 326xx — when a gated-tool auto-redirect happened, ORA was
+  // smart enough to handle it transparently. Show a calm note instead
+  // of treating the prior "is gated" message as a chat-worthy error.
+  const wasRedirected = r._redirected_from && r._redirected_from !== tool;
 
   return (
     <div data-testid={`smart-tool-result-${kind}`}
@@ -79,6 +83,13 @@ export function SmartToolResult({ tool, result }) {
         <span style={{ fontFamily: MONO, color: r.ok ? GREEN : RED }}>
           {tool}
         </span>
+        {wasRedirected && (
+          <span data-testid="redirect-note"
+                style={{ fontFamily: MONO, fontSize: 10, color: TEXT_DIM,
+                          opacity: 0.7 }}>
+            · auto-routed from {r._redirected_from}
+          </span>
+        )}
         {r.elapsed_ms != null && (
           <span style={{ color: TEXT_DIM, opacity: 0.7 }}>
             · {r.elapsed_ms}ms
