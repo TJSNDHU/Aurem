@@ -115,7 +115,13 @@ def _industries() -> list:
 
 
 def _interval_min() -> int:
-    return _cfg_int("AUREM_SCOUT_CRON_INTERVAL_MIN", 120)
+    # iter 326p — was 120 (every 2 hours), which caused multi-hour
+    # queue droughts when consecutive (city, industry) cells returned
+    # 0 leads. New default 15 min — well under the OSM/Apollo rate
+    # limits and tight enough that the founder never sees an empty
+    # queue overnight. Adaptive logic in `replenish_tick` further tunes
+    # the next-run interval based on the last tick's outcome.
+    return _cfg_int("AUREM_SCOUT_CRON_INTERVAL_MIN", 15)
 
 
 def _queue_target() -> int:
@@ -208,6 +214,11 @@ async def replenish_tick(force: bool = False) -> Dict[str, Any]:
             "reason": f"queue_depth {queue_depth} >= target {target}",
             "queue_depth": queue_depth,
             "queue_target": target,
+            # iter 326p — coast on the skip path. Queue is already full,
+            # so the next tick can wait. We use max() with the configured
+            # interval so a founder who deliberately sets a longer cadence
+            # is respected.
+            "next_run_in_minutes": max(60, _interval_min()),
             "started_at": started,
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -256,6 +267,39 @@ async def replenish_tick(force: bool = False) -> Dict[str, Any]:
         "started_at": started,
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
+    # iter 326p — adaptive interval. When the queue is hungry, the cron
+    # used to wait the full 1 hour for the next attempt — and if that
+    # cell happened to return 0 leads, the founder waited another full
+    # hour for the next try. Now we record a `next_run_in_minutes` hint
+    # on every result so the scheduler hook (below) can reschedule the
+    # job dynamically: tight loop when starving, slow loop when full.
+    if result.get("skipped"):
+        # Queue already healthy. Coast for a while.
+        result["next_run_in_minutes"] = max(60, _interval_min())
+    elif result["leads_written"] > 0:
+        # Just got some leads in. Run again sooner — campaigns are eating.
+        result["next_run_in_minutes"] = 20
+    else:
+        # Ran but cell was a dud. Retry FAST with the next (city, industry).
+        result["next_run_in_minutes"] = 5
+
+    # iter 326p — founder notification. When real leads actually land
+    # (>0), send a single concise Telegram ping so the founder knows the
+    # queue is being topped up without having to dashboard-watch. Failures
+    # (creds missing, network) are swallowed silently — notification is
+    # nice-to-have, not load-bearing.
+    if result["leads_written"] > 0:
+        try:
+            from services.autopilot_brief_notifier import _send_telegram
+            await _send_telegram(
+                f"AUREM auto-refill: +{result['leads_written']} fresh leads "
+                f"({industry} in {city}). Queue was {queue_depth}, now "
+                f"{queue_depth + result['leads_written']}. "
+                f"Auto-blast will pick them up on the next cycle."
+            )
+        except Exception as e:
+            logger.debug(f"[scout-cron] telegram ping skipped: {e}")
+
     try:
         await _db.scout_replenish_runs.insert_one({**result, "_id": run_id})
     except Exception:
@@ -264,16 +308,47 @@ async def replenish_tick(force: bool = False) -> Dict[str, Any]:
 
 
 def install_scheduler(scheduler) -> Optional[str]:
-    """Hook the cron job into the existing AsyncIOScheduler."""
+    """Hook the cron job into the existing AsyncIOScheduler.
+
+    iter 326p — wraps `replenish_tick` so that after each run we
+    re-schedule the NEXT run based on the result's adaptive hint
+    (`next_run_in_minutes`). Effect:
+      • Queue healthy / skipped       → 60+ min until next tick (cheap)
+      • Tick wrote ≥1 lead            → 20 min until next tick (warm)
+      • Tick ran but cell was a dud   → 5 min until next tick (hunt mode)
+    """
     try:
         from apscheduler.triggers.interval import IntervalTrigger
+        from apscheduler.triggers.date import DateTrigger
+        from datetime import timedelta
     except Exception as e:
         logger.warning(f"[scout-cron] apscheduler not importable: {e}")
         return None
 
     interval = _interval_min()
+
+    async def _adaptive_tick() -> None:
+        result = await replenish_tick()
+        # Pick the recommended next-run window; fall back to the
+        # baseline interval if the result didn't carry a hint (e.g. on
+        # an unexpected error).
+        next_min = int(result.get("next_run_in_minutes") or interval)
+        try:
+            scheduler.reschedule_job(
+                "scout_replenish_cron",
+                trigger=IntervalTrigger(minutes=next_min),
+            )
+            logger.info(
+                f"[scout-cron] adaptive reschedule → next tick in "
+                f"{next_min} min (last result: "
+                f"{'skipped' if result.get('skipped') else 'ran'}, "
+                f"leads={result.get('leads_written', 0)})"
+            )
+        except Exception as e:
+            logger.warning(f"[scout-cron] reschedule failed: {e}")
+
     job = scheduler.add_job(
-        replenish_tick,
+        _adaptive_tick,
         IntervalTrigger(minutes=interval),
         id="scout_replenish_cron",
         name="Scout Replenish Cron",
@@ -282,7 +357,8 @@ def install_scheduler(scheduler) -> Optional[str]:
         coalesce=True,
     )
     logger.info(
-        f"[scout-cron] scheduled — every {interval} min "
-        f"({len(_cities())} cities × {len(_industries())} industries cycle)"
+        f"[scout-cron] scheduled — initial every {interval} min, "
+        f"adaptive thereafter ({len(_cities())} cities × "
+        f"{len(_industries())} industries cycle)"
     )
     return job.id
