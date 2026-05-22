@@ -193,6 +193,137 @@ def _gemini_cb_record_success() -> None:
     _gemini_cb_until = 0.0
 
 
+# ─────────────────────────────────────────────────────────────────────
+# iter 326q — Shared salvage layer for inline tool-call leakage.
+#
+# Symptom user saw (verbatim from chat with ORA):
+#   Founder: "campaign report?"
+#   ORA:     `{"type": "function", "name": "campaign_status", "parameters": {}}`
+#
+# Root cause: small / poorly-fine-tuned models (qwen2.5-coder local,
+# sometimes Claude/Gemini when prompted with tool schemas) emit tool
+# calls as plain JSON in `content` instead of populating the OpenAI
+# `tool_calls` array. The original salvage only ran inside `_call_ollama`,
+# so non-Ollama providers leaked the JSON straight to chat. Even within
+# Ollama the parser used `startswith("{") and endswith("}")` — a single
+# leading word or a Markdown code fence broke it.
+#
+# This module-level helper is now called AFTER every provider response
+# in the agent loop (right before the "no tool_calls → final reply"
+# branch). Tolerates:
+#   • Markdown code fences  ```json ... ```
+#   • Leading "Sure, here you go:" prose
+#   • Trailing commentary after the JSON
+#   • Three call-shape conventions ({name,parameters} / {tool,args} /
+#     {function,arguments})  AND the OpenAI-schema echo shape
+#     {"type":"function","name":...,"parameters":{...}}
+# ─────────────────────────────────────────────────────────────────────
+_INLINE_TOOL_JSON_RE = re.compile(
+    # Matches `{` ... `}` where the body contains at least one of the
+    # recognised tool-call keys. We allow ONE level of nested `{...}` so
+    # the common `"parameters": {}` and `"args": {"path": "/x"}` shapes
+    # work. Deeper nesting bails out — but for our recognised shapes that
+    # never happens in practice (tool args are flat dicts).
+    r"\{(?:[^{}]|\{[^{}]*\})*?(?:\"name\"|\"tool\"|\"function\")(?:[^{}]|\{[^{}]*\})*\}",
+    re.DOTALL,
+)
+_CODE_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
+
+
+def _extract_candidate_json(text: str) -> str | None:
+    """Pull the first JSON object out of `text`, tolerating fences and
+    surrounding prose. Returns the JSON substring or None."""
+    if not text:
+        return None
+    # 1) Markdown code fence?
+    m = _CODE_FENCE_RE.search(text)
+    if m:
+        inner = m.group(1).strip()
+        if inner.startswith("{") and inner.endswith("}"):
+            return inner
+    # 2) Bare object somewhere in the text?
+    m = _INLINE_TOOL_JSON_RE.search(text)
+    if m:
+        return m.group(0)
+    # 3) Whole content is a single JSON object?
+    stripped = text.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        return stripped
+    return None
+
+
+def _salvage_inline_tool_call(msg: dict[str, Any]) -> bool:
+    """If `msg["content"]` carries an inline tool-call JSON instead of
+    the structured `tool_calls` field, promote it. Returns True if a
+    salvage actually happened. The caller can use the return value to
+    log salvage rate per provider."""
+    if msg.get("tool_calls"):
+        return False  # provider gave us proper tool_calls already
+    content_raw = msg.get("content") or ""
+    candidate = _extract_candidate_json(content_raw)
+    if not candidate:
+        return False
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(parsed, dict):
+        return False
+    # Accept {name,parameters}, {tool,args}, {function,arguments}, AND
+    # the OpenAI-schema echo {"type":"function","name":...,"parameters":...}.
+    tool_name = (
+        parsed.get("name")
+        or parsed.get("tool")
+        or parsed.get("function")
+    )
+    tool_args = (
+        parsed.get("parameters")
+        or parsed.get("args")
+        or parsed.get("arguments")
+        or {}
+    )
+    if not (tool_name and isinstance(tool_name, str)):
+        return False
+    import uuid as _uuid
+    msg["tool_calls"] = [{
+        "id": f"salvage_{_uuid.uuid4().hex[:8]}",
+        "type": "function",
+        "function": {
+            "name": tool_name,
+            "arguments": json.dumps(tool_args, ensure_ascii=False),
+        },
+    }]
+    msg["content"] = ""  # blank content so caller treats as a tool call
+    logger.info(f"[ora-agent] SALVAGED inline tool-call: name={tool_name}")
+    return True
+
+
+def _looks_like_unhandled_tool_call(content: str) -> bool:
+    """Final safety net — used in the agent loop's `if not tool_calls`
+    branch. If the model emitted what looks like a tool-call JSON BUT
+    the salvage already tried and failed (malformed JSON, unrecognised
+    shape, etc), we MUST NOT deliver that raw JSON to the founder. The
+    caller substitutes an honest 'I couldn't fetch — retry' reply."""
+    if not content:
+        return False
+    txt = content.strip()
+    # Common leak markers — pick conservatively to avoid muting valid
+    # mentions of these strings inside genuine prose.
+    needles = (
+        '{"type": "function"',
+        '{"type":"function"',
+        '"name": "campaign_status"',
+        '"name": "view_file"',
+        '"function":',
+        '"tool_calls":',
+        '"parameters": {}',
+    )
+    return any(n in txt for n in needles) and txt.startswith("{") and txt.endswith("}")
+
+
+
+
+
 # ── Tier policy ───────────────────────────────────────────────────────
 # RULE: a tool name must appear in EXACTLY ONE tier set.
 # tier_of() short-circuits on TIER_1 → TIER_2 → TIER_3 → default tier2.
@@ -1188,47 +1319,13 @@ async def _ollama_with_tools(messages: list[dict[str, Any]]) -> dict[str, Any] |
         )
         return None
 
-    # iter 323ab — Salvage qwen2.5-coder tool-call leakage.
-    # qwen2.5-coder and similar local models often emit tool calls as
-    # plain JSON inside `content` instead of populating `tool_calls`.
-    # Example user-visible failure: ORA replies with
-    #   `{"name": "grep_codebase", "parameters": {...}}`
-    # instead of executing the tool. We detect that shape and promote
-    # it to a proper OpenAI tool_calls array so the agent loop can run.
-    if not (msg.get("tool_calls") or []):
-        content_raw = (msg.get("content") or "").strip()
-        if content_raw.startswith("{") and content_raw.endswith("}"):
-            try:
-                parsed = json.loads(content_raw)
-            except json.JSONDecodeError:
-                parsed = None
-            if isinstance(parsed, dict):
-                # Accept {name, parameters} or {tool, args} or {function, arguments}
-                tool_name = (
-                    parsed.get("name")
-                    or parsed.get("tool")
-                    or parsed.get("function")
-                )
-                tool_args = (
-                    parsed.get("parameters")
-                    or parsed.get("args")
-                    or parsed.get("arguments")
-                    or {}
-                )
-                if tool_name and isinstance(tool_name, str):
-                    import uuid as _uuid
-                    msg["tool_calls"] = [{
-                        "id": f"salvage_{_uuid.uuid4().hex[:8]}",
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "arguments": json.dumps(tool_args, ensure_ascii=False),
-                        },
-                    }]
-                    msg["content"] = ""  # blank content so caller treats as tool call
-                    logger.info(
-                        f"[ora-agent] SALVAGED qwen tool-call: name={tool_name}"
-                    )
+    # iter 323ab + iter 326q — Salvage inline tool-call leakage (shared
+    # path now — see _salvage_inline_tool_call defined below). Local
+    # models AND occasionally Claude/Gemini emit tool calls as plain JSON
+    # inside `content` instead of populating `tool_calls`. The shared
+    # salvage handles code fences, leading/trailing text, and the 3 most
+    # common JSON shapes ({name,parameters}, {tool,args}, {function,arguments}).
+    _salvage_inline_tool_call(msg)
 
     logger.info(
         f"[ora-agent] ollama OK: model={data.get('model')} "
@@ -1987,10 +2084,40 @@ async def _continue_loop(
                 "degraded": True,
             }
 
+        # iter 326q — Provider-agnostic salvage. Even though some
+        # provider-specific code paths already run this, certain code
+        # paths (Claude text fallback, mid-loop NVIDIA retries) can
+        # still hand us a `msg` with the tool-call leaked into
+        # `content`. Run salvage one more time here so the rest of the
+        # loop sees a normalised message regardless of the source.
+        _salvage_inline_tool_call(msg)
+
         tool_calls = msg.get("tool_calls") or []
         content    = (msg.get("content") or "").strip()
 
         if not tool_calls:
+            # iter 326q — Final safety net. If we still have JSON that
+            # LOOKS like an unhandled tool-call (e.g. malformed JSON the
+            # salvage parser refused to accept, or an OpenAI-schema echo
+            # we couldn't normalise), DO NOT deliver it to the founder.
+            # The previous behaviour leaked
+            #   `{"type": "function", "name": "campaign_status", "parameters": {}}`
+            # straight into chat, which made the founder think ORA was
+            # broken (it was — but the leak made the symptom worse than
+            # the cause). Substitute an honest "couldn't fetch" reply
+            # instead — and never fabricate numbers to fill the gap.
+            if _looks_like_unhandled_tool_call(content):
+                logger.warning(
+                    f"[ora-agent] DETECTED leaked tool-call JSON in final "
+                    f"reply (len={len(content)}); substituting honest fallback"
+                )
+                content = (
+                    "I tried to fetch that data but my tool call didn't "
+                    "execute cleanly this turn. Please ask again — it usually "
+                    "works on retry. (I won't make up numbers when I don't "
+                    "have real data.)"
+                )
+
             # LLM produced a final answer with no tool calls — done
             # iter 323q — Stop Slop prose filter on every final assistant
             # turn. Idempotent; logs how many AI-tells it scrubbed.
