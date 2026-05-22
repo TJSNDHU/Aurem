@@ -9416,3 +9416,41 @@ trip-wiring the bot rules.
 - `404 /api/repair/health/leaderboard` + `/api/repair/history` —
   internal admin UI poller. Cosmetic.
 - `401` on protected endpoints — auth gate working correctly.
+
+## 2026-02-XX — iter 326uu: ORA chat UI overhaul (10-gap Emergent E1 parity)
+
+### Founder mandate
+Screenshot comparison showed 7 (later 10) gaps where ORA-CTO's chat UI
+felt "2023" compared to my (E1's) 2-pane chat. Each gap = one missing
+piece of context that forced the founder to scroll/parse/guess.
+
+### Closed gaps
+| # | Gap                                  | Renderer             |
+|---|--------------------------------------|----------------------|
+| 1 | Approval→error opacity               | ErrorContext + hint  |
+| 2 | No live preview pane                 | PreviewPane (right)  |
+| 3 | No inline file diffs                 | DiffView (red/green) |
+| 4 | Test results buried                  | TestResultBlock      |
+| 5 | Errors with no context               | inferErrorHint       |
+| 6 | No step tracker                      | StepTracker          |
+| 7 | Approval card state confusion        | (326rr — done)       |
+| 8 | No upfront plan preview              | PlanPreview          |
+| 9 | Tool output silently truncated       | ExpandableOutput     |
+| 10| No clickable file links              | FileLink             |
+
+### Files
+- NEW `frontend/src/platform/admin/OraChatViews.jsx` (~570 lines)
+- MOD `frontend/src/platform/admin/OraChat.jsx` (smart renderer wiring,
+  2-pane layout, plan + step tracker, history refresh after each turn)
+- NEW `backend/ora_skills/agent_ui_renderer_326uu.md` (teaches ORA how
+  her output is now rendered + how to make outputs render best)
+- NEW `backend/tests/test_iter326uu_ora_chat_ui_overhaul.py` (20 tests)
+
+### Tests
+Full iter326 regression: **498 passing in 17 s** (was 478 — +20 new,
+zero regressions).
+
+### Smoke verification
+Live preview environment: 2-pane layout confirmed visually
+(`/admin/ora-chat` URL). All testids resolve:
+`ora-chat`, `ora-preview-column`, `preview-pane-empty`, `chat-input`.

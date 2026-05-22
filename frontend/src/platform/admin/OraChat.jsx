@@ -11,13 +11,17 @@
  * Persistence: server-side per session_id; we also cache the session_id
  * locally so refresh keeps the thread.
  */
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Crown, Send, Loader2, Trash2, Copy, Check,
   Wrench, AlertTriangle, ShieldAlert, X, Wand2, Eye,
   ChevronRight, Sparkles,
 } from "lucide-react";
+import {
+  SmartToolResult, PreviewPane, StepTracker, PlanPreview,
+  ErrorContext, extractPlanSteps,
+} from "./OraChatViews";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const SESSION_KEY = "aurem.ora-agent.session.v1";
@@ -98,6 +102,48 @@ export default function OraChat() {
   const [pending, setPending] = useState(null); // current action_required
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [error, setError] = useState(null);
+
+  // iter 326uu — derived: latest tool_result for the right-side PreviewPane.
+  const latestToolResult = useMemo(() => {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const m = history[i];
+      if (m && m.role === "tool_result") {
+        let parsed = m.result;
+        if (!parsed && m.content) {
+          if (typeof m.content === "object") parsed = m.content;
+          else { try { parsed = JSON.parse(m.content); }
+                 catch { parsed = { raw: String(m.content) }; } }
+        }
+        return { tool: m.tool, result: parsed || { ok: true } };
+      }
+    }
+    return null;
+  }, [history]);
+
+  // iter 326uu — derived: parse the FIRST assistant message for a numbered/
+  // bulleted plan so we can render a checklist above the chat.
+  const planSteps = useMemo(() => {
+    for (const m of history) {
+      if (m && m.role === "assistant" && m.content) {
+        const steps = extractPlanSteps(m.content);
+        if (steps.length >= 2) return steps;
+      }
+    }
+    return [];
+  }, [history]);
+
+  // iter 326uu — derived: completed plan steps from busyTools count
+  // (used to strike-through finished items in the PlanPreview).
+  const planDoneSet = useMemo(() => {
+    const done = new Set();
+    if (planSteps.length === 0) return done;
+    // Use the count of tool_result messages as a coarse "step n done" hint.
+    let n = 0;
+    for (const m of history) if (m.role === "tool_result") n++;
+    for (let i = 0; i < Math.min(n, planSteps.length); i++) done.add(i);
+    return done;
+  }, [history, planSteps]);
+
   const scrollRef = useRef(null);
   // FIX #6 (audit) — track the active copy-feedback timer so unmount or a
   // rapid second copy cancels the pending setCopiedIdx(null) call.
@@ -279,21 +325,50 @@ export default function OraChat() {
     }
   };
 
+  // iter 326uu — pull server-side history so tool_result rows appear
+  // in the UI (and the right-side PreviewPane) after each turn.
+  const refreshHistory = async () => {
+    try {
+      const r = await fetch(`${API}/api/ora/agent/history/${sessionId}`,
+                            { headers: authHeaders() });
+      const j = await safeJson(r);
+      if (j.ok && Array.isArray(j.messages)) {
+        const ui = [];
+        for (const m of j.messages) {
+          if (m.role === "user") {
+            ui.push({ role: "user", content: m.content || "", ts: 0 });
+          } else if (m.role === "assistant") {
+            if (m.content) ui.push({ role: "assistant", content: m.content, ts: 0 });
+            for (const tc of (m.tool_calls || [])) {
+              ui.push({ role: "tool_call", tool: tc.function?.name,
+                         args: _safeArgs(tc.function?.arguments) });
+            }
+          } else if (m.role === "tool") {
+            ui.push({ role: "tool_result", tool: m.name,
+                       content: m.content || "", ts: 0 });
+          }
+        }
+        setHistory(ui);
+      }
+    } catch { /* soft */ }
+  };
+
   const applyTurnResult = (j) => {
     if (!j.ok) {
       setError(j.error || j.detail || `HTTP ${j._http_status}`);
       if (j.reply) setHistory((h) => [...h, { role: "assistant",
                                                  content: j.reply, ts: Date.now() }]);
+      refreshHistory();   // surface any tool_results that ran before the failure
       return;
     }
     if (j.action_required) {
       const ar = j.action_required;
-      // Echo ORA's preamble into chat if she included one
       if (ar.preamble) {
         setHistory((h) => [...h, { role: "assistant",
                                       content: ar.preamble, ts: Date.now() }]);
       }
       setPending(ar);
+      refreshHistory();   // pull in any tool_results from the partial run
       return;
     }
     if (j.reply) {
@@ -301,6 +376,7 @@ export default function OraChat() {
                                     content: j.reply, ts: Date.now() }]);
     }
     setPending(null);
+    refreshHistory();     // pull in tool_results from the completed run
   };
 
   const decide = async (approved, note = "") => {
@@ -412,10 +488,27 @@ export default function OraChat() {
         </div>
       </div>
 
-      {/* Message list */}
+      {/* iter 326uu — 2-pane layout: chat left, live preview right.
+          PreviewPane mirrors the latest tool result so the founder can
+          see file diffs / test output / errors WITHOUT scrolling the
+          chat. Plan + step tracker stay in the chat column above the
+          message list. */}
+      <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex",
+                       gap: 12 }}>
+
+      {/* LEFT — message list */}
       <div ref={scrollRef}
             style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto",
                       paddingRight: 6 }}>
+        {planSteps.length > 0 && (
+          <PlanPreview steps={planSteps} completed={planDoneSet} />
+        )}
+        {busy && !pending && Array.isArray(busyTools) && busyTools.length > 0 && (
+          <StepTracker
+            steps={busyTools}
+            current={busyTools.length}
+            label={busyTools[busyTools.length - 1]} />
+        )}
         {history.length === 0 && !busy && !pending && (
           <div style={{ color: TEXT_DIM, fontSize: 14, padding: 60,
                           textAlign: "center" }}>
@@ -500,6 +593,18 @@ export default function OraChat() {
         )}
       </div>
 
+      {/* RIGHT — live preview pane (iter 326uu).
+          Hidden on narrow viewports; chat stays full-width on mobile. */}
+      <div data-testid="ora-preview-column"
+           style={{ flex: "0 0 38%", maxWidth: 520, minWidth: 280,
+                      display: window.innerWidth < 900 ? "none" : "flex" }}>
+        <PreviewPane
+          latestTool={latestToolResult?.tool}
+          latestResult={latestToolResult?.result} />
+      </div>
+
+      </div>{/* close 2-pane flex */}
+
       {error && (
         <div style={{ background: "rgba(255,118,118,0.10)",
                        border: `1px solid ${RED}`, borderRadius: 10,
@@ -567,10 +672,16 @@ function Message({ m, i, copy, copiedIdx }) {
     );
   }
   if (m.role === "tool_result") {
-    return (
-      <ToolBadge icon={<Eye size={11} />} label="Tool result"
-                  tool={m.tool} payload={m.content} />
-    );
+    // iter 326uu — smart, tool-aware rendering replaces the old
+    // generic JSON-dump ToolBadge. content may be a JSON string
+    // (from server history) or already an object (from live polls).
+    const parsed = (() => {
+      if (m.result && typeof m.result === "object") return m.result;
+      if (!m.content) return { ok: true };
+      if (typeof m.content === "object") return m.content;
+      try { return JSON.parse(m.content); } catch { return { raw: String(m.content) }; }
+    })();
+    return <SmartToolResult tool={m.tool} result={parsed} />;
   }
   if (m.role === "decision") {
     const c = m.tier && TIER_STYLES[m.tier] ? TIER_STYLES[m.tier].color : TEXT_DIM;
