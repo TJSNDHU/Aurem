@@ -301,7 +301,7 @@ async def send_campaign_daily_brief(db, force: bool = False) -> Dict[str, Any]:
     send_id: Optional[str] = None
     error: Optional[str] = None
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = api_key
         res = resend.Emails.send({
             "from": _from_email(),

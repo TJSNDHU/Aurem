@@ -27,7 +27,7 @@ MAX_NUDGES = 3                    # Stop after 3 reminders
 def _resend_client():
     """Return a ready-to-use resend module or None if key missing."""
     try:
-        import resend as _resend
+        from services.email_engine import resend as _resend  # iter 326x defensive
     except ImportError:
         return None
     key = os.environ.get("RESEND_API_KEY", "").strip()

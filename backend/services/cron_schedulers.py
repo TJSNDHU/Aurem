@@ -263,7 +263,7 @@ async def daily_ora_morning_brief():
 
             # Email via Resend (best-effort)
             try:
-                import resend  # type: ignore
+                from services.email_engine import resend  # iter 326x defensive
                 api_key = os.environ.get("RESEND_API_KEY", "").strip()
                 digest_email = (
                     (await db.platform_settings.find_one({"_id": "ora_cto"}) or {})

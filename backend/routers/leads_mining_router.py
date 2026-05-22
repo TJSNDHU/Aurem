@@ -284,7 +284,7 @@ async def _send_bulk_completion_email(db, job_id: str, lead_ids: list,
     """
     import os
     try:
-        import resend  # type: ignore
+        from services.email_engine import resend  # iter 326x defensive
     except ImportError:
         logger.warning("[bulk_mine] resend SDK not installed")
         return

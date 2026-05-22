@@ -496,7 +496,7 @@ async def _send_email(report: Dict[str, Any]) -> bool:
     if not api_key:
         return False
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = api_key
         founder = os.environ.get("FOUNDER_ALERT_EMAIL", "teji.ss1986@gmail.com")
         subject_prefix = "✅" if report["pass_rate"] >= 0.9 else "🔴"

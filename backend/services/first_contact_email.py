@@ -135,7 +135,7 @@ async def send_first_contact_email(
     Uses Resend API. Falls back gracefully if not configured.
     """
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         api_key = os.environ.get("RESEND_API_KEY", "")
         if not api_key:
             logger.warning("[FirstContact] RESEND_API_KEY not set")

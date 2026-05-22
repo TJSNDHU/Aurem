@@ -1077,7 +1077,7 @@ async def _trigger_lead_outreach(db, site_id: str, slug: str,
             if email_addr:
                 try:
                     import os
-                    import resend
+                    from services.email_engine import resend  # iter 326x defensive
                     resend.api_key = os.environ.get("RESEND_API_KEY", "")
                     if resend.api_key:
                         from_email = os.environ.get("RESEND_FROM_EMAIL", "tj@aurem.live")

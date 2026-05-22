@@ -145,7 +145,8 @@ class CloserORA(AuremAgent):
             except Exception:
                 pass
         elif ch == "email":
-            import resend, os
+            from services.email_engine import resend  # iter 326x defensive
+            import os
             email = lead.get("email")
             if email:
                 from services.casl_compliance import wrap_email_html

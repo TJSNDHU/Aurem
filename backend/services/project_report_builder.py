@@ -432,7 +432,7 @@ async def email_system_audit_pdf(
     """Send the system audit PDF to an admin via Resend."""
     import base64
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = os.environ.get("RESEND_API_KEY") or ""
         if not resend.api_key:
             return {"ok": False, "error": "RESEND_API_KEY missing"}

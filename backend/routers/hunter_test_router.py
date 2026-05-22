@@ -146,7 +146,7 @@ async def hunter_run_test(body: HunterTestBody, request: Request):
     # ── STEP 4a: Send Email via Resend ───────────────────────────────
     if body.send_email and body.test_email:
         try:
-            import resend
+            from services.email_engine import resend  # iter 326x defensive
             resend.api_key = os.environ.get("RESEND_API_KEY") or ""
             if not resend.api_key:
                 trace["steps"].append({"step": "send_email", "ok": False, "error": "RESEND_API_KEY missing"})

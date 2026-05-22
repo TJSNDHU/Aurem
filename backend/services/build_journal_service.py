@@ -484,7 +484,7 @@ async def send_daily_digest(db) -> Dict[str, Any]:
     if not api_key:
         return {"ok": True, "note": "RESEND_API_KEY not set — digest built but not sent", "commits": len(items)}
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = api_key
         founder = os.environ.get("FOUNDER_ALERT_EMAIL", "teji.ss1986@gmail.com")
         resend.Emails.send({

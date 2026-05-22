@@ -41,7 +41,7 @@ def set_db(database):
 # upgrade temporarily breaks `import resend` in a build environment.
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 try:
-    import resend
+    from services.email_engine import resend  # iter 326x defensive
     if RESEND_API_KEY:
         resend.api_key = RESEND_API_KEY
     _RESEND_AVAILABLE = True

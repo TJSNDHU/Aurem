@@ -968,7 +968,7 @@ async def send_website_campaign(slug: str, request: Request):
 
     if email:
         try:
-            import resend
+            from services.email_engine import resend  # iter 326x defensive
             resend.api_key = os.environ.get("RESEND_API_KEY", "")
             email_payload = {"from": "ORA <ora@aurem.live>", "to": [email], "subject": email_subject, "html": email_html, "reply_to": "support@aurem.live"}
             bcc = os.environ.get("AUREM_SALES_BCC_EMAIL", "").strip()

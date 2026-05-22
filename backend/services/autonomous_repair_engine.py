@@ -323,7 +323,7 @@ async def _dispatch_for_signature(sig: Dict[str, Any]) -> Dict[str, Any]:
 
 async def _notify(subject: str, html: str) -> None:
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         key = os.environ.get("RESEND_API_KEY", "")
         notify = os.environ.get("AUREM_NOTIFY_EMAIL") or os.environ.get("RESEND_NOTIFY_EMAIL")
         if not key or not notify:

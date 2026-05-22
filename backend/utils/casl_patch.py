@@ -24,7 +24,7 @@ def install_casl_patches():
 
     # ═══ 1. Resend.Emails.send — patch globally ═══
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         from services.casl_compliance import wrap_email_html, email_footer_text
 
         if getattr(resend.Emails, "_aurem_casl_patched", False):

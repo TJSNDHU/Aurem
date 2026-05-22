@@ -461,7 +461,7 @@ async def _exec_blast_one(db, params: Dict[str, Any]) -> Dict[str, Any]:
         from services.aurem_outreach_templates import (
             render_whatsapp, render_sms, render_email_subject, render_email_html,
         )
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         import httpx
         results: Dict[str, Any] = {}
 

@@ -105,7 +105,8 @@ class ReferralORA(AuremAgent):
             except Exception:
                 pass
         elif ch == "email":
-            import resend, os
+            from services.email_engine import resend  # iter 326x defensive
+            import os
             email = ref.get("email")
             if email:
                 from services.casl_compliance import wrap_email_html
@@ -134,7 +135,8 @@ class ReferralORA(AuremAgent):
             if not referrer_email:
                 continue
             try:
-                import resend, os
+                from services.email_engine import resend  # iter 326x defensive
+                import os
                 from services.casl_compliance import wrap_email_html
                 resend.api_key = os.environ.get("RESEND_API_KEY", "")
                 resend.Emails.send({

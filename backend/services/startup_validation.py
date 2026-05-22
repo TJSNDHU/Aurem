@@ -259,7 +259,7 @@ async def _send_failure_notification(result: Dict[str, Any]):
         logger.warning(f"[STARTUP] founder_notifications write failed: {e}")
     # Best-effort email to founder via Resend
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         api_key = os.environ.get("RESEND_API_KEY", "")
         to_addr = os.environ.get("FOUNDER_EMAIL", "")
         if api_key and to_addr:

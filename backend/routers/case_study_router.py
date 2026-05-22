@@ -296,7 +296,7 @@ async def admin_email(body: EmailBody, request: Request):
 
     # Send via Resend with attachment
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = os.environ.get("RESEND_API_KEY") or ""
         if not resend.api_key:
             raise RuntimeError("RESEND_API_KEY missing")

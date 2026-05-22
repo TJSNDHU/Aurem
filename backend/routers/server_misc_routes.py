@@ -409,7 +409,7 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
 
     if RESEND_API_KEY:
         try:
-            import resend
+            from services.email_engine import resend  # iter 326x defensive
             resend.api_key = RESEND_API_KEY
             # iter 282g — tenant-aware branding: AUREM hosts get the new
             # branded template; other tenants (AUREM etc.) keep their

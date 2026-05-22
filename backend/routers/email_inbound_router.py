@@ -241,7 +241,7 @@ def _send_via_resend(to: str, subject: str, body: str, in_reply_to: Optional[str
     if not RESEND_KEY:
         return {"ok": False, "error": "RESEND_API_KEY not set"}
     try:
-        import resend  # type: ignore
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = RESEND_KEY
         params: dict[str, Any] = {
             "from": RESEND_FROM,

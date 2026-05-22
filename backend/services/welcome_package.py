@@ -64,7 +64,7 @@ async def _send_via_resend(to: str, subject: str, html_body: str,
     send_error = None
     try:
         if resend_key:
-            import resend as _resend
+            from services.email_engine import resend as _resend  # iter 326x defensive
             _resend.api_key = resend_key
 
             def _do_send():
@@ -226,7 +226,7 @@ async def send_welcome_package(tenant_id: str, user_doc: dict = None):
     resend_id = None
     send_error = None
     try:
-        import resend as _resend  # type: ignore
+        from services.email_engine import resend as _resend  # iter 326x defensive
         resend_key = os.environ.get("RESEND_API_KEY", "").strip()
         if resend_key and email:
             _resend.api_key = resend_key

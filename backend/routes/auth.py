@@ -1213,7 +1213,7 @@ async def forgot_password(request_data: PasswordResetRequest, request: Request):
     name = user.get("name") or user.get("first_name") or "there"
 
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = RESEND_API_KEY
 
         resend.Emails.send({

@@ -207,7 +207,7 @@ class FollowupORA(AuremAgent):
         elif ch == "email":
             import os
 
-            import resend
+            from services.email_engine import resend  # iter 326x defensive
             email = lead.get("email")
             if email:
                 from services.casl_compliance import wrap_email_html

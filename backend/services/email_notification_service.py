@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Import Resend (already installed in the project)
 try:
-    import resend
+    from services.email_engine import resend  # iter 326x defensive
     RESEND_AVAILABLE = True
 except ImportError:
     RESEND_AVAILABLE = False

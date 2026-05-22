@@ -555,7 +555,7 @@ async def send_end_of_day_email() -> Dict[str, Any]:
 """
 
     try:
-        import resend  # type: ignore
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = api_key
         resp = resend.Emails.send({
             "from": RESEND_FROM,

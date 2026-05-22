@@ -492,7 +492,7 @@ async def send_lead_email(lead_id: str, body: SendEmailBody, user=Depends(_requi
     sent_id = None
     if os.environ.get("RESEND_API_KEY"):
         try:
-            import resend
+            from services.email_engine import resend  # iter 326x defensive
             resend.api_key = os.environ["RESEND_API_KEY"]
             r = resend.Emails.send({
                 "from":    "AUREM <ops@aurem.live>",

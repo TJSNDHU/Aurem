@@ -8911,3 +8911,40 @@ Founder ask: "I'm in the dark — no clue if a turn costs me $0.02 or $2."
   tests covering: constants, tier2/tier3 persistence diff, atomic
   auto-executor scoping, cost row persistence, zero-cost skip.
 - Full iter326 regression: **269 passing in 12s**.
+
+## 2026-02-XX — iter 326x: Production resend.logs Fix
+
+### Root cause
+Production deployment of aurem.live ships a slimmed `resend` Python wheel
+where `resend/__init__.py` does `from . import logs` but `logs.py` is
+missing, so a bare `import resend` raises
+`ModuleNotFoundError: No module named 'resend.logs'`.
+
+`services/email_engine.py` already had a defensive shim (iter 326e) that
+falls back to importing `resend.emails._emails.Emails` directly. The
+problem: **20 other files** did their own bare `import resend` inside
+runtime functions, each independently re-tripping the broken import and
+killing email sends across the platform.
+
+### Fix
+Migrated all bare runtime `import resend` to
+`from services.email_engine import resend` across 20 files:
+- `pillars/sales/routes/blast_service.py` (the source of the visible
+  prod warning)
+- All `routers/*` and `routes/*` paths that send email
+- `shared/agents/{closer,followup,referral}_ora.py`
+- All daily-brief, milestone, dunning, welcome, autonomous-repair senders
+
+### Tests
+- New `tests/test_iter326x_resend_defensive_imports.py` — 35 tests:
+  parametrised over the 32 hot-path files + 3 sanity tests on the shim
+  itself. Locks in the migration so a future bare `import resend`
+  cannot regress production silently.
+- Full iter326 regression: **304 passing in 16s**.
+
+### Note on prod Connection-Refused logs
+The nginx 502s reported with this issue were a transient symptom of a
+rolling redeploy (new pod still booting). With 200+ routers and many
+schedulers, AUREM backend takes 20-40 s to bind port 8001 — within a
+deploy window nginx will record "Connection refused" until the new pod
+is ready. Not a code defect.

@@ -389,7 +389,7 @@ async def _send_pin_reset_email(email: str, name: str, code: str) -> bool:
         logger.info(f"[pin_auth] PIN reset code for {email}: {code}")
         return False
     try:
-        import resend  # type: ignore
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = api_key
         from_addr = os.environ.get("RESEND_FROM_EMAIL", "AUREM <ora@aurem.live>")
         html = f"""

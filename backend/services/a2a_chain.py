@@ -82,7 +82,7 @@ def _now_iso():
 
 def _resend_client():
     try:
-        import resend as _r
+        from services.email_engine import resend as _r  # iter 326x defensive
     except ImportError:
         return None
     key = os.environ.get("RESEND_API_KEY", "").strip()

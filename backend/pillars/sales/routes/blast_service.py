@@ -51,7 +51,11 @@ async def send_lead_email(lead_id: str, request: Request):
     if not to:
         raise HTTPException(400, "No email address")
     try:
-        import resend
+        # iter 326x — production sometimes ships a slimmed resend wheel
+        # where `import resend` raises `ModuleNotFoundError: No module
+        # named 'resend.logs'`. Use the defensive shim from email_engine
+        # which falls back to importing the Emails class directly.
+        from services.email_engine import resend
         resend.api_key = os.environ.get("RESEND_API_KEY", "")
         r = resend.Emails.send({"from": "ORA <ora@aurem.live>", "to": [to], "subject": subject, "html": html or f"<p>Hi {lead['business_name']},</p><p>Follow up from AUREM Intelligence AI.</p>", "reply_to": "support@aurem.live"})
         email_id = r.get("id", str(r))
@@ -225,7 +229,8 @@ async def execute_blast_for_lead(
     # 1) EMAIL
     if email and _gate_open("email"):
         try:
-            import resend
+            # iter 326x — defensive resend import (see services/email_engine.py)
+            from services.email_engine import resend
             resend.api_key = os.environ.get("RESEND_API_KEY", "")
             r = resend.Emails.send({
                 "from": "ORA <ora@aurem.live>",

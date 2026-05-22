@@ -108,7 +108,7 @@ async def _fire_priority_outreach(db, lead: dict, context: str) -> bool:
     if email:
         try:
             import os
-            import resend
+            from services.email_engine import resend  # iter 326x defensive
             from services.casl_compliance import wrap_email_html
             resend.api_key = os.environ.get("RESEND_API_KEY", "")
             html = wrap_email_html(

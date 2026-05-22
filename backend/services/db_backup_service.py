@@ -241,7 +241,7 @@ def _send_failure_email(error_msg: str, run_id: str) -> None:
         api_key = os.environ.get("RESEND_API_KEY")
         if not api_key:
             return
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         resend.api_key = api_key
         founder_email = os.environ.get(
             "FOUNDER_ALERT_EMAIL", "teji.ss1986@gmail.com"

@@ -402,7 +402,7 @@ async def send_milestone_almost_there_email(referrer_code: str, current_count: i
             pass
 
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
         if not RESEND_API_KEY or not member.get("email"):
             return
@@ -440,7 +440,7 @@ async def send_milestone_almost_there_email(referrer_code: str, current_count: i
 async def send_milestone_unlocked_email(email: str, name: str, unlock_code: str):
     """Send the 'Congratulations - You Unlocked 30%' email"""
     try:
-        import resend
+        from services.email_engine import resend  # iter 326x defensive
         RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
         if not RESEND_API_KEY:
             return
