@@ -321,6 +321,182 @@ def _looks_like_unhandled_tool_call(content: str) -> bool:
     return any(n in txt for n in needles) and txt.startswith("{") and txt.endswith("}")
 
 
+# ─────────────────────────────────────────────────────────────────────
+# iter 326t — Hallucination Shield v2: ground numeric claims in facts
+#
+# iter 326q caught LEAKED TOOL CALLS (raw JSON in chat). It did NOT
+# catch FABRICATED CONTENT — when ORA invents plausible-looking numbers
+# because the tool didn't run. Examples seen in production today:
+#   • "Eligible leads: 8, Sent: 5, Streak: 0" — all three numbers fake
+#   • "AUREM is on Windows" — fake platform (fixed in iter 326s via
+#     RULE ONE pinning, but only for the platform claim)
+#
+# Approach: ground numeric claims. Walk the conversation history, pull
+# every value tools have returned, build a "facts" set. Before
+# delivering the final reply, scan it for numbers. Any number that
+# doesn't appear in tool output AND doesn't appear in the user's recent
+# message is FABRICATED — flag or replace.
+#
+# Scope: only applies to DOMAIN-FACTUAL replies (campaign / lead /
+# customer state). Code-help / conceptual / chitchat replies pass
+# through untouched — otherwise we'd false-positive on every reply
+# that happens to contain a number.
+# ─────────────────────────────────────────────────────────────────────
+
+_DOMAIN_TRIGGER_WORDS = frozenset({
+    "campaign", "campaigns", "leads", "lead", "sent", "emails", "email",
+    "queue", "queued", "customers", "customer", "tenants", "tenant",
+    "blast", "blasts", "subscribers", "subscriber", "revenue", "mrr",
+    "stripe", "subscription", "subscriptions", "active", "inactive",
+    "deliveries", "delivered", "opens", "clicks", "watchdog", "streak",
+    "eligible", "blocked", "vetoed", "uptime", "watchdogs", "scout",
+    "scouted",
+})
+
+# Numbers that are always safe — list indices, common round figures.
+# Without this, every "5 minutes" / "step 1" / "100%" in a reply
+# would false-positive.
+_SAFE_NUMBERS = frozenset({
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "12", "24", "60", "100", "1000",
+})
+
+
+def _is_domain_factual_reply(reply: str) -> bool:
+    """True only if the reply makes claims about campaign/customer
+    state that should be grounded. Very short / non-domain replies
+    skip grounding entirely."""
+    if not reply or len(reply) < 30:
+        return False
+    lower = reply.lower()
+    return any(w in lower for w in _DOMAIN_TRIGGER_WORDS)
+
+
+def _extract_tool_facts(
+    history: list[dict[str, Any]],
+) -> tuple[set[str], str]:
+    """Walk history, return (set_of_numbers, lowercased_concatenated_blob).
+
+    The numbers set is for exact-match lookups. The blob is the
+    substring fallback so we don't miss numbers embedded inside JSON
+    like `"sent_count": 254` (where the raw text always carries the
+    sequence even if the regex pass misses it under unusual whitespace)."""
+    numbers: set[str] = set()
+    blob_parts: list[str] = []
+    for msg in history:
+        if msg.get("role") not in ("tool", "function"):
+            continue
+        content = msg.get("content") or ""
+        if not content:
+            continue
+        blob_parts.append(content.lower())
+        for m in re.finditer(r"-?\d+(?:\.\d+)?", content):
+            numbers.add(m.group(0))
+    return numbers, " ".join(blob_parts)
+
+
+def _ground_reply_against_facts(
+    reply: str,
+    history: list[dict[str, Any]],
+) -> tuple[str, dict[str, Any]]:
+    """Inspect every multi-digit number in the reply. Each one MUST
+    appear in either a tool output OR the user's recent message.
+    Numbers that don't match are flagged as fabrication.
+
+    Returns (possibly-rewritten reply, stats dict).
+
+    Strategy:
+      • 0 unverified   → return reply unchanged
+      • 1-2 unverified → SOFT: append a footer noting uncertain numbers
+      • 3+ unverified  → HARD: swap reply for an honest "I can't verify"
+                          message and let the founder ask again
+    """
+    stats: dict[str, Any] = {
+        "replaced": False, "softened": False, "unverified": [],
+    }
+    if not _is_domain_factual_reply(reply):
+        stats["skipped"] = "non_domain"
+        return reply, stats
+
+    fact_numbers, fact_blob = _extract_tool_facts(history)
+    # Also accept numbers the user themselves typed in recent turns —
+    # if the founder asked "did we get more than 50 leads?" and ORA
+    # replies "Yes, 53 leads landed", the "50" must not be flagged.
+    user_blob_parts: list[str] = []
+    for msg in history[-8:]:
+        if msg.get("role") == "user":
+            user_blob_parts.append((msg.get("content") or "").lower())
+    user_blob = " ".join(user_blob_parts)
+
+    unverified: list[str] = []
+    # iter 326t — match TWO patterns to catch single-digit fabrications:
+    #   (a) Multi-digit numbers anywhere — high signal-to-noise.
+    #   (b) Single-digit numbers ONLY when paired with a domain noun
+    #       (e.g. "Eligible leads: 8" / "5 emails sent" / "Sent: 5").
+    # Pattern (b) is what catches the founder's actual reported failure
+    # — "Eligible leads: 8, Sent: 5, Streak: 0" all single-digit fakes.
+    domain_word_pat = "|".join(_DOMAIN_TRIGGER_WORDS)
+    patterns = [
+        # Multi-digit anywhere
+        re.compile(r"\b(\d{2,})\b"),
+        # Single-digit BEFORE a domain noun: "8 leads"
+        re.compile(
+            rf"\b(\d)\b\s+(?:{domain_word_pat})\b", re.IGNORECASE
+        ),
+        # Single-digit AFTER a domain noun (with optional colon/dash):
+        # "Eligible leads: 8" / "Sent — 5" / "Streak: 0"
+        re.compile(
+            rf"(?:{domain_word_pat})\s*[:\-—]\s*(\d)\b", re.IGNORECASE
+        ),
+    ]
+    seen: set[str] = set()
+    for pat in patterns:
+        for m in pat.finditer(reply):
+            n = m.group(1)
+            if n in seen:
+                continue
+            if n in _SAFE_NUMBERS:
+                # Safe numbers still slip through for multi-digit (e.g. "100")
+                # but for single-digit + domain-noun matches we want to
+                # CHECK them — "0", "1" claimed as a metric IS verifiable
+                # and could be fabricated. Only skip if we're sure.
+                if len(n) >= 2:
+                    continue
+            if n in fact_numbers:
+                continue
+            if n in fact_blob or n in user_blob:
+                continue
+            unverified.append(n)
+            seen.add(n)
+
+    if not unverified:
+        return reply, stats
+
+    stats["unverified"] = unverified
+
+    if len(unverified) >= 3:
+        stats["replaced"] = True
+        stats["reason"] = "too_many_unverified"
+        honest = (
+            "I drafted a reply with specific numbers, but I can't "
+            "confirm they came from a real tool call this turn. Rather "
+            "than risk fabricating data, I'm going to stop here. "
+            "Please ask the question again — I'll re-run the right "
+            "tool and give you verified numbers."
+        )
+        return honest, stats
+
+    stats["softened"] = True
+    footer = (
+        "\n\n_(Heads up — I'm not 100% sure about "
+        f"{' and '.join(unverified)}. Ask again if you want me to "
+        "re-verify with a fresh tool call.)_"
+    )
+    return reply + footer, stats
+
+
+
+
 
 
 
@@ -2146,6 +2322,24 @@ async def _continue_loop(
                 )
 
             # LLM produced a final answer with no tool calls — done
+            # iter 326t — Hallucination Shield v2. Ground domain-factual
+            # claims against the conversation's tool outputs. Detects
+            # fabricated numbers like "Eligible: 8, Sent: 5" — the lie
+            # ORA told the founder on aurem.live this morning.
+            content, _grounding_stats = _ground_reply_against_facts(
+                content, history
+            )
+            if _grounding_stats.get("replaced"):
+                logger.warning(
+                    f"[ora-agent] HALLUCINATION REPLACED: "
+                    f"unverified={_grounding_stats.get('unverified')}"
+                )
+            elif _grounding_stats.get("softened"):
+                logger.info(
+                    f"[ora-agent] hallucination soft-flag: "
+                    f"unverified={_grounding_stats.get('unverified')}"
+                )
+
             # iter 323q — Stop Slop prose filter on every final assistant
             # turn. Idempotent; logs how many AI-tells it scrubbed.
             try:
