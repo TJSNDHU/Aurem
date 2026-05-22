@@ -23,6 +23,23 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 VOXTRAL_API_KEY = os.environ.get("VOXTRAL_API_KEY", "")  # Optional Voxtral key
 
 
+# iter 326m — stability: module-level cached client to STOP the
+# per-request MongoClient leak. Earlier every PWA endpoint built a
+# fresh `MongoClient(mongo_url)` (×7 occurrences) which never closed,
+# burning ~100 sockets each call. Single shared client = bounded pool.
+_pwa_db = None
+
+
+def _db():
+    global _pwa_db
+    if _pwa_db is None:
+        from pymongo import MongoClient
+        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+        db_name = os.environ.get("DB_NAME", "reroots")
+        _pwa_db = MongoClient(mongo_url)[db_name]
+    return _pwa_db
+
+
 # ========== Pydantic Models ==========
 
 class PushSubscription(BaseModel):
@@ -69,11 +86,7 @@ async def get_vapid_key():
 async def subscribe_push(subscription: PushSubscription, request: Request):
     """Subscribe to push notifications"""
     try:
-        from pymongo import MongoClient
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url)
-        db = client[db_name]
+        db = _db()
         
         # Store subscription
         sub_data = {
@@ -103,11 +116,7 @@ async def subscribe_push(subscription: PushSubscription, request: Request):
 async def unsubscribe_push(subscription: PushSubscription):
     """Unsubscribe from push notifications"""
     try:
-        from pymongo import MongoClient
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url)
-        db = client[db_name]
+        db = _db()
         
         db.push_subscriptions.update_one(
             {"endpoint": subscription.endpoint},
@@ -342,12 +351,7 @@ If asked about medical conditions, recommend consulting a dermatologist."""
 async def trigger_cart_recovery(user_id: str, background_tasks: BackgroundTasks):
     """Trigger cart recovery push notification for abandoned cart"""
     try:
-        from pymongo import MongoClient
-        
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url)
-        db = client[db_name]
+        db = _db()
         
         # Get user's cart
         cart = db.carts.find_one({"user_id": user_id})
@@ -498,14 +502,8 @@ async def get_pwa_analytics():
 async def log_biometric_event(request: Request):
     """Log biometric authentication events for admin analytics"""
     try:
-        from pymongo import MongoClient
-        
         data = await request.json()
-        
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url)
-        db = client[db_name]
+        db = _db()
         
         log_entry = {
             "event_type": data.get("event_type", "unknown"),  # registration, login, pin_fallback
@@ -529,14 +527,8 @@ async def log_biometric_event(request: Request):
 async def log_vault_activity(request: Request):
     """Log vault activity for admin analytics"""
     try:
-        from pymongo import MongoClient
-        
         data = await request.json()
-        
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url)
-        db = client[db_name]
+        db = _db()
         
         # Update or create vault metadata
         db.vault_metadata.update_one(
@@ -566,13 +558,8 @@ async def log_vault_activity(request: Request):
 async def pwa_health_check():
     """Health check for PWA-to-Admin connection (Circuit Breaker monitoring)"""
     try:
-        from pymongo import MongoClient
         from utils.encryption import is_encryption_available
-        
-        mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-        db_name = os.environ.get("DB_NAME", "reroots")
-        client = MongoClient(mongo_url, serverSelectionTimeoutMS=5000)
-        db = client[db_name]
+        db = _db()
         
         # Test DB connection
         db.command("ping")

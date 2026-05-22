@@ -104,14 +104,29 @@ async def _check_once() -> dict:
     # Use a tiny rolling buffer stored in ora_campaign_health doc.
     health = await db[HEALTH_COLL].find_one({"_id": "global"}, {"_id": 0}) or {}
     zero_streak = int(health.get("zero_sent_streak") or 0)
+    # iter 326m — distinguish "silent failure" from "empty queue".
+    # Previously every `last_sent == 0` incremented the streak — including
+    # cycles where the engine processed 0 leads because the queue was
+    # legitimately empty (last_run_note=="no-eligible-leads"). That turned
+    # the watchdog into a false-alarm machine (streak=203 with NO actual
+    # delivery problem). True silent failure = engine PROCESSED leads but
+    # NONE got sent. Empty queue = needs scout, not a campaign-watchdog
+    # trip.
+    last_processed = int((cfg or {}).get("last_run_processed") or 0)
+    last_note = str((cfg or {}).get("last_run_note") or "")
+    is_empty_queue_cycle = (last_processed == 0) or (last_note == "no-eligible-leads")
+    snapshot["last_run_processed"] = last_processed
+    snapshot["last_run_note"] = last_note
+    snapshot["empty_queue"] = is_empty_queue_cycle
     if enabled and last_run:
-        if last_sent == 0:
+        if last_sent == 0 and not is_empty_queue_cycle:
             zero_streak += 1
-        else:
+        elif last_sent > 0:
             zero_streak = 0
+        # else: empty queue → hold streak steady (neither punish nor reset)
     snapshot["zero_sent_streak"] = zero_streak
 
-    if zero_streak >= SILENT_RUN_SENT_ZERO_CYCLES:
+    if zero_streak >= SILENT_RUN_SENT_ZERO_CYCLES and not is_empty_queue_cycle:
         snapshot["tripped"].append("zero_sent_streak")
         # iter 325u — incident noise fix. Old code emitted to incident_bus on
         # every 60s cycle while tripped (streak=232 = 232 dup incidents). Now

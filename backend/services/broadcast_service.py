@@ -24,6 +24,20 @@ MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "reroots")
 
 
+# iter 326m — stability: module-level cached client. Earlier each method
+# (_capture_lead, _log_activity, sync_customer_state, get_customer_state)
+# created its own `MongoClient(MONGO_URL)` per call → connection-pool
+# explosion on hot WebSocket paths. Single shared client = bounded.
+_broadcast_db = None
+
+
+def _bdb():
+    global _broadcast_db
+    if _broadcast_db is None:
+        _broadcast_db = MongoClient(MONGO_URL)[DB_NAME]
+    return _broadcast_db
+
+
 @dataclass
 class ConnectedClient:
     """Represents a connected WebSocket client"""
@@ -246,8 +260,7 @@ class LiveBroadcastService:
         The "Never Vanish" memory
         """
         try:
-            client = MongoClient(MONGO_URL)
-            db = client[DB_NAME]
+            db = _bdb()
             
             lead_data = {
                 **activity,
@@ -268,8 +281,7 @@ class LiveBroadcastService:
     async def _log_activity(self, activity: dict):
         """Log activity to MongoDB for persistence"""
         try:
-            client = MongoClient(MONGO_URL)
-            db = client[DB_NAME]
+            db = _bdb()
             
             db.live_sync_logs.insert_one({
                 **activity,
@@ -302,8 +314,7 @@ class LiveBroadcastService:
         The "Deep Sync" for persistent memory
         """
         try:
-            client = MongoClient(MONGO_URL)
-            db = client[DB_NAME]
+            db = _bdb()
             
             # Merge with existing state
             existing = db.reroots_customer_profiles.find_one({'user_id': user_id})
@@ -346,8 +357,7 @@ class LiveBroadcastService:
     async def get_customer_state(self, user_id: str) -> dict:
         """Fetch customer state from MongoDB for PWA "Deep Sync" on launch"""
         try:
-            client = MongoClient(MONGO_URL)
-            db = client[DB_NAME]
+            db = _bdb()
             
             state = db.reroots_customer_profiles.find_one(
                 {'user_id': user_id},

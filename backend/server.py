@@ -143,6 +143,12 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response as StarletteResponse
 print("[STARTUP] Starlette imported", flush=True)
 
+# iter 326m — stability fix. Apply pool-size guard BEFORE any motor /
+# pymongo client is ever constructed (root cause: ~40 services were
+# defaulting to maxPoolSize=100 each → mongod FD exhaustion → "blink").
+from utils import mongo_pool_guard  # noqa: F401  (side-effect: patches clients on import)
+print("[STARTUP] mongo-pool-guard patch applied", flush=True)
+
 from motor.motor_asyncio import AsyncIOMotorClient
 print("[STARTUP] Motor imported", flush=True)
 
