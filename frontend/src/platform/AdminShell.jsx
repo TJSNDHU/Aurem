@@ -29,7 +29,7 @@ import {
   // HUD
   Flame, Dot, LogOut, MessageSquare,
 } from 'lucide-react';
-import { getPlatformToken, clearPlatformAuth } from '../utils/secureTokenStore';
+import { getPlatformToken, clearAdminAuth } from '../utils/secureTokenStore';
 import { BACKEND_URL } from '../lib/api';
 import { PillarProvider, usePillarHealth } from './PillarHealthContext';
 import PillarGate, { PillarDot } from './PillarGate';
@@ -329,7 +329,9 @@ const AdminShellInner = () => {
     window.dispatchEvent(new CustomEvent('aurem:open-palette'));
   }, []);
 
-  const logout = () => { clearPlatformAuth(); navigate('/admin/login'); };
+  // iter 326o — clear ONLY the admin token. Customer session in the same
+  // browser must survive an admin logout.
+  const logout = () => { clearAdminAuth(); navigate('/admin/login'); };
 
   const W = collapsed ? COLLAPSED_PX : EXPANDED_PX;
 

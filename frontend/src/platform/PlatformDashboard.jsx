@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import AdminStatusBar from './AdminStatusBar';
 import AuremBugHistory from './AuremBugHistory';
-import { getPlatformToken, clearPlatformAuth } from '../utils/secureTokenStore';
+import { getPlatformToken, clearCustomerAuth } from '../utils/secureTokenStore';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
@@ -85,7 +85,8 @@ const PlatformDashboard = () => {
 
       if (userRes.ok) setUser(await userRes.json());
       else if (userRes.status === 401) {
-        clearPlatformAuth();
+        // iter 326o — only the customer slot is the customer's session.
+        clearCustomerAuth();
         navigate('/login');
         return;
       }
@@ -142,7 +143,8 @@ const PlatformDashboard = () => {
   };
 
   const logout = () => {
-    clearPlatformAuth();
+    // iter 326o — only the customer slot is the customer's session.
+    clearCustomerAuth();
     navigate('/');
   };
 

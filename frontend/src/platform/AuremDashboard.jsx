@@ -178,7 +178,7 @@ import CallLogsFeed from './feeds/CallLogsFeed';
 import HotLeadsFeed from './feeds/HotLeadsFeed';
 import FallbackMonitorFeed from './feeds/FallbackMonitorFeed';
 import LeadPipelineKanban from './feeds/LeadPipelineKanban';
-import { getPlatformToken, getPlatformUser, clearPlatformAuth } from '../utils/secureTokenStore';
+import { getPlatformToken, getPlatformUser, clearCustomerAuth } from '../utils/secureTokenStore';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 
@@ -2507,7 +2507,9 @@ const AuremDashboard = () => {
   }, [activeItem, selectedCustomerId]);
 
   const handleLogout = () => {
-    clearPlatformAuth();
+    // iter 326o — clear ONLY the customer slot. Admin session (in another
+    // tab on the same browser) must survive a customer logout.
+    clearCustomerAuth();
     navigate('/');
   };
 
