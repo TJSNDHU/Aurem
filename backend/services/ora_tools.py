@@ -2789,6 +2789,45 @@ async def browser_screenshot(
     return res
 
 
+# ── iter 326aa — Phase 2 P1.3: Vector memory of past decisions ──────
+async def recall_past_decisions(
+    query: str,
+    limit: int = 5,
+    tags: list[str] | None = None,
+) -> dict:
+    """Ask: 'have we made a decision like this before? what happened?'.
+    Mongo $text search over the ora_decisions log (auto-populated on
+    every approve/reject/auto-execute)."""
+    try:
+        from services.ora_decision_memory import recall_past_decisions as _r
+    except Exception as e:
+        return {"ok": False, "error": f"decision_memory import failed: {e}"}
+    return await _r(query, limit=limit, tags=tags)
+
+
+# ── iter 326bb — Phase 2 P1.4: Semantic codebase search ─────────────
+async def search_codebase_semantic(query: str, limit: int = 20) -> dict:
+    """Intent-level code search ('find code that calculates subscription
+    cost') instead of exact grep. AST + synonym expansion + ranking."""
+    try:
+        from services import codebase_semantic_search as cs
+    except Exception as e:
+        return {"ok": False, "error": f"codebase_semantic_search import failed: {e}"}
+    return cs.search(query, limit=limit)
+
+
+# ── iter 326z — Phase 2 P1.2: Long-running job checkpoints ──────────
+async def load_job_checkpoint(job_id: str) -> dict:
+    """Load the last checkpoint for a long-running job so it can resume
+    where it crashed (4h campaign sweeps, nightly DR jobs)."""
+    try:
+        from services.job_checkpoints import load_checkpoint
+    except Exception as e:
+        return {"ok": False, "error": f"job_checkpoints import failed: {e}"}
+    row = await load_checkpoint(job_id)
+    return {"ok": True, "found": row is not None, "checkpoint": row}
+
+
 TOOL_REGISTRY: dict[str, dict] = {
     "grep_codebase":  {
         "fn": grep_codebase,
@@ -2826,6 +2865,47 @@ TOOL_REGISTRY: dict[str, dict] = {
             "a PNG screenshot. Returns an R2 image URL (or a local /tmp path "
             "served via the static proxy). Useful for visual evidence in lead "
             "research, competitor analysis, and bug reports."
+        ),
+    },
+    "recall_past_decisions": {
+        "fn": recall_past_decisions,
+        "args_spec": {
+            "query": "str — what you want to remember (required)",
+            "limit": "int 1-50, default 5",
+            "tags":  "list[str] — optional filter (e.g. ['cors', 'auth'])",
+        },
+        "description": (
+            "iter 326aa — Search ORA's past decisions ('did we fix this "
+            "before? what was the outcome?'). Mongo $text search over the "
+            "ora_decisions log (auto-populated on every approve/reject/"
+            "auto-execute). Returns top matches with summary, tool, "
+            "outcome, tags, timestamp."
+        ),
+    },
+    "search_codebase_semantic": {
+        "fn": search_codebase_semantic,
+        "args_spec": {
+            "query": "str — intent-level search (required)",
+            "limit": "int 1-100, default 20",
+        },
+        "description": (
+            "iter 326bb — Intent-based code search instead of exact grep. "
+            "AST-extracts function/class/module names + docstrings, applies "
+            "synonym expansion, ranks by hit-density + name match. Returns "
+            "top matches with file path, line number, and docstring excerpt. "
+            "Use this when you DON'T know the exact word but DO know what "
+            "the code should do ('code that calculates subscription cost')."
+        ),
+    },
+    "load_job_checkpoint": {
+        "fn": load_job_checkpoint,
+        "args_spec": {
+            "job_id": "str — the long-running job id (required)",
+        },
+        "description": (
+            "iter 326z — Load the last checkpoint for a long-running job "
+            "(4h campaign sweep, nightly DR job) so it can resume where "
+            "it crashed instead of starting over."
         ),
     },
     "view_file": {

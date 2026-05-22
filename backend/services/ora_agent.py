@@ -654,6 +654,11 @@ TIER_1_AUTO: set[str] = {
     # iter 326i — BUILD MODE tools. Auto-tier so ORA can run the
     # proof-table checklist without founder approval per step.
     "run_pytest", "verify_endpoint",
+    # iter 326aa / 326bb / 326z — Phase 2 P1 read-only memory + search.
+    # Pure observations: no state change, no external network calls,
+    # so safe to auto-execute.
+    "recall_past_decisions", "search_codebase_semantic",
+    "load_job_checkpoint",
 }
 
 TIER_2_APPROVE: set[str] = {
@@ -701,6 +706,14 @@ _db = None
 def set_db(database) -> None:
     global _db
     _db = database
+    # iter 326aa / 326z — wire the new memory/checkpoint services to
+    # the same Mongo handle. Best-effort: failure is non-fatal.
+    try:
+        from services import ora_decision_memory, job_checkpoints
+        ora_decision_memory.set_db(database)
+        job_checkpoints.set_db(database)
+    except Exception as e:
+        logger.warning(f"[ora-agent] decision_memory/checkpoint wire failed: {e}")
 
 
 def _now() -> datetime:
@@ -2016,7 +2029,8 @@ expects YOU to drive the work — no manual tool-picking, no copy-pasting.
 
 Three risk tiers govern tool execution:
   • TIER 1 (auto) — view_file, grep, curl, db reads, lint, shell_exec, claim_build_done,
-    git_bisect, campaign_status, force_blast_cycle, channel_gating_reseed.
+    git_bisect, campaign_status, force_blast_cycle, channel_gating_reseed,
+    recall_past_decisions, search_codebase_semantic, load_job_checkpoint.
     These execute IMMEDIATELY when you call them — no approval needed.
   • TIER 2 (approve) — safe_edit, restart_service, propose_commit, save_to_github,
     create_file, delete_file, ora_rollback_list, rollback, git_commit_local,
@@ -2384,6 +2398,22 @@ async def resume_after_decision(
             {"_id": action_id},
             {"$set": {"status": final_status, "result": result}},
         )
+        # iter 326aa — log this approved decision into ORA's memory so
+        # future "have we done this before?" queries can find it.
+        try:
+            from services.ora_decision_memory import log_decision
+            outcome = "auto_executed" if founder_email.startswith(
+                "system:auto_execute") else "approved"
+            asyncio.create_task(log_decision(
+                session_id=session_id,
+                founder_email=founder_email,
+                tool=row["tool"],
+                summary=row.get("summary") or row["tool"],
+                args=row.get("args"),
+                outcome=outcome if tool_succeeded else f"{outcome}_failed",
+            ))
+        except Exception as _e:
+            logger.debug(f"[decision-memory] log skipped: {_e}")
         history.append({
             "role":         "tool",
             "tool_call_id": action_id,
@@ -2398,6 +2428,19 @@ async def resume_after_decision(
             {"_id": action_id},
             {"$set": {"rejection_note": (note or "")[:400]}},
         )
+        # iter 326aa — log rejections too so ORA learns from no's.
+        try:
+            from services.ora_decision_memory import log_decision
+            asyncio.create_task(log_decision(
+                session_id=session_id,
+                founder_email=founder_email,
+                tool=row["tool"],
+                summary=(note or row.get("summary") or row["tool"])[:500],
+                args=row.get("args"),
+                outcome="rejected",
+            ))
+        except Exception as _e:
+            logger.debug(f"[decision-memory] log skipped: {_e}")
         history.append({
             "role":         "tool",
             "tool_call_id": action_id,

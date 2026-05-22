@@ -8979,3 +8979,45 @@ that needs JS to render is now in scope.
 - Full iter326 regression: **325 passing in 12 s**. Backend healthy
   with both tools live in the tier2 list (verified via
   `/api/ora/agent/_/health`).
+
+## 2026-02-XX — iter 326z/aa/bb: Phase 2 P1.2 / P1.3 / P1.4 — Complete
+
+### P1.2 — Long-running job checkpoints (`services/job_checkpoints.py`)
+- Generic checkpoint store: `save_checkpoint`, `load_checkpoint`,
+  `clear_checkpoint`, `list_checkpoints`.
+- Mongo collection `ora_job_checkpoints` with TTL index (default 72h).
+- Any job (campaign blast, nightly DR, scout sweep) can write a
+  `{step_idx, state}` row periodically and resume after a crash by
+  calling `load_checkpoint(job_id)`.
+- New ORA tool `load_job_checkpoint(job_id)` (tier1_auto).
+
+### P1.3 — Vector memory of past decisions (`services/ora_decision_memory.py`)
+- Mongo collection `ora_decisions` with `$text` index over summary,
+  tool, args_preview. Tag-based filter via the `tags` array.
+- `log_decision(...)` auto-extracts tags (cors / auth / mongo / stripe
+  / etc.) from the summary.
+- Wired into `ora_agent.resume_after_decision`: every approve / reject
+  / auto-execute event is logged best-effort (asyncio.create_task).
+- New ORA tool `recall_past_decisions(query, limit, tags?)` (tier1_auto).
+  Powers "did we fix this before?" queries from ORA.
+
+### P1.4 — Semantic codebase search (`services/codebase_semantic_search.py`)
+- AST-extracts function/class/module names + docstrings from
+  `/app/backend/**/*.py`. Indexes 18k+ entries in ~200 ms.
+- Tokenizes the query, expands via a small synonym table
+  (cost→price/billing, auth→login/jwt, etc.), scores by hit-density
+  + AST kind (functions outrank module preambles), top-N ranking.
+- Lazy index, auto-rebuilds when the project mtime fingerprint changes.
+- New ORA tool `search_codebase_semantic(query, limit)` (tier1_auto).
+
+### Plumbing
+- `ora_agent.set_db` now also wires `ora_decision_memory` and
+  `job_checkpoints` to the same Mongo handle.
+- System prompt advertises the three new tier1 tools so the LLM uses
+  them organically.
+
+### Tests
+- New `tests/test_iter326z_phase2_memory_search_checkpoints.py` — 16
+  tests covering all three modules + the plumbing.
+- Full iter326 regression: **341 passing in 16 s**. Backend healthy;
+  `/api/ora/agent/_/health` confirms all 5 Phase 2 tools live.
