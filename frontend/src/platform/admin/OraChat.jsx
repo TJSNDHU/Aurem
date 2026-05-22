@@ -707,12 +707,49 @@ function ApprovalCard({ action, onApprove, onReject }) {
                  style={{ ...btn(false), padding: "8px 16px" }}>
           <X size={14} /> Reject
         </button>
-        <span style={{ marginLeft: "auto", color: TEXT_DIM, fontSize: 10,
-                         alignSelf: "center" }}>
-          Expires in {action.expires_in_minutes || 30}m
-        </span>
+        <ExpiryCountdown expiresAt={action.expires_at}
+                         fallbackMin={action.expires_in_minutes || 60} />
       </div>
     </div>
+  );
+}
+
+// iter 326tt — live countdown so the founder can SEE when an approval
+// is about to die. Beats the old hard-coded "Expires in 30m" literal
+// that never ticked. Computes remaining seconds from expires_at
+// every second; falls back to the static minute count if backend
+// didn't send expires_at (older sessions).
+function ExpiryCountdown({ expiresAt, fallbackMin }) {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!expiresAt) {
+    return (
+      <span style={{ marginLeft: "auto", color: TEXT_DIM, fontSize: 10,
+                       alignSelf: "center" }}>
+        Expires in {fallbackMin}m
+      </span>
+    );
+  }
+  const target = new Date(expiresAt).getTime();
+  const remaining = Math.max(0, target - now);
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  // Colour shifts: gold → amber (under 5 min) → red (under 1 min)
+  let colour = TEXT_DIM;
+  if (remaining <= 60 * 1000)        colour = RED;
+  else if (remaining <= 5 * 60 * 1000) colour = AMBER;
+  const label = remaining === 0
+    ? "Expired"
+    : `Expires in ${mins}:${String(secs).padStart(2, "0")}`;
+  return (
+    <span data-testid="approval-expiry-countdown"
+           style={{ marginLeft: "auto", color: colour, fontSize: 10,
+                     alignSelf: "center", fontVariantNumeric: "tabular-nums" }}>
+      {label}
+    </span>
   );
 }
 

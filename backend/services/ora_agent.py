@@ -720,6 +720,55 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# iter 326tt — Transient vs deterministic failure distinction.
+# When a tool fails because of a network blip / 5xx / timeout / rate
+# limit, we do NOT want to count it toward the 2-strike halt ceiling.
+# These errors are environmental, not the LLM's fault, and a retry on
+# the next iteration usually clears them. Deterministic failures
+# (invalid args, path-not-allowed, unknown tool, dissent reject) still
+# count fully — the LLM brain must correct them, not retry.
+_TRANSIENT_ERROR_SIGNALS = (
+    "timeout",
+    "timed out",
+    "connection refused",
+    "connection reset",
+    "connection aborted",
+    "connection error",
+    "temporarily unavailable",
+    "service unavailable",
+    "gateway timeout",
+    "bad gateway",
+    "internal server error",
+    "serverselectiontimeout",
+    "rate limit",
+    "rate-limit",
+    "too many requests",
+    "http 500",
+    "http 502",
+    "http 503",
+    "http 504",
+    "http 429",
+    "ssl",
+    "eof occurred",
+    "remote end closed",
+    "dns",
+    "name or service not known",
+)
+
+
+def _is_transient_failure(result: dict | None) -> bool:
+    """True iff the tool result represents a retryable environmental
+    failure (network / 5xx / rate-limit). Deterministic failures
+    (bad args, path not allowed, unknown tool, dissent reject)
+    return False so they still count toward the strike ceiling."""
+    if not isinstance(result, dict):
+        return False
+    err = (result.get("error") or "").lower()
+    if not err:
+        return False
+    return any(sig in err for sig in _TRANSIENT_ERROR_SIGNALS)
+
+
 def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if isinstance(dt, datetime) else None
 
@@ -2510,6 +2559,7 @@ async def _continue_loop(
     """
     iterations: int       = 0
     fail_counts: dict     = {}                    # tool_name → consecutive fails
+    transient_counts: dict = {}                    # iter 326tt — separate bucket for retryable env failures
     loop_start:  float    = time.monotonic()      # FIX #6
 
     while iterations < MAX_TOOL_ITERATIONS:
@@ -2785,16 +2835,29 @@ async def _continue_loop(
 
             tool_ok = bool(result) and bool(result.get("ok", True))
             if not tool_ok:
-                fail_counts[call["name"]] = fail_counts.get(call["name"], 0) + 1
+                # iter 326tt — transient (network/5xx/rate-limit) failures
+                # do not count toward the deterministic strike ceiling.
+                # They still receive a recovery directive so the LLM can
+                # decide to back off or retry with the same args.
+                is_transient = _is_transient_failure(result)
+                if is_transient:
+                    transient_counts[call["name"]] = (
+                        transient_counts.get(call["name"], 0) + 1
+                    )
+                else:
+                    fail_counts[call["name"]] = fail_counts.get(call["name"], 0) + 1
                 history.append(
                     _recovery_directive(
-                        call["name"], result, fail_counts[call["name"]]
+                        call["name"], result,
+                        fail_counts.get(call["name"], 0)
+                        + transient_counts.get(call["name"], 0),
                     )
                 )
             else:
-                fail_counts.pop(call["name"], None)  # reset on success
+                fail_counts.pop(call["name"], None)        # reset on success
+                transient_counts.pop(call["name"], None)   # reset on success
 
-            # Halt if consecutive-fail ceiling reached for this tool
+            # Halt if consecutive deterministic-fail ceiling reached.
             if fail_counts.get(call["name"], 0) >= 2:
                 stop_msg = (
                     f"Tool `{call['name']}` failed twice consecutively. "
@@ -2808,6 +2871,23 @@ async def _continue_loop(
                     "iterations": iterations,
                     "done":       True,
                     "halted_for": "fail_ceiling",
+                }
+            # iter 326tt — separate, higher cap for pure-transient stalls
+            # so a flapping network doesn't loop forever silently.
+            if transient_counts.get(call["name"], 0) >= 5:
+                stop_msg = (
+                    f"Tool `{call['name']}` keeps hitting transient errors "
+                    "(network / 5xx / rate-limit) — paused after 5 retries. "
+                    "Yeh code ki galti nahi, environment issue lag raha hai."
+                )
+                history.append({"role": "assistant", "content": stop_msg})
+                await _save_history(session_id, history)
+                return {
+                    "ok":         True,
+                    "reply":      stop_msg,
+                    "iterations": iterations,
+                    "done":       True,
+                    "halted_for": "transient_ceiling",
                 }
             continue  # next iteration
 
@@ -2828,6 +2908,9 @@ async def _continue_loop(
             summary=summary,
         )
         await _save_history(session_id, history)
+        # iter 326tt — include expires_at_iso so the UI can render a
+        # live countdown instead of a hard-coded "30m" literal.
+        _expires_at_iso = _iso(_now() + timedelta(minutes=EXPIRY_MINUTES))
         return {
             "ok": True,
             "action_required": {
@@ -2839,6 +2922,7 @@ async def _continue_loop(
                 "summary":            summary,
                 "preamble":           content or "ORA wants to run this:",
                 "expires_in_minutes": EXPIRY_MINUTES,
+                "expires_at":         _expires_at_iso,
                 # iter 326w — surface 30 s cancel window to UI (tier2 only).
                 "auto_execute_in_seconds": (
                     TIER2_AUTO_EXECUTE_SECONDS if tier == "tier2_approve" else None
