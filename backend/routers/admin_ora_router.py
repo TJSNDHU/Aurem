@@ -94,6 +94,68 @@ class AskReq(BaseModel):
     question: str
 
 
+@router.get("/api/admin/ora/decisions")
+async def admin_ora_decisions(
+    request: Request,
+    days: int = 7,
+    limit: int = 50,
+    outcome: Optional[str] = None,
+    tag: Optional[str] = None,
+):
+    """iter 326cc — Recent ORA decisions panel for the admin sidebar.
+
+    Returns the last `limit` decisions ORA approved / rejected /
+    auto-executed within the last `days`. Optional filters: `outcome`
+    (approved | rejected | auto_executed) and `tag` (cors, auth, stripe,
+    etc. — auto-extracted at log time).
+    """
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    days = max(1, min(days, 90))
+    limit = max(1, min(limit, 200))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    q: Dict[str, Any] = {"ts": {"$gte": cutoff}}
+    if outcome:
+        q["outcome"] = outcome
+    if tag:
+        q["tags"] = tag
+    rows: List[Dict[str, Any]] = []
+    counts = {"approved": 0, "rejected": 0, "auto_executed": 0, "other": 0}
+    cur = (
+        _db.ora_decisions
+        .find(q, {
+            "_id": 1, "ts": 1, "tool": 1, "summary": 1,
+            "outcome": 1, "tags": 1, "founder_email": 1,
+            "session_id": 1, "args_preview": 1,
+        })
+        .sort("ts", -1)
+        .limit(limit)
+    )
+    async for d in cur:
+        ts = d.get("ts")
+        rows.append({
+            "id":            d.get("_id"),
+            "ts":            ts.isoformat() if isinstance(ts, datetime) else ts,
+            "tool":          d.get("tool"),
+            "summary":       d.get("summary"),
+            "outcome":       d.get("outcome"),
+            "tags":          d.get("tags") or [],
+            "founder_email": d.get("founder_email"),
+            "session_id":    d.get("session_id"),
+            "args_preview":  d.get("args_preview"),
+        })
+        out = d.get("outcome") or "other"
+        counts[out if out in counts else "other"] += 1
+    return {
+        "ok":           True,
+        "window_days":  days,
+        "count":        len(rows),
+        "outcome_counts": counts,
+        "decisions":    rows,
+    }
+
+
 @router.get("/api/admin/ora/cost-summary")
 async def admin_ora_cost_summary(request: Request, days: int = 7):
     """iter 326w — Daily LLM spend dashboard.

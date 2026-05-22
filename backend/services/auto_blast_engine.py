@@ -55,6 +55,13 @@ _db = None
 def set_db(database):
     global _db
     _db = database
+    # iter 326dd — keep the checkpoint store wired to the same DB
+    # so mid-cycle resume reads/writes hit the right collection.
+    try:
+        from services import job_checkpoints
+        job_checkpoints.set_db(database)
+    except Exception:
+        pass
 
 
 def _get_db():
@@ -847,7 +854,38 @@ async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
         tenant_id = cfg.get("tenant_id") or "global"
         cap = int(cfg.get("max_per_cycle", 10))
 
+        # iter 326dd — Phase 3 P2.1: checkpoint the blast cycle so a
+        # mid-cycle pod crash doesn't double-send already-processed
+        # leads. The cycle is keyed by tenant; we save after each lead.
+        _ckpt_job_id = f"auto_blast::{tenant_id}"
+        _processed_ids: list[str] = []
+        try:
+            from services.job_checkpoints import (
+                load_checkpoint as _ckpt_load,
+                save_checkpoint as _ckpt_save,
+                clear_checkpoint as _ckpt_clear,
+            )
+            _prev = await _ckpt_load(_ckpt_job_id)
+            if _prev and isinstance(_prev.get("state"), dict):
+                _processed_ids = list(
+                    _prev["state"].get("processed_lead_ids") or []
+                )
+                if _processed_ids:
+                    logger.info(
+                        f"[auto-blast] resuming {tenant_id}: skipping "
+                        f"{len(_processed_ids)} already-processed lead(s) "
+                        f"from a prior interrupted cycle"
+                    )
+        except Exception as _ck_e:
+            logger.debug(f"[auto-blast] checkpoint preload skipped: {_ck_e}")
+            _ckpt_save = None       # type: ignore[assignment]
+            _ckpt_clear = None      # type: ignore[assignment]
+
         leads = await _eligible_leads(db, cap)
+        # Skip leads we already handled in the interrupted prior cycle.
+        if _processed_ids:
+            _seen = set(_processed_ids)
+            leads = [l for l in leads if l.get("lead_id") not in _seen]
         note = None
         if not leads:
             note = "no-eligible-leads"
@@ -957,8 +995,32 @@ async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
                 await ora.update_outcome(aid, "success" if sent > 0 else "no_reply")
 
                 logger.info(f"[auto-blast] {tenant_id} · {lead_id} · sent {sent}/4")
+                # iter 326dd — record progress so a crash here leaves a
+                # resume point. Best-effort; never breaks the cycle.
+                _processed_ids.append(lead_id)
+                if _ckpt_save is not None:
+                    try:
+                        await _ckpt_save(
+                            _ckpt_job_id,
+                            step_idx=len(_processed_ids),
+                            state={
+                                "tenant_id": tenant_id,
+                                "processed_lead_ids": _processed_ids[-200:],
+                                "cycle_sent": cycle_sent,
+                            },
+                            ttl_hours=6,
+                        )
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.warning(f"[auto-blast] lead {lead_id} failed: {e}")
+
+        # iter 326dd — cycle finished cleanly; remove the resume point.
+        if _ckpt_clear is not None:
+            try:
+                await _ckpt_clear(_ckpt_job_id)
+            except Exception:
+                pass
 
         # Update cfg stats
         await db.auto_blast_config.update_one(

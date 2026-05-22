@@ -9021,3 +9021,40 @@ that needs JS to render is now in scope.
   tests covering all three modules + the plumbing.
 - Full iter326 regression: **341 passing in 16 s**. Backend healthy;
   `/api/ora/agent/_/health` confirms all 5 Phase 2 tools live.
+
+## 2026-02-XX — iter 326cc/dd: Recent Decisions Panel + Blast Cycle Checkpoints
+
+### iter 326cc — Recent decisions panel (admin sidebar)
+Founder ask: "30-second auto-execute raat ko chalega. Subah dikhna chahiye
+kya ORA ne approve/reject kiya. Safety feature hai."
+
+- New endpoint: `GET /api/admin/ora/decisions?days=7&limit=50&outcome=&tag=`
+  Returns last N decisions ORA approved / rejected / auto-executed
+  with outcome_counts rollup. Admin-gated via `_ensure_admin`.
+- New React component: `/app/frontend/src/platform/admin/RecentDecisionsPanel.jsx`
+  Polls every 30 s, filters by outcome and 1/7/30/90-day window. Color-
+  coded badges (approved=green, auto_executed=sky, rejected=rose,
+  *_failed=amber). All interactive elements carry `data-testid`.
+
+### iter 326dd — Wire job_checkpoints into auto_blast_engine
+Founder ask: "Phase 2 ka pehla kaam — bina iske Playwright ki 4-hour
+sweeps abhi bhi crash pe zero se shuru hongi."
+
+- `services/auto_blast_engine.run_auto_blast_cycle` now:
+  - Loads any prior checkpoint for `auto_blast::<tenant_id>` and skips
+    lead_ids already processed in a previously-interrupted cycle.
+  - Saves the running `processed_lead_ids` list (last 200 to bound size)
+    after every successfully-blasted lead. `ttl_hours=6` so abandoned
+    checkpoints clean up fast.
+  - Clears the checkpoint on cycle completion.
+- `services/auto_blast_engine.set_db` now propagates the DB handle to
+  `services/job_checkpoints` so checkpoint reads/writes land in the
+  right Mongo.
+
+### Tests
+- New `tests/test_iter326cc_dd_decisions_endpoint_and_blast_checkpoints.py`
+  — 13 tests covering: endpoint registration, query params, admin gate,
+  ObjectId hygiene, checkpoint imports + job-id format + TTL, processed-
+  lead skip filter, frontend file existence + endpoint + token + testids.
+- Full iter326 regression: **354 passing in 30 s**. Backend healthy;
+  `/api/admin/ora/decisions` returns 401 unauth (correctly protected).
