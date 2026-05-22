@@ -606,21 +606,39 @@ async def connect_tool(data: ToolConnection, authorization: str = Header(None)):
             detail=f"Tool '{data.tool_type}' not available in your plan. Upgrade to access."
         )
     
-    # FIX #4 (audit) — credentials stored "encrypted at rest" is still a TODO.
-    # Until a Fernet/KMS-backed encryption layer lands, we at minimum:
-    #   • Never return `config` in any /tools/* read endpoint (see status route)
-    #   • Wrap the dict in a small envelope so a future migration to encrypted
-    #     storage can be done without touching every read path.
-    # MUST DO: add Fernet encryption with a key from env (ENCRYPTION_KEY) and
-    # migrate existing rows. Tracked in CHANGELOG.md as P0 hardening.
+    # iter 326ww — P0 fix: credentials are now encrypted at rest via
+    # Fernet (AES-128-CBC + HMAC-SHA256) keyed off AUREM_ENCRYPTION_KEY.
+    # See services/credential_crypto.py for the envelope shape. Reads
+    # in /tools/status / /tools/disconnect continue to never expose the
+    # ciphertext — they only check membership.
+    from services.credential_crypto import (
+        encrypt_credentials, is_encryption_available,
+    )
+    envelope = encrypt_credentials(data.credentials)
+    if not envelope.get("_encrypted"):
+        # Encryption unavailable — refuse to persist plaintext for any
+        # tool that obviously carries secrets. We still allow webhooks
+        # (no secret) so the platform doesn't soft-fail on missing key.
+        sensitive = {"whatsapp", "email", "twilio", "stripe", "openai",
+                     "gemini", "claude", "smtp"}
+        if data.tool_type.lower() in sensitive and not is_encryption_available():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Encryption key not configured — refusing to store "
+                    f"{data.tool_type} credentials in plaintext. "
+                    "Set AUREM_ENCRYPTION_KEY in the backend env."
+                ),
+            )
     await db.platform_users.update_one(
         {"_id": user["_id"]},
         {"$set": {
             f"tool_connections.{data.tool_type}": {
                 "connected_at": datetime.now(timezone.utc),
                 "status": "active",
-                "config": data.credentials,  # ⚠️ PLAINTEXT — see FIX #4 TODO
-                "_encrypted": False,
+                # Encrypted envelope — see services/credential_crypto.py
+                "config_envelope": envelope,
+                "_encrypted":      bool(envelope.get("_encrypted")),
             },
             "updated_at": datetime.now(timezone.utc)
         }}
