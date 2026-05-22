@@ -203,6 +203,65 @@ def _gemini_cb_record_success() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────
+# iter 326yy — DeepSeek (OpenRouter) suspended-key circuit breaker.
+# Same pattern as the Gemini breaker above. Production logs were
+# flooding with `deepseek 401 {"message": "User not found"}` because
+# the OPENROUTER_API_KEY had been revoked. Each ORA turn was burning
+# ~1s on the dead route before falling through. Now, after 2
+# consecutive 401/403s we open the circuit for 5 minutes and ORA
+# routes directly to the next provider (Gemini/Claude/NVIDIA/Groq).
+# Founder also gets a single Telegram alert via the iter-326pp
+# `alert_autonomous_401` helper so they know to rotate the key.
+# ─────────────────────────────────────────────────────────────────────
+_DEEPSEEK_CB_FAIL_THRESHOLD = int(os.environ.get("ORA_DEEPSEEK_CB_THRESHOLD", "2"))
+_DEEPSEEK_CB_COOLDOWN_S     = float(os.environ.get("ORA_DEEPSEEK_CB_COOLDOWN_S", "300"))
+_deepseek_cb_fails  = 0
+_deepseek_cb_until  = 0.0
+_deepseek_alert_sent = False  # ensure we ping founder only once per process
+
+
+def _deepseek_cb_open() -> bool:
+    import time as _t
+    return _deepseek_cb_until > _t.time()
+
+
+def _deepseek_cb_record_failure(status_code: int, detail: str = "") -> None:
+    """Increment failure count; open circuit at threshold. Only 401/403
+    are auth-level; transient 5xx/timeouts use the normal retry path."""
+    global _deepseek_cb_fails, _deepseek_cb_until, _deepseek_alert_sent
+    import time as _t
+    _deepseek_cb_fails += 1
+    if _deepseek_cb_fails >= _DEEPSEEK_CB_FAIL_THRESHOLD:
+        _deepseek_cb_until = _t.time() + _DEEPSEEK_CB_COOLDOWN_S
+        logger.warning(
+            f"[ora-agent] deepseek circuit OPEN for {_DEEPSEEK_CB_COOLDOWN_S:.0f}s "
+            f"(fails={_deepseek_cb_fails}, status={status_code}). "
+            "Routing to next provider in chain."
+        )
+        if not _deepseek_alert_sent:
+            _deepseek_alert_sent = True
+            try:
+                from services.silent_failure_alerts import alert_autonomous_401
+                alert_autonomous_401(
+                    context="ora_agent.deepseek_call",
+                    status_code=status_code,
+                    detail=detail[:300],
+                    provider="deepseek_openrouter",
+                )
+            except Exception as _e:
+                logger.debug(f"[ora-agent] deepseek 401 alert dispatch failed: {_e}")
+
+
+def _deepseek_cb_record_success() -> None:
+    global _deepseek_cb_fails, _deepseek_cb_until, _deepseek_alert_sent
+    if _deepseek_cb_fails or _deepseek_cb_until:
+        logger.info("[ora-agent] deepseek circuit CLOSED — success after failure")
+    _deepseek_cb_fails = 0
+    _deepseek_cb_until = 0.0
+    _deepseek_alert_sent = False
+
+
+# ─────────────────────────────────────────────────────────────────────
 # iter 326q — Shared salvage layer for inline tool-call leakage.
 #
 # Symptom user saw (verbatim from chat with ORA):
@@ -1089,6 +1148,10 @@ async def _llm_turn(
                 else:
                     _ollama_cb_record_success()
             elif provider in ("deepseek", "openrouter", "deepseek_v3"):
+                # iter 326yy — skip immediately if circuit is open
+                # (key revoked / suspended); falls through to next.
+                if _deepseek_cb_open():
+                    continue
                 # iter 325z — DeepSeek is primary; one retry on the FIRST
                 # cold-start timeout so the chain doesn't immediately fall
                 # to Claude (which is slower) when the only issue was a
@@ -1237,7 +1300,13 @@ async def _deepseek_with_tools(
             )
             if r.status_code == 200:
                 data = r.json()
+                _deepseek_cb_record_success()  # iter 326yy
                 return (data.get("choices") or [{}])[0].get("message") or {}
+            # iter 326yy — 401/403 trips the circuit breaker so we stop
+            # hammering a dead key. 5xx and rate-limits keep the normal
+            # log-and-fall-through behaviour.
+            if r.status_code in (401, 403):
+                _deepseek_cb_record_failure(r.status_code, r.text[:240])
             logger.warning(
                 f"[ora-agent] deepseek {r.status_code}: {r.text[:240]}"
             )

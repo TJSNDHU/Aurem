@@ -190,10 +190,13 @@ def test_ora_agent_fires_alert_on_gemini_401_403():
     src = (BACKEND / "services" / "ora_agent.py").read_text()
     assert "alert_autonomous_401" in src
     # Must live in the same block as `_gemini_cb_record_failure`
-    # (the 401/403 detection point).
+    # (the 401/403 detection point). Locate that call first, then
+    # search FORWARD from it so the new DeepSeek alert (added in
+    # iter 326yy, earlier in the file) doesn't fool the assertion.
     idx_cb = src.find("_gemini_cb_record_failure(f\"HTTP {r.status_code}")
-    idx_alert = src.find("alert_autonomous_401(")
-    assert idx_cb != -1 and idx_alert != -1
+    assert idx_cb != -1, "Gemini failure-record call missing"
+    idx_alert = src.find("alert_autonomous_401(", idx_cb)
+    assert idx_alert != -1, "Gemini alert call missing after CB record"
     # alert call should immediately follow the cb-record call (within
     # ~600 chars — same try-block)
     assert 0 < (idx_alert - idx_cb) < 600
