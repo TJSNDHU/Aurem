@@ -9325,3 +9325,59 @@ undefined `clearTokens()` would have brick'd the build.
   `shutil.which("git")`, git pre-check runs before subprocess,
   clear error message, module import smoke.
 - Full iter326 regression: **422 passing in 23 s**. Backend healthy.
+
+## 2026-02-XX — iter 326nn: Logout Redirect Loop + Cloudflare 1010
+
+### Founder bug (in production)
+"Login page jumps straight to dashboard. Going to use admin services
+says login again. Click Logout — sends back to dashboard. Loop."
+
+### Root cause (the actual fix)
+`setPlatformToken()` mirrors writes into both the role slot
+(`aurem_admin_token`) AND the legacy `platform_token` slot for
+back-compat. `clearAdminAuth()` cleared only the role slot. Result:
+the legacy mirror kept the admin JWT alive forever. `getPlatformToken()`
+falls through to the legacy slot, so `/admin/login`'s useEffect read
+a still-valid admin payload and bounced the founder back to
+`/admin/mission-control`. The dashboard then failed admin-service API
+calls because the actual admin slot was empty.
+
+### Fix — two parts
+1. **`clearAdminAuth()`** and **`clearCustomerAuth()`** now also wipe
+   the legacy mirror, but role-aware: they only clear it if its
+   decoded role claim matches their own (admin-only clears admin
+   mirrors, customer-only clears customer mirrors). The iter 326o
+   cross-role isolation stays intact.
+2. **`AdminLogin.jsx`** useEffect now verifies `payload.exp` before
+   the auto-redirect. A stale (expired) token triggers
+   `clearAdminAuth()` and shows the login form instead of bouncing
+   to a broken dashboard.
+
+### Also in this iter — Resend Cloudflare 1010
+Deploy log showed:
+```
+[onboarding-reminder] send failed for ...: Resend HTTP fallback 403: error code: 1010
+```
+Cloudflare in front of `api.resend.com` was banning our naked urllib
+calls (no User-Agent → "banned browser signature"). Fixed by sending
+a real UA + Accept header:
+- `User-Agent: aurem-resend-http-fallback/1.0 (python-urllib)`
+- `Accept: application/json`
+
+### Other deploy log items (NOT code fixes)
+- `[recipient-guard] resend import failed` — from pre-iter-326mm
+  bundle; goes away on next redeploy.
+- `[email_engine] resend SDK completely unavailable` — same as above;
+  iter 326kk HTTP fallback is live in preview.
+- nginx Connection refused — transient pod boot window.
+- `POST /api/auth/login 401` — wrong password from the QA bot;
+  expected behaviour.
+
+### Tests
+- New `tests/test_iter326nn_logout_redirect_loop_and_cf1010.py` —
+  8 tests: legacy mirror cleared role-aware on both `clearAdminAuth`
+  and `clearCustomerAuth`, AdminLogin checks `payload.exp`, calls
+  `clearAdminAuth` on stale token, email_engine HTTP fallback sends
+  UA + Accept, iter markers present.
+- Full iter326 regression: **430 passing in 17 s**. Backend healthy;
+  live admin + customer logins both return valid JWTs.

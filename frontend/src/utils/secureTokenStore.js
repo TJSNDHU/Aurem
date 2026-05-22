@@ -108,6 +108,16 @@ export function clearAdminAuth() {
   // admin logout. (This is the actual fix for the founder's bug.)
   _clearDual(ADMIN_TOKEN_KEY);
   _clearDual(ADMIN_USER_KEY);
+  // iter 326nn — also wipe the legacy mirror slot if it currently
+  // holds an admin token. `setPlatformToken()` mirrors writes there
+  // for back-compat, so a stale admin JWT can survive logout and
+  // bounce the founder right back to /admin/mission-control on the
+  // next visit to /admin/login. Customer mirrors stay untouched.
+  const legacy = _readDual(PLATFORM_TOKEN_KEY);
+  if (legacy && _decodeRole(legacy) === 'admin') {
+    _clearDual(PLATFORM_TOKEN_KEY);
+    _clearDual(PLATFORM_USER_KEY);
+  }
 }
 
 export function setCustomerToken(token) {
@@ -129,6 +139,13 @@ export function clearCustomerAuth() {
   // customer logout in the same browser.
   _clearDual(CUSTOMER_TOKEN_KEY);
   _clearDual(CUSTOMER_USER_KEY);
+  // iter 326nn — mirror cleanup for the legacy slot when it holds a
+  // customer token (same rationale as clearAdminAuth above).
+  const legacy = _readDual(PLATFORM_TOKEN_KEY);
+  if (legacy && _decodeRole(legacy) === 'customer') {
+    _clearDual(PLATFORM_TOKEN_KEY);
+    _clearDual(PLATFORM_USER_KEY);
+  }
 }
 
 

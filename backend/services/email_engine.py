@@ -79,6 +79,12 @@ except Exception as _resend_err:
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type":  "application/json",
+                        # iter 326nn — Cloudflare in front of api.resend.com
+                        # was returning 1010 (banned browser signature) on
+                        # our naked urllib calls. Send a real UA so we look
+                        # like a normal SDK client.
+                        "User-Agent":    "aurem-resend-http-fallback/1.0 (python-urllib)",
+                        "Accept":        "application/json",
                     },
                     method="POST",
                 )

@@ -61,10 +61,23 @@ const AdminLogin = () => {
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
+        // iter 326nn — verify the token isn't expired BEFORE auto-
+        // redirecting. A stale token whose `exp` is in the past would
+        // still pass the role check, bounce the user to the dashboard,
+        // and then the dashboard would fail every API call and send
+        // them right back here. Worst possible UX loop.
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < nowSec) {
+          // Stale token — clear it and let the user see the form.
+          import('../utils/secureTokenStore').then(({ clearAdminAuth }) => {
+            clearAdminAuth();
+          }).catch(() => { /* ignore */ });
+          return;
+        }
         if (payload.is_super_admin || payload.role === 'super_admin') {
           navigate('/admin/mission-control');
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore — corrupt token, show the form */ }
     }
   }, [navigate]);
 
