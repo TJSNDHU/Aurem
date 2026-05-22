@@ -522,6 +522,18 @@ REVENUE SNAPSHOT:
 async def deliver_brief(brief: dict, settings: dict = None):
     """Deliver brief via configured channels."""
     channels = (settings or {}).get("channels", ["dashboard"])
+    # iter 326vv — audit trail. Every cron run now persists outcome to
+    # `founder_brief_sends` so the System Overview / debugging dash can
+    # see which channels actually delivered. Previously this was a
+    # silent no-op: 124 briefs generated, 0 founder_brief_sends rows.
+    delivery_outcome = {
+        "brief_id":    brief.get("brief_id"),
+        "tenant_id":   brief.get("tenant_id"),
+        "channels":    list(channels),
+        "results":     {},
+        "delivered":   False,
+        "ts":          datetime.now(timezone.utc).isoformat(),
+    }
 
     if "whatsapp" in channels:
         try:
@@ -534,16 +546,30 @@ async def deliver_brief(brief: dict, settings: dict = None):
             if wa_to:
                 await send_whatsapp_message(wa_to, brief.get("whatsapp_text", ""))
                 logger.info(f"[BRIEF] WhatsApp delivery sent to {wa_to}")
+                delivery_outcome["results"]["whatsapp"] = {"ok": True, "to": wa_to}
+                delivery_outcome["delivered"] = True
             else:
                 logger.warning("[BRIEF] ADMIN_ALERT_PHONE/FOUNDER_PHONE missing — WhatsApp skipped")
+                delivery_outcome["results"]["whatsapp"] = {"ok": False, "reason": "no_phone"}
         except Exception as e:
             logger.warning(f"[BRIEF] WhatsApp delivery failed: {e}")
+            delivery_outcome["results"]["whatsapp"] = {"ok": False, "error": str(e)[:200]}
 
     if "push" in channels:
         attention = brief.get("stats", {}).get("items_attention", 0)
         logger.info(f"[BRIEF] Push notification: {attention} items need attention")
+        delivery_outcome["results"]["push"] = {"ok": True, "items_attention": attention}
+        delivery_outcome["delivered"] = True
 
     logger.info(f"[BRIEF] Brief {brief.get('brief_id')} delivered via {channels}")
+
+    # Persist audit row — best-effort, never break delivery on log failure.
+    try:
+        from server import db as _server_db  # type: ignore
+        if _server_db is not None:
+            await _server_db.founder_brief_sends.insert_one(delivery_outcome)
+    except Exception as _le:
+        logger.debug(f"[BRIEF] audit log skipped: {_le}")
 
 
 # ═══════════════════════════════════════

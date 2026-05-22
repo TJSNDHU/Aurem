@@ -49,11 +49,11 @@ def test_backend_stats_includes_iteration_and_as_of():
 
 def test_frontend_header_uses_api_data():
     """SystemOverview.jsx header must read `p.iteration` and `p.as_of`
-    and only fall back to today's batch (326c / MAY 21, 2026)."""
+    and only fall back to today's batch (326uu / MAY 22, 2026)."""
     src = open("/app/frontend/src/platform/SystemOverview.jsx",
                encoding="utf-8").read()
-    assert "{p.iteration || '326c'}" in src
-    assert "{p.as_of || 'MAY 21, 2026'}" in src
+    assert "{p.iteration || '326uu'}" in src
+    assert "{p.as_of || 'MAY 22, 2026'}" in src
     # Old hardcoded MAY 18 fallback must be gone
     assert "MAY 18, 2026" not in src
     assert "'323r'" not in src

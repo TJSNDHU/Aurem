@@ -631,7 +631,7 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '326c'} | {p.as_of || 'MAY 21, 2026'}</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '326uu'} | {p.as_of || 'MAY 22, 2026'}</p>
 
           {/* ═══ SHARE BUTTON ═══ */}
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -715,6 +715,49 @@ export default function SystemOverview() {
 
         {/* ═══ iter 323j — LIVE FULL SOVEREIGNTY SCORE ═══ */}
         <SovereigntyScoreTile />
+
+        {/* ═══ ITER 325 → 326 — MAY 21, 2026 — SOVEREIGNTY RESILIENCE BATCH ═══ */}
+        <div className="sov-card" style={{
+          padding: '24px 32px', marginBottom: 20,
+          border: `1px solid #C9A84C`, animation: 'sov-glow 5s ease-in-out infinite',
+          background: 'linear-gradient(135deg, #0D0D0D, #1A140A)',
+        }} data-testid="sov-iter326uu-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: GOLD }}>
+            ITER 326 LATE-MAY · ORA-CTO POLISH BATCH · MAY 22, 2026
+          </div>
+          <p className="sov-body" style={{ fontSize: 12, color: '#A89060', marginBottom: 14, letterSpacing: '0.05em' }}>
+            Silent-failure alerts · council role fallback · approval card UX · transient-failure distinction · 10-gap chat UI overhaul (E1 parity)
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 12 }}>
+            {[
+              { iter: '326pp', title: 'Silent-failure Telegram alerts',  desc: 'Backup cron fail · scheduler crash · auth 401 in autonomous run all ping founder (5-min dedup).' },
+              { iter: '326qq', title: 'Council role whitelist fix',      desc: 'LLM-invented roles (legal/compliance) no longer halt — fallback to security/backend/qa with note.' },
+              { iter: '326rr', title: 'Approval card UX',                desc: 'Pre-emptive ✓Approved echo removed · pending always cleared · expiry bumped 30→60min · friendly error copy.' },
+              { iter: '326ss', title: 'Bad-args + wall-clock fixes',     desc: 'Tool dispatcher returns args_spec on TypeError · loop budget 150→300s · ORA self-corrects without halting.' },
+              { iter: '326tt', title: 'Transient vs deterministic',      desc: '5xx / timeouts / rate-limits no longer count toward 2-strike halt · separate 5-strike bucket · live approval countdown UI.' },
+              { iter: '326uu', title: 'ORA chat UI 10-gap overhaul',     desc: 'PreviewPane · DiffView · TestResultBlock · PlanPreview · StepTracker · FileLink · ErrorContext · ExpandableOutput.' },
+            ].map((b, i) => (
+              <div key={i} style={{
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(13,13,13,0.7)',
+                border: '1px solid rgba(201,168,76,0.18)',
+              }}>
+                <div className="sov-mono" style={{ fontSize: 10, color: GOLD, letterSpacing: '0.1em' }}>
+                  ITER {b.iter.toUpperCase()}
+                </div>
+                <div className="sov-body" style={{ fontSize: 14, color: '#E8E0D0', fontWeight: 600, margin: '4px 0 6px' }}>
+                  {b.title}
+                </div>
+                <div className="sov-body" style={{ fontSize: 12, color: '#8A8070', lineHeight: 1.4 }}>
+                  {b.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="sov-mono" style={{ fontSize: 10, color: '#5A5468', marginTop: 14, textAlign: 'right' }}>
+            498 pytest passing · 0 regressions · proven in preview
+          </div>
+        </div>
 
         {/* ═══ ITER 325 → 326 — MAY 21, 2026 — SOVEREIGNTY RESILIENCE BATCH ═══ */}
         <div className="sov-card" style={{
