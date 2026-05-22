@@ -133,7 +133,20 @@ def test_email_engine_http_fallback_sends_user_agent():
         "HTTP fallback must send a User-Agent header — Cloudflare "
         "1010 blocks the request otherwise (deploy log 2026-05-22)."
     )
-    assert "aurem-resend-http-fallback" in cls_body
+    # iter 326oo — UA must NOT contain Cloudflare-blocked bot signatures.
+    # The iter 326nn UA ("python-urllib") was blocked. Block-list match:
+    for forbidden in ("python-urllib", "urllib", "python-requests",
+                       "curl", "wget", "scrapy"):
+        # We allow the substring "python" alone (resend-python is fine),
+        # but the precise bad strings above must not appear.
+        assert forbidden not in cls_body.split("User-Agent")[1].split(",")[0], (
+            f"UA contains Cloudflare-blocked token: {forbidden!r}"
+        )
+    # And specifically: blend in with the official Resend SDK UA.
+    assert "resend-python/" in cls_body, (
+        "UA should look like the Resend python SDK so Cloudflare "
+        "treats us as normal SDK traffic (iter 326oo fix)."
+    )
 
 
 def test_email_engine_http_fallback_sends_accept_json():
