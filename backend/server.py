@@ -1045,6 +1045,14 @@ async def create_indexes():
         except Exception as e:
             logging.warning(f"[startup] recommended_bundles_router wiring failed: {e}")
 
+        # iter 326l — Dashboard bootstrap router DB wire-up.
+        try:
+            from routers import dashboard_bootstrap_router as _dbr
+            _dbr.set_db(db)
+            logging.info("[startup] dashboard_bootstrap_router db wired")
+        except Exception as e:
+            logging.warning(f"[startup] dashboard_bootstrap_router wiring failed: {e}")
+
         # Seed internal @aurem.live addresses into do_not_contact so any
         # legacy code paths that pre-check DNC also respect the block.
         try:
@@ -2515,6 +2523,14 @@ try:
 except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] recommended_bundles wire failed: {_e}")
+
+# iter 326l — Dashboard bootstrap (Reroots-style fresh-tenant fix).
+try:
+    from routers.dashboard_bootstrap_router import router as _dash_bootstrap_router
+    app.include_router(_dash_bootstrap_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] dashboard_bootstrap wire failed: {_e}")
 
 # iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
 try:
