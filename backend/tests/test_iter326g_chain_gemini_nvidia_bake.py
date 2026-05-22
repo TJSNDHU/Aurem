@@ -40,20 +40,12 @@ def test_gemini_nvidia_timeout_constants_declared():
 
 # ── 2. Default chain order is correct ──────────────────────────────────────
 def test_default_chain_order_excludes_freellmapi_and_ollama():
-    """The default ORA_AGENT_PROVIDER_ORDER must be the founder-approved
+    """The MEDIUM-tier chain (which is the default for untagged
+    traffic after iter 326u) must be the founder-approved
     `deepseek,gemini,nvidia,claude,groq` — FreeLLMAPI + Legion Ollama
     are intentionally NOT in the default chain."""
-    src = open("/app/backend/services/ora_agent.py", encoding="utf-8").read()
-    # The DEFAULT (second arg of getenv) is what matters when env is unset.
-    m = re.search(
-        r'os\.environ\.get\(\s*"ORA_AGENT_PROVIDER_ORDER"\s*,\s*'
-        r"(?:#[^\n]*\n\s*)*"          # tolerate inline comments
-        r'"([^"]+)"',
-        src,
-    )
-    assert m, "could not locate default chain string in ora_agent.py"
-    default = m.group(1)
-    providers = [p.strip() for p in default.split(",") if p.strip()]
+    from services.ora_agent import _chain_order_for
+    providers = _chain_order_for("medium")
     assert providers == ["deepseek", "gemini", "nvidia", "claude", "groq"], (
         f"unexpected default chain: {providers}"
     )

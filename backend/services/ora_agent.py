@@ -715,6 +715,128 @@ def lean_ollama_tool_schemas() -> list[dict[str, Any]]:
 
 
 # ── LLM provider chain ────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────
+# iter 326u — Cost-Aware Brain Routing.
+#
+# Before this change the chain order was a STATIC sequence
+# (`deepseek,gemini,nvidia,claude,groq`). Every request — from "hi" to
+# "rewrite the campaign engine" — burned the same providers in the
+# same order. The founder's "campaign report?" question above used
+# Claude for synthesis even though DeepSeek/Gemini would have nailed
+# it in 200ms at 1/10th the cost.
+#
+# This module classifies each request into one of three complexity
+# tiers and picks a DIFFERENT chain order per tier:
+#
+#   SIMPLE   — single-word / question / status check / yes/no:
+#               • Gemini Flash first (cheapest, fastest)
+#               • DeepSeek second   (cheap, strong reasoning)
+#               • NVIDIA third      (free, reliable)
+#               • Claude only as last-ditch
+#   MEDIUM   — explanation, multi-line answer, single-file edit:
+#               • DeepSeek first    (best reasoning per dollar)
+#               • Gemini second
+#               • Claude third
+#   COMPLEX  — multi-file refactor, planning, debug a bug from scratch:
+#               • Claude first      (top reasoning matters here)
+#               • DeepSeek second
+#               • NVIDIA / Gemini   (fallbacks)
+#
+# Classification is a CHEAP keyword + length heuristic. Doing it with
+# another LLM would defeat the cost-saving purpose. The heuristic is
+# intentionally conservative — when in doubt, classify UP (MEDIUM) so
+# we don't underprovision a hard question.
+#
+# Env override: ORA_AGENT_DISABLE_ROUTING=1 → always uses the legacy
+# static chain. Useful for A/B testing the savings.
+# ─────────────────────────────────────────────────────────────────────
+
+# Words that signal a deep code task — bumps complexity to COMPLEX.
+_COMPLEX_TASK_WORDS = frozenset({
+    "refactor", "rewrite", "implement", "build", "architect", "design",
+    "debug", "investigate", "trace", "diagnose", "audit", "migration",
+    "migrate", "fix.+bug", "root.+cause", "deep.+dive",
+})
+
+# Words that signal a quick lookup / status check / chat → SIMPLE.
+_SIMPLE_INTENT_WORDS = frozenset({
+    "status", "health", "ok", "okay", "hi", "hello", "hey",
+    "thanks", "thank", "yes", "no", "got", "good", "great",
+    "report", "show", "list", "check", "ping", "test",
+})
+
+
+def _classify_complexity(messages: list[dict[str, Any]]) -> str:
+    """Return one of: 'simple', 'medium', 'complex'.
+    Heuristic only — no LLM call (that would defeat the cost saving).
+
+    Looks at the LAST user message (the actual question this turn).
+    Earlier messages are context for the LLM, not signal for routing.
+    """
+    last_user = ""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            last_user = (m.get("content") or "").strip()
+            break
+    if not last_user:
+        return "medium"
+
+    txt = last_user.lower()
+    tokens = re.findall(r"\b\w+\b", txt)
+    token_count = len(tokens)
+
+    # Heuristic 1 — anything with deep-code-task words is COMPLEX.
+    for word in _COMPLEX_TASK_WORDS:
+        if "." in word:  # regex pattern
+            if re.search(word, txt):
+                return "complex"
+        elif word in tokens:
+            return "complex"
+
+    # Heuristic 2 — very long messages (>120 tokens) usually mean
+    # complex tasks. Founders don't write essays for "campaign status?".
+    if token_count > 120:
+        return "complex"
+
+    # Heuristic 3 — very short (<= 8 tokens) AND contains a SIMPLE
+    # intent word OR is a question → SIMPLE.
+    if token_count <= 8:
+        ends_question = txt.endswith("?")
+        has_simple_word = any(w in tokens for w in _SIMPLE_INTENT_WORDS)
+        if ends_question or has_simple_word:
+            return "simple"
+        # short but no clear intent → medium (don't underprovision)
+
+    # Heuristic 4 — 9-30 tokens with a simple intent word → SIMPLE.
+    if token_count <= 30 and any(w in tokens for w in _SIMPLE_INTENT_WORDS):
+        return "simple"
+
+    return "medium"
+
+
+def _chain_order_for(complexity: str) -> list[str]:
+    """Pick a provider chain order based on the classified complexity.
+
+    NOTE: Circuit breakers (ollama_cb, gemini_cb) still apply to whichever
+    chain we pick — a dead provider gets skipped silently regardless of
+    its priority on paper."""
+    # Override hook for emergencies / A-B testing.
+    if os.environ.get("ORA_AGENT_DISABLE_ROUTING") == "1":
+        return ["deepseek", "gemini", "nvidia", "claude", "groq"]
+
+    if complexity == "simple":
+        # Cheapest first. Claude is sidelined to last-ditch.
+        return ["gemini", "deepseek", "nvidia", "groq", "claude"]
+    if complexity == "complex":
+        # Claude's reasoning is worth its dollar on hard tasks.
+        return ["claude", "deepseek", "gemini", "nvidia", "groq"]
+    # medium (default) — keep the original chain order so the change
+    # is a strict superset: SIMPLE / COMPLEX paths get cheaper / smarter,
+    # MEDIUM stays identical for safety.
+    return ["deepseek", "gemini", "nvidia", "claude", "groq"]
+
+
 async def _llm_turn(
     messages: list[dict[str, Any]],
     *,
@@ -731,23 +853,22 @@ async def _llm_turn(
     Returns OpenAI-format message dict (may have tool_calls), or None if
     every provider failed.
     """
-    order_env = os.environ.get(
-        "ORA_AGENT_PROVIDER_ORDER",
-        # iter 326f — final chain (FreeLLMAPI proxy skipped per founder
-        # decision 2026-05-21). Both Gemini + NVIDIA already configured
-        # via GOOGLE_API_KEY + NVIDIA_NIM_API_KEY in /app/backend/.env,
-        # which gives us 3 independent free upstreams ahead of paid
-        # Claude. Order:
-        #   1. DeepSeek (primary — best reasoning, OpenRouter)
-        #   2. Gemini   (huge free RPM, sub-second)
-        #   3. NVIDIA   (heavy-hitter fallback)
-        #   4. Claude   (Universal Key safety net)
-        #   5. Groq     (rate-limited final fallback)
-        # Legion Ollama removed from default — usually offline; operator
-        # can re-add via env if their laptop daemon is live.
-        "deepseek,gemini,nvidia,claude,groq",
+    # iter 326u — Cost-aware routing. Classify the request's complexity
+    # and pick a chain order that puts the right brain first. If the
+    # operator set ORA_AGENT_PROVIDER_ORDER explicitly we respect that
+    # (it's a hard override). Otherwise we let the classifier decide.
+    _routing_override = os.environ.get("ORA_AGENT_PROVIDER_ORDER")
+    if _routing_override:
+        order = [p.strip() for p in _routing_override.lower().split(",") if p.strip()]
+        _complexity = "override"
+    else:
+        _complexity = _classify_complexity(messages)
+        order = _chain_order_for(_complexity)
+
+    logger.info(
+        f"[ora-agent] LLM routing → complexity={_complexity} "
+        f"chain={','.join(order)}"
     )
-    order     = [p.strip() for p in order_env.lower().split(",") if p.strip()]
 
     for provider in order:
         # iter 322fk-3 — skip ollama while the circuit breaker is open.
