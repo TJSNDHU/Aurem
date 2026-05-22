@@ -9058,3 +9058,38 @@ sweeps abhi bhi crash pe zero se shuru hongi."
   lead skip filter, frontend file existence + endpoint + token + testids.
 - Full iter326 regression: **354 passing in 30 s**. Backend healthy;
   `/api/admin/ora/decisions` returns 401 unauth (correctly protected).
+
+## 2026-02-XX — iter 326w-UI / 326ee: Phase 3 P2.2 + P2.3
+
+### iter 326w-UI — Daily LLM spend dashboard CARD (P2.2)
+Backend endpoint shipped in iter 326w. This iter adds the React surface.
+- New component: `/app/frontend/src/platform/admin/DailySpendCard.jsx`
+  Compact card with total spend, calls, per-provider rollup (top 5), and
+  an inline sparkline. Auto-spike warning: today > 2× median of prior
+  days (and > $0.05) renders an amber "spike" badge + amber line.
+  Window selector (7d / 14d / 30d). Polls every 60 s.
+
+### iter 326ee — Email channel health probe (P2.3)
+Founder ask: "Yeh probe iter 326x wala 'resend.logs' bug ko pakad leta
+before it bit a real campaign."
+
+- New endpoint: `GET /api/admin/ora/email-health?hours=24`
+  Aggregates email sends across BOTH log sources so neither path goes
+  silent:
+    • `db.email_logs` (engine-sent transactional)
+    • `db.campaign_leads.outreach_history[type=email]` (blast cycles)
+  Returns `{sent, failed, total, success_rate, verdict, top_errors[]}`.
+  Verdict thresholds: ≥0.95 = healthy, ≥0.80 = warning, <0.80 = critical.
+  Top-10 deduped failure reasons surface the smoking gun.
+- New component: `/app/frontend/src/platform/admin/EmailHealthCard.jsx`
+  Sent / failed / success-rate trio, verdict badge, top-5 failure list.
+  Window selector (1h / 24h / 3d / 7d). Polls every 60 s.
+
+### Tests
+- New `tests/test_iter326ee_email_health_and_spend_card.py` — 15 tests
+  covering endpoint registration, auth gate, both-source aggregation,
+  response schema, SLO thresholds, both frontend cards' existence +
+  endpoint + token + data-testids + spike rendering.
+- Full iter326 regression: **369 passing in 17 s**. Backend healthy;
+  all three admin endpoints (`cost-summary`, `email-health`,
+  `decisions`) confirmed live. Frontend lint clean on all 3 new cards.

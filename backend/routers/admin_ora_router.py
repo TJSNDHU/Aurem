@@ -94,6 +94,104 @@ class AskReq(BaseModel):
     question: str
 
 
+@router.get("/api/admin/ora/email-health")
+async def admin_ora_email_health(request: Request, hours: int = 24):
+    """iter 326ee — Phase 3 P2.3: Email channel health probe.
+
+    Aggregates email send success/failure across BOTH log sources:
+      • db.email_logs        — engine-sent (transactional)
+      • db.campaign_leads.outreach_history[type=email] — blast cycles
+
+    Returns total sent / failed / top failure reasons so the daily ORA
+    digest can spot regressions like the iter 326x `resend.logs` bug
+    BEFORE it burns through a campaign cycle.
+    """
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    hours = max(1, min(hours, 720))
+    cutoff_dt  = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff_iso = cutoff_dt.isoformat()
+
+    sent       = 0
+    failed     = 0
+    err_counts: Dict[str, int] = {}
+
+    # 1) engine logs (email_logs)
+    try:
+        async for d in _db.email_logs.find(
+            {"sent_at": {"$gte": cutoff_iso}},
+            {"_id": 0, "success": 1, "error": 1},
+        ):
+            if d.get("success"):
+                sent += 1
+            else:
+                failed += 1
+                err = (d.get("error") or "unknown")[:120]
+                err_counts[err] = err_counts.get(err, 0) + 1
+    except Exception as e:
+        logger.warning(f"[email-health] email_logs scan failed: {e}")
+
+    # 2) blast outreach_history (only email rows)
+    try:
+        pipeline = [
+            {"$unwind": "$outreach_history"},
+            {"$match": {
+                "outreach_history.type": "email",
+                "outreach_history.timestamp": {"$gte": cutoff_iso},
+            }},
+            {"$group": {
+                "_id":  "$outreach_history.status",
+                "n":    {"$sum": 1},
+                "errs": {"$push": "$outreach_history.error"},
+            }},
+        ]
+        async for r in _db.campaign_leads.aggregate(pipeline):
+            status = (r.get("_id") or "").lower()
+            n = int(r.get("n") or 0)
+            if status == "sent":
+                sent += n
+            else:
+                failed += n
+                for e in (r.get("errs") or []):
+                    if not e:
+                        continue
+                    key = str(e)[:120]
+                    err_counts[key] = err_counts.get(key, 0) + 1
+    except Exception as e:
+        logger.warning(f"[email-health] outreach_history scan failed: {e}")
+
+    total = sent + failed
+    success_rate = round(sent / total, 4) if total else None
+    top_errors = sorted(
+        ({"error": k, "count": v} for k, v in err_counts.items()),
+        key=lambda r: -r["count"],
+    )[:10]
+
+    # Founder-friendly verdict line
+    if total == 0:
+        verdict = "no email traffic in window"
+    elif success_rate is None:
+        verdict = "no signal"
+    elif success_rate >= 0.95:
+        verdict = "healthy"
+    elif success_rate >= 0.80:
+        verdict = "warning"
+    else:
+        verdict = "critical"
+
+    return {
+        "ok":            True,
+        "window_hours":  hours,
+        "sent":          sent,
+        "failed":        failed,
+        "total":         total,
+        "success_rate":  success_rate,
+        "verdict":       verdict,
+        "top_errors":    top_errors,
+    }
+
+
 @router.get("/api/admin/ora/decisions")
 async def admin_ora_decisions(
     request: Request,
