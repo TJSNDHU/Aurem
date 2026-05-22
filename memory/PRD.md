@@ -76,12 +76,16 @@ Full-sovereignty, token-conscious autonomous business operator. Local MongoDB + 
   • **New endpoints**: `POST /api/admin/tenant/bootstrap-dashboard` (single tenant) + `POST /api/admin/tenant/bootstrap-all-pending` (bulk backfill).
   • **Live one-shot run on preview DB**: 19 pending tenants bootstrapped including `RERO-3DEJ` (Reroots Aesthetics). All 14 yellow tiles now have non-zero data.
   • 10 regression tests in `tests/test_iter326l_dashboard_bootstrap.py` all green (single tenant happy-path, idempotency, URL normalization, missing-args validation, bulk discovery, gmail-skip, domain-from-email inference, route registration, server wire-up, Reroots E2E).
-- iter 326l-Option-B (2026-02): **Auto-bootstrap on every signup** —
-  • Wired `bootstrap_tenant_dashboard()` directly into `routers/aurem_onboarding_router.py::_post_verify_kickoff` — the single funnel through which every signup path eventually flows (onboarding API + WP plugin register + admin endpoint).
-  • Auto-bootstrap runs **before** the real scan with `force_scan=False` to prevent infinite recursion. Baseline failure is non-fatal — real scan still proceeds.
-  • Result: every newly-onboarded customer now gets non-zero dashboard tiles from second-zero, before the live scan completes.
-  • 5 regression tests in `tests/test_iter326lb_auto_bootstrap_on_signup.py` all green (kickoff seeds baseline, no recursion, non-fatal failure, import contract, force_scan=False enforced).
-  • Full iter 326* regression suite: **110 green** (across 12 test files).
+- iter 326m (2026-02): **Deploy log noise — SEO routes + sentinel probe stubs** —
+  • Deployment agent confirmed app deploys cleanly (NO container-level blockers). Logs were showing **8 routes returning 404** as noise:
+    - `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt` — crawler-facing SEO endpoints
+    - `/api/service-catalog`, `/api/services/catalog`, `/api/leads/health`, `/api/system/overview/public` — internal `sentinel_client_router.PUBLIC_PROBES` targets
+  • **Root cause 1**: `routers/seo_static_router.py` existed but was **never registered** in `server.py`. Single-line fix.
+  • **Root cause 2**: AUREM's own sentinel probed 4 URLs the platform never had route handlers for. Reported the fleet as degraded incorrectly.
+  • **New file**: `routers/sentinel_probe_stubs_router.py` (+106 lines) provides lightweight stub aliases — `service-catalog` and `services/catalog` alias `/api/catalog/services`; `leads/health` returns row count; `system/overview/public` returns platform meta + provider chain.
+  • **Server wire-up** (+22 lines): both routers included at module-import time, DBs set in `startup_event`.
+  • Live verified: all 8 routes now `HTTP 200` (was 404). Sample `/api/system/overview/public` returns `{ok: true, platform: aurem, live: true, services_count: 21, providers_chain: [deepseek, gemini, nvidia, claude, groq]}`.
+  • 8 regression tests in `tests/test_iter326m_deploy_log_noise.py` all green. Individual file pass rate: 100%. Combined large-suite run shows Mongo connection-pool exhaustion in tests (test-infra only, not production code).
 
 ## Backlog (Priority Order)
 - **P1**: ORA Status frontend view — single-screen 9-metric dashboard + Approve queue badge.

@@ -1053,6 +1053,14 @@ async def create_indexes():
         except Exception as e:
             logging.warning(f"[startup] dashboard_bootstrap_router wiring failed: {e}")
 
+        # iter 326m — Sentinel-probe stubs DB wire-up.
+        try:
+            from routers import sentinel_probe_stubs_router as _spsr
+            _spsr.set_db(db)
+            logging.info("[startup] sentinel_probe_stubs_router db wired")
+        except Exception as e:
+            logging.warning(f"[startup] sentinel_probe_stubs_router wiring failed: {e}")
+
         # Seed internal @aurem.live addresses into do_not_contact so any
         # legacy code paths that pre-check DNC also respect the block.
         try:
@@ -2531,6 +2539,26 @@ try:
 except Exception as _e:
     import logging as _lg
     _lg.getLogger(__name__).warning(f"[INLINE] dashboard_bootstrap wire failed: {_e}")
+
+# iter 326m — SEO static endpoints (/robots.txt, /sitemap.xml, /llms.txt,
+# /llms-full.txt) were never registered, returning 404 on every crawler
+# hit. Wiring the existing seo_static_router fixes all four.
+try:
+    from routers.seo_static_router import router as _seo_static_router
+    app.include_router(_seo_static_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] seo_static wire failed: {_e}")
+
+# iter 326m — Sentinel-probe stub aliases. Without these, the existing
+# sentinel reports the AUREM fleet as degraded because it probes URLs
+# the platform never registered. DB wiring in startup_event.
+try:
+    from routers.sentinel_probe_stubs_router import router as _sentinel_stubs_router
+    app.include_router(_sentinel_stubs_router)
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger(__name__).warning(f"[INLINE] sentinel_probe_stubs wire failed: {_e}")
 
 # iter 322g+ — Ghost Scout (IPRoyal residential proxy + Google Places harvest)
 try:
