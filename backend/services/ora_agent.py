@@ -495,6 +495,97 @@ def _ground_reply_against_facts(
     return reply + footer, stats
 
 
+# ─────────────────────────────────────────────────────────────────────
+# iter 326v — Token Cost Transparency
+#
+# Founder ask: "Har chat turn ke neeche dikhega: 'This turn: $0.03 |
+# Session: $0.18'. Tu andhere mein hai right now."
+#
+# Approach: estimate cost from character lengths (rough but reliable;
+# tokens ≈ chars/4 for English+code). No provider-side changes needed.
+# Track per-session totals in a module-level dict so the footer can
+# show both this-turn and session-cumulative.
+#
+# Pricing is per 1M tokens (as of Feb 2026). Numbers are deliberately
+# rounded UP — we'd rather over-report cost (founder under-bills) than
+# under-report (founder overpays without knowing). Update the table as
+# providers re-price.
+# ─────────────────────────────────────────────────────────────────────
+
+_PROVIDER_PRICING_USD_PER_M_TOKENS: dict[str, dict[str, float]] = {
+    # Provider:        input price,    output price  (USD / 1M tokens)
+    "deepseek":      {"input": 0.27,   "output": 1.10},   # via OpenRouter
+    "gemini":        {"input": 0.075,  "output": 0.30},   # Gemini 1.5 Flash
+    "nvidia":        {"input": 0.0,    "output": 0.0 },   # NIM free tier
+    "claude":        {"input": 3.00,   "output": 15.00},  # Sonnet 4.5
+    "groq":          {"input": 0.50,   "output": 0.80},   # Mixtral 8x7B
+    "ollama":        {"input": 0.0,    "output": 0.0 },   # local
+    "legion_ollama": {"input": 0.0,    "output": 0.0 },   # local
+    "freellmapi":    {"input": 0.0,    "output": 0.0 },   # community proxy
+}
+
+# Per-session running cost. Bounded by NORMAL session length — if a
+# pathological session pumps 10k turns the dict grows but each entry is
+# tiny (3 floats), so memory ceiling is well under 1MB even at 10k
+# active sessions. We do prune empty sessions on demand below.
+_SESSION_COST_USD: dict[str, dict[str, float]] = {}
+
+
+def _estimate_call_cost_usd(
+    provider: str, prompt_chars: int, response_chars: int,
+) -> float:
+    """Estimate one provider call's cost in USD from string lengths.
+    tokens ≈ chars / 4 is the standard rule-of-thumb for English+code."""
+    pricing = _PROVIDER_PRICING_USD_PER_M_TOKENS.get(provider)
+    if not pricing:
+        return 0.0
+    input_tokens = max(0, prompt_chars) / 4.0
+    output_tokens = max(0, response_chars) / 4.0
+    cost = (
+        (input_tokens * pricing["input"])
+        + (output_tokens * pricing["output"])
+    ) / 1_000_000.0
+    return round(cost, 6)
+
+
+def _track_session_cost(session_id: str, provider: str, cost_usd: float) -> None:
+    """Add a successful call's cost to the running session total AND
+    the current-turn total. The agent loop resets turn-cost back to 0
+    after each user message (see `reset_turn_cost`)."""
+    if not session_id:
+        return
+    bucket = _SESSION_COST_USD.setdefault(
+        session_id, {"session_total": 0.0, "turn_total": 0.0}
+    )
+    bucket["session_total"] += cost_usd
+    bucket["turn_total"] += cost_usd
+    bucket["last_provider"] = provider  # type: ignore[assignment]
+
+
+def _reset_turn_cost(session_id: str) -> None:
+    """Called by the agent loop at the START of each new user turn,
+    so turn_total only reflects THIS turn."""
+    if not session_id:
+        return
+    bucket = _SESSION_COST_USD.get(session_id)
+    if bucket:
+        bucket["turn_total"] = 0.0
+
+
+def _format_cost_footer(session_id: str) -> str:
+    """Return the user-facing transparency line. Empty string if there's
+    nothing to show (zero-cost turn, e.g. local Ollama only)."""
+    bucket = _SESSION_COST_USD.get(session_id) or {}
+    turn = bucket.get("turn_total", 0.0)
+    sess = bucket.get("session_total", 0.0)
+    if turn <= 0.0 and sess <= 0.0:
+        return ""
+    # Show only meaningful precision. Microcents of cost are noise.
+    def _fmt(v: float) -> str:
+        if v < 0.001:
+            return "<$0.001"
+        return f"${v:.3f}"
+    return f"\n\n_(This turn: {_fmt(turn)} · Session: {_fmt(sess)})_"
 
 
 
@@ -951,6 +1042,24 @@ async def _llm_turn(
 
             if msg is not None:
                 logger.info(f"[ora-agent] provider={provider} served reply")
+                # iter 326v — Token Cost Transparency. Attach the
+                # winning provider AND a rough char count for cost
+                # estimation to the msg. The agent loop reads these
+                # after each tool-call round to update session totals.
+                try:
+                    _prompt_chars = sum(
+                        len((m.get("content") or "")) for m in messages
+                    )
+                    _resp_chars = len(msg.get("content") or "")
+                    # Approximate tool-call payload weight too.
+                    for tc in (msg.get("tool_calls") or []):
+                        fn = (tc or {}).get("function") or {}
+                        _resp_chars += len(str(fn.get("arguments") or ""))
+                    msg["__ora_provider__"] = provider
+                    msg["__ora_prompt_chars__"] = _prompt_chars
+                    msg["__ora_resp_chars__"] = _resp_chars
+                except Exception:
+                    pass  # cost tracking must never break a working reply
                 return msg
 
         except asyncio.TimeoutError:
@@ -2123,6 +2232,11 @@ async def run_turn(
         history = [{"role": "system", "content": SYSTEM_PROMPT}]
     history.append({"role": "user", "content": user_text})
 
+    # iter 326v — reset this-turn cost so the footer reports only the
+    # cost incurred BY this user message (the session_total keeps
+    # accumulating across turns).
+    _reset_turn_cost(session_id)
+
     # Intent fast-path — bypass Ollama for greetings / status queries
     fast_reply = await _maybe_fast_reply(user_text)
     if fast_reply is not None:
@@ -2295,6 +2409,22 @@ async def _continue_loop(
         iterations += 1
         msg = await _llm_turn(history)
 
+        # iter 326v — Token Cost Transparency. If _llm_turn attached
+        # provider + char counts to the msg, accumulate the cost on
+        # the session bucket. Wrapped in try/except so a cost-tracking
+        # bug can NEVER break the reply path.
+        try:
+            _winning_provider = (msg or {}).get("__ora_provider__")
+            if _winning_provider:
+                _call_cost = _estimate_call_cost_usd(
+                    _winning_provider,
+                    (msg or {}).get("__ora_prompt_chars__", 0),
+                    (msg or {}).get("__ora_resp_chars__", 0),
+                )
+                _track_session_cost(session_id, _winning_provider, _call_cost)
+        except Exception as _e:
+            logger.debug(f"[ora-agent] cost tracking skipped: {_e}")
+
         if msg is None:
             await _save_history(session_id, history)
             # Graceful degrade — surface campaign health from DB even when
@@ -2460,6 +2590,18 @@ async def _continue_loop(
                     f"[ora-agent] hallucination soft-flag: "
                     f"unverified={_grounding_stats.get('unverified')}"
                 )
+
+            # iter 326v — Token Cost Transparency footer. Show the
+            # founder what this turn AND the running session cost.
+            # Disabled by setting ORA_AGENT_SHOW_COST=0 for any deploy
+            # that doesn't want the line in user-visible chat.
+            if os.environ.get("ORA_AGENT_SHOW_COST", "1") != "0":
+                try:
+                    _cost_line = _format_cost_footer(session_id)
+                    if _cost_line:
+                        content = content + _cost_line
+                except Exception as _e:
+                    logger.debug(f"[ora-agent] cost footer skipped: {_e}")
 
             # iter 323q — Stop Slop prose filter on every final assistant
             # turn. Idempotent; logs how many AI-tells it scrubbed.
