@@ -1398,10 +1398,16 @@ async def council_consult(question: str, *,
     """
     if not roles:
         roles = ["security", "backend", "qa"]
+    requested = list(roles)
     roles = [r for r in roles if r in _LLM_PEER_PROFILES]
+    # iter 326qq — graceful fallback when LLM passes invented role slugs
+    # (e.g. "legal", "compliance", "lawyer" for CASL prompts). Instead of
+    # returning ok=False and tripping ORA's "twice consecutive failure"
+    # halt, fall back to the safe default trio and tell the LLM exactly
+    # which slugs are valid so it can self-correct on the next call.
+    invalid = [r for r in requested if r not in _LLM_PEER_PROFILES]
     if not roles:
-        return {"ok": False, "error": "no valid roles after filter",
-                "available_roles": sorted(_LLM_PEER_PROFILES)}
+        roles = ["security", "backend", "qa"]
     if len(roles) > 5:
         return {"ok": False, "error": "max 5 peers per council call"}
 
@@ -1424,12 +1430,20 @@ async def council_consult(question: str, *,
                 "elapsed_ms": res.get("elapsed_ms"),
             })
     n_ok = sum(1 for o in opinions if o.get("ok"))
-    return {
+    result = {
         "ok":          n_ok > 0,
         "consulted":   roles,
         "opinions":    opinions,
         "consensus":   f"{n_ok}/{len(opinions)} peers responded",
     }
+    if invalid:
+        result["invalid_roles_ignored"] = invalid
+        result["note"] = (
+            f"Ignored invalid role(s): {invalid}. "
+            f"Valid slugs: {sorted(_LLM_PEER_PROFILES)}. "
+            f"Proceeded with: {roles}."
+        )
+    return result
 
 
 # ─── iter 322eq — Session Quotas + Council-Gate Wrappers (Governance Layer) ───
@@ -3092,7 +3106,14 @@ TOOL_REGISTRY: dict[str, dict] = {
         "fn": council_consult,
         "args_spec": {
             "question": "str — the change / problem",
-            "roles":    "list[str] — peer roles to consult (default: security, backend, qa)",
+            "roles":    (
+                "list[str] — peer roles to consult. MUST be drawn from this "
+                "exact whitelist: ['security','backend','devops','qa','design',"
+                "'finance','marketing','pricing']. Do NOT invent new slugs "
+                "(e.g. 'legal','compliance','lawyer','casl_expert' are NOT "
+                "valid — for compliance/legal questions use 'security' + "
+                "'backend'). Default if omitted: ['security','backend','qa']."
+            ),
             "context":  "str — optional diff/code/log",
         },
         "description": (
@@ -3110,7 +3131,13 @@ TOOL_REGISTRY: dict[str, dict] = {
             "replace_string":       "str — the new code",
             "expected_occurrences": "int 1-50 (default 1)",
             "rationale":            "str ≥10 chars — what is this edit doing? Logged in audit trail.",
-            "roles":                "list[str] — peer roles (defaults to risk-tier auto-select)",
+            "roles":                (
+                "list[str] — peer roles. MUST be from whitelist: "
+                "['security','backend','devops','qa','design','finance',"
+                "'marketing','pricing']. Do NOT invent slugs like 'legal' "
+                "or 'compliance'. Defaults to risk-tier auto-select based "
+                "on path."
+            ),
             "override_dissent":     "bool — only true when caller explicitly accepts the dissent risk",
             "override_reason":      "str ≥20 chars — required iff override_dissent=True",
         },
