@@ -185,8 +185,12 @@ import DevExamples  from './platform/developers/DevExamples';
 import DevStatus    from './platform/developers/DevStatus';
 import DevApiDocs   from './platform/developers/DevApiDocs';
 
-// iter 332b — Contact Sales
+// iter 332b — Contact Sales + Enterprise Admin (4 pages)
 import ContactSales from './platform/ContactSales';
+import EnterpriseAdminOverview from './platform/enterprise/EnterpriseAdminOverview';
+import EnterpriseBranding from './platform/enterprise/EnterpriseBranding';
+import EnterpriseDomain from './platform/enterprise/EnterpriseDomain';
+import EnterpriseApiKeys from './platform/enterprise/EnterpriseApiKeys';
 import { PlatformLogin, PlatformSignup } from './platform/PlatformAuth';
 import AccountSecurity from './platform/AccountSecurity';
 import ORAWidget from './components/ORAWidget';
@@ -323,8 +327,12 @@ function AppRouter() {
       <Route path="/developers/status"    element={<DevStatus />} />
       <Route path="/developers/docs"      element={<DevApiDocs />} />
 
-      {/* iter 332b — Contact Sales */}
-      <Route path="/enterprise"           element={<ContactSales />} />
+      {/* iter 332b — Contact Sales + Enterprise Admin */}
+      <Route path="/enterprise"                   element={<ContactSales />} />
+      <Route path="/enterprise/admin"             element={<EnterpriseAdminOverview />} />
+      <Route path="/enterprise/admin/branding"    element={<EnterpriseBranding />} />
+      <Route path="/enterprise/admin/domain"      element={<EnterpriseDomain />} />
+      <Route path="/enterprise/admin/keys"        element={<EnterpriseApiKeys />} />
       
       {/* Platform Auth */}
       <Route path="/platform/login" element={<PlatformLogin />} />

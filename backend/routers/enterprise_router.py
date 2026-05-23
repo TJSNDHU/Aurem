@@ -206,6 +206,32 @@ async def submit_enterprise_lead(
         site = (os.environ.get("FRONTEND_URL") or "https://aurem.live").rstrip("/")
         await send_email(
             to=row["email"],
+            subject="AUREM CTO — We got your note",
+            text=(
+                f"Thanks for reaching out, {body.company}.\n\n"
+                f"A real human at AUREM will read your message and reply within "
+                f"one business day. Usually faster — we're based in Canada and "
+                f"this inbox pings me on my phone.\n\n"
+                f"In the meantime, the docs are at {site}/developers/docs and "
+                f"the SLA page lives at {site}/developers/status.\n\n"
+                f"— Pratham\n"
+            ),
+            html=(
+                f"<p>Thanks for reaching out, <strong>{body.company}</strong>.</p>"
+                f"<p>A real human at AUREM will read your message and reply "
+                f"within one business day. Usually faster — we're based in "
+                f"Canada and this inbox pings me on my phone.</p>"
+                f"<p>In the meantime, the docs are at "
+                f"<a href='{site}/developers/docs'>{site}/developers/docs</a> "
+                f"and the SLA page lives at "
+                f"<a href='{site}/developers/status'>{site}/developers/status</a>.</p>"
+                f"<p style='margin-top:18px'>— Pratham</p>"
+            ),
+        )
+    except Exception as e:
+        logger.debug(f"[enterprise/leads] auto-reply email skipped: {e}")
+
+    return {"ok": True, "lead_id": lead_id, "status": "received"}
 
 
 # ── iter 332b A-2b — API Key CRUD (admin) ────────────────────────────
@@ -452,30 +478,3 @@ async def verify_custom_domain(body: DomainBody,
     )
     return {"ok": True, "verified": verified,
              "status": new_status, "detail": detail}
-
-            subject="AUREM CTO — We got your note",
-            text=(
-                f"Thanks for reaching out, {body.company}.\n\n"
-                f"A real human at AUREM will read your message and reply within "
-                f"one business day. Usually faster — we're based in Canada and "
-                f"this inbox pings me on my phone.\n\n"
-                f"In the meantime, the docs are at {site}/developers/docs and "
-                f"the SLA page lives at {site}/developers/status.\n\n"
-                f"— Pratham\n"
-            ),
-            html=(
-                f"<p>Thanks for reaching out, <strong>{body.company}</strong>.</p>"
-                f"<p>A real human at AUREM will read your message and reply "
-                f"within one business day. Usually faster — we're based in "
-                f"Canada and this inbox pings me on my phone.</p>"
-                f"<p>In the meantime, the docs are at "
-                f"<a href='{site}/developers/docs'>{site}/developers/docs</a> "
-                f"and the SLA page lives at "
-                f"<a href='{site}/developers/status'>{site}/developers/status</a>.</p>"
-                f"<p style='margin-top:18px'>— Pratham</p>"
-            ),
-        )
-    except Exception as e:
-        logger.debug(f"[enterprise/leads] auto-reply email skipped: {e}")
-
-    return {"ok": True, "lead_id": lead_id, "status": "received"}

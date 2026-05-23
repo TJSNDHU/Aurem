@@ -19,8 +19,11 @@ const NAV = [
 
 export default function EnterpriseAdminShell({ children, eyebrow, title, sub }) {
   const loc = useLocation();
+  // Note: This area uses platform_token (admin) auth, NOT dev_jwt.
+  // We do not wrap in DeveloperShell's requireAuth gate — backend
+  // 401s drive the auth UX instead.
   return (
-    <DeveloperShell requireAuth>
+    <DeveloperShell>
       <div style={{ marginBottom: 18 }}>
         <span style={{
           fontFamily: "'JetBrains Mono', monospace",
