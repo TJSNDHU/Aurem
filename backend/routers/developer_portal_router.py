@@ -410,3 +410,115 @@ async def admin_run_email_sequence(request: Request) -> dict[str, Any]:
     if _db is not None:
         _set_seq_db(_db)
     return await run_sequence_tick()
+
+
+@router.get("/api/admin/developers/health")
+async def admin_developers_health(request: Request) -> dict[str, Any]:
+    """iter 331f — Developer Portal pulse for the ORA Cockpit tile.
+
+    Returns counters + sample state in one shot so the cockpit can
+    render with a single fetch. All numbers are real DB queries.
+    """
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    now = _dt.now(_tz.utc)
+    day_start = (now - _td(hours=24)).isoformat()
+
+    total_devs = await _db.developer_accounts.estimated_document_count()
+    verified = await _db.developer_accounts.count_documents({"email_verified": True})
+    abuse_flagged = await _db.developer_accounts.count_documents({"abuse_flagged": True})
+
+    # Aggregate active sessions across all accounts (sum of array lengths)
+    pipe = [
+        {"$project": {
+            "_id": 0,
+            "n": {"$size": {"$ifNull": ["$active_sessions", []]}},
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$n"}}},
+    ]
+    active_sessions = 0
+    try:
+        agg = await _db.developer_accounts.aggregate(pipe).to_list(length=1)
+        if agg:
+            active_sessions = int(agg[0].get("total") or 0)
+    except Exception:
+        pass
+
+    # Token balances
+    tokens_pipe = [
+        {"$group": {
+            "_id": None,
+            "remaining": {"$sum": "$tokens_remaining"},
+            "used":      {"$sum": "$tokens_total_used"},
+        }},
+    ]
+    tokens_remaining_total = 0
+    tokens_used_total = 0
+    try:
+        agg2 = await _db.developer_accounts.aggregate(tokens_pipe).to_list(length=1)
+        if agg2:
+            tokens_remaining_total = int(agg2[0].get("remaining") or 0)
+            tokens_used_total = int(agg2[0].get("used") or 0)
+    except Exception:
+        pass
+
+    # 24-h block counters from audit log + abuse table
+    ssrf_blocks_today = await _db.ora_tool_audit.count_documents({
+        "ts": {"$gte": day_start},
+        "result.blocked_by": "ssrf_guard",
+    }) if "ora_tool_audit" in await _db.list_collection_names() else 0
+
+    sessions_refused_today = await _db.ora_tool_audit.count_documents({
+        "ts": {"$gte": day_start},
+        "result.reason": "too_many_sessions",
+    }) if "ora_tool_audit" in await _db.list_collection_names() else 0
+
+    abuse_blocks_today = await _db.developer_abuse_flags.count_documents({
+        "timestamp": {"$gte": day_start},
+    })
+
+    # Email sequence 24h
+    emails_sent_today = await _db.developer_email_sequence_log.count_documents({
+        "ts": {"$gte": day_start},
+    })
+
+    # Token deductions 24h
+    token_calls_today = await _db.developer_tokens.count_documents({
+        "timestamp": {"$gte": day_start},
+    })
+
+    # Status classification
+    if abuse_blocks_today >= 3 or ssrf_blocks_today >= 10:
+        status = "red"
+    elif abuse_blocks_today >= 1 or ssrf_blocks_today >= 1 or sessions_refused_today >= 5:
+        status = "yellow"
+    else:
+        status = "green"
+
+    return {
+        "ok": True,
+        "status": status,
+        "developers": {
+            "total":         total_devs,
+            "verified":      verified,
+            "abuse_flagged": abuse_flagged,
+        },
+        "sessions": {
+            "active_total":      active_sessions,
+            "refused_today":     sessions_refused_today,
+        },
+        "tokens": {
+            "remaining_total": tokens_remaining_total,
+            "used_total":      tokens_used_total,
+            "calls_today":     token_calls_today,
+        },
+        "blocks_today": {
+            "ssrf":      ssrf_blocks_today,
+            "abuse":     abuse_blocks_today,
+            "sessions":  sessions_refused_today,
+        },
+        "emails_sent_today": emails_sent_today,
+        "generated_at": now.isoformat(),
+    }

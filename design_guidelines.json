@@ -1,1 +1,173 @@
-{}
+{
+  "theme": "dark",
+  "archetype": "Terminal Luxury (Hybrid Archetype 4 & 5) - Code-respecting, Sharp, Confident",
+  "design_system": {
+    "typography": {
+      "primary_heading_font": "IBM Plex Mono",
+      "secondary_body_font": "IBM Plex Sans",
+      "rules": "Strictly NO Inter or Space Grotesk. Use IBM Plex Mono for all headings, numbers, and technical data to establish the 'Terminal/Developer' vibe. Use IBM Plex Sans for long-form body text. Headings must use tracking-tight. Overlines/labels must be uppercase with tracking-[0.2em]."
+    },
+    "colors": {
+      "background": "#0A0A12",
+      "text_primary": "#F0EADC",
+      "text_dim": "#A8A08F",
+      "accent_gold": "#D4AF37",
+      "status_green": "#67E8A0",
+      "status_amber": "#FFB36B",
+      "status_red": "#FF7676",
+      "surface_solid": "#12121A",
+      "rules": "Stick strictly to the AUREM palette. Do not introduce generic SaaS blues or purples. Use the accent_gold sparingly for primary actions."
+    },
+    "surfaces": {
+      "glass_pattern": "background: linear-gradient(145deg, rgba(212,175,55,0.05) 0%, rgba(10,10,18,0.7) 100%); backdrop-filter: blur(16px); border: 1px solid rgba(212,175,55,0.2);",
+      "flat_panel": "background: #12121A; border: 1px solid rgba(255,255,255,0.05);",
+      "border_radius": "rounded-sm or rounded-none (Sharp edges preferred to maintain terminal aesthetic)."
+    },
+    "motion": {
+      "hover_state": "Slight lift (translate-y-[-2px]), border color shifts to rgba(212,175,55,0.5), subtle shadow-[0_4px_20px_rgba(212,175,55,0.15)]. Transition duration: 300ms ease-out.",
+      "page_enter": "Staggered fade-up and slide-in from bottom (translateY 10px to 0, opacity 0 to 1). 400ms duration."
+    },
+    "layout_spacing": {
+      "scale": "Generous spacing. Use p-8 or p-12 for internal card padding to prevent collision. Use 'Control Room Grid' (gap-4 or gap-6) for dashboards."
+    }
+  },
+  "components_map": {
+    "Card": "Use shadcn/ui Card but strip default backgrounds. Apply 'glass_pattern' for prominent feature cards (e.g., Pricing, Auth) and 'flat_panel' for dense dashboard metric cards.",
+    "Button": "Primary: bg-[#D4AF37] text-[#0A0A12] hover:opacity-90. Secondary/Ghost: border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10. Always sharp (rounded-sm).",
+    "Input": "bg-transparent border border-white/10 text-[#F0EADC] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] rounded-sm.",
+    "Badge": "border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37] rounded-sm font-mono text-xs tracking-wider."
+  },
+  "pages": [
+    {
+      "path": "/developers",
+      "type": "Marketing Landing (Public)",
+      "layout": "Asymmetrical Grid / Full viewport height hero",
+      "sections": [
+        {
+          "name": "Hero",
+          "content": "Exact Copy H1: 'Build with an autonomous CTO.' (IBM Plex Mono, text-5xl md:text-6xl). P: '1000 tokens free.' Single email input field and submit button ABOVE the fold.",
+          "test_ids": ["dev-landing-hero", "hero-email-input", "hero-submit-btn"]
+        },
+        {
+          "name": "Full Form",
+          "content": "Below the fold: comprehensive form including name, company, intent.",
+          "test_ids": ["full-signup-form", "full-signup-name", "full-signup-submit"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/signup",
+      "type": "Auth Flow (Public)",
+      "layout": "Centered Focus Card (GLASS pattern)",
+      "sections": [
+        {
+          "name": "Multi-step Flow",
+          "content": "OTP verification -> GitHub username -> 'What will you build' -> Referral code.",
+          "test_ids": ["signup-step-container", "github-username-input", "build-intent-textarea", "referral-input", "signup-continue-btn"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/connect",
+      "type": "Tool Connection Center (Auth Gated)",
+      "layout": "Bento Grid (gap-6, md:grid-cols-2)",
+      "sections": [
+        {
+          "name": "Integrations",
+          "content": "Cards for: GitHub OAuth, MongoDB string input, VS Code extension install, BYOK (Bring Your Own Key) inputs for Anthropic/DeepSeek/Gemini.",
+          "test_ids": ["connect-github-btn", "connect-mongo-input", "connect-vscode-btn", "byok-anthropic-input", "byok-deepseek-input", "byok-gemini-input", "connect-save-btn"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/dashboard",
+      "type": "Main Developer Hub (Auth Gated)",
+      "layout": "Control Room Grid (Dense, md:grid-cols-4)",
+      "sections": [
+        {
+          "name": "Top Metrics",
+          "content": "Token counter (Large Mono font, always visible), Active project status, Rate-limit indicator.",
+          "test_ids": ["dashboard-token-counter", "active-project-card", "rate-limit-status"]
+        },
+        {
+          "name": "Activity Feed",
+          "content": "Terminal-like scrolling list of recent ORA activity.",
+          "test_ids": ["recent-activity-feed", "activity-item"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/analytics",
+      "type": "Analytics View (Auth Gated)",
+      "layout": "Control Room Grid",
+      "sections": [
+        {
+          "name": "Metrics & Charts",
+          "content": "Pixel analytics: Weekly visitors, Top pages (Table), Lead scores, Token usage graph (use Recharts).",
+          "test_ids": ["analytics-visitors-metric", "analytics-top-pages-table", "analytics-lead-scores", "analytics-token-usage-chart"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/tokens",
+      "type": "Pricing/Purchase (Auth Gated)",
+      "layout": "3-Column Grid (Generous Spacing)",
+      "sections": [
+        {
+          "name": "Tiers",
+          "content": "GLASS pattern cards: Starter $9 / Builder $39 / Pro $99 per month. Prominent Stripe checkout links.",
+          "test_ids": ["pricing-starter-tier", "pricing-builder-tier", "pricing-pro-tier", "checkout-starter-btn", "checkout-builder-btn", "checkout-pro-btn"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/terms",
+      "type": "Legal Document (Auth Gated)",
+      "layout": "Single Column (max-w-3xl, text-left)",
+      "sections": [
+        {
+          "name": "Plain English Terms",
+          "content": "Readable typography. Covers: As-is delivery, BYOK responsibility, abuse = instant suspension, PIPEDA deletion rights.",
+          "test_ids": ["terms-content", "terms-accept-btn"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/settings",
+      "type": "Settings Panel (Auth Gated)",
+      "layout": "Sidebar + Main Content Area",
+      "sections": [
+        {
+          "name": "Preferences",
+          "content": "BYOK key rotation inputs, Account deletion (30-day wipe) danger zone, Consent toggle (20% discount highlight), Active sessions list.",
+          "test_ids": ["settings-byok-rotate-btn", "settings-delete-account-btn", "settings-consent-toggle", "settings-sessions-list"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/examples",
+      "type": "Showcase Gallery (Auth Gated)",
+      "layout": "Tetris Grid (Uneven spans)",
+      "sections": [
+        {
+          "name": "Project List",
+          "content": "5 specific example projects. Each shows Description, Tech Stack Tags, Estimated Tokens, and a 'Build this' CTA that pre-fills ORA chat.",
+          "test_ids": ["example-project-card", "example-build-btn", "example-stack-tags", "example-token-est"]
+        }
+      ]
+    },
+    {
+      "path": "/developers/status",
+      "type": "System Status (Auth Gated)",
+      "layout": "Minimalist Center List",
+      "sections": [
+        {
+          "name": "Component Status",
+          "content": "Live indicator lights (Green/Yellow/Red) mapped to components. Mono font last updated timestamp.",
+          "test_ids": ["status-component-list", "status-indicator", "status-last-updated"]
+        }
+      ]
+    }
+  ],
+  "instructions_to_main_agent": "CRITICAL: 1. Build exclusively using React 18 (.js/.jsx) and Tailwind CSS. 2. Implement all 10 pages EXACTLY as mapped to the routes above using react-router-dom. 3. Include ALL specified data-testids as they are mandatory for the testing agent to pass 401 and functional tests. 4. Heavily utilize the AUREM gold palette and 'glass_pattern' (linear gradient + backdrop blur + gold border) for interactive/hero elements to ensure consistency with existing portal components like DeveloperPortalPulseTile. 5. Guarantee the exact hero copy on /developers: 'Build with an autonomous CTO. 1000 tokens free.' above a single email field. 6. Do NOT invent new pages or additional dashboard tiles outside this scope."
+}

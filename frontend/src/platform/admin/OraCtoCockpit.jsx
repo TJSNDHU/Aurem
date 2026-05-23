@@ -20,6 +20,8 @@ import SlaCard from "./SlaCard";
 import OutreachHealthCard from "./OutreachHealthCard";
 // iter 331c Sprint 6.3 — ORA Health tile (metrics + Vanguard score)
 import OraHealthTile from "./OraHealthTile";
+// iter 331f — Developer Portal pulse tile
+import DeveloperPortalPulseTile from "./DeveloperPortalPulseTile";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_MS = 25000;
@@ -171,6 +173,11 @@ export default function OraCtoCockpit() {
 
       {/* iter 331c Sprint 6 — ORA Health + Vanguard Security tile */}
       <OraHealthTile />
+
+      {/* iter 331f — Developer Portal pulse */}
+      <div style={{ marginBottom: 18 }}>
+        <DeveloperPortalPulseTile />
+      </div>
 
       {/* iter 326c — Provider chain health (DeepSeek → FreeLLMAPI → Claude → Ollama → Groq) */}
       <ProviderHealthPanel
