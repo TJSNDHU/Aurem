@@ -3387,6 +3387,60 @@ def register_all_routers(app, db):
                                 max_instances=1, coalesce=True)
         logger.info("[REGISTRY] ORA Autonomous Driver wired — daily hunt 06:00 UTC, watchdog every 15min")
 
+        # iter 327m — Stripe metered-billing cron. Until this iter,
+        # BillingService.record_overage() existed and was tested but
+        # NO production code path actually invoked it — i.e. customer
+        # overages tracked in business_workspace_usage were NEVER
+        # reported to Stripe and the founder lost revenue every
+        # billing cycle. This job walks every workspace at 03:00 UTC
+        # daily; for any workspace whose `current_period_end` has
+        # passed AND has unreported overage messages, it posts a
+        # Stripe MeterEvent via record_overage and stamps an audit row.
+        async def _billing_overage_job():
+            try:
+                from shared.commercial.billing_service import BillingService
+                from datetime import datetime, timezone
+                bs = BillingService(db)
+                now = datetime.now(timezone.utc)
+                reported = 0
+                cur = db.workspaces.find(
+                    {
+                        # Workspaces that have a billing block with a meter
+                        # event and a period end in the past — i.e. we're
+                        # post-period and haven't reported yet.
+                        "billing.stripe_meter_event_name": {"$exists": True},
+                        "billing.current_period_end":      {"$lte": now.isoformat()},
+                    },
+                    {"_id": 0, "business_id": 1, "billing": 1},
+                ).limit(200)
+                async for ws in cur:
+                    bid = ws.get("business_id")
+                    if not bid:
+                        continue
+                    try:
+                        await bs.record_overage(business_id=bid)
+                        reported += 1
+                    except Exception as inner:
+                        logger.warning(
+                            f"[billing-cron] record_overage failed for "
+                            f"{bid}: {type(inner).__name__}: {str(inner)[:120]}"
+                        )
+                logger.info(f"[billing-cron] daily overage sweep — reported={reported}")
+            except Exception as e:
+                logger.warning(f"[billing-cron] daily overage job failed: {e}")
+
+        aurem_scheduler.add_job(
+            _billing_overage_job,
+            _SCCron(hour=3, minute=0),
+            id="aurem_stripe_overage_daily",
+            name="Stripe metered overage sweep (03:00 UTC)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=1800,
+        )
+        logger.info("[REGISTRY] Stripe overage cron scheduled — daily 03:00 UTC")
+
     except Exception as e:
         logger.warning(f"Nightly self-check not wired: {e}")
 

@@ -471,3 +471,98 @@ flows, this reads real numbers and the 50%-drop alarm becomes useful.)
   GOOGLE_SERVICE_ACCOUNT_KEY)
 - P3: Tailored "report expired" copy + "Get a fresh scan" CTA on
   the existing 404 landing page
+
+## iter 327m (2026-02-23) — Four critical fixes from brutal audit
+
+The 2026-02-23 audit found 4 real issues:
+  1. 10 LLM-visible tools had NO impl (ORA tried to call, failed silently)
+  2. Vision badge fired even on FAILED analyses (silent lie)
+  3. Agent-direct outreach bypassed CASL (do_not_contact) check
+  4. `BillingService.record_overage()` was dead code — no caller, no Stripe charges
+
+**Delivered**
+- **Tool registry**: removed 10 orphan tier entries (`delete_file,
+  feature_flag_set, kv_set, ora_rollback_list, ora_rollback_restore,
+  prod_env_set, save_to_github, send_bulk_email, stripe_charge,
+  supervisor_restart_all`). Added `reconcile_tool_registry()` that
+  runs at module import and logs WARN on drift so a future regression
+  is caught at boot. **Live verified: 0 orphans, 17 intentional
+  hidden tools (github writes, council wrappers).**
+- **Vision gate**: `ora_attachments_router.attach_file` now
+  distinguishes "Image received but analysis failed: …" (sentinel
+  from `_analyze_image`) from real descriptions. Failures go to
+  `vision_failed_reason`; `vision_description` stays empty so the
+  iter 327k provenance badge no longer lies.
+- **CASL gate**: new `services/casl_gate.py` is the single source of
+  truth (`is_blocked_by_casl` + `suppress`). Email + phone
+  normalization, fail-closed on errors, checks BOTH
+  `do_not_contact` collection AND `users.dnc / status=opted_out`.
+  Wired into `armed_outreach._fire_one_lead` so the agent-direct
+  path is now gated identically to the blast pipeline. Lead row
+  stamped with `status=do_not_contact` on hit so we don't retry.
+- **Stripe overage cron**: new `_billing_overage_job` in
+  `routers/registry.py` runs daily 03:00 UTC. Walks workspaces with
+  `billing.stripe_meter_event_name` set AND `current_period_end`
+  past, calls `BillingService.record_overage(business_id)` per
+  workspace. Per-workspace exceptions caught so one bad workspace
+  doesn't kill the sweep. `aurem_stripe_overage_daily` job ID.
+
+**Tests**: `tests/test_iter327m_audit_followups.py` — 17 cases. Full
+regression: **195 / 195 green** across 16 iter files. Both new
+files (`casl_gate.py`, registry cron) lint clean.
+
+**Live preview verification**
+- `/api/health` → 200
+- `POST /api/universal/webhooks/generic` → 200
+- `reconcile_tool_registry()` returns clean: orphans=[], hidden=17
+
+## iter 327n (2026-02-23) — Tiered memory injection (ORA's rule book is now live)
+
+The 2026-02-23 dead-file audit found 29 instruction docs that ORA never read.
+Founder approved a **tiered** approach instead of dumping everything into context.
+
+**Tier 1 — always injected (8000-char cap)**
+- `ora_skills/dev_zero-hallucination-charter.md`
+- `ora_skills/dev_322ey-ora-mistakes-lessons.md`
+- `/app/memory/WATCHDOG_MODE.md`
+- `/app/memory/WORKING_POLICY.md`
+- `/app/memory/SYSTEM_MAP.md` (head 1500 chars)
+Per-file cap 1500 chars × 5 sources ≈ 8000.
+Appended to `SYSTEM_PROMPT` at module import in `services/ora_agent.py`.
+
+**Tier 2 — keyword-gated per-turn**
+- security/auth/jwt/password/secret/token/encryption  → `SECURITY_PATTERNS.md`
+- campaign/outreach/blast/casl/marketing/opt-out      → `SECURITY_PATTERNS.md` (CASL section)
+- fix/debug/error/broken/crash/why/how                → `ARCHITECTURE.md` (head 2000 chars)
+Inserted as SYSTEM message right BEFORE the user turn so it has
+maximum recency. Dedup: same file matching two rules → injected once.
+
+**Tier 3 — already in place**: `search_codebase_semantic`, `git_log`,
+`view_file` give ORA on-demand codebase access.
+
+**Live proof on preview backend**:
+```
+SYSTEM_PROMPT chars: 25,225 (was ~17,200 → +8,025, within 8K budget)
+RULE ZERO            → True
+FOUNDER'S RULE BOOK  → True
+ZERO-HALLUCINATION   → True
+MISTAKES             → True
+WATCHDOG             → True
+WORKING POLICY       → True
+SYSTEM MAP           → True
+```
+
+**Tests**: `tests/test_iter327n_tiered_memory_injection.py` — 13 cases.
+Covers all 5 tier-1 sources present, 8000-char cap, missing-file
+graceful skip, tier-2 keyword matching for security/outreach/debug,
+same-file dedup, per-file cap. Full regression: **189 / 189 green**
+across 15 iter files.
+
+## How ORA learns from now on
+| Channel | Effect |
+|---|---|
+| Edit `SYSTEM_PROMPT` in `ora_agent.py` | Hardcoded; always injected |
+| Edit Tier-1 files (WATCHDOG_MODE.md, ora-mistakes-lessons.md, etc.) | Live on next backend restart |
+| Edit Tier-2 files (SECURITY_PATTERNS.md, ARCHITECTURE.md) | Live immediately (read on every relevant turn) |
+| Add new `dev_*.md` in ora_skills | NOT auto-injected — extend `_TIER1_FILES` or `_TIER2_RULES` to wire it |
+

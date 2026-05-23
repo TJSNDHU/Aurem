@@ -219,11 +219,44 @@ async def cancel_latest_armed(db, founder: str = "tj") -> Dict[str, Any]:
 async def _fire_one_lead(db, campaign: Dict[str, Any],
                               lead_id: str) -> Dict[str, Any]:
     """Delegate to the existing blast_one executor so we reuse message-send
-    + dedupe + rate-limit plumbing."""
+    + dedupe + rate-limit plumbing.
+
+    iter 327m — CASL gate added. Audit (2026-02-23) found the blast
+    pipeline checked do_not_contact but the agent-direct path did NOT.
+    Now both paths go through `services.casl_gate.is_blocked_by_casl`
+    so the rule is enforced everywhere (fail-closed on errors)."""
     lead = await db.campaign_leads.find_one(
         {"lead_id": lead_id}, {"_id": 0})
     if not lead:
         return {"ok": False, "error": "lead_gone"}
+    # ── CASL gate ──
+    try:
+        from services.casl_gate import is_blocked_by_casl
+        casl = await is_blocked_by_casl(
+            db, email=lead.get("email"), phone=lead.get("phone"),
+        )
+        if casl.get("blocked"):
+            # Mark the lead so we don't keep retrying.
+            await db.campaign_leads.update_one(
+                {"lead_id": lead_id},
+                {"$set": {
+                    "status":             "do_not_contact",
+                    "casl_blocked_at":    datetime.now(timezone.utc).isoformat(),
+                    "casl_block_reason":  casl.get("reason"),
+                }},
+            )
+            return {
+                "ok":     False,
+                "lead_id": lead_id,
+                "error":   "casl_blocked",
+                "reason":  casl.get("reason"),
+            }
+    except Exception as e:
+        # Fail-closed: a broken gate must NOT silently permit sends.
+        return {"ok": False, "lead_id": lead_id,
+                "error": "casl_gate_error",
+                "detail": f"{type(e).__name__}: {str(e)[:120]}"}
+
     try:
         from services.ora_command_center import _exec_blast_one
         res = await _exec_blast_one(

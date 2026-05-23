@@ -891,15 +891,10 @@ TIER_1_AUTO: set[str] = {
 
 TIER_2_APPROVE: set[str] = {
     # Mutates state but reversible — inline [Approve]/[Reject] card.
-    "safe_edit", "restart_service", "propose_commit", "save_to_github",
-    # FIX #1 — ora_rollback_list lives here ONLY (removed from TIER_1_AUTO).
-    # Listing available rollbacks is safe to read but it immediately precedes
-    # a destructive restore, so the founder should see it before it runs.
-    "ora_rollback_list", "ora_rollback_restore",
-    "kv_set", "feature_flag_set",
-    "create_file", "delete_file",
+    "safe_edit", "restart_service", "propose_commit",
     # iter 322g — local git checkpoint (push still needs founder click)
     "git_commit_local",
+    "create_file",
     # iter 326y — Phase 2 P1: real browser tool. External URLs go to
     # tier 2 so they get the 30-second cancel window (iter 326w). Cost
     # is non-trivial (~3s per call) and we never want ORA crawling a
@@ -910,9 +905,16 @@ TIER_2_APPROVE: set[str] = {
 TIER_3_HIGH_RISK: set[str] = {
     # Destructive / external — approval card is red-banded;
     # founder must type CONFIRM to approve.
-    "legion_exec", "supervisor_restart_all", "prod_env_set",
-    "stripe_charge", "send_bulk_email",
+    "legion_exec",
 }
+# iter 327m — Removed orphan tier entries that had NO impl in
+# TOOL_REGISTRY (these were sent to the LLM as schemas it could
+# never execute, causing "I tried to call X but..." failures):
+#   delete_file, feature_flag_set, kv_set, ora_rollback_list,
+#   ora_rollback_restore, prod_env_set, save_to_github,
+#   send_bulk_email, stripe_charge, supervisor_restart_all
+# If/when any of these get a real impl, re-add them to the
+# appropriate tier set with the impl registered in TOOL_REGISTRY.
 
 
 def tier_of(name: str) -> str:
@@ -1115,6 +1117,49 @@ def _tool_schemas_for_tier(*tiers: str) -> list[dict[str, Any]]:
 
 def all_agent_tool_schemas() -> list[dict[str, Any]]:
     return _tool_schemas_for_tier("tier1_auto", "tier2_approve", "tier3_high_risk")
+
+
+def reconcile_tool_registry() -> dict:
+    """iter 327m — Boot-time sanity check: every tool listed in a
+    tier set MUST have an impl in TOOL_REGISTRY, and the LLM must be
+    able to call every implemented tool. Returns a dict and logs a
+    LOUD WARNING if there's drift (so the next regression like iter
+    326-era orphans is caught at startup, not by a confused founder
+    seeing 'I tried to call X but...' in chat).
+    """
+    try:
+        from services.ora_tools import TOOL_REGISTRY
+        reg = set(TOOL_REGISTRY.keys())
+    except Exception as e:
+        logger.warning(f"[tool-reconcile] could not load TOOL_REGISTRY: {e}")
+        return {"ok": False, "error": str(e)}
+    tiers = TIER_1_AUTO | TIER_2_APPROVE | TIER_3_HIGH_RISK
+    orphan = sorted(tiers - reg)
+    hidden = sorted(reg - tiers)
+    if orphan:
+        logger.warning(
+            f"[tool-reconcile] {len(orphan)} ORPHAN tools (LLM sees, no impl): "
+            f"{orphan} — REMOVE FROM TIER SET OR ADD IMPL"
+        )
+    if hidden:
+        logger.info(
+            f"[tool-reconcile] {len(hidden)} HIDDEN tools (impl present, "
+            f"not in LLM schema): {hidden}"
+        )
+    if not orphan and not hidden:
+        logger.info(f"[tool-reconcile] tool registry clean — {len(reg)} tools wired")
+    return {"ok": True, "registry_size": len(reg),
+             "schema_size": len(tiers),
+             "orphan":      orphan,
+             "hidden":      hidden}
+
+
+# Run reconciliation at module import — this prints to backend.out.log
+# at boot so a regression is visible the instant it ships.
+try:
+    reconcile_tool_registry()
+except Exception as _e:
+    logger.debug(f"[tool-reconcile] boot-time check skipped: {_e}")
 
 
 # iter 322g — lean schema for local Ollama (qwen2.5:7b freezes on 30+ tools)
@@ -2527,6 +2572,21 @@ Operating principles:
 """
 
 
+# iter 327n — Tiered memory injection. Append the Tier-1 lesson block
+# (zero-hallucination charter + mistakes lessons + watchdog mode +
+# working policy + system map) to SYSTEM_PROMPT ONCE at module load.
+# 8000-char cap enforced inside the loader. Founder asked for this on
+# 2026-02-23 after the dead-file audit found 29 instruction docs ORA
+# never read.
+try:
+    from services.ora_lessons_loader import build_lessons_block as _build_lessons
+    _LESSONS_BLOCK = _build_lessons()
+    if _LESSONS_BLOCK:
+        SYSTEM_PROMPT = SYSTEM_PROMPT + _LESSONS_BLOCK
+except Exception as _e:
+    logger.debug(f"[ora-agent] lessons injection skipped: {_e}")
+
+
 # ── Helpers ───────────────────────────────────────────────────────────
 def _serialise_tool_call(call: dict[str, Any]) -> dict[str, Any]:
     fn      = call.get("function") or {}
@@ -2713,6 +2773,19 @@ async def run_turn(
             logger.debug(f"[ora-agent] voice preamble skipped: {_e}")
         history = [{"role": "system", "content": voice_pre + SYSTEM_PROMPT}]
     history.append({"role": "user", "content": user_text})
+
+    # iter 327n — Tier-2 lesson injection (keyword-gated, per-turn).
+    # If the founder's message mentions security/auth/CASL/outreach/
+    # debug-style keywords, prepend the relevant policy doc as a
+    # SYSTEM message right before the user turn so it has maximum
+    # recency in the LLM's context window. No-op when nothing matches.
+    try:
+        from services.ora_lessons_loader import relevant_tier2_blocks
+        _t2 = relevant_tier2_blocks(user_text)
+        if _t2:
+            history.insert(-1, {"role": "system", "content": _t2})
+    except Exception as _e:
+        logger.debug(f"[ora-agent] tier-2 lesson injection skipped: {_e}")
 
     # iter 326v — reset this-turn cost so the footer reports only the
     # cost incurred BY this user message (the session_total keeps

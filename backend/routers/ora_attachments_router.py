@@ -258,25 +258,33 @@ async def attach_file(
 
     storage = await _upload_to_cloudinary(blob, file.filename, kind)
 
-    # iter 327j — Vision: if this is an image, run it through the
-    # existing MultiModalProcessor._analyze_image (GPT-4o vision)
-    # ONCE at upload time and stash the description on the
-    # attachment row. Future chat turns reuse the cached description
-    # so we don't pay vision tokens again for the same image. Best-
-    # effort: failure here just leaves vision_description empty and
-    # ORA falls back to the old "filename + URL" breadcrumb.
+    # iter 327j — Vision (with iter 327m gate fix).
+    # Run image through GPT-4o vision ONCE at upload time. The gate
+    # used to be `vision_description != ""`, but `_analyze_image`
+    # returns the literal sentence "Image received but analysis
+    # failed: …" on error — that string is non-empty so the badge
+    # was firing on FAILED analyses too (silent lie). Now we keep
+    # the description for forensics but only stash it on the
+    # attachment row if the analyze actually succeeded.
     vision_description = ""
+    vision_failed_reason = ""
     if kind == "image" and blob:
         try:
             from services.multimodal_processor import get_multimodal_processor
             proc = get_multimodal_processor()
-            vision_description = await proc._analyze_image(
+            raw = (await proc._analyze_image(
                 blob, {"business_name": "AUREM ORA admin"}
-            )
-            vision_description = (vision_description or "").strip()[:2400]
+            )) or ""
+            raw = raw.strip()[:2400]
+            if raw.startswith("Image received but analysis failed"):
+                vision_failed_reason = raw[:200]
+            elif raw == "" or raw == "[Vision returned no content]":
+                vision_failed_reason = raw or "empty_description"
+            else:
+                vision_description = raw
         except Exception as e:
-            logger.warning(f"[ora-attach] vision analysis failed: {e}")
-            vision_description = ""
+            logger.warning(f"[ora-attach] vision analysis raised: {e}")
+            vision_failed_reason = f"{type(e).__name__}: {str(e)[:160]}"
 
     attachment_id = uuid.uuid4().hex
     record = {
@@ -291,6 +299,7 @@ async def attach_file(
         "storage_id":         storage.get("public_id") or "",
         "extracted_text":     extracted[:8000] if extracted else "",
         "vision_description": vision_description,
+        "vision_failed_reason": vision_failed_reason,  # iter 327m forensics
         "uploaded_by":        (user or {}).get("email") or (user or {}).get("user_id") or "",
         "ts":                 datetime.now(timezone.utc).isoformat(),
     }
