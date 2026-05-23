@@ -821,5 +821,51 @@ iter 326 recent + iter 322er.
 
 ## Backlog
 - P2 — Splice monthly external uptime line into Morning Brief once `EXTERNAL_UPTIME_SECRET` is configured.
+
+- iter 331a (current): **MASTER BUILD Sprints 1+2+3+3.5+3.7 — ORA full autonomy upgrade**
+
+  **Sprint 1 — Memory & Loader (folder-driven):**
+  • `/app/memory/` reorganized into `tier1/` (always-on), `tier2/` (keyword-gated), `tier3/` (reference). Backward-compat symlinks at old paths preserve every hardcoded reference.
+  • Loader now scans tier1/ folder; drop a `.md` file in to auto-inject. ORA_MEMORY.md is finally Tier-1 wired (was dead code before).
+  • New tier-1 files: `DEVELOPER_CAPABILITIES.md`, `CODE_STANDARDS.md`, `progress.md`. New tier-2 files: `DEPLOYMENT_RUNBOOK.md`, `INTEGRATION_PLAYBOOK.md`, `PROJECT_TEMPLATES.md` + `TIER2_TRIGGERS.json` rule config.
+
+  **Sprint 2 — 8 Tier-1 Tools:**
+  • `web_search` (Wikipedia REST API — DDG blocked from pod), `read_logs`, `check_coverage`, `run_linter` (Python+JS), `mongo_query_safe` (read-only, no _id), `view_bulk` (10 files/call), `ask_human` (persistent question card), `glob_files` (.gitignore-aware). All E2E verified with real outputs.
+
+  **Sprint 3 — 6 Safety Guards (`services/ora_guards.py`):**
+  • Per-session cost cap (warn 80%, halt 100%, Telegram alert).
+  • Idempotency: same-content edit 3× → halt + Telegram.
+  • Stuck-process watchdog (heartbeats + scheduler tick).
+  • Destructive command filter (rm -rf /protected, dropDatabase, kubectl delete ns, TRUNCATE, DELETE-without-WHERE, fork-bomb, mkfs, dd-to-/dev/).
+  • Integration playbook hard gate (vendor tool blocked if no web_search in last 5 turns).
+  • Package verification gate (real PyPI/npmjs lookup; refuses fake packages).
+
+  **Sprint 3.5 — VS Code + DB portability + Deploy + 3 Blindspots:**
+  • `/app/.vscode/tasks.json` + `launch.json` (deploy, tests, coverage, lint, debug-backend).
+  • `/app/scripts/deploy.sh` — portable 6-step deploy for emergent|hetzner|docker|local.
+  • `services/db_manager.py` — `DB_TYPE` switch with built-in defaults; real ping; password redaction.
+  • `services/ora_deploy_tool.py` — `deploy_to_platform` + `rollback_deploy` (Tier-3 CONFIRM).
+  • `services/ora_blindspot_tools.py` — git_current_branch / git_create_branch / git_push_branch / git_create_pr / git_merge_branch; create_sandbox / run_in_sandbox / promote_from_sandbox / cleanup_sandbox; start_background_process / check_process_status / wait_for_process / kill_process (process state persisted to `ora_background_processes` so a crashed session can resume).
+
+  **Sprint 3.7 — 4 Critical Gaps Closed:**
+  • Gap 1: `services/ora_safety.assert_path_safe()` — blocks /etc, /sys, /proc, /dev, /root and any path outside ORA_TOOLS_ROOT.
+  • Gap 2: `services/ora_semantic_memory.py` — SQLite FTS5 BM25 ranked snippets across all memory files (real embeddings deferred — needs 200MB transformer; FTS5 is strictly better than substring keyword match and zero new deps). `semantic_memory_search(query, top_k)` wired as Tier-1.
+  • Gap 3: Non-blocking deploy already supported via `start_background_process` (deploy_to_platform itself is blocking by design, but ORA can wrap it in a bg-process for long-running runs).
+  • Gap 4: `scrub_secrets()` wired into `view_file`, `view_bulk`, `read_logs`. Redacts Stripe keys, Mongo URIs, JWTs, bearer tokens, passwords, high-entropy 40+ char alphanumerics. Verified E2E: `STRIPE_SECRET_KEY=sk_live_xyz...` in source file → LLM sees `STRIPE_SECRET_KEY=[REDACTED_STRIPE_KEY]`.
+
+  **Portability:**
+  • Zero Emergent-specific imports in ORA's 9 core files. Only optional `emergentintegrations` import (gracefully falls back).
+  • `ORA_PORTABLE_MANIFEST.md` lists all 5 locations + 30+ env vars + zero-lock-in confirmation.
+  • `MIGRATION_CHECKLIST.md` step-by-step (copy folders → set env vars → mongodump/restore → verify).
+
+  **Testing:** 52/52 new regression tests pass. Files: `test_iter331a_sprints_1_2_3.py` (18 tests) + `test_iter331a_sprints_3_5_and_3_7.py` (34 tests).
+
+  **Deferred to next session** (founder said "stop after 3.5", expanded to include 3.7):
+  • Sprint 4: skill files (dev_new_project, dev_self_recovery, dev_integration, dev_testing, expand dev_debugging).
+  • Sprint 5: fork_context fresh-context spawn pattern.
+  • Sprint 6: per-session metrics collection + Cockpit health tile + full codebase portability audit of routers/services/server.py/frontend.
+  • Vanguard Security portability + Morning Brief security score line + Telegram alert <80.
+
+  **Founder push to GitHub required** to deploy this entire stack to aurem.live.
 - P3 — Service-account Google Calendar for shared AUREM staff calendar.
 - P3 — "Get a fresh scan" CTA on stale `ghost-*` 404 landing page.

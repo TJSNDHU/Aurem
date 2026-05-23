@@ -1,0 +1,44 @@
+[
+  {
+    "file": "DEPLOYMENT_RUNBOOK.md",
+    "label": "DEPLOYMENT RUNBOOK",
+    "keywords": ["deploy", "restart", "supervisor", "503", "502", "down", "crash", "rollback", "redeploy", "health check"],
+    "cap": 3000
+  },
+  {
+    "file": "INTEGRATION_PLAYBOOK.md",
+    "label": "INTEGRATION PLAYBOOK",
+    "keywords": ["stripe", "twilio", "retell", "resend", "mongodb", "mongo", "motor", "atlas", "webhook", "sdk", "api key", "emergent llm", "whatsapp"],
+    "cap": 3000
+  },
+  {
+    "file": "PROJECT_TEMPLATES.md",
+    "label": "PROJECT TEMPLATES",
+    "keywords": ["new project", "scaffold", "from scratch", "skeleton", "template", "green-field", "build a new", "create a new app", "boilerplate"],
+    "cap": 3000
+  },
+  {
+    "file": "SYSTEM_MAP.md",
+    "label": "SYSTEM MAP",
+    "keywords": ["architecture", "where is", "how does the system", "system map", "pillar"],
+    "cap": 1500
+  },
+  {
+    "file": "../SECURITY_PATTERNS.md",
+    "label": "SECURITY PATTERNS",
+    "keywords": ["security", "auth", "jwt", "password", "secret", "token", "encryption"],
+    "cap": 4000
+  },
+  {
+    "file": "../SECURITY_PATTERNS.md",
+    "label": "CASL + OUTREACH RULES",
+    "keywords": ["campaign", "outreach", "email blast", "blast", "marketing", "opt out", "opt-out", "unsubscribe", "casl"],
+    "cap": 4000
+  },
+  {
+    "file": "../ARCHITECTURE.md",
+    "label": "ARCHITECTURE (summary)",
+    "keywords": ["fix", "debug", "broken", "crash", "why does", "how does", "error"],
+    "cap": 2000
+  }
+]

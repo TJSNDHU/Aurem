@@ -906,6 +906,14 @@ TIER_1_AUTO: set[str] = {
     # so safe to auto-execute.
     "recall_past_decisions", "search_codebase_semantic",
     "load_job_checkpoint",
+    # iter 331a — Sprint 2 tools: 8 new Tier-1 capabilities.
+    "web_search", "read_logs", "check_coverage", "run_linter",
+    "mongo_query_safe", "view_bulk", "ask_human", "glob_files",
+    # iter 331a — Sprint 3.5/3.7: read-only blindspot tools + semantic.
+    "git_current_branch",
+    "create_sandbox", "cleanup_sandbox",
+    "check_process_status", "wait_for_process",
+    "semantic_memory_search",
 }
 
 TIER_2_APPROVE: set[str] = {
@@ -922,12 +930,20 @@ TIER_2_APPROVE: set[str] = {
     # iter 327q — FIX 3 + P1: BUILD MODE plan + self-journaling lesson
     # proposal. Both gated by the 30-second Tier-2 cancel window.
     "propose_build_plan", "propose_lesson",
+    # iter 331a — Sprint 3.5 blindspots (state-mutating but reversible).
+    "git_create_branch", "git_push_branch", "git_create_pr",
+    "run_in_sandbox", "start_background_process",
 }
 
 TIER_3_HIGH_RISK: set[str] = {
     # Destructive / external — approval card is red-banded;
     # founder must type CONFIRM to approve.
     "legion_exec",
+    # iter 331a Sprint 3.5 — deploy + rollback are CONFIRM-only.
+    "deploy_to_platform", "rollback_deploy",
+    # iter 331a — Sprint 3.5 blindspots: merge to main + promote files
+    # + kill bg process are all irreversible/destructive.
+    "git_merge_branch", "promote_from_sandbox", "kill_process",
 }
 # iter 327m — Removed orphan tier entries that had NO impl in
 # TOOL_REGISTRY (these were sent to the LLM as schemas it could

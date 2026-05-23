@@ -68,6 +68,24 @@ _db = None  # set by registry.set_db()
 def set_db(database) -> None:
     global _db
     _db = database
+    # iter 331a — propagate to Sprint-2 tools (mongo_query_safe, ask_human).
+    try:
+        from services import ora_sprint2_tools as _S2
+        _S2.set_db(database)
+    except Exception:
+        pass
+    # iter 331a — propagate to Sprint-3 guards (cost cap, edit loop, etc.)
+    try:
+        from services import ora_guards as _G
+        _G.set_db(database)
+    except Exception:
+        pass
+    # iter 331a — propagate to Sprint-3.5 blindspot tools (bg process tracking).
+    try:
+        from services import ora_blindspot_tools as _BS
+        _BS.set_db(database)
+    except Exception:
+        pass
 
 
 def _now_iso() -> str:
@@ -175,12 +193,21 @@ async def view_file(path: str, max_lines: int = 200, start: int = 1) -> dict:
         total = len(lines)
         end = min(total, start + max_lines - 1)
         chunk = lines[start - 1:end]
+        chunk_text = "\n".join(chunk)
+        # iter 331a Sprint 3.7 Gap 4 — scrub secrets before the LLM sees them.
+        try:
+            from services.ora_safety import scrub_secrets
+            chunk_text, _n = scrub_secrets(chunk_text)
+            if _n:
+                logger.info(f"[secrets-scrubber] redacted {_n} item(s) in view_file({p})")
+        except Exception:
+            pass
         return {
             "ok":           True,
             "path":         str(p),
             "total_lines":  total,
             "shown_range":  f"{start}-{end}",
-            "content":      "\n".join(chunk),
+            "content":      chunk_text,
             "more_after":   end < total,
         }
     except Exception as e:
@@ -3757,6 +3784,72 @@ except Exception as _e:  # pragma: no cover - defensive
     import logging as _logging
     _logging.getLogger(__name__).warning(
         f"[ora_tools] failed to splice build_mode tools: {_e}"
+    )
+
+# iter 331a — Sprint 2: 8 new Tier-1 tools (web_search, read_logs,
+# check_coverage, run_linter, mongo_query_safe, view_bulk, ask_human,
+# glob_files). Same patch pattern as build_mode for portability.
+try:
+    from services import ora_sprint2_tools as _S2
+    _added = _S2.splice_into(TOOL_REGISTRY)
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        f"[ora_tools] iter 331a — spliced {_added} Sprint-2 tools"
+    )
+except Exception as _e:  # pragma: no cover - defensive
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"[ora_tools] failed to splice Sprint-2 tools: {_e}"
+    )
+
+# iter 331a — Sprint 3.5: deploy + rollback tools (Tier-3).
+try:
+    from services import ora_deploy_tool as _DT
+    _added = _DT.splice_into(TOOL_REGISTRY)
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        f"[ora_tools] iter 331a — spliced {_added} deploy tools (Tier-3)"
+    )
+except Exception as _e:  # pragma: no cover - defensive
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"[ora_tools] failed to splice deploy tools: {_e}"
+    )
+
+# iter 331a — Sprint 3.5 Blindspots: git branches + sandbox + bg process.
+try:
+    from services import ora_blindspot_tools as _BS
+    _added = _BS.splice_into(TOOL_REGISTRY)
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        f"[ora_tools] iter 331a — spliced {_added} blindspot tools"
+    )
+except Exception as _e:  # pragma: no cover - defensive
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"[ora_tools] failed to splice blindspot tools: {_e}"
+    )
+
+# iter 331a — Sprint 3.7 Gap 2: semantic memory search (FTS5).
+try:
+    from services import ora_semantic_memory as _SM
+    _added = _SM.splice_into(TOOL_REGISTRY)
+    # Build the FTS5 index on import so first-search is fast.
+    try:
+        _SM.reindex()
+    except Exception as _e2:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            f"[ora_tools] semantic reindex failed: {_e2}"
+        )
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        f"[ora_tools] iter 331a — spliced {_added} semantic tools + indexed"
+    )
+except Exception as _e:  # pragma: no cover - defensive
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"[ora_tools] failed to splice semantic tools: {_e}"
     )
 
 
