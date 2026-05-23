@@ -12,6 +12,16 @@ import DeveloperShell from "./DeveloperShell";
 export default function DevLanding() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [betaCount, setBetaCount] = useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch(`${process.env.REACT_APP_BACKEND_URL || ""}/api/developers/public/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j && !cancelled) setBetaCount(j.verified_developers || 0); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   function go(e) {
     e.preventDefault();

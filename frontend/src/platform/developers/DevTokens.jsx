@@ -1,8 +1,10 @@
 /**
  * /developers/tokens — Pricing & purchase (Auth-gated)
+ * iter 331g — Real Stripe Checkout integration.
  */
-import React, { useState } from "react";
-import { Check, Coins } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Check, Coins, CheckCircle2 } from "lucide-react";
 import DeveloperShell, { devAuthHeaders, useDevMe } from "./DeveloperShell";
 import { PageHeader } from "./DevDashboard";
 
@@ -19,17 +21,44 @@ const TIERS = [
     perks: ["Everything in Starter",
              "Priority queue (no throttling)",
              "60-day expiry"] },
-  { id: "pro", name: "Pro", price: "$99", cadence: "per month",
+  { id: "pro", name: "Pro", price: "$99", cadence: "30 days",
     tokens: "Unlimited tokens",
     perks: ["Everything in Builder",
              "BYOK bypasses deductions",
-             "Cancel any time"] },
+             "30 days of unlimited usage"] },
 ];
 
 export default function DevTokens() {
   const { me } = useDevMe();
+  const [params] = useSearchParams();
   const [busy, setBusy] = useState("");
   const [msg, setMsg]   = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  // iter 331g — handle Stripe success redirect. Poll status until paid
+  // or 3 attempts, whichever first. Credits are server-side idempotent.
+  useEffect(() => {
+    if (params.get("success") !== "1") return;
+    const sid = params.get("session_id");
+    if (!sid) return;
+    let cancelled = false;
+    let tries = 0;
+    async function poll() {
+      tries += 1;
+      try {
+        const r = await fetch(`${API}/api/developers/checkout/status/${sid}`,
+                               { headers: devAuthHeaders() });
+        const j = await r.json();
+        if (!cancelled && j.payment_status === "paid") {
+          setSuccess(j);
+          return;
+        }
+      } catch (e) { /* ignore */ }
+      if (!cancelled && tries < 8) setTimeout(poll, 1500);
+    }
+    poll();
+    return () => { cancelled = true; };
+  }, [params]);
 
   async function checkout(tier) {
     setBusy(tier); setMsg(null);
@@ -37,15 +66,15 @@ export default function DevTokens() {
       const r = await fetch(`${API}/api/developers/checkout/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...devAuthHeaders() },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ tier, origin_url: window.location.origin }),
       });
-      if (r.status === 404) {
-        setMsg("Checkout opens in Batch C — back here in a few days.");
-        return;
-      }
       const j = await r.json();
-      if (j.url) window.location.href = j.url;
-      else if (!r.ok) throw new Error(j.detail || "checkout failed");
+      if (!r.ok) throw new Error(j.detail || "checkout failed");
+      if (j.url) {
+        window.location.href = j.url;
+      } else {
+        throw new Error("no_url");
+      }
     } catch (e) {
       setMsg(String(e.message || e));
     } finally { setBusy(""); }
@@ -55,6 +84,35 @@ export default function DevTokens() {
     <DeveloperShell requireAuth>
       <PageHeader eyebrow="TOKENS" title="Pay only for what you ship."
                   sub={`You currently have ${(me?.tokens_remaining ?? 0).toLocaleString()} tokens.`} />
+
+      {success && (
+        <div data-testid="tokens-success-banner" className="av2-card"
+             style={{ borderColor: "rgba(80,200,120,0.40)",
+                       background: "rgba(80,200,120,0.08)",
+                       color: "var(--dash-green)", fontSize: 14,
+                       display: "flex", alignItems: "center", gap: 12 }}>
+          <CheckCircle2 size={20} />
+          <span>
+            Payment confirmed.
+            {success.tokens_granted ? (
+              <> <strong>{success.tokens_granted.toLocaleString()}</strong> tokens added.</>
+            ) : success.days_paid ? (
+              <> Pro active for the next <strong>{success.days_paid}</strong> days.</>
+            ) : (
+              <> Your account has been updated.</>
+            )}
+          </span>
+        </div>
+      )}
+
+      {params.get("cancelled") === "1" && (
+        <div data-testid="tokens-cancelled-banner" className="av2-card"
+             style={{ borderColor: "rgba(255,179,107,0.40)",
+                       background: "rgba(255,179,107,0.08)",
+                       color: "var(--dash-amber)", fontSize: 14 }}>
+          Checkout cancelled. No charge was made.
+        </div>
+      )}
 
       <div className="av2-grid-3-2"
            style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>

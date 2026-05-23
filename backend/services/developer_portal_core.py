@@ -115,6 +115,10 @@ async def ensure_indexes() -> None:
         await _db.developer_otp_codes.create_index("expires_at", expireAfterSeconds=0)
         await _db.developer_rate_limits.create_index("user_id")
         await _db.developer_rate_limits.create_index("ip")
+        # iter 331g — Stripe collections
+        await _db.payment_transactions.create_index("session_id", unique=True)
+        await _db.payment_transactions.create_index([("user_id", 1), ("created_at", -1)])
+        await _db.stripe_events_processed.create_index("event_id", unique=True)
         logger.info("[developer-portal] indexes ensured")
     except Exception as e:
         logger.warning(f"[developer-portal] index creation failed: {e}")

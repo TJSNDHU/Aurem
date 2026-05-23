@@ -183,6 +183,7 @@ import DevTerms     from './platform/developers/DevTerms';
 import DevSettings  from './platform/developers/DevSettings';
 import DevExamples  from './platform/developers/DevExamples';
 import DevStatus    from './platform/developers/DevStatus';
+import DevApiDocs   from './platform/developers/DevApiDocs';
 import { PlatformLogin, PlatformSignup } from './platform/PlatformAuth';
 import AccountSecurity from './platform/AccountSecurity';
 import ORAWidget from './components/ORAWidget';
@@ -317,6 +318,7 @@ function AppRouter() {
       <Route path="/developers/settings"  element={<DevSettings />} />
       <Route path="/developers/examples"  element={<DevExamples />} />
       <Route path="/developers/status"    element={<DevStatus />} />
+      <Route path="/developers/docs"      element={<DevApiDocs />} />
       
       {/* Platform Auth */}
       <Route path="/platform/login" element={<PlatformLogin />} />

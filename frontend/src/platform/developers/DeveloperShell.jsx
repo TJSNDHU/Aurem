@@ -15,7 +15,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Home as HomeIcon, Github, Activity, BarChart3, Coins,
   ScrollText, Settings as SettingsIcon, Briefcase, ShieldCheck,
-  LogOut, Sun, Moon,
+  LogOut, Sun, Moon, BookOpen,
 } from "lucide-react";
 
 import "../../styles/dashboard-theme.css";
@@ -296,6 +296,7 @@ const DASH_NAV = [
   { to: "/developers/analytics", label: "Analytics",  icon: BarChart3,   testid: "dev-nav-analytics" },
   { to: "/developers/examples",  label: "Examples",   icon: Briefcase,   testid: "dev-nav-examples" },
   { to: "/developers/tokens",    label: "Tokens",     icon: Coins,       testid: "dev-nav-tokens" },
+  { to: "/developers/docs",      label: "API Docs",   icon: BookOpen,    testid: "dev-nav-docs" },
   { to: "/developers/status",    label: "Status",     icon: Activity,    testid: "dev-nav-status" },
   { to: "/developers/settings",  label: "Settings",   icon: SettingsIcon,testid: "dev-nav-settings" },
   { to: "/developers/terms",     label: "Terms",      icon: ScrollText,  testid: "dev-nav-terms" },

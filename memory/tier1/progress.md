@@ -119,3 +119,41 @@ PIDs: []
 Updated: 2026-02-24T01:20:00Z
 ---
 
+
+---
+Task: iter 331g — Beta ticker + Swagger UI + Stripe Batch C
+Succeeded:
+  • Beta ticker on /developers landing: new `GET /api/developers/public/stats` returns `{verified_developers: N}` (no auth). DevLanding fetches once on mount and renders "in public beta — N developers building" in JetBrains Mono just under the eyebrow pill (only when N > 0). Real count proven: 3 verified devs in preview DB.
+  • Swagger UI page at /developers/docs: new `DevApiDocs.jsx` loads swagger-ui-bundle v5.17.14 from JSDelivr CDN, points it at the new filtered openapi feed, auto-attaches the dev JWT to every "Try it out" call via requestInterceptor, pre-authorizes the BearerAuth lock on load.
+  • Filtered OpenAPI feed `GET /api/developers/openapi.json`: builds against THIS router's routes only (bypasses the rest of the codebase which has at least one route missing a response class that breaks the global `app.openapi()` schema generator). Returns 11 developer-facing paths + a BearerAuth security scheme. NO admin paths leak through.
+  • Stripe Batch C — three packages, all one-time payment (Pro is one-time $99 = 30 days of unlimited rather than a recurring subscription, simpler than Stripe subscriptions for now):
+    - starter: $9   → +10,000 tokens
+    - builder: $39  → +50,000 tokens
+    - pro:     $99  → 30 days of subscription_status="paid"
+  • New service `services/developer_stripe.py` using `emergentintegrations.payments.stripe.checkout.StripeCheckout` per the integration playbook. Public surface: `start_checkout`, `get_status`, `credit_for_session`, `process_webhook_event`, `package_table`. Fixed amounts on the BACKEND — frontend cannot inject a tier price.
+  • New endpoints in `developer_portal_router.py`:
+    - `GET  /api/developers/packages` — public price table for /tokens page
+    - `POST /api/developers/checkout/start` — body `{tier, origin_url}` → returns `{url, session_id}`. Creates a pending `payment_transactions` row before redirecting.
+    - `GET  /api/developers/checkout/status/{session_id}` — polled by the frontend success page. Idempotently credits on first poll where `payment_status == "paid"`.
+    - `POST /api/webhook/stripe` — Stripe webhook handler. Verifies signature via `client.handle_webhook(raw_body, signature)`, dedupes on `event.id` against `stripe_events_processed` collection (unique index), routes the event to credit/grace handlers.
+  • Idempotency contract proven by tests: 5 concurrent `credit_for_session` calls + a webhook event all converge to exactly ONE token grant. The race winner is decided atomically via `findOneAndUpdate({credited: false} → {credited: true})`. Webhook deduping uses unique index on `event_id`.
+  • 3-day grace logic for `invoice.payment_failed`: first failure stamps `grace_period_ends_at = now + 3d` and emails the customer. Second failure after grace expiry flips `subscription_status` back to "free" and clears the grace stamp. Both branches tested.
+  • Invoice email: after successful credit, a Resend email is sent (`AUREM CTO — Receipt for your <tier> purchase`) with the session_id, USD amount, and either token grant or paid-until date.
+  • Two new collections wired into `ensure_indexes()`: `payment_transactions` (unique on `session_id`, indexed on `(user_id, created_at)`), `stripe_events_processed` (unique on `event_id`).
+  • DevTokens.jsx rewritten to use the real flow: POST `/checkout/start` → window.location.href = j.url → on Stripe redirect back with `?success=1&session_id=...`, polls `/checkout/status/{sid}` up to 8 times (1.5s interval). Success banner shows tokens or days granted.
+  • New regression file `test_iter331g_stripe.py` — 14 cases covering all surfaces above. Plus 2 existing test files updated (test_iter331d for AUREM CTO welcome subject, test_iter331e unchanged).
+  • Full regression: **415 / 415 GREEN** across iter 327d → 331g (was 401 last iter; +14 new Stripe cases all green).
+Blocker: none.
+Next:
+  • Push iter 331g to GitHub via "Save to Github" — preview is green, production redeploys from main. The pod env already has STRIPE_SECRET_KEY (live key) and STRIPE_PUBLISHABLE_KEY (live key) provisioned by Emergent. STRIPE_WEBHOOK_SECRET will need to be set in production env once you register the webhook endpoint with Stripe and grab the signing secret.
+  • iter 332a — Emergent Specialist Swarm (extend fork_context with mode="emergent", auto-escalation after 2 failures, validated solution memory with SHA256 signatures, cost tracking, Specialist Cost Breakdown cockpit tile). Full spec captured. Estimated 3-4 hours of careful infra work. Queued for the next context window.
+Backlog:
+  • Webhook endpoint needs to be REGISTERED in the Stripe dashboard once aurem.live ships with iter 331g. URL = `https://aurem.live/api/webhook/stripe`. Events to enable: `checkout.session.completed`, `invoice.payment_failed`, `invoice.payment_succeeded`, `customer.subscription.deleted`.
+  • Pro recurring subscriptions: current impl treats $99/Pro as one-time → 30 days unlimited. If customers ask for auto-renew, swap to Stripe subscription mode (mode="subscription" + recurring price) — about 60 LOC change in `start_checkout` + 30 LOC in webhook handler.
+  • ConsentToggleCard still uses shadcn Card primitive instead of av2-card — minor visual inconsistency previously flagged by testing agent. ~20 LOC swap when next touching settings.
+Cost: $0.00 USD (pytest + lint + integration playbook only; no LLM calls beyond playbook)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T01:55:00Z
+---
+

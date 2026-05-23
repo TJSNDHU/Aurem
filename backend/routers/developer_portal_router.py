@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import os
 import secrets
 from datetime import datetime, timezone
 from typing import Any
@@ -414,11 +415,7 @@ async def admin_run_email_sequence(request: Request) -> dict[str, Any]:
 
 @router.get("/api/admin/developers/health")
 async def admin_developers_health(request: Request) -> dict[str, Any]:
-    """iter 331f — Developer Portal pulse for the ORA Cockpit tile.
-
-    Returns counters + sample state in one shot so the cockpit can
-    render with a single fetch. All numbers are real DB queries.
-    """
+    """iter 331f — Developer Portal pulse for the ORA Cockpit tile."""
     _ensure_admin(request)
     if _db is None:
         raise HTTPException(503, "db not ready")
@@ -522,3 +519,154 @@ async def admin_developers_health(request: Request) -> dict[str, Any]:
         "emails_sent_today": emails_sent_today,
         "generated_at": now.isoformat(),
     }
+
+
+@router.get("/api/developers/openapi.json", include_in_schema=False)
+async def developers_openapi(request: Request) -> dict[str, Any]:
+    """Filtered OpenAPI schema for the Swagger UI page. Builds against
+    THIS router's routes only — bypasses the rest of the codebase
+    (which has at least one route without a response class that breaks
+    the global schema). Adds a `BearerAuth` security scheme.
+    """
+    from fastapi.openapi.utils import get_openapi
+    try:
+        full = get_openapi(
+            title="AUREM CTO — Developer Portal API",
+            version="1.0",
+            description=(
+                "REST endpoints available to developer-portal tenants. "
+                "Authenticate with the JWT you receive from "
+                "`POST /api/developers/verify-otp` and paste it into "
+                "the Authorize dialog above."
+            ),
+            routes=router.routes,
+        )
+    except Exception as e:
+        logger.warning(f"[dev-openapi] schema build failed: {e}")
+        full = {"openapi": "3.0.0",
+                "info": {"title": "AUREM CTO — Developer Portal API",
+                          "version": "1.0"},
+                "paths": {}, "components": {}}
+
+    paths = {
+        k: v for k, v in (full.get("paths") or {}).items()
+        if k.startswith("/api/developers/")
+        and not k.startswith("/api/developers/openapi")
+        and not k.startswith("/api/admin/")
+    }
+    return {
+        "openapi": full.get("openapi", "3.0.0"),
+        "info":    full.get("info", {
+            "title":   "AUREM CTO — Developer Portal API",
+            "version": "1.0",
+        }),
+        "paths":   paths,
+        "components": {
+            **(full.get("components") or {}),
+            "securitySchemes": {
+                "BearerAuth": {
+                    "type":   "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "JWT",
+                    "description": (
+                        "Paste the JWT returned by /api/developers/verify-otp."
+                    ),
+                },
+            },
+        },
+        "security": [{"BearerAuth": []}],
+    }
+
+
+
+# ── iter 331g — Public landing-page count + Stripe Batch C ──
+
+@router.get("/api/developers/public/stats")
+async def developers_public_stats() -> dict[str, Any]:
+    """Public count for the landing-page beta ticker. NO auth."""
+    if _db is None:
+        return {"verified_developers": 0}
+    n = await _db.developer_accounts.count_documents({"email_verified": True})
+    return {"verified_developers": int(n)}
+
+
+@router.get("/api/developers/packages")
+async def developers_packages() -> dict[str, Any]:
+    """Public — packages with prices. Used by /developers/tokens."""
+    from services.developer_stripe import package_table
+    return {"ok": True, "packages": package_table()}
+
+
+class CheckoutStartBody(BaseModel):
+    tier: str
+    origin_url: str
+
+
+@router.post("/api/developers/checkout/start")
+async def developers_checkout_start(
+    body: CheckoutStartBody,
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    me = await _current_dev(authorization)
+    from services.developer_stripe import start_checkout, set_db as _set_pay_db
+    if _db is not None:
+        _set_pay_db(_db)
+    r = await start_checkout(
+        user_id=me["user_id"], email=me["email"],
+        tier=body.tier, origin_url=body.origin_url,
+    )
+    if not r.get("ok"):
+        raise HTTPException(400, r.get("error") or "checkout_failed")
+    return r
+
+
+@router.get("/api/developers/checkout/status/{session_id}")
+async def developers_checkout_status(
+    session_id: str,
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    await _current_dev(authorization)
+    from services.developer_stripe import get_status, set_db as _set_pay_db
+    if _db is not None:
+        _set_pay_db(_db)
+    return await get_status(session_id)
+
+
+@router.post("/api/webhook/stripe", include_in_schema=False)
+async def stripe_webhook(request: Request) -> dict[str, Any]:
+    """Stripe webhook — verifies the signature, dedupes on event.id,
+    routes the event to the credit/grace handlers."""
+    from services.developer_stripe import process_webhook_event, set_db as _set_pay_db
+    if _db is not None:
+        _set_pay_db(_db)
+    raw_body = await request.body()
+    signature = request.headers.get("Stripe-Signature") or ""
+
+    try:
+        from emergentintegrations.payments.stripe.checkout import StripeCheckout
+        api_key = os.environ.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_API_KEY") or ""
+        webhook_url = (
+            (os.environ.get("FRONTEND_URL") or "https://aurem.live").rstrip("/")
+            + "/api/webhook/stripe"
+        )
+        client = StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+        webhook_resp = await client.handle_webhook(raw_body, signature)
+    except Exception as e:
+        logger.warning(f"[dev-stripe] webhook signature/parse failed: {e}")
+        raise HTTPException(400, "invalid_signature")
+
+    event_id   = webhook_resp.event_id or ""
+    event_type = webhook_resp.event_type or ""
+    session_id = webhook_resp.session_id
+    raw_event  = getattr(webhook_resp, "raw_event", None) or {}
+
+    if not event_id:
+        # No id means we cannot dedupe — refuse rather than risk
+        # double-credit on retry.
+        return {"ok": False, "reason": "no_event_id"}
+
+    return await process_webhook_event(
+        event_id=event_id, event_type=event_type,
+        session_id=session_id, raw_event=raw_event if isinstance(raw_event, dict) else None,
+    )
+
