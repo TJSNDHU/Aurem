@@ -115,6 +115,51 @@ async def get_admin_user(creds: HTTPAuthorizationCredentials = Depends(security)
 class RunBody(BaseModel):
     session_id: str = Field(min_length=3, max_length=120)
     text:       str = Field(min_length=1, max_length=4000)
+    # iter 327c — optional attachment_ids list. The chat UI uploads to
+    # /api/ora/agent/attach first, then sends this run call with the
+    # ids. Backend fans them out into the user-visible message so
+    # ORA's brain reads the extracted text / link preview.
+    attachment_ids: Optional[list[str]] = Field(default=None, max_length=8)
+
+
+async def _enrich_text_with_attachments(
+    text: str,
+    attachment_ids: Optional[list[str]],
+) -> str:
+    """Append attachment-context blocks + auto-detected URL previews
+    so ORA's LLM sees the uploaded content."""
+    extra_parts: list[str] = []
+
+    # Resolve attachment_ids → context blocks
+    if attachment_ids and _db is not None:
+        try:
+            cursor = _db.ora_attachments.find(
+                {"attachment_id": {"$in": list(attachment_ids)}},
+                {"_id": 0},
+            )
+            records = await cursor.to_list(length=8)
+            from routers.ora_attachments_router import render_attachment_context
+            for rec in records:
+                extra_parts.append(render_attachment_context(rec))
+        except Exception as e:
+            logger.warning(f"[ora-run] attachment enrich failed: {e}")
+
+    # Auto-detect URLs in the raw text → fetch previews (cap 2)
+    try:
+        from routers.ora_attachments_router import URL_RE, _link_preview
+        urls = URL_RE.findall(text or "")[:2]
+        for u in urls:
+            preview = await _link_preview(u)
+            block = (f"\n\n[Link auto-detected: {u}\n"
+                     f"Title: {preview.get('title','(no title)')}\n"
+                     f"Description: {preview.get('description','(none)')}]")
+            extra_parts.append(block)
+    except Exception as e:
+        logger.warning(f"[ora-run] URL auto-preview failed: {e}")
+
+    if not extra_parts:
+        return text
+    return text + "".join(extra_parts)
 
 
 class DecideBody(BaseModel):
@@ -138,8 +183,9 @@ async def health():
 
 @router.post("/run")
 async def agent_run(body: RunBody, user: dict = Depends(get_admin_user)):
+    enriched = await _enrich_text_with_attachments(body.text, body.attachment_ids)
     return await ora_agent.run_turn(
-        body.session_id, body.text, founder_email=user["email"]
+        body.session_id, enriched, founder_email=user["email"]
     )
 
 
@@ -162,9 +208,10 @@ async def agent_run(body: RunBody, user: dict = Depends(get_admin_user)):
 @router.post("/run-async")
 async def agent_run_async(body: RunBody, user: dict = Depends(get_admin_user)):
     from services import ora_agent_jobs
+    enriched = await _enrich_text_with_attachments(body.text, body.attachment_ids)
     return await ora_agent_jobs.enqueue(
         session_id=body.session_id,
-        text=body.text,
+        text=enriched,
         founder_email=user["email"],
     )
 

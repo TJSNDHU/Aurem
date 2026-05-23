@@ -684,6 +684,7 @@ def register_all_routers(app, db):
         ("routers.sms_admin_router", "SMS Admin + CA Allowlist (iter 282al-33)"),
         ("routers.incident_router", "Incident Pipeline (iter 322ff)"),
         ("routers.ora_agent_router", "ORA Autonomous Agent (iter 322fi)"),
+        ("routers.ora_attachments_router", "ORA Chat Attachments (iter 327c)"),
     ]
 
     for module_path, label in _aurem_with_db:

@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Crown, Send, Loader2, Trash2, Copy, Check,
   Wrench, AlertTriangle, ShieldAlert, X, Wand2, Eye,
-  ChevronRight, Sparkles,
+  ChevronRight, Sparkles, Plus,
 } from "lucide-react";
 import {
   SmartToolResult, PreviewPane, StepTracker, PlanPreview,
@@ -102,6 +102,46 @@ export default function OraChat() {
   const [pending, setPending] = useState(null); // current action_required
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [error, setError] = useState(null);
+
+  // iter 327c — multi-upload state. attachments[] holds metadata
+  // for files the user picked but hasn't sent yet. They're posted
+  // alongside the next message via attachment_ids in the run-async
+  // body. ORA's backend resolves them and pastes preview text into
+  // the user message so the LLM brain reads the upload.
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading]     = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleFileChosen = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (e.target) e.target.value = "";   // allow re-picking same file
+    if (!f) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("session_id", sessionId);
+      const r = await fetch(`${API}/api/ora/agent/attach`, {
+        method: "POST",
+        headers: { ...authHeaders() },
+        body: fd,
+      });
+      const j = await safeJson(r);
+      if (!j || !j.ok || !j.attachment) {
+        throw new Error((j && (j.error || j.detail)) || "upload failed");
+      }
+      setAttachments((arr) => [...arr, j.attachment]);
+    } catch (err) {
+      setError(`Upload failed: ${err.message || err}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments((arr) => arr.filter((a) => a.attachment_id !== id));
+  };
 
   // iter 326uu — derived: latest tool_result for the right-side PreviewPane.
   const latestToolResult = useMemo(() => {
@@ -250,14 +290,19 @@ export default function OraChat() {
   const POLL_INTERVAL_MS = 1200;
   const POLL_MAX_TRIES   = 280;   // 280 × 1.2 s = ~5.6 min, matches worker timeout
 
-  const runAsyncPolling = async (q, onProgress) => {
+  const runAsyncPolling = async (q, onProgress, attachmentIds) => {
     // 1) Enqueue
     let startRes;
     try {
       startRes = await fetch(`${API}/api/ora/agent/run-async`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ session_id: sessionId, text: q }),
+        body: JSON.stringify({
+          session_id: sessionId,
+          text: q,
+          attachment_ids: attachmentIds && attachmentIds.length
+            ? attachmentIds : undefined,
+        }),
       });
     } catch (e) {
       throw new Error(`network: ${e}`);
@@ -267,7 +312,12 @@ export default function OraChat() {
       const r = await fetch(`${API}/api/ora/agent/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ session_id: sessionId, text: q }),
+        body: JSON.stringify({
+          session_id: sessionId,
+          text: q,
+          attachment_ids: attachmentIds && attachmentIds.length
+            ? attachmentIds : undefined,
+        }),
       });
       return await safeJson(r);
     }
@@ -307,15 +357,28 @@ export default function OraChat() {
 
   const send = async () => {
     const q = input.trim();
-    if (!q || busy) return;
+    if ((!q && attachments.length === 0) || busy) return;
     setError(null);
-    setHistory((h) => [...h, { role: "user", content: q, ts: Date.now() }]);
+    // iter 327c — echo attachments + text into history together.
+    const attachmentMeta = attachments.map((a) => ({
+      kind: a.kind, filename: a.filename, url: a.url, title: a.title,
+    }));
+    const attachmentIds = attachments.map((a) => a.attachment_id);
+    setHistory((h) => [...h, {
+      role: "user",
+      content: q || (attachments.length === 1
+        ? `(sent ${attachments[0].kind})`
+        : `(sent ${attachments.length} files)`),
+      attachments: attachmentMeta,
+      ts: Date.now(),
+    }]);
     setInput("");
+    setAttachments([]);
     setBusyStartedAt(Date.now());
     setBusyTools([]);
     setBusy(true);
     try {
-      const j = await runAsyncPolling(q, setBusyTools);
+      const j = await runAsyncPolling(q, setBusyTools, attachmentIds);
       applyTurnResult(j);
     } catch (e) {
       setError(String(e));
@@ -614,9 +677,69 @@ export default function OraChat() {
         </div>
       )}
 
+      {/* iter 327c — attachment chips above the input bar */}
+      {attachments.length > 0 && (
+        <div data-testid="attachment-chips"
+             style={{ display: "flex", flexWrap: "wrap", gap: 6,
+                        padding: "0 0 8px", flex: "0 0 auto" }}>
+          {attachments.map((a) => (
+            <span key={a.attachment_id}
+                  data-testid={`attachment-chip-${a.kind}`}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "4px 8px", fontSize: 11,
+                    background: "rgba(212,175,55,0.10)",
+                    border: `1px solid ${GOLD}55`, color: GOLD,
+                    borderRadius: 999, fontFamily: "monospace",
+                  }}>
+              {a.kind === "image" && "🖼"}
+              {a.kind === "pdf"   && "📄"}
+              {a.kind === "doc"   && "📝"}
+              {a.kind === "video" && "🎥"}
+              {a.filename || a.url || a.kind}
+              <button onClick={() => removeAttachment(a.attachment_id)}
+                      data-testid="attachment-remove"
+                      style={{ background: "transparent", border: "none",
+                                color: GOLD, cursor: "pointer", padding: 0,
+                                marginLeft: 2 }}>
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+          {uploading && (
+            <span style={{ color: TEXT_DIM, fontSize: 11,
+                              display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <Loader2 size={11} className="spin" /> uploading…
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Input */}
       <div style={{ display: "flex", gap: 8, padding: "12px 0 18px",
-                      flex: "0 0 auto" }}>
+                      flex: "0 0 auto", alignItems: "center" }}>
+        {/* iter 327c — single "+" button. One tap opens picker.
+            `capture="environment"` makes mobile offer camera too. */}
+        <input ref={fileInputRef}
+                type="file"
+                data-testid="ora-attachment-input"
+                accept="image/*,application/pdf,.doc,.docx,.txt,.md,.csv,video/*"
+                onChange={handleFileChosen}
+                style={{ display: "none" }} />
+        <button data-testid="ora-attach-btn"
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                disabled={busy || !!pending || uploading}
+                title="Attach a photo, document, video, or take a picture"
+                style={{
+                  width: 38, height: 38, borderRadius: 999,
+                  background: "rgba(212,175,55,0.06)",
+                  border: `1px solid ${GOLD}55`, color: GOLD,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  cursor: (busy || !!pending || uploading) ? "not-allowed" : "pointer",
+                  flex: "0 0 auto",
+                }}>
+          {uploading ? <Loader2 size={16} className="spin" /> : <Plus size={16} />}
+        </button>
         <input data-testid="chat-input"
                 value={input}
                 disabled={busy || !!pending}
@@ -627,9 +750,9 @@ export default function OraChat() {
                   : "Bata kya karna hai (Hindi/English mix chalega)…"}
                 style={chatInput(busy || !!pending)} />
         <button data-testid="chat-send"
-                disabled={busy || !!pending || !input.trim()}
+                disabled={busy || !!pending || (!input.trim() && attachments.length === 0)}
                 onClick={send}
-                style={btn(true, busy || !!pending || !input.trim())}>
+                style={btn(true, busy || !!pending || (!input.trim() && attachments.length === 0))}>
           <Send size={14} /> Send
         </button>
       </div>
@@ -655,8 +778,40 @@ export default function OraChat() {
 function Message({ m, i, copy, copiedIdx }) {
   if (m.role === "user") {
     return (
-      <Bubble side="right" colorBg="rgba(212,175,55,0.16)" label="YOU"
-              content={m.content} idx={i} copy={copy} copiedIdx={copiedIdx} />
+      <div>
+        <Bubble side="right" colorBg="rgba(212,175,55,0.16)" label="YOU"
+                content={m.content} idx={i} copy={copy} copiedIdx={copiedIdx} />
+        {Array.isArray(m.attachments) && m.attachments.length > 0 && (
+          <div data-testid={`user-attachments-${i}`}
+               style={{ display: "flex", flexWrap: "wrap", gap: 6,
+                          justifyContent: "flex-end",
+                          marginTop: -4, marginBottom: 8 }}>
+            {m.attachments.map((a, j) => (
+              <a key={j}
+                 href={a.url || "#"}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 data-testid={`attachment-preview-${a.kind}`}
+                 style={{
+                   display: "inline-flex", alignItems: "center", gap: 6,
+                   padding: "4px 8px", fontSize: 11,
+                   background: "rgba(212,175,55,0.08)",
+                   border: "1px solid rgba(212,175,55,0.35)",
+                   borderRadius: 8, color: "#D4AF37",
+                   fontFamily: "monospace",
+                   textDecoration: "none",
+                 }}>
+                {a.kind === "image" && "🖼"}
+                {a.kind === "pdf"   && "📄"}
+                {a.kind === "doc"   && "📝"}
+                {a.kind === "video" && "🎥"}
+                {a.kind === "link"  && "🔗"}
+                {a.filename || a.title || a.url || a.kind}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
   if (m.role === "assistant") {
