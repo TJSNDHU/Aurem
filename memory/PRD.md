@@ -869,3 +869,15 @@ iter 326 recent + iter 322er.
   **Founder push to GitHub required** to deploy this entire stack to aurem.live.
 - P3 — Service-account Google Calendar for shared AUREM staff calendar.
 - P3 — "Get a fresh scan" CTA on stale `ghost-*` 404 landing page.
+
+- iter 331a — Sprint 4 (skill files): **4 new dev skills + dev_debugging hard-rules prepend.**
+
+  • `dev_new_project.md` — 12-step green-field playbook. Mandatory references to `PROJECT_TEMPLATES.md`, `check_coverage`, `run_linter`, smoke-test, founder report.
+  • `dev_self_recovery.md` — 8-step healing loop. Step 1 = `read_logs`. Cross-refs the mistake journal. `ask_human` at 3 failures, halt at 4th (backed by `services/ora_guards` fail-ceiling + idempotency guard).
+  • `dev_integration.md` — 8-step playbook with `web_search` as a hard CODE-ENFORCED gate (via `ora_guards.check_integration_gate`). Mock + real verify_endpoint tests required. Webhook signature verification mandatory.
+  • `dev_testing.md` — 6 non-negotiable rules: 80% line coverage, mock all external APIs, use `REACT_APP_BACKEND_URL` (not localhost), `data-testid` on every UI element, `check_coverage` after every session, one regression test per bug fix.
+  • `dev_debugging.md` — prepended with iter-331a hard-rules header: always `read_logs` first, always check `progress.md`, always use `mongo_query_safe`, never guess.
+  • E2E proof: 4 founder-style semantic queries route to the correct new skill files (`"Build a lead tracker"` → dev_new_project, `"Stripe webhook"` → dev_integration, `"test failing 500"` → dev_self_recovery, `"80% coverage rules"` → dev_testing).
+  • 11 new regression tests in `test_iter331a_sprint4_skills.py`. **Total iter-331a tests: 95 across Sprints 1–4. All passing.**
+
+  **Founder push to GitHub** required to ship Sprint 4 to aurem.live.

@@ -3,6 +3,25 @@
 This skill is used when ORA helps build,
 debug, or test the AUREM platform itself.
 Stack: FastAPI + React + MongoDB on Emergent.
+
+## iter 331a — Debugging Hard Rules (read FIRST)
+
+Before ANY debug attempt, ORA MUST follow these four rules:
+
+1. **Always `read_logs` first.** Don't guess what broke — the
+   traceback is on disk. `read_logs("backend", lines=200)` is step 1.
+2. **Always check `progress.md`** for similar past issues. If a prior
+   session hit + fixed the same root cause, replay that fix before
+   inventing a new one.
+3. **Use `mongo_query_safe`** for any data-layer debugging. Read-only,
+   `_id` stripped, no risk of mutation.
+4. **Never guess — verify with tools first.** If a hypothesis isn't
+   tool-verifiable, it isn't a hypothesis, it's a wild swing.
+
+See also: `dev_self_recovery.md` for the full 8-step healing loop
+with the 3-strikes-and-escalate halt rule.
+
+
 ## Trigger intent
 User asks to fix, build, debug, test,
 refactor, review, or improve AUREM code.
