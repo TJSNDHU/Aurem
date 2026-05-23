@@ -191,7 +191,8 @@ def test_system_prompt_documents_gated_auto_redirect():
     src = AGENT.read_text()
     # Find SYSTEM_PROMPT and assert the new section is present
     idx = src.index('SYSTEM_PROMPT = """')
-    block = src[idx: idx + 8000]
+    # Grow window to 12000 since RULE ZERO got reinforced in iter 327b
+    block = src[idx: idx + 12000]
     assert "iter 326xx" in block
     assert "auto-redirect" in block.lower()
     assert "shell_exec_with_council" in block
@@ -204,7 +205,7 @@ def test_shell_exec_moved_to_tier2_in_prompt():
     """shell_exec is gated (Tier 2 with auto-execute), not Tier 1."""
     src = AGENT.read_text()
     idx = src.index('SYSTEM_PROMPT = """')
-    block = src[idx: idx + 8000]
+    block = src[idx: idx + 12000]
     # Tier 1 list must not include shell_exec
     t1_idx = block.index("TIER 1 (auto)")
     t1_end = block.index("TIER 2 (approve)")
