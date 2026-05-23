@@ -22,6 +22,9 @@ import OutreachHealthCard from "./OutreachHealthCard";
 import OraHealthTile from "./OraHealthTile";
 // iter 331f — Developer Portal pulse tile
 import DeveloperPortalPulseTile from "./DeveloperPortalPulseTile";
+// iter 332a-2 — Specialist Cost Breakdown + Validated Solutions
+import SpecialistCostBreakdownTile from "./SpecialistCostBreakdownTile";
+import ValidatedSolutionsPanel from "./ValidatedSolutionsPanel";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_MS = 25000;
@@ -177,6 +180,14 @@ export default function OraCtoCockpit() {
       {/* iter 331f — Developer Portal pulse */}
       <div style={{ marginBottom: 18 }}>
         <DeveloperPortalPulseTile />
+      </div>
+
+      {/* iter 332a-2 — Specialist Cost + Validated Solutions */}
+      <div style={{ display: "grid",
+                     gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr)",
+                     gap: 18, marginBottom: 18 }}>
+        <SpecialistCostBreakdownTile />
+        <ValidatedSolutionsPanel />
       </div>
 
       {/* iter 326c — Provider chain health (DeepSeek → FreeLLMAPI → Claude → Ollama → Groq) */}

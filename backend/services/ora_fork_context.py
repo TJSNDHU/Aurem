@@ -383,6 +383,20 @@ async def fork_context(
     parsed = _extract_json(content)
     validated = _validate_result(parsed)
 
+    # iter 332a-2 — update failure counter for auto-escalation policy.
+    # Caller can opt-in by passing session_id; absent → no-op.
+    if session_id:
+        try:
+            from services.ora_guards import (
+                record_task_failure, record_task_success,
+            )
+            if validated["verdict"] == "fail":
+                record_task_failure(session_id, task_type)
+            else:
+                record_task_success(session_id, task_type)
+        except Exception:
+            pass
+
     # Persist the validated answer — so the next identical problem is $0.
     files_involved = [m.get("path") for m in manifest if m.get("path")]
     await _VS.save_solution(

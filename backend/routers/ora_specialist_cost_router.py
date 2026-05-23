@@ -54,3 +54,31 @@ async def specialist_cost_breakdown(request: Request) -> dict[str, Any]:
     _ensure_admin(request)
     from services.ora_validated_solutions import cost_rollup_7d
     return await cost_rollup_7d()
+
+
+@router.get("/validated-solutions")
+async def validated_solutions(request: Request, limit: int = 20) -> dict[str, Any]:
+    """iter 332a-2 — 'What ORA taught itself this week' cockpit panel.
+    Returns the most-recently-used validated solutions in human
+    English so the founder can see what ORA learned without grepping
+    Mongo."""
+    _ensure_admin(request)
+    if _db is None:
+        return {"ok": False, "error": "db not ready"}
+    limit = max(1, min(int(limit or 20), 100))
+    cursor = _db.ora_validated_solutions.find(
+        {},
+        {"_id": 0,
+          "signature":      1,
+          "task_type":      1,
+          "fix_suggestion": 1,
+          "findings":       1,
+          "files_involved": 1,
+          "specialist":     1,
+          "use_count":      1,
+          "created_at":     1,
+          "last_used_at":   1,
+          "last_updated_at": 1},
+    ).sort("last_used_at", -1).limit(limit)
+    rows = await cursor.to_list(length=limit)
+    return {"ok": True, "rows": rows, "count": len(rows)}

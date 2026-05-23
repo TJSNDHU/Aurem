@@ -497,3 +497,155 @@ async def check_plan_first_gate(
     })
     return {"ok": False, "level": "block", "message": msg,
             "reason": "no_plan_in_window"}
+
+
+
+# ════════════════════════════════════════════════════════════════════
+# GUARD 8 — Auto-escalation to Emergent (iter 332a-2, Part 2)
+# ════════════════════════════════════════════════════════════════════
+# Counts consecutive failures on the SAME (session_id, task_id) tuple.
+# After ORA_ESCALATE_AFTER_FAILS (default: 2) ora-mode failures, the
+# next attempt is silently routed to mode="emergent" instead. ORA does
+# NOT ask the founder — silent escalation per Rule Zero.
+#
+# Storage: in-process dict keyed on `(session_id, task_id)`. Process
+# restarts reset the counter (acceptable — escalation policy is best-
+# effort, not a hard contract).
+
+ESCALATE_AFTER_FAILS = int(os.environ.get("ORA_ESCALATE_AFTER_FAILS", "2"))
+
+_FAILURE_COUNTS: dict[tuple[str, str], int] = {}
+
+
+def _task_key(session_id: str, task_id: str) -> tuple[str, str]:
+    return (session_id or "default", task_id or "default")
+
+
+def record_task_failure(session_id: str, task_id: str) -> int:
+    """Bump the failure counter for this (session, task). Returns the
+    new count. Caller (typically a tool wrapper that just saw a failed
+    result) decides what to do based on `check_escalation_needed`."""
+    k = _task_key(session_id, task_id)
+    _FAILURE_COUNTS[k] = _FAILURE_COUNTS.get(k, 0) + 1
+    return _FAILURE_COUNTS[k]
+
+
+def record_task_success(session_id: str, task_id: str) -> None:
+    """Reset the counter once a task finally succeeds, so the next
+    occurrence of the same task starts fresh."""
+    _FAILURE_COUNTS.pop(_task_key(session_id, task_id), None)
+
+
+def check_escalation_needed(session_id: str, task_id: str) -> dict:
+    """Returns `{escalate: bool, fails: int, suggested_mode: "emergent"|"ora"}`.
+    After ESCALATE_AFTER_FAILS consecutive failures, suggested_mode flips
+    to 'emergent'."""
+    fails = _FAILURE_COUNTS.get(_task_key(session_id, task_id), 0)
+    escalate = fails >= ESCALATE_AFTER_FAILS
+    return {
+        "escalate":       escalate,
+        "fails":          fails,
+        "suggested_mode": "emergent" if escalate else "ora",
+        "threshold":      ESCALATE_AFTER_FAILS,
+        "task_id":        task_id,
+    }
+
+
+# ════════════════════════════════════════════════════════════════════
+# Smart routing rules (iter 332a-2, Part 5)
+# ════════════════════════════════════════════════════════════════════
+# Decides what `mode` + `task_type` fork_context should run in BEFORE
+# trying anything. Some tasks are ALWAYS better with a specialist
+# (e.g. new .jsx file → design agent); others should try ORA first
+# and escalate on repeat failure.
+#
+# Returns the structured envelope the calling logic uses:
+#   {
+#     "mode":          "ora" | "emergent",
+#     "task_type":     "debug" | "qa" | "design" | "integration",
+#     "auto_specialist": bool,   # true = skip ORA attempt entirely
+#     "reason":        plain-english string,
+#   }
+#
+# Pure function — no DB, no LLM call. Safe to invoke from anywhere.
+
+_DESIGN_EXTENSIONS    = (".jsx", ".tsx")
+_INTEGRATION_KEYWORDS = (
+    "stripe", "openai", "anthropic", "gemini", "deepseek",
+    "twilio", "resend", "sendgrid", "google cloud", "aws ",
+    "kafka", "redis", "postgres", "auth0", "firebase",
+    "elevenlabs", "fal.ai", "shopify",
+)
+
+
+def smart_route(
+    task_type: str,
+    brief: str,
+    relevant_files: list[str] | None = None,
+    is_new_file: bool = False,
+    session_id: str = "",
+    task_id: str = "",
+) -> dict:
+    """Decide which specialist (and which mode) should handle this task.
+
+    Hard rules — these ALWAYS skip ORA and call a specialist directly:
+      • A new .jsx/.tsx file is being authored → design specialist
+      • The brief mentions a brand-new third-party SaaS integration
+        (Stripe, Twilio, etc.) → integration playbook expert
+
+    Soft rules — try ORA first; if `check_escalation_needed` says
+    we've already failed N times, flip to emergent:
+      • Debug touching 3+ files
+      • QA on a major change
+      • Anything else (default)
+    """
+    brief_lc = (brief or "").lower()
+    files = list(relevant_files or [])
+
+    # ── Hard rule 1: new .jsx/.tsx → design specialist ──────────────
+    if is_new_file and any(f.lower().endswith(_DESIGN_EXTENSIONS) for f in files):
+        return {
+            "mode":            "emergent",
+            "task_type":       "design",
+            "auto_specialist": True,
+            "reason":          "new_frontend_component_design_specialist",
+        }
+
+    # ── Hard rule 2: new third-party SaaS integration ───────────────
+    if any(kw in brief_lc for kw in _INTEGRATION_KEYWORDS) and (
+        "new" in brief_lc or "integrate" in brief_lc or "wire up" in brief_lc
+    ):
+        return {
+            "mode":            "emergent",
+            "task_type":       "integration",
+            "auto_specialist": True,
+            "reason":          "new_third_party_integration_playbook",
+        }
+
+    # ── Soft rule: respect any active failure-escalation ────────────
+    esc = check_escalation_needed(session_id, task_id)
+    chosen_mode = "emergent" if esc["escalate"] else "ora"
+    if esc["escalate"]:
+        reason = f"escalated_after_{esc['fails']}_ora_failures"
+    elif task_type == "debug" and len(files) >= 3:
+        reason = "debug_3plus_files_try_ora_then_escalate"
+    elif task_type == "qa" and len(files) >= 5:
+        reason = "qa_5plus_files_try_ora_then_escalate"
+    else:
+        reason = "default_ora_first"
+
+    return {
+        "mode":            chosen_mode,
+        "task_type":       task_type,
+        "auto_specialist": False,
+        "reason":          reason,
+        "previous_fails":  esc["fails"],
+    }
+
+
+__all__ += [
+    "ESCALATE_AFTER_FAILS",
+    "record_task_failure", "record_task_success",
+    "check_escalation_needed",
+    "smart_route",
+]
