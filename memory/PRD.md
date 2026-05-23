@@ -259,8 +259,71 @@ One click unlock → auto-relocks after 15 min. Audit row on relock."
 
 **Pytest status (322er + 327d + 327e + 327f): 54 / 54 green.**
 
+## iter 327h (2026-02-23) — Production-404 pixel fix + Appointment Calendar/Email
+Founder reported in production logs:
+  - `POST /api/universal/webhooks/generic` → 404 (AUREM pixel data loss)
+  - P1 follow-up: `appointment_scheduler_router.py:171-172` Google
+    Calendar + confirmation email TODO.
+
+**Delivered — Track A (pixel webhook 404)**
+- Root cause: `routers/_registry_config.py::SKIP_IN_LEAN` (line 52)
+  contained `routers.universal_connector_router`. With
+  `LEAN_ROUTES=1` (the production default) the registry never called
+  `app.include_router` for it — every `/api/universal/*` route
+  returned 404, including the AUREM tracking pixel's POST to
+  `/api/universal/webhooks/generic` (static/aurem-pixel.js:44).
+  Same skip list also had `appointment_scheduler_router`, which
+  would have blocked the P1 fix below.
+- Fix: removed both modules from `SKIP_IN_LEAN`, left an inline
+  comment explaining why so the next maintainer doesn't re-disable.
+- Live verification on preview: `POST /api/universal/webhooks/generic`
+  now returns HTTP 200 with `{"received": true, "event_id": "...",
+  "universal_type": "custom.pixel_test"}`. The webhook payload normalizes
+  through `services/universal_connector.normalize_webhook_event` and
+  inserts into `db.universal_events` (or `_unresolved_quarantine` if no
+  tenant_id resolved).
+
+**Delivered — Track D (appointment calendar + email)**
+- `routers/appointment_scheduler_router.py` — replaced the two TODO
+  lines with real work. No third email system, no new Google Calendar
+  SDK pulled in:
+    1. `_build_ics(appointment)` — RFC 5545 portable iCalendar invite
+       (works in Google Calendar, Outlook, Apple Mail, Thunderbird).
+       Proper CRLF line endings, basic-UTC datetimes, escaped TEXT
+       fields.
+    2. `_build_google_calendar_quick_add_url(appointment, base)` —
+       one-click `https://calendar.google.com/calendar/render?
+       action=TEMPLATE&...` URL so the customer adds the event to
+       their personal calendar without any OAuth/API-key dance on
+       our side.
+    3. `_send_confirmation_email(appointment, ics_url, gcal_url)` —
+       calls `GmailService.send_email` DIRECTLY (not the
+       fire-and-forget `email_service.send_email` wrapper that
+       returns True even on failure). Returns `{ok, message_id}` or
+       `{ok: False, error}`. The booking handler persists
+       `confirmation_email_sent_at` / `confirmation_message_id` on
+       success, or `confirmation_email_error` on failure — booking
+       UI gets the truth.
+    4. New public endpoint `GET /api/appointments/{appointment_id}/
+       calendar.ics` — serves the .ics with the right `text/calendar`
+       content-type so any calendar app can grab it. Auth = the
+       16-hex appointment_id secret (same pattern as
+       `/api/report/{slug}`).
+- The book endpoint now returns `confirmation_email_sent` (bool),
+  `confirmation_email_error` (nullable), `ics_url`, `gcal_url` —
+  callers can decide whether to surface a retry button.
+- Tests: `tests/test_iter327h_pixel_404_and_appointments_calendar.py`
+  — 13 cases. Covers SKIP_IN_LEAN regression, .ics envelope/escaping,
+  GCal URL params, three branches of confirmation send (no Gmail /
+  ok / send failure), TODO-removed source check, .ics route exposure.
+
+**Pytest status (322er + 327d/e/f/g/h): 76 / 76 green.**
+
 ## Next Action Items
-- P1: `sales_pipeline.py:515` — wire welcome email + customer account creation on signup.
-- P1: `appointment_scheduler_router.py:171-172` — Google Calendar event create + confirmation email.
 - P2: ORA Multimodal Vision (Claude image understanding on image-bearing turns).
 - P2: Inline link unfurls (rich preview cards) in ORA chat.
+- P3: Optional — proper Google Calendar API (service-account) event
+  creation on a shared AUREM calendar, gated on `GOOGLE_CALENDAR_ID`
+  + `GOOGLE_SERVICE_ACCOUNT_KEY` env vars. Today's per-customer
+  "add to your calendar" link covers 95% of UX; this would just
+  give AUREM staff visibility on a central calendar.

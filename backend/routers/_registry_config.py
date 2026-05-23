@@ -49,7 +49,15 @@ SKIP_IN_LEAN: frozenset[str] = frozenset({
     "routers.whatsapp_router", "routers.whatsapp_webhook_router",
     "routers.gmail_router", "routers.gmail_channel_router",
     "routers.omnidim_router", "routers.connector_router",
-    "routers.universal_connector_router",
+    # "routers.universal_connector_router" — RE-ENABLED (iter 327h):
+    # The AUREM tracking pixel (static/aurem-pixel.js:44) hits
+    # /api/universal/webhooks/generic on every page view of every
+    # customer who installs the pixel. With LEAN_ROUTES=1 this router
+    # was skipped → every visitor event 404'd → silent data loss.
+    # The "generic" platform path needs zero API keys (it just inserts
+    # into db.universal_events). Stripe/Shopify/Woocommerce paths
+    # gracefully fall back to "skip signature check" when the secret
+    # env var is missing, so it's safe to keep loaded in LEAN mode.
     # "routers.google_oauth_router" — RE-ENABLED (iter 285): wired to Gmail Integration sidebar widget + audit
     "routers.shopify_storefront_router",
     # iter 322ee — e-commerce skeleton dead-load (orders/products/carts
@@ -118,7 +126,10 @@ SKIP_IN_LEAN: frozenset[str] = frozenset({
     # "routers.proximity_blast_router" — RE-ENABLED (iter 284): wired to ProximityBlast.jsx sidebar widget
     # "routers.system_pulse_router" — WIRED to SystemPulseHUD.jsx (keep loaded)
     "routers.crypto_signal_engine",    # separate deployment
-    "routers.appointment_scheduler_router", # 8 routes, 0 frontend refs
+    # "routers.appointment_scheduler_router" — RE-ENABLED (iter 327h):
+    # P1 task ships Google Calendar event creation + confirmation
+    # email at lines 171,172. Router must be loaded in LEAN mode
+    # for the booking endpoint to serve traffic.
     # ── Core sub-modules with 0 frontend refs ──
     "routes.business_system",          # 33 routes (CRM/inventory/accounting/fulfillment)
     "routes.automation_gaps_routes",   # 0 refs
