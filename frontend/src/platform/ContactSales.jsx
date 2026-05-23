@@ -40,6 +40,53 @@ export default function ContactSales() {
   const [busy, setBusy]       = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError]     = useState(null);
+  const sessionIdRef = React.useRef(
+    `ent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  );
+  const mountedAtRef = React.useRef(Date.now());
+
+  // iter 332b — scroll-depth + tier-hover ping
+  React.useEffect(() => {
+    let maxDepth = 0;
+    let throttled = false;
+    function track(event, tier) {
+      if (throttled) return;
+      throttled = true;
+      setTimeout(() => { throttled = false; }, 1000);
+      const depthPct = Math.round(
+        (window.scrollY + window.innerHeight) /
+        document.documentElement.scrollHeight * 100
+      );
+      maxDepth = Math.max(maxDepth, depthPct);
+      fetch(`${API}/api/enterprise/leads/track`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionIdRef.current,
+          event, tier,
+          depth_pct: maxDepth,
+          ms_on_page: Date.now() - mountedAtRef.current,
+        }),
+      }).catch(() => {});
+    }
+    function onScroll() { track("scroll", ""); }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    // Initial page-view ping
+    track("view", "");
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  function pingTierHover(tier) {
+    fetch(`${API}/api/enterprise/leads/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionIdRef.current,
+        event: "tier_hover", tier,
+        ms_on_page: Date.now() - mountedAtRef.current,
+      }),
+    }).catch(() => {});
+  }
 
   function update(k, v) { setForm(prev => ({ ...prev, [k]: v })); }
 
@@ -125,6 +172,7 @@ export default function ContactSales() {
           {TIERS.map(t => (
             <div key={t.id}
                   data-testid={`enterprise-tier-${t.id}`}
+                  onMouseEnter={() => pingTierHover(t.id)}
                   className="dev-feature-card"
                   style={{
                     borderColor: t.featured

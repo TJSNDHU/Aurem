@@ -112,6 +112,37 @@ class EnterpriseLeadBody(BaseModel):
     intent:     str = Field("", max_length=2000)
 
 
+@router.post("/leads/track")
+async def track_enterprise_interest(
+    request: Request,
+) -> dict[str, Any]:
+    """Public — tracks anonymous interest signals on /enterprise
+    (scroll depth, tier-card hovers, time on page) BEFORE the form
+    is submitted. Lightweight ping; failures never surface."""
+    if _db is None:
+        return {"ok": False, "error": "db not ready"}
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "invalid_json"}
+    row = {
+        "ts":          datetime.now(timezone.utc).isoformat(),
+        "ip_address":  request.client.host if request.client else None,
+        "user_agent":  request.headers.get("user-agent", "")[:200],
+        "session_id":  (body.get("session_id") or "")[:40],
+        "event":       (body.get("event") or "unknown")[:40],
+        "tier":        (body.get("tier") or "")[:40],
+        "depth_pct":   int(body.get("depth_pct") or 0),
+        "ms_on_page":  int(body.get("ms_on_page") or 0),
+    }
+    try:
+        await _db.enterprise_interest_signals.insert_one(row)
+    except Exception as e:
+        logger.debug(f"[enterprise/track] insert failed: {e}")
+        return {"ok": False, "error": "insert_failed"}
+    return {"ok": True}
+
+
 @router.post("/leads")
 async def submit_enterprise_lead(
     body: EnterpriseLeadBody,
@@ -175,6 +206,253 @@ async def submit_enterprise_lead(
         site = (os.environ.get("FRONTEND_URL") or "https://aurem.live").rstrip("/")
         await send_email(
             to=row["email"],
+
+
+# ── iter 332b A-2b — API Key CRUD (admin) ────────────────────────────
+
+class ApiKeyCreateBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    scope: str = Field("read", max_length=40)
+
+
+def _generate_api_key() -> str:
+    return "aurem_" + uuid.uuid4().hex + uuid.uuid4().hex[:8]
+
+
+@router.get("/keys")
+async def list_api_keys(request: Request) -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        return {"ok": False, "rows": []}
+    cursor = _db.enterprise_api_keys.find(
+        {}, {"_id": 0, "key": 0},   # never return the full key after creation
+    ).sort("created_at", -1).limit(100)
+    rows = await cursor.to_list(length=100)
+    return {"ok": True, "rows": rows}
+
+
+@router.post("/keys")
+async def create_api_key(
+    body: ApiKeyCreateBody, request: Request,
+) -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    key = _generate_api_key()
+    key_id = uuid.uuid4().hex
+    doc = {
+        "key_id":      key_id,
+        "key":         key,
+        "key_preview": key[:14] + "…",
+        "name":        body.name.strip(),
+        "scope":       body.scope.strip(),
+        "active":      True,
+        "created_at":  datetime.now(timezone.utc).isoformat(),
+        "last_used_at": None,
+        "use_count":   0,
+    }
+    await _db.enterprise_api_keys.insert_one(doc)
+    try:
+        from services.unified_audit import write_event
+        await write_event(
+            action="api_key_created", resource=f"key:{body.name}",
+            result="ok", source_collection="enterprise_api_keys",
+            extra={"key_id": key_id, "scope": body.scope},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "key_id": key_id,
+             "key": key, "key_preview": doc["key_preview"],
+             "warning": "This is the only time the full key is shown — save it now."}
+
+
+@router.post("/keys/{key_id}/rotate")
+async def rotate_api_key(key_id: str, request: Request) -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    new_key = _generate_api_key()
+    r = await _db.enterprise_api_keys.find_one_and_update(
+        {"key_id": key_id, "active": True},
+        {"$set": {"key": new_key,
+                   "key_preview": new_key[:14] + "…",
+                   "rotated_at": datetime.now(timezone.utc).isoformat()}},
+        projection={"_id": 0, "key": 0},
+        return_document=True,
+    )
+    if not r:
+        raise HTTPException(404, "key_not_found_or_inactive")
+    try:
+        from services.unified_audit import write_event
+        await write_event(
+            action="api_key_rotated", resource=f"key:{r.get('name')}",
+            result="ok", source_collection="enterprise_api_keys",
+            extra={"key_id": key_id},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "key_id": key_id, "key": new_key,
+             "key_preview": new_key[:14] + "…",
+             "warning": "This is the only time the new key is shown — save it now."}
+
+
+@router.delete("/keys/{key_id}")
+async def revoke_api_key(key_id: str, request: Request) -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    r = await _db.enterprise_api_keys.update_one(
+        {"key_id": key_id, "active": True},
+        {"$set": {"active": False,
+                   "revoked_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "key_not_found_or_already_revoked")
+    try:
+        from services.unified_audit import write_event
+        await write_event(
+            action="api_key_revoked", resource=f"key:{key_id}",
+            result="ok", source_collection="enterprise_api_keys",
+            extra={"key_id": key_id},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "key_id": key_id, "revoked": True}
+
+
+# ── White-label config (admin) — thin wrapper around services/white_label.py
+
+class BrandingBody(BaseModel):
+    tenant_id:     str = Field("default", max_length=80)
+    logo_url:      str = Field("", max_length=400)
+    primary_color: str = Field("", max_length=20)
+    company_name:  str = Field("", max_length=120)
+
+
+@router.get("/branding")
+async def get_branding(request: Request,
+                        tenant_id: str = "default") -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        return {"ok": True, "branding": None}
+    row = await _db.enterprise_branding.find_one(
+        {"tenant_id": tenant_id}, {"_id": 0},
+    )
+    return {"ok": True, "branding": row}
+
+
+@router.put("/branding")
+async def set_branding(body: BrandingBody,
+                        request: Request) -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    doc = {
+        "tenant_id":     body.tenant_id,
+        "logo_url":      body.logo_url.strip(),
+        "primary_color": body.primary_color.strip(),
+        "company_name":  body.company_name.strip(),
+        "updated_at":    datetime.now(timezone.utc).isoformat(),
+    }
+    await _db.enterprise_branding.update_one(
+        {"tenant_id": body.tenant_id},
+        {"$set": doc},
+        upsert=True,
+    )
+    try:
+        from services.unified_audit import write_event
+        await write_event(
+            action="branding_updated", resource=f"tenant:{body.tenant_id}",
+            result="ok", source_collection="enterprise_branding",
+            extra={"company_name": body.company_name},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "branding": doc}
+
+
+@router.get("/branding/public/{tenant_id}")
+async def get_branding_public(tenant_id: str) -> dict[str, Any]:
+    """PUBLIC — used by the React shell to swap branding at runtime."""
+    if _db is None:
+        return {"ok": False, "branding": None}
+    row = await _db.enterprise_branding.find_one(
+        {"tenant_id": tenant_id}, {"_id": 0},
+    )
+    return {"ok": True, "branding": row}
+
+
+# ── Custom domain wizard (admin) ─────────────────────────────────────
+
+class DomainBody(BaseModel):
+    tenant_id: str = Field("default", max_length=80)
+    domain:    str = Field(..., min_length=4, max_length=120)
+
+
+@router.post("/domain")
+async def register_custom_domain(body: DomainBody,
+                                   request: Request) -> dict[str, Any]:
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    domain = body.domain.lower().strip()
+    if not all(c.isalnum() or c in ".-" for c in domain):
+        raise HTTPException(400, "invalid_domain")
+    doc = {
+        "tenant_id":   body.tenant_id,
+        "domain":      domain,
+        "status":      "pending_verification",
+        "cname_target": "aurem.live",
+        "created_at":  datetime.now(timezone.utc).isoformat(),
+    }
+    await _db.enterprise_domains.update_one(
+        {"tenant_id": body.tenant_id, "domain": domain},
+        {"$setOnInsert": doc},
+        upsert=True,
+    )
+    return {
+        "ok":           True,
+        "domain":       domain,
+        "cname_target": "aurem.live",
+        "instructions": (
+            f"Add a CNAME record on {domain} pointing to aurem.live, "
+            f"then hit Verify."
+        ),
+    }
+
+
+@router.post("/domain/verify")
+async def verify_custom_domain(body: DomainBody,
+                                 request: Request) -> dict[str, Any]:
+    """Verify the CNAME is in place. Uses socket DNS resolution —
+    no external DNS provider dependency."""
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    domain = body.domain.lower().strip()
+    verified = False
+    detail = ""
+    try:
+        import socket
+        # CNAME → an A record on aurem.live, both should resolve to
+        # the same set of IPs. We accept that as "verified".
+        their_ips = sorted({ai[4][0] for ai in socket.getaddrinfo(domain, None)})
+        ours_ips  = sorted({ai[4][0] for ai in socket.getaddrinfo("aurem.live", None)})
+        verified = bool(set(their_ips) & set(ours_ips))
+        detail = f"resolved={their_ips} expected={ours_ips}"
+    except Exception as e:
+        detail = f"dns_error: {str(e)[:120]}"
+
+    new_status = "active" if verified else "pending_verification"
+    await _db.enterprise_domains.update_one(
+        {"tenant_id": body.tenant_id, "domain": domain},
+        {"$set": {"status": new_status,
+                   "last_check_at": datetime.now(timezone.utc).isoformat(),
+                   "last_check_detail": detail}},
+    )
+    return {"ok": True, "verified": verified,
+             "status": new_status, "detail": detail}
+
             subject="AUREM CTO — We got your note",
             text=(
                 f"Thanks for reaching out, {body.company}.\n\n"
