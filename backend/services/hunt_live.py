@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -352,6 +353,17 @@ async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
                         return results
                 else:
                     logger.warning(f"[hunt_live] Google Places HTTP {resp.status_code}: {resp.text[:200]}")
+                    # iter 330d — surface key issues to Telegram immediately.
+                    try:
+                        from services.api_key_health_watcher import record_api_failure
+                        await record_api_failure(
+                            provider="google_places",
+                            status_code=resp.status_code,
+                            body=resp.text[:400],
+                            key_hint=(os.environ.get("GOOGLE_PLACES_API_KEY") or "")[-6:],
+                        )
+                    except Exception:
+                        pass
         except Exception as e:
             logger.warning(f"[hunt_live] Google Places discovery failed: {e}")
 

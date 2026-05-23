@@ -120,9 +120,29 @@ async def apollo_people_search(
                 json=payload,
             )
         if r.status_code == 429:
+            # iter 330d — credential health watcher.
+            try:
+                from services.api_key_health_watcher import record_api_failure
+                await record_api_failure(
+                    provider="apollo", status_code=429,
+                    body=r.text[:300],
+                    key_hint=(os.environ.get("APOLLO_API_KEY") or "")[-6:],
+                )
+            except Exception:
+                pass
             logger.warning(f"[apollo_scout] rate-limited on {domain}")
             return []
         if r.status_code != 200:
+            # iter 330d — surface 401/403/suspended/inaccessible to Telegram.
+            try:
+                from services.api_key_health_watcher import record_api_failure
+                await record_api_failure(
+                    provider="apollo", status_code=r.status_code,
+                    body=r.text[:300],
+                    key_hint=(os.environ.get("APOLLO_API_KEY") or "")[-6:],
+                )
+            except Exception:
+                pass
             logger.warning(f"[apollo_scout] http {r.status_code} on {domain}: {r.text[:150]}")
             return []
         body = r.json() or {}

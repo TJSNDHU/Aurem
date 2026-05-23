@@ -124,9 +124,29 @@ async def yelp_leads(
             r = await client.get(SEARCH_URL, headers=headers, params=params)
             if r.status_code == 401:
                 logger.warning("[yelp-scout] 401 — invalid YELP_API_KEY")
+                try:
+                    from services.api_key_health_watcher import record_api_failure
+                    await record_api_failure(
+                        provider="yelp_fusion",
+                        status_code=401,
+                        body=r.text[:300],
+                        key_hint=(os.environ.get("YELP_API_KEY") or "")[-6:],
+                    )
+                except Exception:
+                    pass
                 return {"success": False, "leads": [], "total": 0, "source": "yelp_fusion", "error": "unauthorized"}
             if r.status_code != 200:
                 logger.warning(f"[yelp-scout] HTTP {r.status_code}: {r.text[:200]}")
+                try:
+                    from services.api_key_health_watcher import record_api_failure
+                    await record_api_failure(
+                        provider="yelp_fusion",
+                        status_code=r.status_code,
+                        body=r.text[:300],
+                        key_hint=(os.environ.get("YELP_API_KEY") or "")[-6:],
+                    )
+                except Exception:
+                    pass
                 return {"success": False, "leads": [], "total": 0, "source": "yelp_fusion", "error": f"http_{r.status_code}"}
             data = r.json()
             raw = data.get("businesses", []) or []

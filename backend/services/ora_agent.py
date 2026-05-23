@@ -981,6 +981,12 @@ def set_db(database) -> None:
         ora_build_mode.set_db(database)
     except Exception as e:
         logger.debug(f"[ora-agent] build_mode wire failed: {e}")
+    # iter 330d — API-key health watcher.
+    try:
+        from services import api_key_health_watcher
+        api_key_health_watcher.set_db(database)
+    except Exception as e:
+        logger.debug(f"[ora-agent] api_key_health wire failed: {e}")
 
 
 def _now() -> datetime:
