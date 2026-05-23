@@ -320,50 +320,196 @@ def _extract_candidate_json(text: str) -> str | None:
     return None
 
 
+def _salvage_python_call_form(content: str) -> tuple[str, dict] | None:
+    """iter 327i — Salvage tool calls emitted in *Python-call form* in
+    chat content.
+
+    The user hit this on 2026-02-23: DeepSeek replied with literally
+        curl_internal(endpoint="/api/platform/warm-prober", method="GET")
+    in `content` instead of a structured `tool_calls` entry. Salvage
+    used to only handle JSON shapes — so this leaked into chat, the
+    iter 327e detector caught it, and the founder saw the "couldn't
+    fetch — retry" fallback instead of real data.
+
+    Now we PARSE the python-call form, extract `(tool_name, kwargs)`,
+    and let the caller promote it to `tool_calls`. The same call gets
+    executed and the loop returns real data on the next iteration.
+
+    Accepts:
+      • `tool_name()`                          (no args)
+      • `tool_name(k="v")`                     (one or more kwargs)
+      • `tool_name(k="v", k2=42, k3=true)`     (mixed scalar kwargs)
+
+    Refuses positional args, nested calls, expressions —
+    everything else falls through to the safety-net fallback.
+
+    Returns `(tool_name, args_dict)` on success, `None` otherwise.
+    """
+    if not content:
+        return None
+    txt = content.strip()
+    # Match: whole message is exactly `name(...)`. We're conservative
+    # here so we never hijack genuine prose that happens to mention a
+    # tool by name.
+    m = re.match(r"^([a-zA-Z_][\w]*)\s*\(([\s\S]*)\)\s*\.?\s*$", txt)
+    if not m:
+        return None
+    tool_name = m.group(1)
+    # The tool name must be a registered ORA tool — otherwise this is
+    # just a code snippet, not a hijacked call.
+    try:
+        from services.ora_tools import TOOL_REGISTRY as _TR
+        registered = set(_TR.keys())
+    except Exception:
+        registered = set()
+    if tool_name not in registered:
+        return None
+    body = m.group(2).strip()
+    args: dict = {}
+    if not body:
+        return (tool_name, args)
+    # Walk top-level kwargs split on commas that are NOT inside a
+    # string/bracket. This handles `details="a, b"` correctly without
+    # pulling in a real Python parser.
+    parts: list[str] = []
+    buf = []
+    depth = 0          # () [] {} depth
+    in_str: str | None = None
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if in_str:
+            buf.append(ch)
+            if ch == "\\" and i + 1 < len(body):
+                buf.append(body[i + 1])
+                i += 2
+                continue
+            if ch == in_str:
+                in_str = None
+        else:
+            if ch in ('"', "'"):
+                in_str = ch
+                buf.append(ch)
+            elif ch in "([{":
+                depth += 1
+                buf.append(ch)
+            elif ch in ")]}":
+                depth -= 1
+                buf.append(ch)
+            elif ch == "," and depth == 0:
+                parts.append("".join(buf).strip())
+                buf = []
+            else:
+                buf.append(ch)
+        i += 1
+    if buf:
+        parts.append("".join(buf).strip())
+
+    for part in parts:
+        if "=" not in part:
+            # Positional arg — refuse the whole salvage. We can't be
+            # sure which kwarg this maps to without a real signature
+            # introspection step.
+            return None
+        k, _, v = part.partition("=")
+        k = k.strip()
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z_]\w*$", k):
+            return None
+        # Try JSON literal parse first (handles strings, numbers,
+        # bools, null, lists, dicts).
+        try:
+            args[k] = json.loads(v)
+            continue
+        except json.JSONDecodeError:
+            pass
+        # Python-style literals JSON refuses: True/False/None and
+        # single-quoted strings.
+        lv = v.lower()
+        if lv == "true":
+            args[k] = True
+        elif lv == "false":
+            args[k] = False
+        elif lv in ("none", "null"):
+            args[k] = None
+        elif (v.startswith("'") and v.endswith("'")) and len(v) >= 2:
+            args[k] = v[1:-1]
+        else:
+            # Plain bareword — most likely a Python identifier we
+            # can't safely evaluate. Keep as string so the tool at
+            # least receives something interpretable.
+            args[k] = v
+    return (tool_name, args)
+
+
 def _salvage_inline_tool_call(msg: dict[str, Any]) -> bool:
     """If `msg["content"]` carries an inline tool-call JSON instead of
     the structured `tool_calls` field, promote it. Returns True if a
     salvage actually happened. The caller can use the return value to
-    log salvage rate per provider."""
+    log salvage rate per provider.
+
+    iter 327i — extended to also salvage *Python-call form*
+    (`tool_name(arg="val")`) when JSON parsing fails. Stops the
+    "couldn't fetch — retry" fallback from firing on real intents.
+    """
     if msg.get("tool_calls"):
         return False  # provider gave us proper tool_calls already
     content_raw = msg.get("content") or ""
+
+    # ── JSON salvage path (original behaviour) ──
     candidate = _extract_candidate_json(content_raw)
-    if not candidate:
-        return False
-    try:
-        parsed = json.loads(candidate)
-    except json.JSONDecodeError:
-        return False
-    if not isinstance(parsed, dict):
-        return False
-    # Accept {name,parameters}, {tool,args}, {function,arguments}, AND
-    # the OpenAI-schema echo {"type":"function","name":...,"parameters":...}.
-    tool_name = (
-        parsed.get("name")
-        or parsed.get("tool")
-        or parsed.get("function")
-    )
-    tool_args = (
-        parsed.get("parameters")
-        or parsed.get("args")
-        or parsed.get("arguments")
-        or {}
-    )
-    if not (tool_name and isinstance(tool_name, str)):
-        return False
-    import uuid as _uuid
-    msg["tool_calls"] = [{
-        "id": f"salvage_{_uuid.uuid4().hex[:8]}",
-        "type": "function",
-        "function": {
-            "name": tool_name,
-            "arguments": json.dumps(tool_args, ensure_ascii=False),
-        },
-    }]
-    msg["content"] = ""  # blank content so caller treats as a tool call
-    logger.info(f"[ora-agent] SALVAGED inline tool-call: name={tool_name}")
-    return True
+    if candidate:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            tool_name = (
+                parsed.get("name")
+                or parsed.get("tool")
+                or parsed.get("function")
+            )
+            tool_args = (
+                parsed.get("parameters")
+                or parsed.get("args")
+                or parsed.get("arguments")
+                or {}
+            )
+            if tool_name and isinstance(tool_name, str):
+                import uuid as _uuid
+                msg["tool_calls"] = [{
+                    "id": f"salvage_{_uuid.uuid4().hex[:8]}",
+                    "type": "function",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": json.dumps(tool_args, ensure_ascii=False),
+                    },
+                }]
+                msg["content"] = ""
+                logger.info(f"[ora-agent] SALVAGED inline tool-call (json): name={tool_name}")
+                return True
+
+    # ── Python-call form salvage (iter 327i) ──
+    pc = _salvage_python_call_form(content_raw)
+    if pc is not None:
+        tool_name, tool_args = pc
+        import uuid as _uuid
+        msg["tool_calls"] = [{
+            "id": f"salvage_{_uuid.uuid4().hex[:8]}",
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "arguments": json.dumps(tool_args, ensure_ascii=False),
+            },
+        }]
+        msg["content"] = ""
+        logger.info(
+            f"[ora-agent] SALVAGED inline tool-call (python-call form): "
+            f"name={tool_name} args_keys={list(tool_args.keys())}"
+        )
+        return True
+
+    return False
 
 
 def _looks_like_unhandled_tool_call(content: str) -> bool:
@@ -2930,16 +3076,40 @@ async def _continue_loop(
             # the cause). Substitute an honest "couldn't fetch" reply
             # instead — and never fabricate numbers to fill the gap.
             if _looks_like_unhandled_tool_call(content):
+                # iter 327i — if a tool name is detectable inside the
+                # leak, surface it in the fallback so the founder sees
+                # *which* lookup ORA tried instead of a generic apology.
+                _leaked_tool = None
+                try:
+                    import re as _re_leak
+                    m = _re_leak.match(r"^\s*([a-zA-Z_][\w]*)\s*\(", (content or "").strip())
+                    if m:
+                        _leaked_tool = m.group(1)
+                    else:
+                        m = _re_leak.search(r'"name"\s*:\s*"([a-zA-Z_][\w]*)"', content or "")
+                        if m:
+                            _leaked_tool = m.group(1)
+                except Exception:
+                    _leaked_tool = None
                 logger.warning(
-                    f"[ora-agent] DETECTED leaked tool-call JSON in final "
-                    f"reply (len={len(content)}); substituting honest fallback"
+                    f"[ora-agent] DETECTED leaked tool-call in final "
+                    f"reply (tool={_leaked_tool!r}, len={len(content)}); "
+                    f"substituting honest fallback"
                 )
-                content = (
-                    "I tried to fetch that data but my tool call didn't "
-                    "execute cleanly this turn. Please ask again — it usually "
-                    "works on retry. (I won't make up numbers when I don't "
-                    "have real data.)"
-                )
+                if _leaked_tool:
+                    content = (
+                        f"I tried to call `{_leaked_tool}` but the format "
+                        f"my brain emitted couldn't be auto-parsed this turn. "
+                        f"Please ask again — usually a retry succeeds. "
+                        f"(I won't make up numbers when I don't have real data.)"
+                    )
+                else:
+                    content = (
+                        "I tried to fetch that data but my tool call didn't "
+                        "execute cleanly this turn. Please ask again — it usually "
+                        "works on retry. (I won't make up numbers when I don't "
+                        "have real data.)"
+                    )
 
             # LLM produced a final answer with no tool calls — done
             # iter 326t — Hallucination Shield v2. Ground domain-factual
