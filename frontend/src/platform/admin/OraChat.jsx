@@ -586,7 +586,9 @@ export default function OraChat() {
         )}
 
         {history.map((m, i) => (
-          <Message key={i} m={m} i={i} copy={copy} copiedIdx={copiedIdx} />
+          <Message key={i} m={m} i={i}
+                   prev={i > 0 ? history[i - 1] : null}
+                   copy={copy} copiedIdx={copiedIdx} />
         ))}
 
         {pending && (
@@ -776,7 +778,7 @@ export default function OraChat() {
   );
 }
 
-function Message({ m, i, copy, copiedIdx }) {
+function Message({ m, i, prev, copy, copiedIdx }) {
   if (m.role === "user") {
     return (
       <div>
@@ -819,9 +821,40 @@ function Message({ m, i, copy, copiedIdx }) {
     );
   }
   if (m.role === "assistant") {
+    // iter 327k — Vision provenance badge. When the immediately
+    // preceding user turn carried an image attachment with a cached
+    // GPT-4o description (set at upload time in
+    // ora_attachments_router.attach_file), surface a small badge so
+    // the founder visually confirms vision actually fired vs the
+    // model guessing from the filename.
+    const visionFired = !!(
+      prev &&
+      prev.role === "user" &&
+      Array.isArray(prev.attachments) &&
+      prev.attachments.some(
+        (a) => a.kind === "image" && (a.vision_description || "").trim().length > 0
+      )
+    );
     return (
-      <Bubble side="left" colorBg="rgba(255,255,255,0.05)" label="ORA"
-              content={m.content} idx={i} copy={copy} copiedIdx={copiedIdx} />
+      <div>
+        {visionFired && (
+          <div data-testid="vision-description-source"
+               style={{
+                 display: "inline-flex", alignItems: "center", gap: 5,
+                 marginLeft: 4, marginBottom: 4, padding: "2px 8px",
+                 fontSize: 10, fontWeight: 600, letterSpacing: 0.4,
+                 textTransform: "uppercase",
+                 color: "#7DD3A0",
+                 background: "rgba(125,211,160,0.10)",
+                 border: "1px solid rgba(125,211,160,0.35)",
+                 borderRadius: 999,
+               }}>
+            <Eye size={10} /> Saw image via GPT-4o
+          </div>
+        )}
+        <Bubble side="left" colorBg="rgba(255,255,255,0.05)" label="ORA"
+                content={m.content} idx={i} copy={copy} copiedIdx={copiedIdx} />
+      </div>
     );
   }
   if (m.role === "tool_call") {

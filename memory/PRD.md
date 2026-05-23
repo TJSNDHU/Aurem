@@ -396,3 +396,21 @@ persistence, LinkPreviewCard component presence.
 ## Backlog
 - P3: Service-account Google Calendar API for shared staff calendar.
 - P3: Friendlier "report expired" landing page for stale ghost-* slugs.
+
+## iter 327k (2026-02-23) — Vision provenance badge
+Founder request: "Yes — add 'saw image via GPT-4o' badge. Helps
+confirm vision actually fired."
+
+**Delivered**
+- `frontend/src/platform/admin/OraChat.jsx::Message` — assistant
+  bubble now receives a `prev` prop (the immediately-preceding
+  message). When `prev.role === 'user'` AND its attachments contain
+  an image with a non-empty `vision_description` (cached at upload
+  in iter 327j), render a small green pill above the bubble:
+  `🔍 SAW IMAGE VIA GPT-4O` with `data-testid="vision-description-source"`.
+- No badge when vision failed or wasn't invoked — we don't lie about
+  firing.
+
+**Tests**: `tests/test_iter327k_vision_provenance_badge.py` — 4
+cases, all green. Total touched-iter regression 159/159 green.
+
