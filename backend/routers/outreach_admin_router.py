@@ -84,3 +84,44 @@ async def list_unmatched_pixels(limit: int = 50,
         "count_24h":  count_24h,
         "total":      total,
     }
+
+
+@router.get("/tenants")
+async def list_tenants_for_picker(user: dict = Depends(_admin_dep())):
+    """iter 330c — Compact tenant list for the unmatched-pixel dropdown."""
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    cur = _db.tenants.find(
+        {}, {"_id": 0, "bin_id": 1, "business_name": 1, "city": 1, "industry": 1},
+    ).limit(500)
+    rows = await cur.to_list(length=500)
+    rows.sort(key=lambda r: (r.get("business_name") or "").lower())
+    return {"ok": True, "tenants": rows, "count": len(rows)}
+
+
+from pydantic import BaseModel, Field
+
+
+class LinkRefererBody(BaseModel):
+    referer:   str = Field(min_length=1, max_length=300)
+    tenant_id: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/unmatched-pixels/link")
+async def link_unmatched_pixel(body: LinkRefererBody,
+                                    user: dict = Depends(_admin_dep())):
+    """iter 330c — Map an unknown referer host → tenant. From this point
+    on, every future pixel from that host auto-resolves to this tenant
+    and bypasses the unmatched_pixel_events fallback."""
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    from services.pixel_referer_resolver import link_referer_to_tenant
+    out = await link_referer_to_tenant(
+        _db,
+        referer=body.referer,
+        tenant_id=body.tenant_id,
+        linked_by=(user.get("email") or "founder"),
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error") or "link failed")
+    return out

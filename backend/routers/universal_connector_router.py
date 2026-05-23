@@ -501,6 +501,21 @@ async def receive_webhook(platform: str, request: Request):
                 tenant_id = key_doc.get("tenant_id")
 
     if not tenant_id:
+        # iter 330c — Try the founder's referer→tenant map. The Outreach
+        # Health card lets the founder link an unknown referer to a
+        # tenant in two clicks; once linked, every future pixel from
+        # that host auto-resolves here.
+        try:
+            from services.pixel_referer_resolver import resolve_tenant_from_referer
+            resolved = await resolve_tenant_from_referer(
+                db, request.headers.get("referer", "")
+            )
+            if resolved:
+                tenant_id = resolved
+        except Exception:
+            pass
+
+    if not tenant_id:
         # iter 330 — Demote the warning to an audit row. Pixel webhooks
         # without a resolvable tenant are usually new sites that haven't
         # been linked yet, not bugs. Persist to `unmatched_pixel_events`

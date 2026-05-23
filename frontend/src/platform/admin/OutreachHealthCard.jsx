@@ -271,32 +271,12 @@ export default function OutreachHealthCard() {
           {showUnmatched && (unmatched.entries || []).length > 0 && (
             <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
               {(unmatched.entries || []).map((e, i) => (
-                <div
+                <UnmatchedPixelRow
                   key={i}
-                  data-testid={`unmatched-pixel-row-${i}`}
-                  style={{
-                    padding: "6px 8px", borderRadius: 6,
-                    background: "rgba(0,0,0,0.18)",
-                    fontSize: 11, lineHeight: 1.4,
-                  }}
-                >
-                  <div style={{ color: TEXT }}>
-                    {e.platform}/{e.event_type}
-                    <span style={{ color: TEXT_DIM, marginLeft: 8 }}>
-                      {timeAgo(e.ts)}
-                    </span>
-                    {e.remote_addr && (
-                      <span style={{ color: TEXT_DIM, marginLeft: 8 }}>
-                        from {e.remote_addr}
-                      </span>
-                    )}
-                  </div>
-                  {e.referer && (
-                    <div style={{ color: TEXT_DIM, marginTop: 2, wordBreak: "break-all" }}>
-                      ref: {e.referer.slice(0, 80)}
-                    </div>
-                  )}
-                </div>
+                  entry={e}
+                  idx={i}
+                  onLinked={load}
+                />
               ))}
             </div>
           )}
@@ -315,3 +295,153 @@ const pillBtn = (busy) => ({
   cursor: busy ? "not-allowed" : "pointer",
   opacity: busy ? 0.7 : 1,
 });
+
+
+// iter 330c — inline "Link to tenant" action per unmatched-pixel row.
+function UnmatchedPixelRow({ entry, idx, onLinked }) {
+  const [open, setOpen] = React.useState(false);
+  const [tenants, setTenants] = React.useState(null);
+  const [picking, setPicking] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  async function openPicker() {
+    if (tenants) { setOpen(true); return; }
+    try {
+      const r = await fetch(`${API}/api/admin/outreach/tenants`, { headers: authHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setTenants(j.tenants || []);
+      setOpen(true);
+    } catch (e) {
+      setMsg(`Couldn't load tenants: ${e.message || e}`);
+    }
+  }
+
+  async function link() {
+    if (!picking) { setMsg("Pick a tenant first."); return; }
+    if (!entry.referer) { setMsg("This row has no referer to link."); return; }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch(`${API}/api/admin/outreach/unmatched-pixels/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ referer: entry.referer, tenant_id: picking }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.detail || j.error || `HTTP ${r.status}`);
+      setMsg(`✔ Linked ${j.host} → ${j.tenant_id}`);
+      setOpen(false);
+      setTimeout(() => onLinked && onLinked(), 600);
+    } catch (e) {
+      setMsg(`✖ ${e.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      data-testid={`unmatched-pixel-row-${idx}`}
+      style={{
+        padding: "6px 8px", borderRadius: 6,
+        background: "rgba(0,0,0,0.18)",
+        fontSize: 11, lineHeight: 1.4,
+      }}
+    >
+      <div style={{ color: TEXT, display: "flex", alignItems: "center", gap: 8 }}>
+        <span>{entry.platform}/{entry.event_type}</span>
+        <span style={{ color: TEXT_DIM }}>{timeAgo(entry.ts)}</span>
+        {entry.remote_addr && (
+          <span style={{ color: TEXT_DIM }}>from {entry.remote_addr}</span>
+        )}
+        <div style={{ flex: 1 }} />
+        {entry.referer && (
+          <button
+            data-testid={`unmatched-link-btn-${idx}`}
+            onClick={openPicker}
+            style={{
+              padding: "2px 8px", borderRadius: 999,
+              background: "rgba(125,211,160,0.10)",
+              border: `1px solid rgba(125,211,160,0.30)`,
+              color: "#7DD3A0", fontSize: 10, fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Link
+          </button>
+        )}
+      </div>
+      {entry.referer && (
+        <div style={{ color: TEXT_DIM, marginTop: 2, wordBreak: "break-all" }}>
+          ref: {entry.referer.slice(0, 80)}
+        </div>
+      )}
+      {open && (
+        <div
+          data-testid={`unmatched-picker-${idx}`}
+          style={{
+            marginTop: 6, padding: "6px 8px", borderRadius: 6,
+            background: "rgba(0,0,0,0.30)",
+            display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+          }}
+        >
+          <select
+            data-testid={`unmatched-tenant-select-${idx}`}
+            value={picking}
+            onChange={(e) => setPicking(e.target.value)}
+            style={{
+              flex: 1, minWidth: 180,
+              background: "transparent", color: TEXT,
+              border: `1px solid ${BORDER}`, borderRadius: 4,
+              fontSize: 11, padding: "3px 6px",
+            }}
+          >
+            <option value="">Pick a tenant…</option>
+            {(tenants || []).map((t) => (
+              <option key={t.bin_id} value={t.bin_id}>
+                {(t.business_name || t.bin_id) +
+                  (t.city ? ` · ${t.city}` : "")}
+              </option>
+            ))}
+          </select>
+          <button
+            data-testid={`unmatched-link-save-${idx}`}
+            onClick={link}
+            disabled={busy || !picking}
+            style={{
+              padding: "3px 10px", borderRadius: 999,
+              background: busy ? "rgba(212,175,55,0.25)" : "#D4AF37",
+              color: "#0B0B16",
+              border: "none", fontSize: 11, fontWeight: 600,
+              cursor: busy || !picking ? "not-allowed" : "pointer",
+              opacity: busy || !picking ? 0.6 : 1,
+            }}
+          >
+            {busy ? "Linking…" : "Save"}
+          </button>
+          <button
+            onClick={() => setOpen(false)}
+            style={{
+              padding: "3px 8px", borderRadius: 999,
+              background: "transparent", color: TEXT_DIM,
+              border: `1px solid ${BORDER}`,
+              fontSize: 11, cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {msg && (
+        <div
+          data-testid={`unmatched-link-msg-${idx}`}
+          style={{ marginTop: 4, color: msg.startsWith("✔") ? OK_GREEN : ERR_RED }}
+        >
+          {msg}
+        </div>
+      )}
+    </div>
+  );
+}
