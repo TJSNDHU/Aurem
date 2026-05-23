@@ -521,6 +521,23 @@ async def admin_developers_health(request: Request) -> dict[str, Any]:
     }
 
 
+@router.get("/api/developers/me/purchases")
+async def developers_me_purchases(
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    """iter 331g — last N receipts for the dashboard 'Recent purchases' strip."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        return {"ok": True, "rows": []}
+    cursor = _db.payment_transactions.find(
+        {"user_id": me["user_id"]},
+        {"_id": 0, "session_id": 1, "tier": 1, "amount_usd": 1,
+         "payment_status": 1, "credited": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(3)
+    rows = await cursor.to_list(length=3)
+    return {"ok": True, "rows": rows}
+
+
 @router.get("/api/developers/openapi.json", include_in_schema=False)
 async def developers_openapi(request: Request) -> dict[str, Any]:
     """Filtered OpenAPI schema for the Swagger UI page. Builds against

@@ -58,6 +58,44 @@ export default function DevDashboard() {
                     value={used.toLocaleString()} />
       </div>
 
+      {/* Recent purchases strip — iter 331g */}
+      {purchases.length > 0 && (
+        <div className="av2-card" data-testid="recent-purchases-strip">
+          <SectionTitle title="Recent purchases" />
+          <ul style={{ listStyle: "none", padding: 0, margin: 0,
+                       fontFamily: "'JetBrains Mono', monospace",
+                       fontSize: 12 }}>
+            {purchases.map((p, i) => (
+              <li key={p.session_id || i}
+                  data-testid="purchase-row"
+                  style={{ display: "flex", alignItems: "center",
+                            gap: 12, padding: "8px 0",
+                            borderBottom: i < purchases.length - 1
+                              ? "1px solid var(--dash-divider)" : "none",
+                            color: "var(--dash-text)" }}>
+                <span style={{ color: "var(--dash-text-muted)",
+                                minWidth: 92 }}>
+                  {(p.created_at || "").slice(0, 10)}
+                </span>
+                <span style={{ minWidth: 70,
+                                textTransform: "uppercase",
+                                color: "var(--dash-gold-bright)",
+                                fontWeight: 500 }}>
+                  {p.tier}
+                </span>
+                <span style={{ minWidth: 60 }}>
+                  ${Number(p.amount_usd || 0).toFixed(2)}
+                </span>
+                <span style={{ color: p.credited ? "var(--dash-green)"
+                                                  : "var(--dash-text-muted)" }}>
+                  {p.credited ? "✓ credited" : p.payment_status || "pending"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Recent activity feed */}
       <div className="av2-card" data-testid="recent-activity-feed">
         <SectionTitle title="Recent activity" pill="live" />
