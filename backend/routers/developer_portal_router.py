@@ -358,3 +358,55 @@ async def admin_share_reject(
     if r.matched_count == 0:
         raise HTTPException(404, "share_request_not_pending")
     return {"ok": True, "request_id": request_id, "status": "rejected"}
+
+
+# ── iter 331e — Concurrent session control + email-seq admin trigger ─
+
+class SessionAcquireBody(BaseModel):
+    session_id: str
+
+
+@router.post("/api/developers/session/acquire")
+async def acquire_session_route(
+    body: SessionAcquireBody, authorization: str = Header(None),
+) -> dict[str, Any]:
+    me = await _current_dev(authorization)
+    from services.dev_security_guards import acquire_session
+    r = await acquire_session(me["user_id"], body.session_id)
+    if not r.get("ok"):
+        raise HTTPException(
+            429,
+            r.get("message") or r.get("reason") or "too_many_sessions",
+        )
+    return r
+
+
+@router.post("/api/developers/session/release")
+async def release_session_route(
+    body: SessionAcquireBody, authorization: str = Header(None),
+) -> dict[str, Any]:
+    me = await _current_dev(authorization)
+    from services.dev_security_guards import release_session
+    return await release_session(me["user_id"], body.session_id)
+
+
+@router.get("/api/developers/sessions")
+async def list_sessions_route(authorization: str = Header(None)) -> dict[str, Any]:
+    me = await _current_dev(authorization)
+    from services.dev_security_guards import (
+        list_active_sessions, MAX_ACTIVE_SESSIONS,
+    )
+    rows = await list_active_sessions(me["user_id"])
+    return {"ok": True, "active": rows, "limit": MAX_ACTIVE_SESSIONS}
+
+
+@router.post("/api/admin/developers/email-sequence/run")
+async def admin_run_email_sequence(request: Request) -> dict[str, Any]:
+    """Founder-triggered run of the Day 3 / 7 / 25 email cron."""
+    _ensure_admin(request)
+    from services.developer_email_sequence import (
+        run_sequence_tick, set_db as _set_seq_db,
+    )
+    if _db is not None:
+        _set_seq_db(_db)
+    return await run_sequence_tick()

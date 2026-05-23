@@ -767,6 +767,12 @@ def register_all_routers(app, db):
                     _aio.create_task(ensure_indexes())
                 except Exception:
                     pass
+                # iter 331e — wire dev_security_guards DB for session limits
+                try:
+                    from services.dev_security_guards import set_db as _set_sec_db
+                    _set_sec_db(db)
+                except Exception as _sg_e:
+                    logger.warning(f"[REGISTRY] dev_security_guards.set_db failed: {_sg_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
@@ -2183,6 +2189,39 @@ def register_all_routers(app, db):
             logger.info("[REGISTRY] Dev sandbox cleanup cron scheduled: daily at 04:30 UTC")
         except Exception as _e:
             logger.warning(f"[REGISTRY] Dev sandbox cleanup cron failed: {_e}")
+
+        # iter 331e — Developer Portal email sequence (Day 3 / 7 / 25).
+        # Daily at 05:00 UTC walks verified developer accounts, classifies
+        # each into 0..N pending email buckets, sends via Resend, stamps
+        # `email_sequence_sent[<bucket>]` so we never re-fire.
+        try:
+            from services.developer_email_sequence import (
+                run_sequence_tick, set_db as _set_seq_db,
+            )
+            if db is not None:
+                _set_seq_db(db)
+            async def _email_sequence_tick():
+                try:
+                    r = await run_sequence_tick()
+                    if r.get("sent"):
+                        logger.info(
+                            f"[dev-email-seq] sent={r['sent']} "
+                            f"scanned={r['scanned']} skipped={r['skipped']} "
+                            f"failed={r['failed']}"
+                        )
+                except Exception as _ee:
+                    logger.warning(f"[dev-email-seq] tick error: {_ee}")
+            aurem_scheduler.add_job(
+                _email_sequence_tick,
+                CronTrigger(hour=5, minute=0, timezone="UTC"),
+                id='aurem_dev_email_sequence',
+                name='Developer Onboarding Email Sequence (Day 3/7/25)',
+                replace_existing=True,
+                misfire_grace_time=3600,
+            )
+            logger.info("[REGISTRY] Dev email sequence cron scheduled: daily at 05:00 UTC")
+        except Exception as _e:
+            logger.warning(f"[REGISTRY] Dev email sequence cron failed: {_e}")
 
         # Midnight daily usage reset for tenant_customers
         async def reset_tenant_daily_usage():

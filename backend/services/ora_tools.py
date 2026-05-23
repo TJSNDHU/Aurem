@@ -4054,6 +4054,54 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
                         result["ts"] = _now_iso()
                         asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
                         return result
+
+                # iter 331e — SSRF guard for any tool arg that looks
+                # like a URL. Refuses private/internal targets.
+                try:
+                    from services import dev_security_guards as _SG
+                    for _k in ("url", "endpoint", "host", "webhook_url", "target"):
+                        _v = args.get(_k)
+                        if isinstance(_v, str) and _v.strip():
+                            _ssrf = _SG.assert_url_safe(_v)
+                            if not _ssrf.get("ok"):
+                                result = {
+                                    "ok":     False,
+                                    "error":  f"SSRF blocked: {_ssrf.get('reason')}",
+                                    "blocked_by": "ssrf_guard",
+                                    "host":    _ssrf.get("host"),
+                                    "reason":  _ssrf.get("reason"),
+                                    "http_status": 400,
+                                }
+                                elapsed_ms = int((time.time() - start) * 1000)
+                                result["tool"] = name
+                                result["elapsed_ms"] = elapsed_ms
+                                result["ts"] = _now_iso()
+                                asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                                return result
+                    # iter 331e — internal path block on file-read tools
+                    if name in ("view_file", "view_bulk", "view_dir", "safe_edit"):
+                        _path_args = []
+                        if isinstance(args.get("path"), str):
+                            _path_args.append(args["path"])
+                        if isinstance(args.get("paths"), list):
+                            _path_args.extend(p for p in args["paths"] if isinstance(p, str))
+                        for _p in _path_args:
+                            if _SG.is_internal_path(_p):
+                                result = {
+                                    "ok":     False,
+                                    "error":  "This path is part of the AUREM platform and isn't readable from the developer sandbox.",
+                                    "blocked_by": "internal_path",
+                                    "path":     _p,
+                                    "http_status": 403,
+                                }
+                                elapsed_ms = int((time.time() - start) * 1000)
+                                result["tool"] = name
+                                result["elapsed_ms"] = elapsed_ms
+                                result["ts"] = _now_iso()
+                                asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                                return result
+                except Exception as _sg:
+                    logger.debug(f"[ora_tools] dev_security_guards non-fatal: {_sg}")
             except Exception as _e:
                 logger.debug(f"[ora_tools] developer-portal guards non-fatal: {_e}")
 
@@ -4110,6 +4158,16 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
                 tool_name=name,
                 session_id=str(args.get("_session_id") or ""),
             ))
+    except Exception:
+        pass
+
+    # iter 331e — output masking for developer tenants. Strip secrets,
+    # JWTs, internal paths from anything the developer can see.
+    try:
+        dev_uid_mask = (args or {}).get("_dev_user_id") if isinstance(args, dict) else None
+        if dev_uid_mask:
+            from services import dev_security_guards as _SG
+            result = _SG.mask_sensitive_output(result)
     except Exception:
         pass
 

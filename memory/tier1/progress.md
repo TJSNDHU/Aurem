@@ -58,3 +58,37 @@ Branch: main
 PIDs: []
 Updated: 2026-02-23T23:30:00Z
 ---
+
+---
+Task: iter 331e Batch A — Security hardening + email sequence + stale test repair
+Succeeded:
+  Part 1 — Security guards (new services/dev_security_guards.py):
+    - SSRF guard `assert_url_safe`: blocks 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16, ::1, and exact-host list (localhost, kubernetes.default, metadata.google.internal, 169.254.169.254 AWS metadata, host.docker.internal, *.local, *.internal, *.intranet, *.lan, *.corp). Re-resolves hostnames via DNS and re-checks each returned IP — defeats DNS-rebinding (127-0-0-1.nip.io attacks). Fails closed on DNS failure.
+    - File size limits `enforce_file_size_limits`: per-file 10 MB hard cap, per-session 50 MB cumulative cap, HTTP 413 envelope with plain-English message. Session totals tracked in-process dict; `reset_session_bytes` exposed for session release.
+    - Concurrent session limit `acquire_session` / `release_session`: max 2 active per developer (env: ORA_DEV_MAX_ACTIVE_SESSIONS), tracked in `developer_accounts.active_sessions[]`. Stale sessions (heartbeat > 30 min) auto-pruned before counting. Same `session_id` twice = heartbeat refresh, not refusal.
+    - Output masking `mask_sensitive_output`: walks nested dict/list and strips JWTs, bearer tokens, sk-*, sk_live_*, sk_test_*, pk_live_*, AIza*, re_*, mongodb:// URLs, telegram bot tokens, BEGIN PRIVATE KEY blocks, every env-var value whose name matches KEY|TOKEN|SECRET|PASSWORD|PASS|DSN|CONN_STRING, and internal AUREM paths (/app/backend/services/, /app/backend/routers/, /app/backend/.env, /app/memory/tier1/2/, /etc/supervisor/).
+    - Internal path block `is_internal_path`: file-read tools (view_file/view_bulk/view_dir/safe_edit) refuse /app/backend/* paths from developer tenants.
+    - All four guards wired into `ora_tools.invoke_tool` so they fire on every developer-initiated tool call (carries `_dev_user_id` in args).
+    - 3 new tenant endpoints: POST /api/developers/session/acquire, POST /api/developers/session/release, GET /api/developers/sessions.
+  Part 4 — Email sequence (new services/developer_email_sequence.py):
+    - APScheduler cron daily 05:00 UTC, job id `aurem_dev_email_sequence`.
+    - 4 buckets: day3_github_nudge (only if GitHub not connected, days 3-7), day7_unused (tokens_total_used==0, days 7-25), day7_halfway (tokens_remaining < 500 AND used > 0), day25_expiry (days 25-32).
+    - Renders branded HTML (dark theme, same shell as Day-0 welcome) + plain-text fallback for each bucket; deep links to dashboard / connect / tokens pages.
+    - Idempotent — stamps `email_sequence_sent[bucket_id]` on the account so cron re-runs never re-fire.
+    - Best-effort audit row in `developer_email_sequence_log`.
+    - Founder-trigger endpoint `POST /api/admin/developers/email-sequence/run` so the cron can be fired manually.
+  Part 6 — Stale tier-1 loader test repair:
+    - test_iter327n: 3 tests rewritten against the new folder-driven loader API (`last_injection_manifest()` instead of removed `_TIER1_FILES` constant; new normalized labels — `ZERO HALLUCINATION CHARTER`, `ORA MISTAKES LESSONS` etc).
+    - test_iter329: 2 tests updated — file path moved /app/memory → /app/memory/tier1, assertion checks the folder discovery manifest rather than the truncated assembled block.
+  Full active regression: **401 / 401 GREEN** across iter 327d → 331e (was 355/359 last iter; all 4 previously-stale assertions now green + 42 new iter-331e cases all green). Backend boots cleanly post-restart, /api/health 200.
+Blocker: none
+Next:
+  - Batch B (next context window): all 8 developer frontend pages + landing-page hero + /developers/examples + /developers/status.
+  - Batch C (third context window): Stripe — products, checkout, webhook, failed-payment downgrade with 3-day grace, invoice emails. Stripe test key is in pod env per platform policy.
+  - User: push iter 331e to GitHub via "Save to Github" button.
+Cost: $0.00 USD (pytest + lint only; no LLM calls)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T00:30:00Z
+---
+

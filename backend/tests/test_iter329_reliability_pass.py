@@ -218,13 +218,27 @@ def test_public_status_jsx_has_sla_tiles():
 
 
 def test_seven_ways_memory_file_wired_in_tier1():
-    from services.ora_lessons_loader import _TIER1_FILES
-    paths = [p for _, p, _ in _TIER1_FILES]
-    assert "/app/memory/SEVEN_WAYS.md" in paths
+    """iter 331a moved to folder-driven discovery. Assert SEVEN_WAYS.md
+    is in the tier1/ folder and gets injected at boot."""
+    import os
+    from pathlib import Path
+    from services.ora_lessons_loader import (
+        build_lessons_block, last_injection_manifest,
+    )
+    tier1_dir = Path(os.environ.get("ORA_MEMORY_ROOT", "/app/memory")) / "tier1"
+    assert (tier1_dir / "SEVEN_WAYS.md").exists(), \
+        "SEVEN_WAYS.md must live in /app/memory/tier1/"
+    # Force a rebuild and check the manifest
+    build_lessons_block()
+    manifest = last_injection_manifest()
+    loaded_paths = [m.get("path") for m in manifest if m.get("loaded")]
+    assert any("SEVEN_WAYS.md" in p for p in loaded_paths), \
+        "SEVEN_WAYS.md must be discovered by the folder-driven loader"
 
 
 def test_seven_ways_content_covers_all_six_iter329_topics():
-    body = Path("/app/memory/SEVEN_WAYS.md").read_text()
+    from pathlib import Path
+    body = Path("/app/memory/tier1/SEVEN_WAYS.md").read_text()
     assert "329a" in body and "329b" in body and "329c" in body
     assert "329d" in body and "329e" in body and "329f" in body
 
