@@ -157,3 +157,36 @@ PIDs: []
 Updated: 2026-02-24T01:55:00Z
 ---
 
+
+---
+Task: iter 332a-1 — Emergent Specialist Swarm foundation (Parts 1 + 3 + 4) + Recent purchases strip
+Succeeded:
+  • Recent purchases strip on /developers/dashboard: new `GET /api/developers/me/purchases` returns last 3 `payment_transactions` rows. DevDashboard renders a compact JetBrains-Mono list (date · tier · $amount · ✓ credited / pending) in an av2-card, only when at least one purchase exists.
+  • Extended `fork_context(...)`: new optional kwargs `mode="ora"|"emergent"` (default "ora") + `session_id` for cost-log audit. Refuses unknown modes with clear error. Added task_type aliases `"integration"` and `"design"` that route to the existing prompts.
+  • New service `services/ora_validated_solutions.py` — self-learning memory for ORA's specialist calls:
+    - `compute_signature(task_type, error_message, file_type)` produces a SHA256 hash that normalises away traceback line numbers, hex addresses, request ids and quoted strings so two different occurrences of the same bug collapse to the same signature.
+    - `lookup_solution(sig)` atomically increments `use_count` and returns the cached row, capped at `MAX_USES_BEFORE_REVALIDATE = 10` (env-overridable). At cap, returns None so the caller falls through to a fresh specialist.
+    - `save_solution(...)` upserts a row idempotently against `signature`. Stores fix_suggestion (capped 4000 chars), findings (20 max), files_involved (20 max), specialist tag and cost_usd.
+    - `log_specialist_call(...)` appends a row to `ora_specialist_calls` with mode / task_type / specialist_name / verdict / cache-hit flag / tokens_used / cost_usd / elapsed_ms. Cost defaults: $0.001 per ora call, $0.05 per emergent call, $0 for cache hits.
+    - `cost_rollup_7d()` aggregates the 7-day cost picture into ora / emergent / validated buckets for the cockpit tile. Saved-USD = N × $0.05 emergent-call equivalent.
+  • fork_context now does cache lookup BEFORE the LLM call. On hit it returns at $0 with `used_validated_solution=True` and `elapsed_s=0.0`. On miss it runs the LLM, saves the answer under the signature, and logs the cost row. Cache-hit logging happens in BOTH branches so the rollup is honest.
+  • New router `routers/ora_specialist_cost_router.py` exposes `GET /api/admin/ora/specialist-cost-breakdown` (super-admin gated via existing `services.admin_security.ensure_admin`). Smoke-tested: refuses without bearer → HTTP 401, returns the full 7-day shape with bearer.
+  • Both `set_db` calls wired into `routers/registry.py` startup so the cache + cost log connect to the real Mongo on every boot.
+  • New regression file `test_iter332a_specialist_swarm_foundation.py` — 17 cases covering: signature determinism, traceback-noise collapse, file_type isolation, task_type isolation, cache lookup empty/hit/cap, save+lookup roundtrip, fork_context end-to-end cache hit, mode validation, task_type alias acceptance, log_specialist_call with default + cache pricing, cost_rollup_7d 3-bucket aggregation, cockpit endpoint admin gate, source-level wiring sanity.
+  • Full regression: **432 / 432 GREEN** across iter 327d → 332a-1 (was 415 last iter; +17 new cases all green; no regressions on the older `fork_context` callers thanks to all new params being keyword-only with defaults).
+  • Recent-purchases endpoint also smoke-tested.
+Blocker: none.
+Deferred to iter 332a-2 (next context window):
+  • Part 2 — Auto-escalation in `ora_guards.py`: count failures per task per session, silently escalate to mode="emergent" after 2 ora-mode failures. Hook into `check_escalation_needed(session_id, task_id)` + the ORA SYSTEM_PROMPT rule "If task fails 2x, auto-call fork_context with mode='emergent'".
+  • Part 5 — Smart routing rules: new .jsx/.tsx file created → design-mode directly; new 3rd-party integration → integration-mode directly; debug touching 3+ files → ora first then escalate.
+  • Cockpit UI tile — "Specialist Cost Breakdown" card pulling from the new endpoint, similar to DeveloperPortalPulseTile (~50 LOC).
+  • The 6 E2E proofs from the original spec — only proofs 3, 5, 6 (cache hit, integration playbook routing, /developers/health real data) work today. Proofs 1, 2, 4 (auto-escalation, validated solution on 3rd try, new-jsx → design agent) need Part 2 + Part 5.
+Next:
+  • Push iter 332a-1 to GitHub via "Save to Github" — preview is green.
+  • iter 332a-2 — the three deferred items above.
+Cost: $0.00 USD (pytest + lint + curl smoke only; no LLM calls)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T02:30:00Z
+---
+

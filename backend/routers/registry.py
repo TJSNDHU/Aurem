@@ -773,6 +773,23 @@ def register_all_routers(app, db):
                     _set_sec_db(db)
                 except Exception as _sg_e:
                     logger.warning(f"[REGISTRY] dev_security_guards.set_db failed: {_sg_e}")
+                # iter 332a-1 — wire validated-solutions cache DB
+                try:
+                    from services.ora_validated_solutions import set_db as _set_vs_db
+                    _set_vs_db(db)
+                except Exception as _vs_e:
+                    logger.warning(f"[REGISTRY] ora_validated_solutions.set_db failed: {_vs_e}")
+
+                # iter 332a-1 — Specialist Cost Breakdown cockpit endpoint
+                try:
+                    from routers.ora_specialist_cost_router import (
+                        router as _cost_router, set_db as _set_cost_db,
+                    )
+                    app.include_router(_cost_router)
+                    _set_cost_db(db)
+                    logger.info("[REGISTRY] ORA Specialist Cost Breakdown endpoint wired")
+                except Exception as _cr_e:
+                    logger.warning(f"[REGISTRY] specialist-cost router failed: {_cr_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

@@ -102,7 +102,12 @@ _PROMPTS = {
     "debug":              _PROMPT_DEBUG,
     "qa":                 _PROMPT_QA,
     "integration_check":  _PROMPT_INTEGRATION_CHECK,
+    # iter 332a-1 — aliases used by the new mode parameter
+    "integration":        _PROMPT_INTEGRATION_CHECK,
+    "design":             _PROMPT_QA,   # design review uses the same one-shot QA prompt
 }
+
+_VALID_MODES = {"ora", "emergent"}
 
 # Hard caps so a sub-session can never blow up the main budget.
 _MAX_FILES = 10
@@ -216,26 +221,45 @@ async def fork_context(
     brief: str,
     relevant_files: list[str] | None = None,
     return_schema: dict | None = None,
+    *,
+    mode: str = "ora",
+    session_id: str = "",
 ) -> dict:
     """Spawn a fresh-context sub-session of ORA.
 
+    iter 332a-1 — new optional kwargs:
+      mode        : "ora" (default) | "emergent". "emergent" tags the
+                    cost-log row appropriately so the cockpit knows
+                    this was a higher-tier specialist call. Actual
+                    sub-agent dispatch shares the same LLM path; the
+                    auto-escalation routing rules ship in iter 332a-2.
+      session_id  : caller's session id, used only for cost-log audit.
+
+    Self-learning: BEFORE calling the LLM, hash a problem signature
+    from (task_type, brief, files) and check `ora_validated_solutions`.
+    If a cached answer exists and its use_count < threshold, return it
+    directly at $0 cost. AFTER a successful LLM call, the answer is
+    persisted under that signature so the next identical problem is free.
+
     Args:
-      task_type:      "debug" | "qa" | "integration_check"
+      task_type:      "debug" | "qa" | "integration" | "integration_check" | "design"
       brief:          one paragraph describing the focused task
       relevant_files: up to 10 file paths to load into the sub-context
       return_schema:  reserved for future schema customisation;
-                      currently the schema is fixed (verdict / findings /
-                      fix_suggestion) so the main agent has a stable contract.
+                      currently fixed (verdict / findings / fix_suggestion).
 
     Returns:
-      ok           : True
-      task_type    : echo
-      verdict      : "pass" | "fail"
-      findings     : list[str]
-      fix_suggestion: str
-      files_loaded : manifest
-      elapsed_s    : float
-      provider     : which LLM provider answered
+      ok                     : True
+      task_type              : echo
+      mode                   : echo ("ora" | "emergent")
+      verdict                : "pass" | "fail"
+      findings               : list[str]
+      fix_suggestion         : str
+      files_loaded           : manifest
+      elapsed_s              : float
+      provider               : which LLM provider answered
+      used_validated_solution: bool
+      signature              : sha256 — for debugging / cache eviction
     """
     if task_type not in _PROMPTS:
         return {
@@ -243,12 +267,62 @@ async def fork_context(
             "error": f"unknown task_type '{task_type}'. "
                      f"Valid: {sorted(_PROMPTS)}",
         }
+    if mode not in _VALID_MODES:
+        return {
+            "ok":    False,
+            "error": f"unknown mode '{mode}'. Valid: {sorted(_VALID_MODES)}",
+        }
     if not brief or len(brief.strip()) < 5:
         return {"ok": False, "error": "brief is empty or too short (<5 chars)"}
 
     brief = brief.strip()[:_MAX_BRIEF_CHARS]
     system_prompt = _PROMPTS[task_type]
     files_block, manifest = _load_files(relevant_files or [])
+
+    # ── iter 332a-1 — self-learning cache lookup ─────────────────────
+    from services import ora_validated_solutions as _VS
+    file_type = ""
+    if manifest:
+        first_path = manifest[0].get("path") or ""
+        if "." in first_path:
+            file_type = "." + first_path.rsplit(".", 1)[-1].lower()
+    signature = _VS.compute_signature(
+        task_type=task_type if task_type != "integration_check" else "integration",
+        error_message=brief,
+        file_type=file_type,
+    )
+    cached = await _VS.lookup_solution(signature)
+    if cached:
+        # Cache hit — return at $0
+        elapsed = 0.0
+        # Log cost row (still recorded so cockpit shows the win)
+        await _VS.log_specialist_call(
+            session_id=session_id,
+            mode=mode,
+            task_type=task_type,
+            specialist_name="cache",
+            verdict="pass",
+            used_validated_solution=True,
+            tokens_used=0,
+            elapsed_ms=0,
+        )
+        logger.info(
+            f"[fork_context] sig={signature[:12]}… CACHE HIT — "
+            f"use_count={cached.get('use_count')}"
+        )
+        return {
+            "ok":                True,
+            "task_type":         task_type,
+            "mode":              mode,
+            "verdict":           "pass",
+            "findings":          cached.get("findings") or [],
+            "fix_suggestion":    cached.get("fix_suggestion") or "",
+            "files_loaded":      manifest,
+            "elapsed_s":         elapsed,
+            "used_validated_solution": True,
+            "signature":         signature,
+            "validated_use_count": cached.get("use_count"),
+        }
 
     user_content = f"BRIEF:\n{brief}"
     if files_block:
@@ -272,39 +346,79 @@ async def fork_context(
         content = await _llm_no_tools(messages)
     except Exception as e:
         logger.exception("[fork_context] LLM call failed")
+        # Cost log even on failure so the cockpit reflects spend
+        await _VS.log_specialist_call(
+            session_id=session_id, mode=mode, task_type=task_type,
+            specialist_name=mode, verdict="fail",
+            used_validated_solution=False,
+            elapsed_ms=int((time.time() - t0) * 1000),
+        )
         return {
             "ok":         False,
             "task_type":  task_type,
+            "mode":       mode,
             "error":      f"LLM dispatcher raised: {type(e).__name__}: {e}",
             "files_loaded": manifest,
+            "signature":  signature,
         }
     elapsed = round(time.time() - t0, 2)
 
     if not content:
+        await _VS.log_specialist_call(
+            session_id=session_id, mode=mode, task_type=task_type,
+            specialist_name=mode, verdict="fail",
+            used_validated_solution=False,
+            elapsed_ms=int(elapsed * 1000),
+        )
         return {
             "ok":         False,
             "task_type":  task_type,
+            "mode":       mode,
             "error":      "every LLM provider failed",
             "files_loaded": manifest,
             "elapsed_s":  elapsed,
+            "signature":  signature,
         }
 
     parsed = _extract_json(content)
     validated = _validate_result(parsed)
 
+    # Persist the validated answer — so the next identical problem is $0.
+    files_involved = [m.get("path") for m in manifest if m.get("path")]
+    await _VS.save_solution(
+        signature=signature,
+        task_type=task_type,
+        fix_suggestion=validated["fix_suggestion"],
+        findings=validated["findings"],
+        files_involved=files_involved,
+        specialist=mode,
+    )
+    # Cost log
+    await _VS.log_specialist_call(
+        session_id=session_id, mode=mode, task_type=task_type,
+        specialist_name=mode, verdict=validated["verdict"],
+        used_validated_solution=False,
+        elapsed_ms=int(elapsed * 1000),
+    )
+
     out: dict[str, Any] = {
         "ok":           True,
         "task_type":    task_type,
+        "mode":         mode,
         "verdict":      validated["verdict"],
         "findings":     validated["findings"],
         "fix_suggestion": validated["fix_suggestion"],
         "files_loaded": manifest,
         "elapsed_s":    elapsed,
+        "used_validated_solution": False,
+        "signature":    signature,
         "raw_llm_text": content[:2000],  # for debugging
     }
     logger.info(
-        f"[fork_context] task={task_type} verdict={validated['verdict']} "
-        f"findings={len(validated['findings'])} elapsed={elapsed}s"
+        f"[fork_context] task={task_type} mode={mode} "
+        f"verdict={validated['verdict']} "
+        f"findings={len(validated['findings'])} elapsed={elapsed}s "
+        f"sig={signature[:12]}…"
     )
     return out
 
