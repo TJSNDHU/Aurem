@@ -3132,6 +3132,60 @@ async def resume_after_decision(
         # iter 326rr — surface a structured error_code so the UI can
         # render distinct, friendlier messaging per cause without
         # parsing the English string.
+        #
+        # iter 330e — RULE ZERO + race-fix. When the atomic gate misses,
+        # look up the row by _id alone to find out WHY. The most common
+        # cause is NOT "expired/missing" — it's the tier-2 auto-executor
+        # claiming the row in the 30-second cancel window before the
+        # founder's click reached us. In that case the action ACTUALLY
+        # COMPLETED. Showing "Approval failed" for a successful action
+        # is the bug the founder saw in the screenshot.
+        existing = await _db[PENDING_COLLECTION].find_one(
+            {"_id": action_id},
+            {"_id": 0, "status": 1, "decided_by": 1, "result": 1, "tool": 1},
+        )
+        if not existing:
+            return {
+                "ok":         False,
+                "error":      "action not found, already processed, or expired",
+                "error_code": "not_found",
+            }
+        actual = existing.get("status")
+        # Auto-executed / currently running / already finished — these
+        # are all "the action ran on your behalf, no founder action
+        # needed". Treat them as a soft success so the UI can show a
+        # neutral message instead of a red error banner.
+        if actual in ("auto_executing", "executing", "done"):
+            return {
+                "ok":             False,
+                "soft_success":   True,
+                "error":          "already_executed",
+                "error_code":     "already_executed",
+                "previous_status": actual,
+                "decided_by":     existing.get("decided_by") or "system",
+                "tool":           existing.get("tool"),
+            }
+        if actual == "failed":
+            return {
+                "ok":         False,
+                "error":      "already_failed",
+                "error_code": "already_failed",
+                "tool":       existing.get("tool"),
+            }
+        if actual == "rejected":
+            return {
+                "ok":         False,
+                "error":      "already_rejected",
+                "error_code": "already_rejected",
+            }
+        if actual == "expired":
+            return {
+                "ok":         False,
+                "error":      "action not found, already processed, or expired",
+                "error_code": "expired_or_missing",
+            }
+        # Fallback — unknown terminal state. Keep the legacy error_code
+        # so old test assertions (test_iter326rr) still pass.
         return {
             "ok":         False,
             "error":      "action not found, already processed, or expired",

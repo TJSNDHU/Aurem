@@ -468,8 +468,15 @@ export default function OraChat() {
       // pre-emptively (that produced a false "✓ Approved" line when the
       // backend later returned ok:false).
       const ok = j && j.ok !== false;
-      const verb = ok
-        ? (approved ? "✓ Approved" : "✗ Rejected")
+      // iter 330e — soft-success path: backend tells us the action
+      // already ran (auto-executed in the 30 s cancel window). Treat
+      // as a success so we don't show a red "Approval failed" banner
+      // for an action that actually completed.
+      const softOk = j && j.soft_success === true;
+      const effOk = ok || softOk;
+      const verb = effOk
+        ? (approved ? (softOk ? "✓ Auto-executed" : "✓ Approved")
+                    : "✗ Rejected")
         : (approved ? "⚠️ Approval failed" : "⚠️ Reject failed");
       setHistory((h) => [...h, {
         role: "decision",
@@ -478,16 +485,34 @@ export default function OraChat() {
         ts: Date.now(),
       }]);
       setPending(null);
-      if (!ok) {
+      if (!effOk) {
+        const code = (j && j.error_code) || "";
         const msg = (j && (j.error || j.detail))
           || `HTTP ${j && j._http_status}`;
-        // Friendlier wording for the most common case: row expired
-        // between propose and click (default 30-min window).
-        const friendly = /not found|already processed|expired/i.test(msg)
-          ? "Yeh approval expire ho gayi (30 min window). " +
-            "ORA ko dobara bolo — fresh action banegi."
-          : msg;
+        // iter 330e — RULE ZERO: plain English only, no Hindi/Urdu.
+        // Tailored per error_code so the founder knows exactly what
+        // happened without parsing the raw backend string.
+        let friendly = msg;
+        if (code === "expired_or_missing" || code === "not_found") {
+          friendly = "Approval window closed. Ask ORA again and it will propose a fresh action.";
+        } else if (code === "already_rejected") {
+          friendly = "This action was already rejected. Ask ORA again to retry.";
+        } else if (code === "already_failed") {
+          friendly = "This action already ran but failed. Ask ORA to investigate and retry.";
+        } else if (code === "session_mismatch") {
+          friendly = "This approval card belongs to a different chat session. Reload to sync.";
+        } else if (code === "not_authorized") {
+          friendly = "You are not authorized to approve this action.";
+        } else if (/not found|already processed|expired/i.test(msg)) {
+          friendly = "Approval window closed. Ask ORA again and it will propose a fresh action.";
+        }
         setError(friendly);
+      } else if (softOk) {
+        // Soft-success: action ran via auto-execute. Show a neutral
+        // info banner, not an error. Refresh history so the user
+        // sees the actual tool result that already landed.
+        setError(null);
+        refreshHistory();
       } else if (j.reply) {
         applyTurnResult(j);
       }
@@ -750,7 +775,7 @@ export default function OraChat() {
                 onKeyDown={(e) => e.key === "Enter" && send()}
                 placeholder={pending
                   ? "Pending approval above — decide first"
-                  : "Bata kya karna hai (Hindi/English mix chalega)…"}
+                  : "Tell ORA what to do (English)…"}
                 style={chatInput(busy || !!pending)} />
         <button data-testid="chat-send"
                 disabled={busy || !!pending || (!input.trim() && attachments.length === 0)}

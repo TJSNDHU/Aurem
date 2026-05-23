@@ -91,7 +91,10 @@ def test_frontend_decide_clears_pending_after_api_returns():
     src = FRONTEND.read_text()
     # Locate the decide function body
     idx = src.index("const decide = async (approved")
-    decide_block = src[idx: idx + 3000]
+    # iter 330e — decide() body grew with per-error_code friendly
+    # copy. Widen the slice to keep capturing both setPending(null)
+    # sites (post-result + catch).
+    decide_block = src[idx: idx + 5000]
     # Must call setPending(null) after the fetch resolves (success
     # AND failure). Two places: post-result + catch.
     assert decide_block.count("setPending(null)") >= 2, \
@@ -122,9 +125,12 @@ def test_frontend_decide_shows_failure_verb_on_ok_false():
 
 def test_frontend_decide_uses_friendlier_expired_message():
     src = FRONTEND.read_text()
-    # Hindi-EN mixed copy per founder's directive
-    assert "approval expire ho gayi" in src
-    assert "ORA ko dobara bolo" in src
+    # iter 330e — RULE ZERO: plain English only (Hindi/Urdu removed).
+    assert "Approval window closed" in src
+    assert "Ask ORA again" in src
+    # Old Hindi copy must be gone
+    assert "approval expire ho gayi" not in src
+    assert "ORA ko dobara bolo" not in src
 
 
 def test_iter_326rr_marker_present():

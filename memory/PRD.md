@@ -803,6 +803,14 @@ iter 326 recent + iter 322er.
 - (carried over) Configure `EXTERNAL_UPTIME_SECRET` on prod env + sign up UptimeRobot pointing at `https://aurem.live/api/uptime/report`.
 - Optional: run `python scripts/dr_restore_test.py --dry-run` on prod, then schedule monthly.
 
+- iter 330e (current): **Approval race + Rule Zero fix** —
+  • Backend `resume_after_decision` now looks up the row a second time when the atomic gate misses, returning distinct `error_code`s: `not_found`, `already_executed` (with `soft_success:true`), `already_failed`, `already_rejected`, or legacy `expired_or_missing`. Fixes the bug where Tier-2 auto-executor claimed the row during the 30 s cancel window and the founder's click then showed "Approval failed" for an action that actually completed.
+  • OraChat.jsx maps each code to plain English copy (no Hindi/Urdu). Soft-success path shows "✓ Auto-executed" + history refresh instead of red error.
+  • Chat input placeholder rewritten in plain English ("Tell ORA what to do").
+  • 19 new regression tests in `test_iter330e_approval_race_rule_zero.py` (Rule Zero + soft-success + error_code mapping). 73 approval-flow tests total green.
+  • E2E verified live on preview: `not_found` and `already_executed` paths both return correct shape.
+  • Founder needs to push to GitHub → redeploy aurem.live to ship this fix to production.
+
 ## Backlog
 - P2 — Splice monthly external uptime line into Morning Brief once `EXTERNAL_UPTIME_SECRET` is configured.
 - P3 — Service-account Google Calendar for shared AUREM staff calendar.

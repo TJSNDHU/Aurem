@@ -9,9 +9,9 @@ that do not ship frontend source files.
 """
 from __future__ import annotations
 
-BUILT_AT: str = '2026-05-23T03:48:34.168981+00:00'
+BUILT_AT: str = '2026-05-23T16:16:15.973710+00:00'
 SRC_ROOT: str = '/app/frontend/src'
-ENDPOINT_COUNT: int = 989
+ENDPOINT_COUNT: int = 998
 
 SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'],
  '/api/accounting/summary': ['services/api.js'],
@@ -222,6 +222,13 @@ SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'
  '/api/admin/ora/skills': ['platform/admin/SkillsMarketplace.jsx'],
  '/api/admin/ora/skills/': ['platform/admin/SkillsMarketplace.jsx'],
  '/api/admin/ora/voice-profile/': ['platform/admin/VoiceProfileEditor.jsx'],
+ '/api/admin/outreach/closer-day5/run': ['platform/admin/OutreachHealthCard.jsx'],
+ '/api/admin/outreach/health': ['platform/admin/OutreachHealthCard.jsx'],
+ '/api/admin/outreach/reply-inbox/run': ['platform/admin/OutreachHealthCard.jsx'],
+ '/api/admin/outreach/social/post-now': ['platform/admin/OutreachHealthCard.jsx'],
+ '/api/admin/outreach/tenants': ['platform/admin/OutreachHealthCard.jsx'],
+ '/api/admin/outreach/unmatched-pixels': ['platform/admin/OutreachHealthCard.jsx'],
+ '/api/admin/outreach/unmatched-pixels/link': ['platform/admin/OutreachHealthCard.jsx'],
  '/api/admin/pillars-map/collection/': ['platform/AdminPillarsMap.jsx'],
  '/api/admin/pillars-map/endpoint-audit/summary': ['platform/AdminPillarsMap.jsx'],
  '/api/admin/pillars-map/heartbeat': ['lib/sentinel.js',
@@ -260,6 +267,7 @@ SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'
  '/api/admin/site-monitor/overview': ['platform/AdminSiteMonitor.jsx'],
  '/api/admin/site-monitor/scan-now': ['platform/AdminSiteMonitor.jsx'],
  '/api/admin/site-monitor/tenants': ['platform/AdminSiteMonitor.jsx'],
+ '/api/admin/sla/snapshot': ['platform/admin/SlaCard.jsx'],
  '/api/admin/sovereignty/score': ['platform/AdminSovereigntyScore.jsx', 'platform/SystemOverview.jsx'],
  '/api/admin/ssot/config': ['platform/AdminSSOT.jsx'],
  '/api/admin/ssot/log': ['platform/AdminSSOT.jsx'],
@@ -749,6 +757,7 @@ SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'
  '/api/ora/avatar-preference': ['components/ORASelector.jsx'],
  '/api/ora/command': ['platform/AdminShell.jsx', 'platform/SidebarAddons.jsx'],
  '/api/ora/context': ['platform/OraDesktopSidebar.jsx'],
+ '/api/ora/feedback': ['platform/admin/OraChat.jsx'],
  '/api/ora/health': ['lib/sentinel.js', 'platform/luxe/LuxeV2Pages.jsx'],
  '/api/ora/knowledge/force-sync': ['platform/TrainingDashboard.jsx'],
  '/api/ora/knowledge/status': ['platform/TrainingDashboard.jsx'],
