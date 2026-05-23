@@ -1469,6 +1469,27 @@ async def startup_event():
                     except Exception as e:
                         logging.warning(f"[STARTUP-BG] skills seed skipped: {e}")
                 asyncio.create_task(_bg_seed_skills())
+
+                # iter 327o — Lesson Journal snapshot on boot.
+                # Captures hash + size of each tier-1 lesson file so the
+                # founder has a rollback trail when a bad lesson edit
+                # ships. Runs once per boot, idempotent on no-change.
+                async def _bg_lesson_journal():
+                    try:
+                        from services.ora_lessons_loader import (
+                            record_journal_entry_if_changed,
+                        )
+                        r = await record_journal_entry_if_changed(db)
+                        if r.get("changed"):
+                            logging.info(
+                                f"[STARTUP-BG] lesson journal: snapshot written, "
+                                f"changed_paths={r.get('changed_paths')}"
+                            )
+                        else:
+                            logging.debug(f"[STARTUP-BG] lesson journal: {r}")
+                    except Exception as e:
+                        logging.warning(f"[STARTUP-BG] lesson journal skipped: {e}")
+                asyncio.create_task(_bg_lesson_journal())
                 # ════════════════════════════════════════════════════════════════
                 
         except Exception as e:

@@ -116,16 +116,35 @@ def build_lessons_block() -> str:
     block is hard-capped at `_TIER1_CAP_TOTAL` characters even if
     individual files come in under their per-file cap — predictable
     token cost is more valuable than 100% inclusion.
+
+    iter 327o — Side-effect: a record of each tier-1 file's hash + size
+    is persisted to the module-level `_LAST_INJECTION_MANIFEST` so the
+    admin endpoint and the learning-journal cron can compare against
+    prior hashes and surface deltas to the founder.
     """
+    import hashlib
     parts: list[str] = []
     sources: list[str] = []
+    manifest: list[dict] = []
     for label, path, cap in _TIER1_FILES:
         body = _read_capped(path, cap)
         if body is None:
+            manifest.append({"label": label, "path": path,
+                              "loaded": False, "size": 0, "sha256": None})
             continue
         parts.append(_format_block(label, body))
         sources.append(Path(path).name)
+        manifest.append({
+            "label": label,
+            "path":  path,
+            "loaded": True,
+            "size":  len(body),
+            "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+        })
+    global _LAST_INJECTION_MANIFEST, _LAST_TOTAL_CHARS
+    _LAST_INJECTION_MANIFEST = manifest
     if not parts:
+        _LAST_TOTAL_CHARS = 0
         logger.info("[lessons-loader] tier-1 empty — no lesson files found")
         return ""
     assembled = (
@@ -141,11 +160,92 @@ def build_lessons_block() -> str:
             assembled[:_TIER1_CAP_TOTAL]
             + f"\n…[total block truncated to {_TIER1_CAP_TOTAL} chars]"
         )
+    _LAST_TOTAL_CHARS = len(assembled)
     logger.info(
         f"[ora-agent] Injected {len(assembled)} chars from "
         f"{len(parts)} lesson files: {', '.join(sources)}"
     )
     return assembled
+
+
+# iter 327o — Module-level mirrors of the last boot's tier-1 state.
+# Read by the admin endpoint (iter 327p) + journal recorder so we don't
+# re-read disk on every API call.
+_LAST_INJECTION_MANIFEST: list[dict] = []
+_LAST_TOTAL_CHARS: int = 0
+
+
+def last_injection_manifest() -> list[dict]:
+    """Return a defensive copy of the most recent tier-1 manifest."""
+    return [dict(r) for r in _LAST_INJECTION_MANIFEST]
+
+
+def tier1_total_chars() -> int:
+    return _LAST_TOTAL_CHARS
+
+
+def tier2_rule_table() -> list[dict]:
+    """Return the configured tier-2 rules so the admin panel can show
+    which keywords gate which file."""
+    out: list[dict] = []
+    for keywords, label, path, cap in _TIER2_RULES:
+        out.append({
+            "label":    label,
+            "path":     path,
+            "cap":      cap,
+            "keywords": list(keywords),
+            "exists":   Path(path).exists(),
+        })
+    return out
+
+
+async def record_journal_entry_if_changed(db) -> dict:
+    """iter 327o — Compare the current tier-1 manifest against the
+    last entry in `ora_learning_journal`. Append a new doc when any
+    file's sha256 changed (or first-ever boot). Best-effort: returns
+    a status dict, never raises.
+
+    The journal lets the founder roll back a bad lesson — every change
+    is captured (who modified the file is best-effort; we record the
+    OS mtime user when available, the hostname/pod, and the diff).
+    """
+    if db is None or not _LAST_INJECTION_MANIFEST:
+        return {"ok": False, "reason": "no_db_or_manifest"}
+    from datetime import datetime, timezone
+    try:
+        # Latest entry (if any) for comparison.
+        last = await db.ora_learning_journal.find_one(
+            {"kind": "tier1_snapshot"},
+            sort=[("ts", -1)],
+        )
+        prev_hashes = {}
+        if last and isinstance(last.get("files"), list):
+            prev_hashes = {f["path"]: f.get("sha256")
+                            for f in last["files"] if "path" in f}
+        cur_hashes = {f["path"]: f.get("sha256")
+                       for f in _LAST_INJECTION_MANIFEST if "path" in f}
+        changed = [p for p, h in cur_hashes.items()
+                    if prev_hashes.get(p) != h]
+        if last is not None and not changed:
+            return {"ok": True, "changed": False, "files_unchanged": len(cur_hashes)}
+        import os
+        import socket
+        await db.ora_learning_journal.insert_one({
+            "kind":            "tier1_snapshot",
+            "ts":              datetime.now(timezone.utc).isoformat(),
+            "total_chars":     _LAST_TOTAL_CHARS,
+            "files":           _LAST_INJECTION_MANIFEST,
+            "changed_paths":   changed,
+            "first_snapshot":  last is None,
+            "pod":             socket.gethostname()[:64],
+            "process_user":    os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown",
+        })
+        return {"ok": True, "changed": True,
+                 "changed_paths": changed,
+                 "first_snapshot": last is None}
+    except Exception as e:
+        logger.warning(f"[lessons-loader] journal write failed: {e}")
+        return {"ok": False, "reason": str(e)[:200]}
 
 
 # ── Tier 2 — keyword-gated, called once per user turn ────────────────

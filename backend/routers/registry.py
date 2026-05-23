@@ -686,6 +686,7 @@ def register_all_routers(app, db):
         ("routers.ora_agent_router", "ORA Autonomous Agent (iter 322fi)"),
         ("routers.ora_attachments_router", "ORA Chat Attachments (iter 327c)"),
         ("routers.ora_github_lock_router", "ORA GitHub Read-Only Lock (iter 327d)"),
+        ("routers.ora_lesson_sources_router", "ORA Lesson Sources & Journal (iter 327o+p)"),
     ]
 
     for module_path, label in _aurem_with_db:

@@ -566,3 +566,47 @@ across 15 iter files.
 | Edit Tier-2 files (SECURITY_PATTERNS.md, ARCHITECTURE.md) | Live immediately (read on every relevant turn) |
 | Add new `dev_*.md` in ora_skills | NOT auto-injected — extend `_TIER1_FILES` or `_TIER2_RULES` to wire it |
 
+
+## iter 327o + 327p backend (2026-02-23) — Lesson Journal + Admin Sources
+
+**327o — Lesson Learning Journal**
+- `services/ora_lessons_loader.py`:
+  - `build_lessons_block()` now stamps sha256 + size per tier-1 file
+    into module-level `_LAST_INJECTION_MANIFEST`.
+  - New helpers: `last_injection_manifest()`, `tier1_total_chars()`,
+    `tier2_rule_table()`.
+  - `record_journal_entry_if_changed(db)` writes a `tier1_snapshot`
+    doc into `db.ora_learning_journal` when any file's hash differs
+    from the prior snapshot. Idempotent on no-change. Records:
+    timestamp, total_chars, full files manifest, changed_paths list,
+    first_snapshot flag, pod hostname, process_user.
+- `server.py` startup → background task `_bg_lesson_journal` calls
+  the recorder. Founder gets a rollback trail.
+
+**327p backend half — Admin sources endpoint**
+- `routers/ora_lesson_sources_router.py`:
+  - `GET /api/admin/ora/lesson-sources` → tier-1 manifest + tier-2
+    rule table + caps + journal_count
+  - `GET /api/admin/ora/lesson-journal?limit=N` → last N snapshots
+  - Both gated by the same `get_admin_user` dep as github-lock router.
+- Registered in `routers/registry.py` alongside github_lock_router.
+
+**Live proof on preview**:
+```
+GET /api/admin/ora/lesson-sources → HTTP 401 (mounted, auth-gated)
+GET /api/admin/ora/lesson-journal → HTTP 401 (mounted, auth-gated)
+ora_learning_journal collection: 1 doc (first-ever baseline)
+  ts: 2026-05-23T03:26:29 UTC
+  total_chars: 8039  (within 8K cap)
+  files: 5 sha256-stamped
+  first_snapshot: True
+```
+
+**Tests**: `test_iter327op_lesson_journal_and_admin.py` — 10 cases.
+Full regression on 12 touched iter files: **156/156 green**.
+
+## Frontend admin panel — queued
+The UI half of 327p (an actual admin tab showing tier-1 + tier-2 +
+journal entries) is deferred to the next iter so this push contains
+only backend changes.
+
