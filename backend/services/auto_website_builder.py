@@ -1124,12 +1124,27 @@ async def _trigger_lead_outreach(db, site_id: str, slug: str,
                     out["skipped"].append({"channel": "whatsapp", "reason": str(e)[:120]})
 
         # Persist outreach event
+        outreach_doc = {
+            "lead_id": lead.get("lead_id"), "site_id": site_id, "slug": slug,
+            "type": "awb_preview", "channels_attempted": list(gates.keys()),
+            "result": out, "ts": _now(),
+        }
         try:
-            await db.outreach_history.insert_one({
-                "lead_id": lead.get("lead_id"), "site_id": site_id, "slug": slug,
-                "type": "awb_preview", "channels_attempted": list(gates.keys()),
-                "result": out, "ts": _now(),
-            })
+            await db.outreach_history.insert_one(outreach_doc)
+        except Exception:
+            pass
+
+        # iter 331c Sprint 6.1 — Consent-Based Data Network hook.
+        # Strictly anonymized post-campaign metadata extraction.
+        # NO writes unless the tenant has data_sharing_consent=true.
+        # Best-effort: never blocks the outreach pipeline.
+        try:
+            from services.consent_data_network import record_network_event_if_consented
+            import asyncio as _aio
+            _aio.create_task(record_network_event_if_consented(
+                lead_id=lead.get("lead_id") or "",
+                outreach_doc=outreach_doc,
+            ))
         except Exception:
             pass
         return out

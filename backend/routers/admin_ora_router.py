@@ -43,6 +43,18 @@ GROUNDING_MIN_EVENTS = int(os.environ.get("ADMIN_ORA_GROUNDING_MIN_EVENTS", "5")
 def set_db(db):
     global _db
     _db = db
+    # iter 331c — propagate to metrics module so cockpit tile works.
+    try:
+        from services import ora_metrics as _M
+        _M.set_db(db)
+    except Exception:
+        pass
+    # iter 331c Sprint 6.1 — propagate to consent network module.
+    try:
+        from services import consent_data_network as _CDN
+        _CDN.set_db(db)
+    except Exception:
+        pass
 
 
 def _ensure_admin(request: Request):
@@ -453,3 +465,69 @@ async def admin_ora_recent(request: Request, limit: int = 25):
     async for d in _db.admin_ora_qa.find({}, {"_id": 0}).sort("ts", -1).limit(limit):
         rows.append(d)
     return {"ok": True, "count": len(rows), "history": rows}
+
+
+
+# ── iter 331c Sprint 6 — ORA Health tile (Cockpit) ─────────────────
+
+@router.get("/api/admin/ora/health")
+async def admin_ora_health(request: Request, days: int = 7):
+    """Rolling-window health snapshot for the ORA Cockpit tile.
+
+    Returns a green/yellow/red status + the underlying numbers so the
+    founder can see at a glance whether ORA is degrading.
+    """
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    try:
+        from services.ora_metrics import health_snapshot
+        snap = await health_snapshot(days=max(1, min(int(days or 7), 90)))
+    except Exception as e:
+        raise HTTPException(500, f"metrics error: {e}")
+    return snap
+
+
+# ── iter 331c Sprint 6 — Vanguard Security score (Cockpit) ─────────
+
+@router.get("/api/admin/ora/vanguard-status")
+async def admin_ora_vanguard_status(request: Request):
+    """Return the latest Vanguard Security score for the Cockpit tile
+    + Morning Brief line. Reads the most recent persisted score from
+    `vanguard_scores` collection (populated by the existing Vanguard
+    cron). Returns a neutral 'no data yet' shape when the collection is
+    empty so the UI never crashes."""
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    try:
+        # Look for the most recent doc across the most likely collection
+        # names — the Vanguard router was added before this refactor.
+        for col in ("vanguard_scores", "vanguard_runs",
+                    "aurem_vanguard_scores", "vanguard_security_runs"):
+            doc = await _db[col].find_one({}, {"_id": 0}, sort=[("ts", -1)])
+            if doc:
+                score = (
+                    doc.get("score") or doc.get("overall_score")
+                    or doc.get("security_score")
+                )
+                return {
+                    "ok":     True,
+                    "score":  score,
+                    "status": (
+                        "green"  if (score or 0) >= 80
+                        else "yellow" if (score or 0) >= 60
+                        else "red"
+                    ),
+                    "last_ts": doc.get("ts") or doc.get("created_at"),
+                    "source_collection": col,
+                    "raw":    {k: v for k, v in doc.items() if k != "details"},
+                }
+        return {
+            "ok":     True,
+            "score":  None,
+            "status": "gray",
+            "message": "No Vanguard score yet — run aurem_vanguard once.",
+        }
+    except Exception as e:
+        raise HTTPException(500, f"vanguard query failed: {e}")

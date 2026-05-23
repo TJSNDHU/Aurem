@@ -61,12 +61,27 @@ def _format_brief(run: dict) -> str:
         f"in {run.get('duration_seconds', 0)}s"
     )
 
+    # iter 331c Sprint 6.3 — Vanguard Security line.
+    # Best-effort; never breaks the brief.
+    security_line = ""
+    try:
+        # Synchronous shim — we can't await inside _format_brief, but the
+        # caller (dispatch_brief) is async, so we expose a sync helper
+        # that reads the stashed line from run["security_line"] if set.
+        security_line = run.get("security_line") or ""
+    except Exception:
+        security_line = ""
+
     lines = [
         headline,
         "",
         f"  Scout: {leads} lead{'s' if leads != 1 else ''} processed",
         f"  Blast: {sent}/{processed} sent" if processed else "  Blast: 0 eligible",
         f"  Brief: {brief_id or 'not_generated'}",
+    ]
+    if security_line:
+        lines.append(f"  {security_line}")
+    lines += [
         "",
         f"  Run ID: {run.get('run_id', '?')}",
         f"  Time:   {run.get('started_at', '?')}",
@@ -182,6 +197,16 @@ async def dispatch_brief(db: Any, run: dict) -> dict:
     Also drains db.alerts_digest_queue and appends the consolidated
     overnight QA digest to the brief (iter 286.0 alert suppression).
     """
+    # ── iter 331c Sprint 6.3 — Vanguard Security one-liner ──
+    try:
+        from services.vanguard_alerts import (
+            morning_brief_security_line, set_db as _set_va_db,
+        )
+        _set_va_db(db)
+        run["security_line"] = await morning_brief_security_line()
+    except Exception:
+        run["security_line"] = ""
+
     # ── Drain pending alerts digest queue (mute-mode consolidated list) ──
     digest_summary: dict = {"pending": 0, "by_source": {}, "sample_ids": []}
     try:

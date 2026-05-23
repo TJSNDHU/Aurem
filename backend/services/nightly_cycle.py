@@ -331,6 +331,42 @@ def register_nightly_jobs(scheduler, db):
     except Exception as e:
         logger.warning(f"[NightlyCycle] Pixel buffer not scheduled: {e}")
 
+    # iter 331c Sprint 6.1 — Consent revocation purge (PIPEDA/GDPR).
+    # Runs daily at 03:30 UTC. Hard-deletes aurem_network_leads rows
+    # for every tenant whose 30-day grace period has elapsed.
+    try:
+        from services.consent_data_network import (
+            purge_scheduler_tick, set_db as set_cdn_db,
+        )
+        set_cdn_db(db)
+        scheduler.add_job(
+            purge_scheduler_tick,
+            "cron", hour=3, minute=30,
+            id="aurem_consent_purge",
+            replace_existing=True,
+        )
+        logger.info("[NightlyCycle] Consent revocation purge scheduled (3:30 AM)")
+    except Exception as e:
+        logger.warning(f"[NightlyCycle] Consent purge not scheduled: {e}")
+
+    # iter 331c Sprint 6.3 — Vanguard Security threshold alert.
+    # Runs daily at 03:45 UTC. Sends Telegram if score < 80.
+    try:
+        from services.vanguard_alerts import (
+            check_and_alert_if_below_threshold, set_db as set_va_db,
+        )
+        set_va_db(db)
+        scheduler.add_job(
+            check_and_alert_if_below_threshold,
+            "cron", hour=3, minute=45,
+            id="aurem_vanguard_alert",
+            replace_existing=True,
+        )
+        logger.info("[NightlyCycle] Vanguard threshold alert scheduled (3:45 AM)")
+    except Exception as e:
+        logger.warning(f"[NightlyCycle] Vanguard alert not scheduled: {e}")
+
+
     # Anomaly detector — every 5 minutes (Iteration 207)
     try:
         from services.anomaly_detector import detect_anomalies, set_db as set_ad_db

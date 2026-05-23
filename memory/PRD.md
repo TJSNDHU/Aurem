@@ -911,4 +911,37 @@ iter 326 recent + iter 322er.
   **Tests: 14 new (`test_iter331b_sprint5_fork_and_plan_guard.py`) — all passing. Total iter-331 passing: 110.**
 
   **Founder push to GitHub** required to ship Sprint 5 to aurem.live.
+
+- iter 331c — Sprint 6 (Metrics + Consent Data Network + Vanguard + Portability):
+
+  **Sprint 6.1 — Consent-Based Data Network (PIPEDA / GDPR):**
+  • `services/consent_data_network.py` — full state machine with consent default=false, 20% discount toggle when true, 30-day grace-period purge on opt-out.
+  • Anonymizer extracts strictly non-PII fields (industry, city, region, country, company_size, channel, outcome). Defense-in-depth regex blocks PII patterns even if they leak into "safe" fields. Tenant_id never written — replaced with a SHA-256 non-reversible token (salt in `ORA_NETWORK_TENANT_SALT` env var).
+  • `record_network_event_if_consented` hook wired into the outreach pipeline (`auto_website_builder.py`). Best-effort, never blocks outreach.
+  • Daily purge cron at 03:30 UTC scans `network_purge_due_at` timestamps and hard-deletes the right rows.
+  • Endpoints: `GET/PATCH /api/me/consent`, `POST /api/admin/consent/purge`, `GET /api/admin/consent/network/stats`. All persistence happens via Mongo (`user_profiles` + new `aurem_network_leads` collection).
+  • **6 dedicated compliance tests** — including 2 that PROVE no row is written when consent=false (one direct hook invocation, one full anonymizer pass with PII fields present).
+
+  **Sprint 6.2 — Per-session metrics + Health endpoint:**
+  • `services/ora_metrics.py` — `record_tool_call`, `record_prose_scrub`, `record_loop_halt`, `record_session_end`, `health_snapshot`. Persists to `ora_session_metrics` Mongo collection.
+  • Wired into the `invoke_tool` dispatcher — every tool call increments counters automatically.
+  • `/api/admin/ora/health?days=7` returns green/yellow/red status + reasons (tool_failure_rate >20% → red, success_rate <50% → red, >3 loops in window → yellow).
+  • Recommend_fork nudge — when a session crosses 100 tool calls, a one-time system-role hint suggests `fork_context` for the next deep-dive task.
+
+  **Sprint 6.3 — Vanguard + Cockpit Tile + Portability Audit:**
+  • `services/vanguard_alerts.py` — reads latest Vanguard score from any of 4 candidate collections; Telegram alert if <80 (configurable via `ORA_VANGUARD_ALERT_THRESHOLD`); dedup by (score, day) so no spam.
+  • Daily 03:45 UTC cron checks + alerts.
+  • Morning Brief now includes one-line "Security: 92/100 ✓" status (or warning + threshold note if below).
+  • `OraHealthTile.jsx` — Cockpit tile reading both `/api/admin/ora/health` + `/api/admin/ora/vanguard-status`. Green/yellow/red dot, supporting numbers, reasons-when-not-green.
+  • **Frontend portability audit** (`/app/memory/tier3/FRONTEND_PORTABILITY_AUDIT.md`): 0 hardcoded credentials, 0 Emergent imports, 0 hardcoded `/app/...` paths. 3 hardcoded API endpoints fixed (PublicStatus.jsx, useAuth.js, LuxeV2Pages.jsx) — now route through `REACT_APP_PUBLIC_BASE_URL` (new optional env var) or same-origin detection. The ~45 remaining `aurem.live` references are intentional brand/SEO/email — not lock-in.
+
+  **E2E (real round-trips against preview backend):**
+  • `GET /api/me/consent` (new tenant) → `consent: false, discount: 0%`.
+  • `PATCH /api/me/consent {consent:true}` → `current_consent: true`.
+  • `GET /api/me/consent` (after) → `discount_active: true, discount_pct: 20`, granted-at timestamp.
+  • `PATCH /api/me/consent {consent:false}` → `purge_due_at` = exactly 30 days from now.
+
+  **Tests:** 14 new (`test_iter331c_sprint6_consent_metrics_vanguard.py`) — total iter-331 passing: **124**.
+
+  **Founder push to GitHub** required to ship Sprint 6 to aurem.live.
   **Founder push to GitHub** required to ship Sprint 4 to aurem.live.

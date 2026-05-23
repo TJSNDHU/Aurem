@@ -740,6 +740,18 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] admin_ora_router not loaded: {e}")
 
+    # iter 331c Sprint 6.1 — Consent-based data network (PIPEDA/GDPR).
+    if not _should_skip("routers.consent_router"):
+        try:
+            from routers.consent_router import router as consent_router, set_db as set_consent_db
+            app.include_router(consent_router)
+            if db is not None:
+                set_consent_db(db)
+            logger.info("[REGISTRY] consent_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] consent_router not loaded: {e}")
+
+
     # iter 326ff/gg/hh — Phase 3 P3: voice tuning, morning brief, skills marketplace
     if not _should_skip("routers.ora_phase3_router"):
         try:

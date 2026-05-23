@@ -19,20 +19,19 @@ Updated: 2026-MM-DDTHH:MM:SSZ
 ## Current State
 
 ---
-Task: iter 331b — Sprint 5 COMPLETE (fork_context + plan-first guard)
+Task: iter 331c — Sprint 6 COMPLETE (metrics + consent network + Vanguard + portability audit)
 Succeeded:
-  - fork_context tool delivered with own tools-free LLM call path (OpenRouter primary, Emergent LLM key fallback). E2E proven with 3 real LLM round-trips: debug (zero-division bug found), qa (CODE_STANDARDS verified), integration_check (Stripe webhook sig confirmed).
-  - Plan-first hard guard in services/ora_guards.py: blocks create_file/safe_edit for brand-new files unless propose_build_plan was approved this session within the 1-hour TTL.
-  - Dispatcher (invoke_tool) wired to fire plan-first + destructive guards BEFORE any tool runs — guards are now code-enforced, not just policy.
-  - mark_plan_approved auto-called when a propose_build_plan card is approved through the existing approval flow.
-  - 110/110 regression tests passing (95 from prior sprints + 14 new Sprint 5 tests + 1 marker).
+  - Sprint 6.1: Consent-Based Data Network. set_consent / get_consent state machine, anonymizer with PII regex defense-in-depth, record_network_event_if_consented hook in outreach pipeline, 30-day purge cron, /api/me/consent endpoints. CRITICAL compliance proof: data NEVER written if consent=false (verified by 2 dedicated unit tests).
+  - Sprint 6.2: ora_session_metrics collection + health_snapshot + /api/admin/ora/health endpoint. Recommend_fork nudge fires when session crosses 100 tool calls.
+  - Sprint 6.3: OraHealthTile cockpit component (reads health + Vanguard score). vanguard_alerts module sends Telegram if score <80, daily 03:45 UTC cron. Morning Brief now includes one-line security status. Frontend portability audit: 3 hardcoded API endpoints fixed (PublicStatus, useAuth, LuxeV2Pages); REACT_APP_PUBLIC_BASE_URL added as optional env var.
+  - 124/124 regression tests passing. 14 new Sprint 6 tests. Real E2E: consent toggle round-trip + 30-day purge scheduling verified live against preview backend.
 Blocker: none
 Next:
-  - Sprint 6: per-session metrics collection (ora_session_metrics) + ORA Health tile in Cockpit + Telegram alert on low score.
-  - Frontend portability audit (scan /app/frontend/src/ for hardcoded URLs).
-  - Vanguard Security portability + Cockpit tile + Morning Brief security line.
-Cost: ~$0.001 (3 real LLM calls in fork_context E2E proof)
+  - User pushes to GitHub → redeploys aurem.live to ship Sprint 6.
+  - Backlog: real vector embeddings (90 MB MiniLM-L6 + sqlite-vec) when memory grows past ~50 docs.
+  - Backlog: aggregate predictive lead scorer that consumes aurem_network_leads (once enough consented tenants contribute).
+Cost: $0.00 (all unit + curl tests; no LLM calls this sprint)
 Branch: main
 PIDs: []
-Updated: 2026-02-23T21:30:00Z
+Updated: 2026-02-23T22:00:00Z
 ---

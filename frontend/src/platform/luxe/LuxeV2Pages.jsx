@@ -159,7 +159,11 @@ const useApi = (path, deps = [], intervalMs = null) => {
 
 export const LuxeLiveHealth = () => {
   const toast = useV2Toast();
-  const scores = useApi('/api/repair/scores?url=https://aurem.live', [], 30000);
+  // iter 331c Sprint 6.3 — use env var so the page works on any deployed domain.
+  const _ownUrl = (process.env.REACT_APP_PUBLIC_BASE_URL
+                    || (typeof window !== 'undefined' ? window.location.origin : '')
+                    || 'https://aurem.live');
+  const scores = useApi(`/api/repair/scores?url=${encodeURIComponent(_ownUrl)}`, [], 30000);
   const incidents = useApi('/api/incidents/list?limit=20', [], 30000);
   const [scanning, setScanning] = useState(false);
   const [resolvingId, setResolvingId] = useState(null);

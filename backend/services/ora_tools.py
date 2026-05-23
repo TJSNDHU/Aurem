@@ -4019,6 +4019,22 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
     result["elapsed_ms"] = elapsed_ms
     result["ts"] = _now_iso()
 
+    # iter 331c Sprint 6 — per-session metrics. Best-effort, never blocks.
+    try:
+        from services import ora_metrics as _M
+        if not isinstance(args, dict):
+            args = {}
+        sess_for_metrics = str(args.get("_session_id") or actor or "default")
+        asyncio.create_task(_M.record_tool_call(
+            session_id=sess_for_metrics,
+            tool=name,
+            ok=bool(result.get("ok")),
+            elapsed_ms=elapsed_ms,
+            blocked_by=result.get("blocked_by"),
+        ))
+    except Exception:
+        pass
+
     # Audit log (best-effort, never blocks)
     asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
     return result

@@ -18,6 +18,8 @@ import {
 import { safeFetchJson } from "../../lib/safeFetchJson";
 import SlaCard from "./SlaCard";
 import OutreachHealthCard from "./OutreachHealthCard";
+// iter 331c Sprint 6.3 — ORA Health tile (metrics + Vanguard score)
+import OraHealthTile from "./OraHealthTile";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_MS = 25000;
@@ -166,6 +168,9 @@ export default function OraCtoCockpit() {
 
       {/* iter 330 — Outreach Health card (7 channels) */}
       <OutreachHealthCard />
+
+      {/* iter 331c Sprint 6 — ORA Health + Vanguard Security tile */}
+      <OraHealthTile />
 
       {/* iter 326c — Provider chain health (DeepSeek → FreeLLMAPI → Claude → Ollama → Groq) */}
       <ProviderHealthPanel

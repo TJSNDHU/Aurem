@@ -136,7 +136,8 @@ export default function PublicStatus() {
   const embedUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/public/status/badge.json`
-      : "https://aurem.live/api/public/status/badge.json";
+      // iter 331c Sprint 6.3 — portable fallback uses env var.
+      : `${(process.env.REACT_APP_PUBLIC_BASE_URL || process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "")}/api/public/status/badge.json`;
   const embedShield = `https://img.shields.io/endpoint?url=${encodeURIComponent(embedUrl)}`;
   const embedMarkdown = `![AUREM Autonomy](${embedShield})`;
 

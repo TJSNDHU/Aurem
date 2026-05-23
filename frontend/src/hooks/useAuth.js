@@ -6,7 +6,20 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
 
-const API = (typeof window !== 'undefined' && window.location.hostname.includes('aurem.live') ? 'https://aurem.live' : process.env.REACT_APP_BACKEND_URL) + '/api';
+// iter 331c Sprint 6.3 — portable same-origin detection.
+// On a deployed custom domain (anything except localhost / *.preview)
+// use same-origin so the K8s ingress routes /api correctly. On
+// preview/dev, use REACT_APP_BACKEND_URL. Works for aurem.live or any
+// other future custom domain without code change.
+const API = (() => {
+  if (typeof window === 'undefined') {
+    return (process.env.REACT_APP_BACKEND_URL || '') + '/api';
+  }
+  const host = window.location.hostname || '';
+  const isPreview = host === 'localhost' || host.endsWith('.preview.emergentagent.com')
+                    || host.endsWith('.emergentagent.com');
+  return (isPreview ? process.env.REACT_APP_BACKEND_URL : window.location.origin) + '/api';
+})();
 
 const AuthContext = createContext(null);
 

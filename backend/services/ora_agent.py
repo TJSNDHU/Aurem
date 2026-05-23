@@ -3371,6 +3371,28 @@ async def _continue_loop(
 
     while iterations < MAX_TOOL_ITERATIONS:
 
+        # iter 331c Sprint 6 — recommend_fork nudge. After the session
+        # has accumulated >100 tool calls, inject a one-time system hint
+        # suggesting `fork_context` for the next deep-dive task. Helps
+        # ORA self-promote to fresh sub-sessions before context bloat
+        # degrades signal-to-noise. Only fires once per session.
+        if iterations == 100 and not any(
+            m.get("role") == "system"
+            and "FORK_CONTEXT_NUDGE" in (m.get("content") or "")
+            for m in history
+        ):
+            history.append({
+                "role": "system",
+                "content": (
+                    "FORK_CONTEXT_NUDGE: This session has run 100+ tool "
+                    "calls. For the next deep-dive debug/QA/integration-"
+                    "check task, consider `fork_context(task_type=..., "
+                    "brief=..., relevant_files=[...])` so the sub-task "
+                    "runs in a fresh context window. The main session's "
+                    "context is approaching saturation."
+                ),
+            })
+
         # FIX #6 — wall-clock guard, checked at the top of every iteration
         elapsed = time.monotonic() - loop_start
         if elapsed > MAX_LOOP_WALL_SECONDS:
