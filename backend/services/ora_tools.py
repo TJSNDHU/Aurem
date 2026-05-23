@@ -3995,12 +3995,75 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
         except Exception as _e:
             logger.debug(f"[ora_tools] guard layer non-fatal: {_e}")
 
+        # iter 331d — Developer Portal guards. Only run when this call
+        # is initiated by an external developer (carries _dev_user_id).
+        # Internal ORA/founder sessions are unaffected.
+        _dev_user_id = (args or {}).get("_dev_user_id") if isinstance(args, dict) else None
+        if _dev_user_id:
+            try:
+                from services import developer_portal_core as _D
+                # Token wall — refuse if balance hits 0.
+                wall = await _D.enforce_token_wall(_dev_user_id)
+                if not wall.get("ok") and wall.get("error") == "token_wall":
+                    result = {
+                        "ok":     False,
+                        "error":  "token_wall",
+                        "blocked_by": "token_wall",
+                        "tokens_remaining": 0,
+                        "options": wall.get("options", {}),
+                        "http_status": 402,
+                    }
+                    elapsed_ms = int((time.time() - start) * 1000)
+                    result["tool"] = name
+                    result["elapsed_ms"] = elapsed_ms
+                    result["ts"] = _now_iso()
+                    asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                    return result
+                # Per-developer rate limit (10/min, 100/day on free tier).
+                rl = await _D.check_rate_limit(_dev_user_id)
+                if not rl.get("ok"):
+                    result = {
+                        "ok":     False,
+                        "error":  rl.get("error") or "rate_limited",
+                        "blocked_by": "developer_rate_limit",
+                        "limit":  rl.get("limit"),
+                        "window": rl.get("window"),
+                        "http_status": 429,
+                    }
+                    elapsed_ms = int((time.time() - start) * 1000)
+                    result["tool"] = name
+                    result["elapsed_ms"] = elapsed_ms
+                    result["ts"] = _now_iso()
+                    asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                    return result
+                # Abuse pattern check (shell commands only).
+                cmd = (args.get("cmd") or args.get("command") or "")
+                if cmd:
+                    ab = await _D.check_abuse_pattern(_dev_user_id, cmd)
+                    if ab.get("blocked"):
+                        result = {
+                            "ok":     False,
+                            "error":  ab["message"],
+                            "blocked_by": "abuse_pattern",
+                            "matched": ab.get("matched"),
+                            "http_status": 403,
+                        }
+                        elapsed_ms = int((time.time() - start) * 1000)
+                        result["tool"] = name
+                        result["elapsed_ms"] = elapsed_ms
+                        result["ts"] = _now_iso()
+                        asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                        return result
+            except Exception as _e:
+                logger.debug(f"[ora_tools] developer-portal guards non-fatal: {_e}")
+
         fn = TOOL_REGISTRY[name]["fn"]
         # Light arg sanitisation — coerce dict
         if not isinstance(args, dict):
             args = {}
         try:
-            result = await fn(**args)
+            result = await fn(**{k: v for k, v in args.items()
+                                  if not k.startswith("_")})  # strip _session_id/_dev_user_id
         except TypeError as e:
             # iter 326ss — surface the tool's args_spec on bad-args so
             # the LLM brain can self-correct on the next iteration
@@ -4032,6 +4095,21 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
             elapsed_ms=elapsed_ms,
             blocked_by=result.get("blocked_by"),
         ))
+    except Exception:
+        pass
+
+    # iter 331d — Developer-portal token deduction. Only for external
+    # developer calls (carries _dev_user_id), and only on successful
+    # tool runs. Failures don't burn tokens.
+    try:
+        dev_uid = (args or {}).get("_dev_user_id") if isinstance(args, dict) else None
+        if dev_uid and result.get("ok"):
+            from services import developer_portal_core as _D
+            asyncio.create_task(_D.deduct_tokens(
+                user_id=dev_uid,
+                tool_name=name,
+                session_id=str(args.get("_session_id") or ""),
+            ))
     except Exception:
         pass
 

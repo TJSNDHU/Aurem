@@ -366,6 +366,20 @@ def register_nightly_jobs(scheduler, db):
     except Exception as e:
         logger.warning(f"[NightlyCycle] Vanguard alert not scheduled: {e}")
 
+    # iter 331d — Developer-portal: clean up sandboxes idle > 45 days.
+    # Runs daily at 04:15 UTC.
+    try:
+        from services.developer_portal_core import cleanup_inactive_sandboxes
+        scheduler.add_job(
+            cleanup_inactive_sandboxes,
+            "cron", hour=4, minute=15,
+            id="aurem_sandbox_cleanup",
+            replace_existing=True,
+        )
+        logger.info("[NightlyCycle] Sandbox cleanup scheduled (4:15 AM, 45d idle)")
+    except Exception as e:
+        logger.warning(f"[NightlyCycle] Sandbox cleanup not scheduled: {e}")
+
 
     # Anomaly detector — every 5 minutes (Iteration 207)
     try:

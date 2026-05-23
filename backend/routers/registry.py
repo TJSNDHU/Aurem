@@ -751,6 +751,26 @@ def register_all_routers(app, db):
         except Exception as e:
             logger.warning(f"[REGISTRY] consent_router not loaded: {e}")
 
+    # iter 331d — Developer Portal foundation (signup/OTP/BYOK/tokens).
+    if not _should_skip("routers.developer_portal_router"):
+        try:
+            from routers.developer_portal_router import (
+                router as dev_portal_router, set_db as set_dev_portal_db,
+            )
+            app.include_router(dev_portal_router)
+            if db is not None:
+                set_dev_portal_db(db)
+                # Ensure Mongo indexes once at startup.
+                from services.developer_portal_core import ensure_indexes
+                try:
+                    import asyncio as _aio
+                    _aio.create_task(ensure_indexes())
+                except Exception:
+                    pass
+            logger.info("[REGISTRY] developer_portal_router loaded")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
+
 
     # iter 326ff/gg/hh — Phase 3 P3: voice tuning, morning brief, skills marketplace
     if not _should_skip("routers.ora_phase3_router"):
