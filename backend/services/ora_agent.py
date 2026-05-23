@@ -72,8 +72,21 @@ EXPIRY_MINUTES:        int = int(os.environ.get("ORA_APPROVAL_EXPIRY_MIN", "60")
 # normal approve path and ORA proceeds. Tier 3 (irreversible /
 # high-risk) is NOT auto-executed — founder must still click approve.
 TIER2_AUTO_EXECUTE_SECONDS: int = 30
-MAX_TOOL_ITERATIONS:   int = 8
-MAX_LOOP_WALL_SECONDS: int = int(os.environ.get("ORA_MAX_LOOP_S", "300"))
+# iter 327q — bumped from 8 → 60 iterations and wall-clock from 300 → 900 s.
+# Multi-file refactors need ~30+ tool calls. Old caps killed the loop mid-job
+# and the founder had to type "continue" by hand. Both are env-overridable
+# (ORA_MAX_TOOL_ITERATIONS / ORA_MAX_LOOP_S) so a future tight pod can dial
+# them back without a code change. Combined with the checkpoint+auto-resume
+# below, long jobs now survive a wall-clock hit transparently.
+MAX_TOOL_ITERATIONS:   int = int(os.environ.get("ORA_MAX_TOOL_ITERATIONS", "60"))
+MAX_LOOP_WALL_SECONDS: int = int(os.environ.get("ORA_MAX_LOOP_S", "900"))
+# iter 327q — mid-task checkpoint cadence. Every N tool-call iterations
+# _continue_loop persists the running history+iteration to ora_job_checkpoints
+# so a crashed pod can resume from the last checkpoint instead of restarting.
+CHECKPOINT_EVERY_N_ITERS: int = int(os.environ.get("ORA_CHECKPOINT_EVERY", "50"))
+# iter 327q — long-job progress Telegram cadence (FIX 5). Founder gets a
+# "still working — step X of Y done" ping every N minutes during long runs.
+LONG_JOB_PROGRESS_MINUTES: int = int(os.environ.get("ORA_LONG_JOB_PING_MIN", "30"))
 PENDING_COLLECTION:    str = "ora_pending_actions"
 HISTORY_COLLECTION:    str = "ora_agent_history"
 HISTORY_CAP:           int = 40   # non-system messages kept per session
@@ -900,6 +913,9 @@ TIER_2_APPROVE: set[str] = {
     # is non-trivial (~3s per call) and we never want ORA crawling a
     # site by mistake without founder visibility.
     "browser_get_text", "browser_screenshot",
+    # iter 327q — FIX 3 + P1: BUILD MODE plan + self-journaling lesson
+    # proposal. Both gated by the 30-second Tier-2 cancel window.
+    "propose_build_plan", "propose_lesson",
 }
 
 TIER_3_HIGH_RISK: set[str] = {
@@ -917,7 +933,16 @@ TIER_3_HIGH_RISK: set[str] = {
 # appropriate tier set with the impl registered in TOOL_REGISTRY.
 
 
-def tier_of(name: str) -> str:
+def tier_of(name: str, args: dict | None = None) -> str:
+    # iter 327q — FIX 4: legion_exec is risk-aware. Low/read-only commands
+    # get the Tier-2 30 s cancel window; anything else (medium/high/write)
+    # stays Tier-3 and needs explicit founder CONFIRM. `risk_hint` is
+    # supplied by the LLM in args; defaults to high if missing.
+    if name == "legion_exec" and isinstance(args, dict):
+        rh = str(args.get("risk_hint") or "").lower()
+        if rh in ("low", "read", "read-only", "readonly", "safe"):
+            return "tier2_approve"
+        return "tier3_high_risk"
     if name in TIER_1_AUTO:
         return "tier1_auto"
     if name in TIER_2_APPROVE:
@@ -944,6 +969,12 @@ def set_db(database) -> None:
         job_checkpoints.set_db(database)
     except Exception as e:
         logger.warning(f"[ora-agent] decision_memory/checkpoint wire failed: {e}")
+    # iter 327q — wire BUILD MODE + lesson proposal db handle.
+    try:
+        from services import ora_build_mode
+        ora_build_mode.set_db(database)
+    except Exception as e:
+        logger.debug(f"[ora-agent] build_mode wire failed: {e}")
 
 
 def _now() -> datetime:
@@ -2569,6 +2600,30 @@ Operating principles:
       English ("the test failed, here's why"). Banned: ASCII success
       boxes without real tool output. Banned: "looks good!" / "should
       be working" — only literal tool output counts.
+
+      iter 327q PHASED BUILD: for any feature touching MORE THAN 2 files,
+      Step 1 must be `propose_build_plan` (Tier-2, 30s cancel window).
+      Do NOT begin writing files until that returns ok=True. After the
+      plan lands, build file-by-file, calling run_pytest after each one.
+
+  17. SELF-LEARNING (iter 327q). When you catch yourself making a
+      mistake mid-chat — a wrong number, a misread file path, a tool
+      misuse — say so in plain English first ("I made a mistake — I
+      said X but the real value is Y"). THEN ask: "Should I add this
+      as a lesson so I don't repeat it?" If the founder agrees, call
+      `propose_lesson` (Tier-2). Never edit the lessons file directly
+      or via any other tool — `propose_lesson` is the only path. The
+      founder must approve every lesson; you don't autonomously
+      rewrite your own rule book.
+
+  18. LEGION ACCESS (iter 327q). `legion_exec` is now risk-tiered.
+      Read-only commands (cat, ls, grep, ps, df, free, pytest --
+      collect-only, curl GET) MUST be called with `risk_hint="low"`;
+      they route through Tier-2 (30s cancel window). Write/destructive
+      commands (rm, mv, install, sudo, systemctl, anything that
+      modifies disk or services) MUST be called with `risk_hint="high"`
+      and stay Tier-3 (founder CONFIRM required). When in doubt, pick
+      "high" — never under-classify risk.
 """
 
 
@@ -2808,6 +2863,151 @@ async def run_turn(
     return await _continue_loop(session_id, history, founder_email, progress_cb=progress_cb)
 
 
+# ── iter 327q — Auto-resume queue + scheduler (FIX 1 + FIX 5) ────────
+#
+# When _continue_loop halts on wall_clock, it writes a row to
+# `ora_auto_resume_queue`. A background APScheduler tick polls this
+# collection every 30 s, picks the oldest due row, and calls
+# resume_session() which loads the saved history and re-enters
+# _continue_loop. Net effect: a 30-iter refactor that hits the 900-s
+# wall is transparently resumed without the founder typing "continue".
+
+_AUTO_RESUME_COLLECTION = "ora_auto_resume_queue"
+
+
+async def _enqueue_auto_resume(
+    *,
+    session_id:    str,
+    founder_email: str,
+    history:       list[dict[str, Any]],
+    iterations:    int,
+    reason:        str,
+) -> None:
+    """Persist a checkpoint + queue row so the scheduler can resume."""
+    if _db is None:
+        return
+    from services.job_checkpoints import save_checkpoint
+    await save_checkpoint(
+        job_id=f"ora_session:{session_id}",
+        step_idx=iterations,
+        state={
+            "history":       history,          # full history needed to resume
+            "founder_email": founder_email,
+            "reason":        reason,
+            "ts":            _now().isoformat(),
+        },
+        ttl_hours=24,
+    )
+    await _db[_AUTO_RESUME_COLLECTION].insert_one({
+        "session_id":    session_id,
+        "founder_email": founder_email,
+        "reason":        reason,
+        "iter_at_halt":  iterations,
+        "retries":       0,
+        "max_retries":   3,
+        "queued_at":     _now(),
+        "resume_after":  _now() + timedelta(seconds=5),
+        "status":        "pending",
+    })
+
+
+async def resume_session(session_id: str, founder_email: str) -> dict[str, Any]:
+    """Public entry: re-enter _continue_loop with the saved history.
+
+    Returns the same shape as run_turn — caller (scheduler) just logs it.
+    """
+    history = await _load_history(session_id)
+    if not history:
+        return {"ok": False, "error": "no history for session"}
+    # Inject a synthetic system nudge so the LLM continues the previous task.
+    history.append({
+        "role":    "system",
+        "content": "[auto-resume] Wall-clock budget reset. Continue the "
+                   "previous task from where you left off. Do not restart "
+                   "from scratch — pick up the next file/step.",
+    })
+    return await _continue_loop(session_id, history, founder_email)
+
+
+async def auto_resume_tick(now: datetime | None = None) -> dict[str, Any]:
+    """Background tick — drains up to 5 due auto-resume rows per call.
+
+    Wired into APScheduler from routers/registry.py at 30 s cadence.
+    Best-effort: any failure marks the row as `failed` and (if under the
+    retry cap) re-queues it with exponential backoff.
+    """
+    if _db is None:
+        return {"ok": False, "error": "db_not_ready"}
+    now = now or _now()
+    cur = _db[_AUTO_RESUME_COLLECTION].find({
+        "status":       "pending",
+        "resume_after": {"$lte": now},
+    }).sort("queued_at", 1).limit(5)
+    drained = 0
+    failed = 0
+    async for row in cur:
+        _id = row["_id"]
+        # Reserve the row so two ticks can't run the same resume.
+        upd = await _db[_AUTO_RESUME_COLLECTION].update_one(
+            {"_id": _id, "status": "pending"},
+            {"$set": {"status": "running", "started_at": _now()}},
+        )
+        if upd.modified_count == 0:
+            continue
+        try:
+            result = await resume_session(
+                row["session_id"], row.get("founder_email") or "system",
+            )
+            await _db[_AUTO_RESUME_COLLECTION].update_one(
+                {"_id": _id},
+                {"$set": {
+                    "status":     "done",
+                    "finished_at": _now(),
+                    "halted_for": (result or {}).get("halted_for"),
+                    "iterations": (result or {}).get("iterations"),
+                }},
+            )
+            drained += 1
+        except Exception as e:
+            failed += 1
+            retries = int(row.get("retries") or 0) + 1
+            max_retries = int(row.get("max_retries") or 3)
+            if retries >= max_retries:
+                # Final fail → Telegram alert + mark failed.
+                await _db[_AUTO_RESUME_COLLECTION].update_one(
+                    {"_id": _id},
+                    {"$set": {
+                        "status":     "failed",
+                        "error":      str(e)[:300],
+                        "retries":    retries,
+                        "finished_at": _now(),
+                    }},
+                )
+                try:
+                    from services.silent_failure_alerts import _send as _tg
+                    await _tg(
+                        f"❌ ORA auto-resume failed after {retries} retries: "
+                        f"session={row['session_id']} reason={row.get('reason')} "
+                        f"err={str(e)[:160]}",
+                        fingerprint=f"ora_auto_resume_fail_{row['session_id']}",
+                    )
+                except Exception:
+                    pass
+            else:
+                # Re-queue with exponential backoff: 30 s, 2 min, 8 min.
+                backoff = 30 * (4 ** (retries - 1))
+                await _db[_AUTO_RESUME_COLLECTION].update_one(
+                    {"_id": _id},
+                    {"$set": {
+                        "status":       "pending",
+                        "retries":      retries,
+                        "last_error":   str(e)[:300],
+                        "resume_after": _now() + timedelta(seconds=backoff),
+                    }},
+                )
+    return {"ok": True, "drained": drained, "failed": failed}
+
+
 async def resume_after_decision(
     session_id:    str,
     *,
@@ -2975,17 +3175,33 @@ async def _continue_loop(
     fail_counts: dict     = {}                    # tool_name → consecutive fails
     transient_counts: dict = {}                    # iter 326tt — separate bucket for retryable env failures
     loop_start:  float    = time.monotonic()      # FIX #6
+    last_progress_ping: float = loop_start        # iter 327q — long-job 30-min ping cadence (FIX 5)
 
     while iterations < MAX_TOOL_ITERATIONS:
 
         # FIX #6 — wall-clock guard, checked at the top of every iteration
         elapsed = time.monotonic() - loop_start
         if elapsed > MAX_LOOP_WALL_SECONDS:
+            # iter 327q — FIX 1+5: instead of asking the founder to type
+            # "continue", checkpoint the full state and enqueue an
+            # auto-resume tick. The background scheduler picks it up and
+            # calls resume_session() within ~30 s. The user-visible reply
+            # explains what happened, but the loop resumes hands-free.
+            try:
+                await _enqueue_auto_resume(
+                    session_id=session_id,
+                    founder_email=founder_email,
+                    history=history,
+                    iterations=iterations,
+                    reason="wall_clock",
+                )
+            except Exception as _e:
+                logger.warning(f"[ora-agent] auto-resume enqueue failed: {_e}")
             wall_msg = (
                 f"Wall-clock budget reached ({int(elapsed)}s / "
-                f"{MAX_LOOP_WALL_SECONDS}s). "
-                "Ruk gayi taaki HTTP request hang na ho. "
-                "Agle message mein continue."
+                f"{MAX_LOOP_WALL_SECONDS}s) at iter {iterations}. "
+                "Continuing from where I left off — no need to type "
+                "anything, the next tick will resume automatically."
             )
             history.append({"role": "assistant", "content": wall_msg})
             await _save_history(session_id, history)
@@ -2995,7 +3211,39 @@ async def _continue_loop(
                 "iterations":  iterations,
                 "done":        True,
                 "halted_for":  "wall_clock",
+                "auto_resume": True,
             }
+
+        # iter 327q — FIX 1: mid-task checkpoint every N iterations.
+        # Best-effort; checkpoint failure NEVER breaks the loop.
+        if iterations and iterations % CHECKPOINT_EVERY_N_ITERS == 0:
+            try:
+                from services.job_checkpoints import save_checkpoint
+                await save_checkpoint(
+                    job_id=f"ora_session:{session_id}",
+                    step_idx=iterations,
+                    state={
+                        "history":       history[-40:],   # keep last 40 msgs
+                        "founder_email": founder_email,
+                        "ts":            _now().isoformat(),
+                    },
+                )
+            except Exception as _e:
+                logger.debug(f"[ora-agent] mid-task checkpoint skipped: {_e}")
+
+        # iter 327q — FIX 5: long-job progress Telegram ping every N minutes.
+        if (time.monotonic() - last_progress_ping) >= LONG_JOB_PROGRESS_MINUTES * 60:
+            try:
+                from services.silent_failure_alerts import _send as _tg_send
+                await _tg_send(
+                    f"⏳ ORA long-job progress: still working — "
+                    f"{iterations} tool calls done, "
+                    f"{int((time.monotonic() - loop_start) / 60)} min elapsed",
+                    fingerprint=f"ora_long_job_{session_id}_{iterations // 50}",
+                )
+            except Exception as _e:
+                logger.debug(f"[ora-agent] long-job ping skipped: {_e}")
+            last_progress_ping = time.monotonic()
 
         iterations += 1
         msg = await _llm_turn(history)
@@ -3251,7 +3499,7 @@ async def _continue_loop(
             "tool_calls": [call_raw],  # ← exactly one; the LLM gets one result back
         })
 
-        tier = tier_of(call["name"])
+        tier = tier_of(call["name"], call.get("args"))
 
         # ── TIER 1: execute immediately ───────────────────────────────
         if tier == "tier1_auto":

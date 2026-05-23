@@ -9,9 +9,9 @@ that do not ship frontend source files.
 """
 from __future__ import annotations
 
-BUILT_AT: str = '2026-05-23T01:19:52.811086+00:00'
+BUILT_AT: str = '2026-05-23T03:48:34.168981+00:00'
 SRC_ROOT: str = '/app/frontend/src'
-ENDPOINT_COUNT: int = 983
+ENDPOINT_COUNT: int = 989
 
 SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'],
  '/api/accounting/summary': ['services/api.js'],
@@ -211,7 +211,13 @@ SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'
  '/api/admin/ora/decisions': ['platform/admin/RecentDecisionsPanel.jsx'],
  '/api/admin/ora/email-health': ['platform/admin/EmailHealthCard.jsx'],
  '/api/admin/ora/github-lock': ['platform/admin/OraChat.jsx'],
+ '/api/admin/ora/github-relock': ['platform/admin/OraChat.jsx'],
+ '/api/admin/ora/github-unlock': ['platform/admin/OraChat.jsx'],
+ '/api/admin/ora/lesson-journal': ['platform/admin/LessonSources.jsx'],
+ '/api/admin/ora/lesson-snapshot': ['platform/admin/LessonSources.jsx'],
+ '/api/admin/ora/lesson-sources': ['platform/admin/LessonSources.jsx'],
  '/api/admin/ora/morning-brief': ['platform/admin/MorningBriefCard.jsx', 'platform/admin/MorningBriefMobile.jsx'],
+ '/api/admin/ora/nightly-self-tests': ['platform/admin/LessonSources.jsx'],
  '/api/admin/ora/providers/health': ['platform/SystemOverview.jsx', 'platform/admin/OraCtoCockpit.jsx'],
  '/api/admin/ora/skills': ['platform/admin/SkillsMarketplace.jsx'],
  '/api/admin/ora/skills/': ['platform/admin/SkillsMarketplace.jsx'],

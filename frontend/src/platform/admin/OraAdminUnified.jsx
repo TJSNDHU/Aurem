@@ -33,12 +33,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   Crown, MessageSquare, Activity, Settings as SettingsIcon,
   Zap, Terminal, LogOut, Menu, X, ChevronLeft, ChevronRight,
+  BookOpen,
 } from "lucide-react";
 
 import OraChat from "./OraChat";
 import OraCtoCockpit from "./OraCtoCockpit";
 import OraSettings from "./OraSettings";
 import OraOptimizer from "./OraOptimizer";
+import LessonSources from "./LessonSources";
 import CommandPalette from "./CommandPalette";
 
 // We lazy-load the legacy founder console so its 1374-line bundle only
@@ -55,6 +57,7 @@ const PANEL_BG = "linear-gradient(160deg, rgba(22,22,32,0.78), rgba(10,10,18,0.8
 const TABS = [
   { id: "chat",      label: "Chat",       icon: MessageSquare, Comp: OraChat },
   { id: "cockpit",   label: "Cockpit",    icon: Activity,      Comp: OraCtoCockpit },
+  { id: "memory",    label: "Memory",     icon: BookOpen,      Comp: LessonSources },
   { id: "console",   label: "Console",    icon: Terminal,      Comp: AdminConsole, lazy: true },
   { id: "optimizer", label: "Optimizer",  icon: Zap,           Comp: OraOptimizer },
   { id: "settings",  label: "Settings",   icon: SettingsIcon,  Comp: OraSettings },

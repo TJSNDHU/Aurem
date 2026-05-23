@@ -605,8 +605,140 @@ ora_learning_journal collection: 1 doc (first-ever baseline)
 **Tests**: `test_iter327op_lesson_journal_and_admin.py` — 10 cases.
 Full regression on 12 touched iter files: **156/156 green**.
 
-## Frontend admin panel — queued
-The UI half of 327p (an actual admin tab showing tier-1 + tier-2 +
-journal entries) is deferred to the next iter so this push contains
-only backend changes.
+## iter 327q (2026-02-23) — ORA-CTO Capability Expansion (5 fixes) + P0 Memory UI + P1 Self-Journaling
 
+**FIX 1 — Multi-file refactors without wall-clock hit**
+- `MAX_LOOP_WALL_SECONDS` 300 → 900 s (env: ORA_MAX_LOOP_S).
+- `MAX_TOOL_ITERATIONS` 8 → 60 (env: ORA_MAX_TOOL_ITERATIONS).
+- Mid-task `save_checkpoint` every 50 iters (env: ORA_CHECKPOINT_EVERY).
+- New collection `ora_auto_resume_queue` + APScheduler tick every 30 s.
+  On wall-clock halt, ORA enqueues herself + a checkpoint; tick calls
+  `resume_session()` which re-enters `_continue_loop` with a synthetic
+  "[auto-resume] continue from where you left off" system nudge.
+  No founder typing required. Exponential-backoff retry (30s/2m/8m)
+  capped at 3 attempts; final fail = Telegram alert.
+
+**FIX 2 — Anti-hallucination + nightly self-test**
+- Existing `_ground_reply_against_facts` shield retained.
+- New `services/ora_nightly_self_test.py` runs 5 checks at 02:00 UTC:
+  SYSTEM_PROMPT size, tool-registry reconcile, /api/health, Mongo
+  write+read round-trip, learning-journal reachable. Persists to
+  `ora_nightly_self_tests`. Telegram alert on any failure with daily
+  fingerprint so re-runs don't double-ping.
+
+**FIX 3 — BUILD MODE for >2-file features**
+- New `propose_build_plan` Tier-2 tool: 30-s cancel window for the
+  founder to read the plan before ORA writes code. Plan persisted to
+  `ora_build_plans`. SYSTEM_PROMPT rule 16 amended to require this
+  tool for any build touching more than 2 files.
+
+**FIX 4 — Legion daemon risk-tiered access**
+- `legion_exec` is now **risk-aware**: `risk_hint=low|read` routes
+  through Tier-2 (30-s cancel), everything else stays Tier-3 (founder
+  CONFIRM). SYSTEM_PROMPT rule 18 teaches ORA when to use each.
+- Founder-offline alert reuses existing legion_queue infra; ORA's
+  schema generation unchanged.
+
+**FIX 5 — Long-job UX**
+- Telegram progress ping every 30 min during long runs (env:
+  ORA_LONG_JOB_PING_MIN).
+- Auto-resume retry x3 with exponential backoff (shared with FIX 1).
+
+**P0 — Frontend Memory tab**
+- New `LessonSources.jsx` admin tab (Memory icon) showing tier-1
+  files (sha256 + size + load status), tier-2 keyword rules,
+  learning-journal entries (including lesson-proposal diffs), and
+  the nightly self-test history. "Snapshot now" button hits new
+  `POST /api/admin/ora/lesson-snapshot`.
+
+**P1 — ORA self-journaling (founder-supervised)**
+- New `propose_lesson` Tier-2 tool: ORA proposes a lesson; founder
+  sees 30-s approval card; on approve the lesson is appended to
+  `dev_322ey-ora-mistakes-lessons.md` AND a unified-diff snapshot
+  lands in `ora_learning_journal` (kind=lesson_proposal_applied)
+  for rollback. PII (emails, API keys) rejected by the tool itself.
+  SYSTEM_PROMPT rule 17 makes `propose_lesson` the only path.
+
+**Tests**: `tests/test_iter327q_ora_capability_expansion.py` — 27
+cases. Full regression on iter 327* + iter 326 recent + iter 322er:
+**311 / 311 green**.
+
+## iter 328 series (2026-02-23) — Hardening pass (rate limits, PIPEDA, uptime, DR, load, SLA)
+
+**328a — Tiered rate limits**
+- `middleware/security.py` now classifies each request and applies
+  per-tier limits: auth 5/min, admin 60/min, webhook 100/min,
+  public 30/min (all env-overridable: RL_AUTH_LIMIT etc).
+- Repeat-offender tracker fires one Telegram per IP per 10-minute
+  window after 3+ trips so the founder sees attacks without spam.
+
+**328b — PIPEDA retention in code**
+- New `services/data_retention.py`:
+    • leads > 2 years → move to `leads_archive` collection
+    • users with `deletion_requested_at` > 30 days → PII hard-purge
+    • every action stamped to `pipeda_audit_log`
+- New `routers/pipeda_sla_router.py` exposes 4 super-admin endpoints
+  (`/audit`, `/sweep`, `/request-deletion`, `/sla/snapshot`).
+- Daily APScheduler cron at 04:00 UTC runs `run_retention_sweep`.
+- `/privacy` page already existed (PIPEDA-compliant copy).
+
+**328c — External uptime monitor (UptimeRobot-ready)**
+- `POST /api/uptime/report` accepts pings with shared secret
+  (`EXTERNAL_UPTIME_SECRET` env). When env not set, pings are stored
+  with `secret_ok:false` so founder can wire up without losing data.
+- APScheduler 10-min cron fires Telegram alert if no valid ping for
+  > 10 min (silent monitor = unknown outage).
+- `monthly_uptime_report(db)` ready to splice into morning brief.
+- **Founder setup task**: 5-min UptimeRobot signup → webhook URL
+  https://aurem.live/api/uptime/report + matching secret in env.
+
+**328d — DR restore test (script + monthly cron-ready)**
+- `scripts/dr_restore_test.py` restores the latest backup to a
+  scratch DB `aurem_dr_test_<YYYY-MM>`, compares 8 critical
+  collection counts within 5% tolerance, drops the scratch DB,
+  writes verdict to `dr_restore_tests`. Telegram on fail. Includes
+  documented manual restore procedure in the file header.
+
+**328e — Multi-tenant load test (10 tenants / 1000 leads / 5 chats)**
+- `scripts/multi_tenant_load_test.py` runs 3 parallel workloads
+  (campaign-cycle, leads bulk-add, ORA chat burst) and emits a
+  bottleneck verdict + persists to `load_test_runs`. Defaults match
+  founder spec (10 tenants × 100 leads = 1000 leads, 5 ORA chats).
+
+**328f — SLA + Error Budget**
+- New `services/sla_metrics.py` with explicit targets:
+    • uptime ≥ 99.5% / 30d
+    • ORA p95 reply ≤ 3 s / 24h
+    • email delivery ≥ 95% / 24h
+    • campaign completion ≥ 98% / 24h
+- 15-min APScheduler cron snapshots all 4 metrics into
+  `sla_snapshots` + fires one Telegram per breaching metric per day.
+- New `SlaCard.jsx` mounted in ORA-CTO Cockpit shows pass/fail tiles
+  with live values.
+
+**Live proofs (post-restart smoke)**
+- `/api/health` → 200
+- `POST /api/uptime/report` → 200 stored (secret_ok:false until env set)
+- `/api/admin/pipeda/audit` → 401 (auth-gated)
+- `/api/admin/sla/snapshot` → 401 (auth-gated, mounted)
+- `sla_snapshots` collection: 1 doc (15-min cron fired on boot)
+- `external_uptime_pings` collection: 2 docs (smoke webhook)
+- `ora_learning_journal`: 1 doc (tier-1 manifest snapshot)
+
+**Tests**: `tests/test_iter328_capability_expansion.py` — 18 cases.
+Full regression: **311 / 311 green** across iter 327* + iter 328 +
+iter 326 recent + iter 322er.
+
+## Next Action Items (founder)
+- Push to GitHub → redeploy aurem.live so iter 327q + 328a-f ship.
+- Update `EXTERNAL_UPTIME_SECRET` on prod env; sign up UptimeRobot
+  with the webhook URL above (5-min task; unlocks 328c).
+- Optional: run `python scripts/dr_restore_test.py --dry-run` on
+  prod to confirm `mongorestore` is reachable; schedule monthly.
+- Optional: run the load test against preview first, then prod.
+
+## Backlog
+- P2: Wire monthly external uptime line into Morning Brief once
+  `EXTERNAL_UPTIME_SECRET` is configured.
+- P3: Service-account Google Calendar for shared staff calendar.
+- P3: Friendlier "report expired" 404 page with "Get a fresh scan" CTA.

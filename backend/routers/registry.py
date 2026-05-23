@@ -687,6 +687,8 @@ def register_all_routers(app, db):
         ("routers.ora_attachments_router", "ORA Chat Attachments (iter 327c)"),
         ("routers.ora_github_lock_router", "ORA GitHub Read-Only Lock (iter 327d)"),
         ("routers.ora_lesson_sources_router", "ORA Lesson Sources & Journal (iter 327o+p)"),
+        ("routers.pipeda_sla_router",          "PIPEDA + SLA admin (iter 328b+f)"),
+        ("routers.uptime_webhook_router",      "External uptime webhook (iter 328c)"),
     ]
 
     for module_path, label in _aurem_with_db:
@@ -3441,6 +3443,128 @@ def register_all_routers(app, db):
             misfire_grace_time=1800,
         )
         logger.info("[REGISTRY] Stripe overage cron scheduled — daily 03:00 UTC")
+
+        # iter 327q — ORA auto-resume tick (FIX 1 + FIX 5).
+        # Every 30 seconds, drain pending rows from ora_auto_resume_queue
+        # so long-running ORA tasks that hit ORA_MAX_LOOP_S transparently
+        # continue without the founder typing "continue".
+        async def _ora_auto_resume_job():
+            try:
+                from services.ora_agent import auto_resume_tick
+                out = await auto_resume_tick()
+                if out.get("drained") or out.get("failed"):
+                    logger.info(
+                        f"[ora-auto-resume] drained={out.get('drained')} "
+                        f"failed={out.get('failed')}"
+                    )
+            except Exception as e:
+                logger.warning(f"[ora-auto-resume] tick failed: {e}")
+
+        aurem_scheduler.add_job(
+            _ora_auto_resume_job,
+            "interval",
+            seconds=30,
+            id="aurem_ora_auto_resume",
+            name="ORA auto-resume tick (every 30s)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=60,
+        )
+        logger.info("[REGISTRY] ORA auto-resume tick scheduled — every 30s")
+
+        # iter 327q — ORA nightly self-test (FIX 2).
+        # Runs 5 standard checks at 02:00 UTC; on any failure fires a
+        # Telegram alert BEFORE the morning brief so the founder wakes
+        # up to a clear single-line report.
+        async def _ora_nightly_self_test_job():
+            try:
+                from services.ora_nightly_self_test import run_nightly_self_test
+                await run_nightly_self_test(db)
+            except Exception as e:
+                logger.warning(f"[ora-nightly-self-test] failed: {e}")
+
+        aurem_scheduler.add_job(
+            _ora_nightly_self_test_job,
+            _SCCron(hour=2, minute=0),
+            id="aurem_ora_nightly_self_test",
+            name="ORA nightly self-test (02:00 UTC)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=1800,
+        )
+        logger.info("[REGISTRY] ORA nightly self-test scheduled — daily 02:00 UTC")
+
+        # iter 328b — PIPEDA daily retention sweep (04:00 UTC).
+        async def _pipeda_sweep_job():
+            try:
+                from services.data_retention import run_retention_sweep
+                out = await run_retention_sweep(db)
+                logger.info(f"[pipeda-cron] {out}")
+            except Exception as e:
+                logger.warning(f"[pipeda-cron] failed: {e}")
+
+        aurem_scheduler.add_job(
+            _pipeda_sweep_job,
+            _SCCron(hour=4, minute=0),
+            id="aurem_pipeda_daily_sweep",
+            name="PIPEDA retention sweep (04:00 UTC)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("[REGISTRY] PIPEDA retention cron scheduled — daily 04:00 UTC")
+
+        # iter 328f — SLA snapshot every 15 min. Cheap (4 small queries)
+        # and fires Telegram alerts only on transition to breach.
+        async def _sla_snapshot_job():
+            try:
+                from services.sla_metrics import (
+                    compute_sla_snapshot, maybe_alert_sla_breach,
+                )
+                snap = await compute_sla_snapshot(db)
+                await maybe_alert_sla_breach(db, snap)
+            except Exception as e:
+                logger.warning(f"[sla-cron] failed: {e}")
+
+        aurem_scheduler.add_job(
+            _sla_snapshot_job,
+            "interval",
+            minutes=15,
+            id="aurem_sla_snapshot",
+            name="SLA snapshot + alert (every 15 min)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
+        logger.info("[REGISTRY] SLA snapshot cron scheduled — every 15 min")
+
+        # iter 328c — External uptime monitor staleness check.
+        # If the external service (UptimeRobot) stops pinging us, we
+        # fire a Telegram alert once per hour. Cheap — single Mongo
+        # lookup per tick.
+        async def _external_uptime_check_job():
+            try:
+                from services.external_uptime_monitor import staleness_check
+                await staleness_check(db)
+            except Exception as e:
+                logger.warning(f"[ext-uptime-cron] failed: {e}")
+
+        aurem_scheduler.add_job(
+            _external_uptime_check_job,
+            "interval",
+            minutes=10,
+            id="aurem_external_uptime_check",
+            name="External uptime staleness check (every 10 min)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=120,
+        )
+        logger.info("[REGISTRY] External uptime staleness cron scheduled — every 10 min")
 
     except Exception as e:
         logger.warning(f"Nightly self-check not wired: {e}")

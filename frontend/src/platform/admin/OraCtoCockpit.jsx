@@ -16,6 +16,7 @@ import {
   Zap, FileWarning, Hammer, CheckCircle, Cpu,
 } from "lucide-react";
 import { safeFetchJson } from "../../lib/safeFetchJson";
+import SlaCard from "./SlaCard";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_MS = 25000;
@@ -158,6 +159,9 @@ export default function OraCtoCockpit() {
           <Tile testid="kpi-active" icon={Hammer}    label="Active tools 24h" value={summary.tools_active_24h} sub="distinct tools" />
         </div>
       )}
+
+      {/* iter 328f — SLA + Error Budget card */}
+      <SlaCard />
 
       {/* iter 326c — Provider chain health (DeepSeek → FreeLLMAPI → Claude → Ollama → Groq) */}
       <ProviderHealthPanel

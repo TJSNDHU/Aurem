@@ -74,10 +74,47 @@ async def lesson_journal(limit: int = 20,
     limit = max(1, min(int(limit or 20), 100))
     try:
         cur = _db.ora_learning_journal.find(
-            {"kind": "tier1_snapshot"}, {"_id": 0}
+            {}, {"_id": 0}
         ).sort("ts", -1).limit(limit)
         entries = await cur.to_list(length=limit)
     except Exception as e:
         logger.warning(f"[lesson-journal] read failed: {e}")
+        entries = []
+    return {"ok": True, "entries": entries, "count": len(entries)}
+
+
+@router.post("/lesson-snapshot")
+async def lesson_snapshot_now(user: dict = Depends(_admin_dep())):
+    """iter 327q — Force a tier-1 snapshot right now (founder-triggered).
+
+    Re-reads disk via `build_lessons_block`, compares sha256s, writes a
+    new `ora_learning_journal` row when anything changed. Idempotent
+    when no files changed (returns `changed: false`).
+    """
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    from services.ora_lessons_loader import (
+        build_lessons_block, record_journal_entry_if_changed,
+    )
+    # Rebuild so the in-memory manifest reflects what's on disk RIGHT NOW.
+    build_lessons_block()
+    result = await record_journal_entry_if_changed(_db)
+    return {"ok": bool(result.get("ok")), **result}
+
+
+@router.get("/nightly-self-tests")
+async def nightly_self_tests(limit: int = 14,
+                                 user: dict = Depends(_admin_dep())):
+    """iter 327q — Last N nightly self-test rows for the admin UI."""
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    limit = max(1, min(int(limit or 14), 60))
+    try:
+        cur = _db.ora_nightly_self_tests.find(
+            {}, {"_id": 0}
+        ).sort("ts", -1).limit(limit)
+        entries = await cur.to_list(length=limit)
+    except Exception as e:
+        logger.warning(f"[nightly-self-tests] read failed: {e}")
         entries = []
     return {"ok": True, "entries": entries, "count": len(entries)}

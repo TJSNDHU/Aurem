@@ -3746,6 +3746,19 @@ TOOL_REGISTRY: dict[str, dict] = {
     },
 }
 
+# iter 327q — Splice in the BUILD MODE + self-learning tools defined in
+# services/ora_build_mode.py. Kept in a separate module so the
+# Tier-2-approval lifecycle for these two specific gates is easy to
+# evolve without touching the giant TOOL_REGISTRY block above.
+try:
+    from services.ora_build_mode import TOOL_REGISTRY_PATCH as _BUILD_MODE_PATCH
+    TOOL_REGISTRY.update(_BUILD_MODE_PATCH)
+except Exception as _e:  # pragma: no cover - defensive
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"[ora_tools] failed to splice build_mode tools: {_e}"
+    )
+
 
 
 # FIX #2 (audit iter 322fi) — removed duplicate shadow definitions of

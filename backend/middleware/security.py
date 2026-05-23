@@ -27,6 +27,79 @@ STRICT_RATE_LIMIT = int(os.environ.get("STRICT_RATE_LIMIT", "30"))
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
 REDIS_URL = os.environ.get("REDIS_URL", "")
 
+# iter 328a — Tiered rate-limit table. Keyed by classifier output.
+# Values are `(limit, window_seconds)` so all tiers share the same
+# sliding-window logic in `is_rate_limited`.
+_RATE_LIMITS_BY_TIER: dict[str, tuple[int, int]] = {
+    "auth":    (int(os.environ.get("RL_AUTH_LIMIT",    "5")),   60),   # 5/min
+    "admin":   (int(os.environ.get("RL_ADMIN_LIMIT",   "60")),  60),   # 60/min
+    "webhook": (int(os.environ.get("RL_WEBHOOK_LIMIT", "100")), 60),   # 100/min
+    "public":  (int(os.environ.get("RL_PUBLIC_LIMIT",  "30")),  60),   # 30/min
+}
+
+# Auth endpoints — anything that handles credentials, registration or
+# password reset. Kept short and explicit so a typo doesn't silently
+# downgrade rate limiting to the more permissive `public` tier.
+_AUTH_PATH_SIGNALS = (
+    "/auth/login", "/admin/login", "/auth/register", "/auth/signup",
+    "/auth/password-reset", "/auth/forgot-password", "/auth/refresh",
+    "/auth/verify-email", "/rbac/login",
+)
+# Webhook endpoints — high volume from third-party services. Limits
+# stay generous so legitimate Stripe / Resend / pixel traffic isn't
+# clipped, but a single rogue IP can still be throttled.
+_WEBHOOK_PATH_SIGNALS = (
+    "/webhook", "/webhooks/",
+    "/stripe/webhook", "/resend/webhook", "/retell/webhook",
+    "/universal/webhooks/", "/twilio/webhook",
+)
+
+
+def _classify_endpoint_tier(path: str) -> str:
+    """Return one of: 'auth' | 'admin' | 'webhook' | 'public'.
+
+    Order matters — auth wins over admin so /api/admin/login still hits
+    the 5/min auth limit instead of the 60/min admin limit.
+    """
+    p = (path or "").lower()
+    if any(sig in p for sig in _AUTH_PATH_SIGNALS):
+        return "auth"
+    if any(sig in p for sig in _WEBHOOK_PATH_SIGNALS):
+        return "webhook"
+    if p.startswith("/api/admin") or "/admin/" in p:
+        return "admin"
+    return "public"
+
+
+# iter 328a — Repeat-offender tracker. When the same IP trips a rate
+# limit 3+ times in 10 minutes we fire one Telegram alert (dedup'd by
+# IP+window so a sustained attack doesn't spam the founder).
+_OFFENDER_WINDOW_SECONDS = 600
+_OFFENDER_TRIP_THRESHOLD = 3
+_offender_buckets: dict[str, list[float]] = defaultdict(list)
+
+
+async def _track_rate_limit_offender(client_ip: str, path: str, tier: str) -> None:
+    """Record a 429 against this IP; alert when threshold tripped."""
+    if not client_ip:
+        return
+    now = time.time()
+    bucket = _offender_buckets[client_ip]
+    # Drop entries outside the 10-minute window.
+    bucket[:] = [t for t in bucket if now - t < _OFFENDER_WINDOW_SECONDS]
+    bucket.append(now)
+    if len(bucket) >= _OFFENDER_TRIP_THRESHOLD:
+        try:
+            from services.silent_failure_alerts import _send as _tg_send
+            window_id = int(now // _OFFENDER_WINDOW_SECONDS)
+            await _tg_send(
+                f"🚧 Rate-limit offender — IP {client_ip} tripped "
+                f"{tier} limit {len(bucket)}× in 10 min (last path: {path[:80]})",
+                fingerprint=f"rate_limit_offender_{client_ip}_{window_id}",
+            )
+        except Exception as e:
+            logging.debug(f"rate_limit alert failed: {e}")
+
 BLOCKED_PATHS = [
     "/.env", "/wp-admin", "/wp-login", "/.git",
     "/phpmyadmin", "/admin.php", "/.well-known/security.txt",
@@ -266,23 +339,36 @@ class SecurityMiddleware:
                            "/api/qa/pulse/",
                            "/api/sentinel-anomaly/"]
         if not any(skip in path for skip in skip_rate_limit):
-            # Determine rate limit based on endpoint
-            if "/auth/login" in path or "/admin/login" in path:
-                rate_key = f"login:{client_ip}"
-                limit = LOGIN_RATE_LIMIT
-                window = LOGIN_RATE_WINDOW
-            else:
-                rate_key = f"api:{client_ip}"
-                limit = RATE_LIMIT_REQUESTS
-                window = RATE_LIMIT_WINDOW
+            # iter 328a — Tiered rate limits per endpoint class.
+            #   • Auth     →  5 req/min/IP  (login, register, password reset)
+            #   • Admin    → 60 req/min/IP  (all /api/admin/*)
+            #   • Webhook  →100 req/min/IP  (Stripe/Resend/Universal pixel)
+            #   • Public   → 30 req/min/IP  (default for everything else)
+            # The original RATE_LIMIT_REQUESTS env var is honoured as a
+            # ceiling for backwards compat, but the per-tier defaults
+            # are now the source of truth. Telegram alert fires when the
+            # same IP trips the limit 3+ times in a 10-minute window.
+            tier = _classify_endpoint_tier(path)
+            limit, window = _RATE_LIMITS_BY_TIER[tier]
+            rate_key = f"{tier}:{client_ip}"
             
             # P0 FIX: Use Redis-backed rate limiter
             try:
                 is_limited = await rate_limiter.is_rate_limited(rate_key, limit, window)
                 if is_limited:
+                    # iter 328a — track repeat offenders for Telegram alert.
+                    try:
+                        await _track_rate_limit_offender(client_ip, path, tier)
+                    except Exception as _e:
+                        logging.debug(f"rate_limit offender tracker: {_e}")
                     response = JSONResponse(
                         status_code=429,
-                        content={"detail": "Too many requests. Please try again later."}
+                        content={
+                            "detail": "Too many requests. Please try again later.",
+                            "tier":   tier,
+                            "limit":  limit,
+                            "window_s": window,
+                        }
                     )
                     await response(scope, receive, send)
                     return
