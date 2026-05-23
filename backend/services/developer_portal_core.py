@@ -142,7 +142,7 @@ async def signup_anti_bot_check(ip: str, email: str) -> dict:
         return {
             "ok":   False,
             "reason": "signup_rate_per_ip",
-            "message": f"Too many signups from this IP. Try again in an hour.",
+            "message": "Too many signups from this IP. Try again in an hour.",
         }
     # Obvious-junk patterns
     bad_patterns = (
@@ -173,21 +173,85 @@ def _generate_referral_code(email: str) -> str:
     return f"r{h}"
 
 
-async def _send_email(to: str, subject: str, body: str) -> bool:
-    """Best-effort email via services.email_service.send_email if present.
-    Returns True if a real send was attempted, False if no transport
-    available."""
+async def _send_email(to: str, subject: str, body: str, html: str | None = None) -> bool:
+    """Best-effort email via Resend wrapper. Returns True on success."""
     try:
-        from services.email_service import send_email
-        result = send_email(to=to, subject=subject, body=body)
-        if hasattr(result, "__await__"):
-            await result
-        return True
+        from services.email_service_resend import send_email
+        html_body = html or f"<pre style='font-family:system-ui'>{body}</pre>"
+        ok, _ = await send_email(to=to, subject=subject, html=html_body, text=body)
+        if not ok:
+            # Log the OTP/body so the founder can still test locally
+            logger.info(f"[developer-portal] EMAIL FALLBACK TO={to} SUBJ='{subject}' BODY='{body[:200]}'")
+        return ok
     except Exception as e:
         logger.warning(f"[developer-portal] email send fallback: {e}")
-        # Fallback: just log the OTP so the founder can read it during testing
-        logger.info(f"[developer-portal] OTP/EMAIL TO={to} SUBJ='{subject}' BODY='{body[:200]}...'")
+        logger.info(f"[developer-portal] EMAIL FALLBACK TO={to} SUBJ='{subject}' BODY='{body[:200]}'")
         return False
+
+
+def _welcome_email_html(name: str, login_url: str, connect_url: str) -> tuple[str, str]:
+    """Returns (subject, html) for the Day-0 welcome email."""
+    subject = "Welcome to ORA CTO — Your 1000 tokens are ready"
+    display_name = (name or "there").split()[0]
+    html = f"""<!doctype html>
+<html><body style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+                   background:#0b1020;color:#e7ecff;margin:0;padding:32px;">
+  <div style="max-width:560px;margin:0 auto;background:#10172a;
+              border:1px solid #1e2a4a;border-radius:14px;padding:32px;">
+    <h1 style="font-size:22px;margin:0 0 8px;letter-spacing:-0.01em;">
+      Welcome to ORA CTO, {display_name}.
+    </h1>
+    <p style="color:#9aa6c7;line-height:1.55;margin:0 0 18px;">
+      Your account is verified and <strong style="color:#7ad9b6;">1,000 free
+      tokens</strong> have been added to your balance. Enough to ship your
+      first small project end-to-end.
+    </p>
+
+    <div style="background:#0b1224;border:1px solid #1a2547;border-radius:10px;
+                padding:18px;margin:18px 0;">
+      <p style="margin:0 0 10px;color:#cfd8f5;font-weight:600;">Get started in 3 steps</p>
+      <ol style="padding-left:18px;margin:0;color:#9aa6c7;line-height:1.7;">
+        <li><a href="{login_url}" style="color:#7ad9b6;text-decoration:none;">
+            Log in to your dashboard</a> — see your token balance + project list.</li>
+        <li><a href="{connect_url}" style="color:#7ad9b6;text-decoration:none;">
+            Connect your GitHub</a> — so ORA can read your repos (read-only by default).</li>
+        <li>Tell ORA what you want to build. Chat, edit, test, deploy — all
+            inside one window.</li>
+      </ol>
+    </div>
+
+    <p style="color:#9aa6c7;line-height:1.55;margin:18px 0 0;font-size:13px;">
+      Token costs are transparent: chat = 1 token, file edit = 2, test = 3,
+      deploy = 5. You can <strong>bring your own LLM keys</strong> (BYOK) any
+      time and tokens stop deducting for your own calls.
+    </p>
+
+    <p style="color:#6a7aab;font-size:12px;margin-top:28px;text-align:center;">
+      Reply to this email if you get stuck. A real human reads every reply.
+    </p>
+  </div>
+</body></html>"""
+    return subject, html
+
+
+async def _send_welcome_email(email: str, name: str) -> bool:
+    """Day-0 welcome email — sent once on OTP verify success."""
+    site = os.environ.get("FRONTEND_URL") or os.environ.get("SITE_URL") or "https://aurem.live"
+    site = site.rstrip("/")
+    login_url   = f"{site}/developers/login"
+    connect_url = f"{site}/developers/connect"
+    subject, html = _welcome_email_html(name, login_url, connect_url)
+    text = (
+        f"Welcome to ORA CTO, {(name or 'there').split()[0]}.\n\n"
+        f"Your account is verified and 1,000 free tokens are ready.\n\n"
+        f"Get started in 3 steps:\n"
+        f"  1. Log in: {login_url}\n"
+        f"  2. Connect GitHub: {connect_url}\n"
+        f"  3. Tell ORA what you want to build.\n\n"
+        f"Token costs: chat=1, file edit=2, test=3, deploy=5. BYOK any time.\n\n"
+        f"Reply to this email if you get stuck."
+    )
+    return await _send_email(to=email, subject=subject, body=text, html=html)
 
 
 async def create_signup(
@@ -335,6 +399,9 @@ async def verify_otp(email: str, otp: str) -> dict:
                 exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
             except Exception:
                 exp = None
+        # Mongo returns datetimes as tz-naive UTC — normalize before compare
+        if isinstance(exp, datetime) and exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
         if exp and exp < datetime.now(timezone.utc):
             return {"ok": False, "error": "otp_expired"}
 
@@ -356,6 +423,16 @@ async def verify_otp(email: str, otp: str) -> dict:
             referrer_user_id=account["referred_by"],
             new_user_id=account["user_id"],
         )
+
+    # Day-0 welcome email — fire-and-forget so OTP verify stays snappy
+    try:
+        import asyncio as _aio
+        _aio.create_task(_send_welcome_email(
+            email=account["email"],
+            name=account.get("name", ""),
+        ))
+    except Exception as _we:
+        logger.debug(f"[developer-portal] welcome email skipped: {_we}")
 
     # Mint JWT
     token = issue_jwt(account["user_id"], account["email"])
@@ -797,4 +874,5 @@ __all__ = [
     "check_abuse_pattern", "check_rate_limit",
     "validate_pixel_domain",
     "cleanup_inactive_sandboxes",
+    "_send_welcome_email", "_welcome_email_html",
 ]

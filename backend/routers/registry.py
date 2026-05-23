@@ -2157,6 +2157,33 @@ def register_all_routers(app, db):
         except Exception as _e:
             logger.warning(f"[REGISTRY] DR backup cron failed to register: {_e}")
 
+        # iter 331d — Developer Portal sandbox cleanup (45-day idle gc).
+        # Walks /tmp/ora-sandbox-* and deletes folders untouched for
+        # ORA_SANDBOX_INACTIVE_DAYS days. Runs daily at 04:30 UTC.
+        try:
+            from services.developer_portal_core import cleanup_inactive_sandboxes
+            async def _sandbox_cleanup_tick():
+                try:
+                    r = await cleanup_inactive_sandboxes()
+                    if r.get("removed"):
+                        logger.info(
+                            f"[sandbox-cleanup] removed {r['removed']} stale sandboxes "
+                            f"(scanned {r.get('scanned', 0)})"
+                        )
+                except Exception as _ce:
+                    logger.warning(f"[sandbox-cleanup] tick error: {_ce}")
+            aurem_scheduler.add_job(
+                _sandbox_cleanup_tick,
+                CronTrigger(hour=4, minute=30, timezone="UTC"),
+                id='aurem_dev_sandbox_cleanup',
+                name='Developer Sandbox Cleanup (45d idle)',
+                replace_existing=True,
+                misfire_grace_time=3600,
+            )
+            logger.info("[REGISTRY] Dev sandbox cleanup cron scheduled: daily at 04:30 UTC")
+        except Exception as _e:
+            logger.warning(f"[REGISTRY] Dev sandbox cleanup cron failed: {_e}")
+
         # Midnight daily usage reset for tenant_customers
         async def reset_tenant_daily_usage():
             try:
