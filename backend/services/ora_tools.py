@@ -2585,6 +2585,119 @@ async def _ora_git_commit_local(message: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
+async def _ora_git_log(path: str = "", limit: int = 5) -> dict:
+    """iter 326zz — Tier-1 read-only git inspector.
+
+    Answers the question "is this file in git history?" without
+    needing shell_exec or council approval. Strictly read-only
+    (`git log` mutates nothing) and path-validated to prevent
+    arbitrary command injection.
+
+    Args:
+      path:  repo-relative or absolute path to inspect. Empty/"."
+             returns the latest 5 commits of the repo (overview).
+      limit: number of commits to return (default 5, max 20).
+
+    Returns dict:
+      ok                : True
+      path              : echo of the queried path
+      committed         : bool — is the path tracked anywhere in history?
+      last_commit_hash  : "abc1234" short hash | None
+      last_commit_date  : ISO timestamp | None
+      last_commit_msg   : first line of the most recent commit | None
+      commits           : [{sha, date, author, msg}] up to `limit`
+      gitignored        : bool — is the path matched by a .gitignore rule?
+    """
+    import asyncio as _aio
+    import os as _os
+    import re as _re
+
+    # Normalise + validate the path. Only allow paths that resolve
+    # inside the repo root /app — no /etc/passwd shenanigans.
+    repo_root = "/app"
+    if not path or path.strip() in (".", ""):
+        repo_path = ""  # repo-wide log
+        abs_path = repo_root
+    else:
+        # Reject obviously hostile inputs
+        if any(c in path for c in (";", "|", "&", "$", "`", "\n")):
+            return {"ok": False, "error": "path contains shell metachars"}
+        if path.startswith("/"):
+            abs_path = _os.path.realpath(path)
+        else:
+            abs_path = _os.path.realpath(_os.path.join(repo_root, path))
+        if not abs_path.startswith(repo_root):
+            return {"ok": False,
+                    "error": f"path outside repo: {path!r}"}
+        repo_path = _os.path.relpath(abs_path, repo_root)
+
+    try:
+        n = max(1, min(int(limit or 5), 20))
+    except (TypeError, ValueError):
+        n = 5
+
+    # Build the command. We use `--all` so branches/stashes are
+    # covered when answering "is X in git history?".
+    cmd = ["git", "-C", repo_root, "log", "--all",
+            f"-{n}", "--pretty=format:%H%x09%cI%x09%an%x09%s"]
+    if repo_path:
+        cmd += ["--", repo_path]
+
+    try:
+        proc = await _aio.create_subprocess_exec(
+            *cmd,
+            stdout=_aio.subprocess.PIPE,
+            stderr=_aio.subprocess.PIPE,
+        )
+        out_b, err_b = await _aio.wait_for(proc.communicate(), timeout=15)
+    except _aio.TimeoutError:
+        return {"ok": False, "error": "git log timed out"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+    out = (out_b or b"").decode("utf-8", errors="replace").strip()
+    err = (err_b or b"").decode("utf-8", errors="replace").strip()
+
+    commits = []
+    for line in out.splitlines():
+        parts = line.split("\t", 3)
+        if len(parts) == 4:
+            commits.append({
+                "sha":    parts[0][:7],
+                "sha_full": parts[0],
+                "date":   parts[1],
+                "author": parts[2],
+                "msg":    parts[3],
+            })
+
+    # Gitignore check (only meaningful for a specific path)
+    gitignored = None
+    if repo_path:
+        try:
+            ck = await _aio.create_subprocess_exec(
+                "git", "-C", repo_root, "check-ignore", "--quiet", "--", repo_path,
+                stdout=_aio.subprocess.DEVNULL,
+                stderr=_aio.subprocess.DEVNULL,
+            )
+            rc = await _aio.wait_for(ck.wait(), timeout=5)
+            gitignored = (rc == 0)  # exit 0 means ignored
+        except Exception:
+            gitignored = None
+
+    committed = bool(commits)
+    return {
+        "ok":               True,
+        "path":             repo_path or "<repo root>",
+        "committed":        committed,
+        "last_commit_hash": commits[0]["sha"] if commits else None,
+        "last_commit_date": commits[0]["date"] if commits else None,
+        "last_commit_msg":  commits[0]["msg"] if commits else None,
+        "commits":          commits,
+        "gitignored":       gitignored,
+        "stderr":           err[:300] if err else "",
+    }
+
+
 async def _ora_git_bisect(
     bad_sha: str = "HEAD",
     good_sha: str = "",
@@ -3425,6 +3538,22 @@ TOOL_REGISTRY: dict[str, dict] = {
             "'Save to GitHub' button (platform-gated, founder approval). Use this to "
             "checkpoint state after autofix so founder can review + push with one "
             "click. Returns {sha, files_changed_preview, next_step}."
+        ),
+    },
+    "git_log": {
+        "fn": _ora_git_log,
+        "args_spec": {
+            "path":  "str — repo-relative or absolute path to check (empty = repo-wide overview)",
+            "limit": "int — number of recent commits to return (default 5, max 20)",
+        },
+        "description": (
+            "TIER 1 (auto, read-only). Answer 'is X in git history?' without "
+            "needing shell_exec or council. Returns committed=True/False, "
+            "last_commit_hash, last_commit_date, last_commit_msg, full commits "
+            "list, and gitignored flag. Path-validated against /app — won't "
+            "accept arbitrary system paths. Use this BEFORE proposing any "
+            "scary git-cleanup work — it tells you cheaply whether the file "
+            "is actually tracked."
         ),
     },
     "git_bisect": {

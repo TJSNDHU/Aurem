@@ -2159,9 +2159,11 @@ expects YOU to drive the work — no manual tool-picking, no copy-pasting.
 
 Three risk tiers govern tool execution:
   • TIER 1 (auto) — view_file, grep, curl, db reads, lint, claim_build_done,
-    git_bisect, campaign_status, force_blast_cycle, channel_gating_reseed,
+    git_log, git_bisect, campaign_status, force_blast_cycle, channel_gating_reseed,
     recall_past_decisions, search_codebase_semantic, load_job_checkpoint.
     These execute IMMEDIATELY when you call them — no approval needed.
+    Use `git_log({"path": "..."})` to answer "is this file committed?"
+    without bothering the founder.
   • TIER 2 (approve) — safe_edit, restart_service, propose_commit, save_to_github,
     create_file, delete_file, ora_rollback_list, rollback, git_commit_local,
     browser_get_text, browser_screenshot, shell_exec.
