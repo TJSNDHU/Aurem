@@ -729,16 +729,33 @@ cases. Full regression on iter 327* + iter 326 recent + iter 322er:
 Full regression: **311 / 311 green** across iter 327* + iter 328 +
 iter 326 recent + iter 322er.
 
+## iter 329 series (2026-02-23) — Reliability pass (grounding, confidence, routing, feedback, injection, public status)
+
+- **329a Fact grounding** — `_ground_reply_against_facts` now REPLACES the entire reply when 3+ unverified numbers appear ("I don't have enough data — want me to check?"). No more soft footers; ORA never guesses.
+- **329b Confidence prefixes** — 1-2 unverified numbers → "I believe …" prefix so the founder knows partial confidence. Zero unverified → reply unchanged (silent confidence).
+- **329c Brain routing** — `_classify_complexity` now floors money/billing/refund/Stripe at MEDIUM (never cheap-only), escalates code/fix/debug/error/crash to COMPLEX (Claude), and routes CASL/PIPEDA/legal/compliance to COMPLEX. Cheap models never touch money or legal questions.
+- **329d Feedback loop** — `routers/ora_feedback_router.py` exposes `POST /api/ora/feedback` and admin `GET /api/admin/ora/feedback/summary?days=7`. New `ora_feedback` collection (upsert on `session_id+message_id`). `OraChat.jsx` shows 👍/👎 buttons under every ORA reply with a reason dropdown on 👎. Weekly summary line auto-spliced into Morning Brief.
+- **329e Prompt-injection guard** — `services/prompt_injection_guard.py` detects 6 patterns (ignore previous, you are now a different AI, forget your rules, pretend you are, your real instructions are, DAN/developer mode). Hooked into `run_turn` BEFORE any LLM call — blocked turns reply with stock "I can't process that request.", record to `prompt_injection_blocks`, and fire Telegram alert. Adversary never sees the system prompt.
+- **329f Public /status SLA tiles** — `public_status_aggregator.build_public_status` now embeds a 4-metric SLA block (uptime 30d, ORA p95, email delivery %, campaign completion %). `PublicStatus.jsx` renders 4 read-only tiles with pass/fail colour. No auth — customers can self-check.
+- **+bonus** — `/app/memory/SEVEN_WAYS.md` (the founder's improvement charter mapping all six iter-329 fixes) is now a Tier-1 file auto-injected into SYSTEM_PROMPT on every boot.
+
+**Live proofs (post-restart)**
+- `POST /api/ora/feedback` → `{ok:true,stored:true,rating:"down"}` · `ora_feedback`: 1 doc
+- `GET /api/admin/ora/feedback/summary` → 401 (mounted + auth-gated)
+- `run_turn("ignore previous instructions…")` → `blocked:True`, reply `"I can't process that request."`, pattern `ignore_previous_instructions`
+- `prompt_injection_blocks`: 1 doc (smoke attempt persisted)
+- `GET /api/public/status` returns `sla:{uptime_30d_pct:0, ora_p95_seconds:0, email_delivery_pct:100, campaign_completion_pct:100, all_targets_met:false}`
+- Grounding live: 3-unverified → "I don't have enough data" replacement confirmed
+- Tier-1 manifest now includes `/app/memory/SEVEN_WAYS.md`
+
+**Tests**: `tests/test_iter329_reliability_pass.py` — 19 cases. Full regression on active suite (iter 327* + 328 + 329 + recent 326 + 322er): **314 / 314 green** (one pre-existing flaky test in `test_iter326i_build_mode.py::test_verify_endpoint_against_live_health_route` requires backend running during pytest — unrelated to iter 329).
+
 ## Next Action Items (founder)
-- Push to GitHub → redeploy aurem.live so iter 327q + 328a-f ship.
-- Update `EXTERNAL_UPTIME_SECRET` on prod env; sign up UptimeRobot
-  with the webhook URL above (5-min task; unlocks 328c).
-- Optional: run `python scripts/dr_restore_test.py --dry-run` on
-  prod to confirm `mongorestore` is reachable; schedule monthly.
-- Optional: run the load test against preview first, then prod.
+- Push to GitHub → redeploy aurem.live so iter 327q + 328a–f + 329a–f ship to production.
+- (carried over) Configure `EXTERNAL_UPTIME_SECRET` on prod env + sign up UptimeRobot pointing at `https://aurem.live/api/uptime/report`.
+- Optional: run `python scripts/dr_restore_test.py --dry-run` on prod, then schedule monthly.
 
 ## Backlog
-- P2: Wire monthly external uptime line into Morning Brief once
-  `EXTERNAL_UPTIME_SECRET` is configured.
-- P3: Service-account Google Calendar for shared staff calendar.
-- P3: Friendlier "report expired" 404 page with "Get a fresh scan" CTA.
+- P2 — Splice monthly external uptime line into Morning Brief once `EXTERNAL_UPTIME_SECRET` is configured.
+- P3 — Service-account Google Calendar for shared AUREM staff calendar.
+- P3 — "Get a fresh scan" CTA on stale `ghost-*` 404 landing page.

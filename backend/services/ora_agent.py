@@ -724,25 +724,31 @@ def _ground_reply_against_facts(
 
     stats["unverified"] = unverified
 
+    # iter 329a + 329b — Confidence-marker policy.
+    #   • 0 unverified  → reply unchanged (silent confidence).
+    #   • 1-2 unverified → "I believe…" prefix so the founder knows
+    #     this is partial-confidence (founder spec).
+    #   • 3+ unverified → REPLACE with "I don't have enough data —
+    #     want me to check?" (founder spec). Never guess, never invent
+    #     numbers.
     if len(unverified) >= 3:
         stats["replaced"] = True
         stats["reason"] = "too_many_unverified"
         honest = (
-            "I drafted a reply with specific numbers, but I can't "
-            "confirm they came from a real tool call this turn. Rather "
-            "than risk fabricating data, I'm going to stop here. "
-            "Please ask the question again — I'll re-run the right "
-            "tool and give you verified numbers."
+            "I don't have enough data to answer that right now. "
+            "Want me to check? I'll run the right tool and reply "
+            "with verified numbers."
         )
         return honest, stats
 
     stats["softened"] = True
-    footer = (
-        "\n\n_(Heads up — I'm not 100% sure about "
-        f"{' and '.join(unverified)}. Ask again if you want me to "
-        "re-verify with a fresh tool call.)_"
-    )
-    return reply + footer, stats
+    stats["confidence"] = "partial"
+    # Lower-case `i believe…` only if reply does not already open with
+    # that or a similar hedge, to avoid double-marking.
+    lowered = reply.lstrip().lower()
+    if not lowered.startswith(("i believe", "i think", "i'm not 100%", "(heads up")):
+        return "I believe " + reply.lstrip(), stats
+    return reply, stats
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -1261,10 +1267,29 @@ def lean_ollama_tool_schemas() -> list[dict[str, Any]]:
 # ─────────────────────────────────────────────────────────────────────
 
 # Words that signal a deep code task — bumps complexity to COMPLEX.
+# iter 329c — expanded so money/legal/code/error always escalate to
+# Claude. Cheap models never handle billing or compliance.
 _COMPLEX_TASK_WORDS = frozenset({
     "refactor", "rewrite", "implement", "build", "architect", "design",
     "debug", "investigate", "trace", "diagnose", "audit", "migration",
     "migrate", "fix.+bug", "root.+cause", "deep.+dive",
+    # iter 329c — fix/debug/error/broken/crash → COMPLEX (Claude).
+    "fix", "broken", "crash", "crashed", "error", "errored", "stack trace",
+    # iter 329c — CASL / legal / compliance → COMPLEX.
+    "casl", "pipeda", "gdpr", "compliance", "legal", "contract",
+    "privacy policy", "terms", "consent",
+    # iter 329c — code-flavoured signals → COMPLEX.
+    "function", "class ", "endpoint", "api endpoint", "schema",
+    "regex", "stack trace", "traceback", "exception",
+})
+
+# iter 329c — Words that bump complexity to at least MEDIUM (never
+# allowed to be SIMPLE/cheap-only). Money, billing, refunds and
+# anything financial routes to a stronger brain by default.
+_MEDIUM_FLOOR_WORDS = frozenset({
+    "money", "$", "usd", "cad", "price", "pricing", "cost", "costs",
+    "bill", "billing", "invoice", "refund", "payment", "subscription",
+    "stripe", "charge", "charged", "overage", "tier", "plan",
 })
 
 # Words that signal a quick lookup / status check / chat → SIMPLE.
@@ -1299,8 +1324,17 @@ def _classify_complexity(messages: list[dict[str, Any]]) -> str:
         if "." in word:  # regex pattern
             if re.search(word, txt):
                 return "complex"
+        elif " " in word:
+            if word in txt:
+                return "complex"
         elif word in tokens:
             return "complex"
+
+    # iter 329c — Heuristic 1b: money / billing words floor at MEDIUM
+    # (Claude/DeepSeek), never SIMPLE-only.
+    money_flag = any(
+        (w in tokens) or (w in txt) for w in _MEDIUM_FLOOR_WORDS
+    )
 
     # Heuristic 2 — very long messages (>120 tokens) usually mean
     # complex tasks. Founders don't write essays for "campaign status?".
@@ -1312,13 +1346,17 @@ def _classify_complexity(messages: list[dict[str, Any]]) -> str:
     if token_count <= 8:
         ends_question = txt.endswith("?")
         has_simple_word = any(w in tokens for w in _SIMPLE_INTENT_WORDS)
-        if ends_question or has_simple_word:
+        if (ends_question or has_simple_word) and not money_flag:
             return "simple"
         # short but no clear intent → medium (don't underprovision)
 
     # Heuristic 4 — 9-30 tokens with a simple intent word → SIMPLE.
-    if token_count <= 30 and any(w in tokens for w in _SIMPLE_INTENT_WORDS):
+    if token_count <= 30 and any(w in tokens for w in _SIMPLE_INTENT_WORDS) and not money_flag:
         return "simple"
+
+    # iter 329c — money/billing topics floor at MEDIUM.
+    if money_flag:
+        return "medium"
 
     return "medium"
 
@@ -2816,6 +2854,41 @@ async def run_turn(
     """
     await _expire_old()
     history = await _load_history(session_id)
+
+    # iter 329e — Prompt-injection guard. Run BEFORE we touch the LLM
+    # so the adversary never gets to see the system prompt and we don't
+    # bill a cent on a hostile turn.
+    try:
+        from services.prompt_injection_guard import (
+            classify as _pi_classify,
+            record_and_alert_block as _pi_alert,
+            BLOCK_REPLY as _PI_BLOCK_REPLY,
+        )
+        verdict, pattern = _pi_classify(user_text or "")
+        if verdict == "blocked":
+            # Best-effort alert; never crash the user reply.
+            try:
+                await _pi_alert(
+                    _db, text=user_text or "",
+                    pattern=pattern or "unknown",
+                    session_id=session_id,
+                    founder_email=founder_email,
+                )
+            except Exception:
+                pass
+            history.append({"role": "user", "content": user_text})
+            history.append({"role": "assistant", "content": _PI_BLOCK_REPLY})
+            await _save_history(session_id, history)
+            return {
+                "ok":             True,
+                "reply":          _PI_BLOCK_REPLY,
+                "done":           True,
+                "blocked":        True,
+                "block_reason":   "prompt_injection",
+                "block_pattern":  pattern,
+            }
+    except Exception as _e:
+        logger.debug(f"[ora-agent] injection-guard skipped: {_e}")
 
     if not history:
         # iter 326ff — prepend tenant voice preamble so this session

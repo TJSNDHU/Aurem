@@ -465,6 +465,16 @@ async def generate_brief(scan: dict, auto_actions: list, tenant_id: str = None) 
         logger.debug(f"[BRIEF] pixel health unavailable: {_e}")
     pixel_section = f"\nPIXEL HEALTH:\n  • {pixel_health_line}\n" if pixel_health_line else ""
 
+    # iter 329d — Weekly ORA feedback summary in the brief.
+    feedback_line = ""
+    try:
+        from routers.ora_feedback_router import weekly_feedback_summary
+        _fb = await weekly_feedback_summary(_get_db())
+        feedback_line = _fb.get("line") or ""
+    except Exception as _e:
+        logger.debug(f"[BRIEF] feedback summary unavailable: {_e}")
+    feedback_section = f"\nORA FEEDBACK:\n  • {feedback_line}\n" if feedback_line else ""
+
     brief_text = f"""AUREM MORNING BRIEF — {now.strftime('%B %d, %Y')} {now.strftime('%I:%M %p')} UTC
 System Health: {scan['site_health']['score']}/100
 
@@ -473,7 +483,7 @@ HANDLED OVERNIGHT (no action needed):
 
 NEEDS YOUR ATTENTION:
 {chr(10).join(f'  • {a}' for a in needs_attention) if needs_attention else '  • All clear — no items need attention'}
-{econ_section}{ssot_section}{webclaw_line}{intel_section}{pixel_section}
+{econ_section}{ssot_section}{webclaw_line}{intel_section}{pixel_section}{feedback_section}
 TODAY'S PRIORITIES:
 {chr(10).join(f'  {i+1}. {p}' for i, p in enumerate(priorities[:3]))}
 

@@ -62,6 +62,8 @@ _TIER1_FILES: list[tuple[str, str, int]] = [
     ("WATCHDOG MODE",               "/app/memory/WATCHDOG_MODE.md",                  _TIER1_CAP_PER_FILE),
     ("WORKING POLICY",              "/app/memory/WORKING_POLICY.md",                 _TIER1_CAP_PER_FILE),
     ("SYSTEM MAP (summary)",        "/app/memory/SYSTEM_MAP.md",                     _SYSTEM_MAP_HEAD),
+    # iter 329 — Founder's 7-way continuous-improvement charter.
+    ("7 WAYS TO IMPROVE",           "/app/memory/SEVEN_WAYS.md",                     _TIER1_CAP_PER_FILE),
 ]
 
 # Tier 2 triggers: (regex-ish keywords, label, path, cap).

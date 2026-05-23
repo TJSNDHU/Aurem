@@ -291,6 +291,37 @@ export default function PublicStatus() {
           </div>
         </div>
 
+        {/* iter 329f — SLA & Error Budget panel (read-only, no auth). */}
+        {data?.sla && Object.keys(data.sla).length > 0 && (
+          <div data-testid="public-status-sla" style={{
+            marginTop: 28, padding: 20, borderRadius: 14,
+            border: "1px solid var(--border-gold)",
+            background: "rgba(15,15,26,0.5)",
+          }}>
+            <div style={{ fontFamily: "Cinzel,serif", fontSize: 18,
+                           color: "var(--gold)", marginBottom: 4 }}>
+              SLA &amp; Error Budget
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>
+              {data.sla.all_targets_met ? "All 4 targets met."
+                                          : "One or more targets currently breaching."}
+            </div>
+            <div style={{ display: "grid",
+                           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                           gap: 12 }}>
+              <SlaTile testid="sla-tile-uptime" label="Uptime (30d)"
+                       value={data.sla.uptime_30d_pct} target={99.5} unit="%" />
+              <SlaTile testid="sla-tile-ora" label="ORA p95 reply"
+                       value={data.sla.ora_p95_seconds} target={3.0} unit="s"
+                       lowerBetter />
+              <SlaTile testid="sla-tile-email" label="Email delivery"
+                       value={data.sla.email_delivery_pct} target={95.0} unit="%" />
+              <SlaTile testid="sla-tile-campaign" label="Campaign cycle"
+                       value={data.sla.campaign_completion_pct} target={98.0} unit="%" />
+            </div>
+          </div>
+        )}
+
         <div className="s-foot">
           <span>
             Updated{" "}
@@ -304,6 +335,32 @@ export default function PublicStatus() {
             </a>
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SlaTile({ label, value, target, unit, lowerBetter, testid }) {
+  const v = Number(value || 0);
+  const t = Number(target);
+  const ok = lowerBetter ? v <= t : v >= t;
+  return (
+    <div
+      data-testid={testid}
+      style={{
+        padding: "12px 14px", borderRadius: 10,
+        background: ok ? "rgba(63,207,142,0.08)" : "rgba(255,90,107,0.08)",
+        border: `1px solid ${ok ? "rgba(63,207,142,0.35)" : "rgba(255,90,107,0.35)"}`,
+      }}
+    >
+      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 600,
+                     color: ok ? "var(--green)" : "var(--red)" }}>
+        {v.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 4 }}>{unit}</span>
+      </div>
+      <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 4 }}>
+        target: {lowerBetter ? "≤" : "≥"}{t.toLocaleString()}{unit}
       </div>
     </div>
   );

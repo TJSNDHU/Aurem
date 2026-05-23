@@ -263,6 +263,23 @@ async def build_public_status(db) -> Dict[str, Any]:
     except Exception:
         pass
 
+    # iter 329f — SLA snapshot (4 metrics from iter 328f) on the public
+    # status page. Numbers only, never operational internals.
+    sla_block: Dict[str, Any] = {}
+    try:
+        from services.sla_metrics import compute_sla_snapshot
+        snap = await compute_sla_snapshot(db)
+        ms = snap.get("metrics") or {}
+        sla_block = {
+            "uptime_30d_pct":          float(ms.get("uptime_pct", {}).get("value", 0)),
+            "ora_p95_seconds":         float(ms.get("ora_latency_p95_seconds", {}).get("value", 0)),
+            "email_delivery_pct":      float(ms.get("email_delivery_pct", {}).get("value", 0)),
+            "campaign_completion_pct": float(ms.get("campaign_completion_pct", {}).get("value", 0)),
+            "all_targets_met":         bool(snap.get("all_ok")),
+        }
+    except Exception:
+        sla_block = {}
+
     return {
         "ts": _utc_now().isoformat(),
         "system_autonomy_pct": autonomy["pct"],
@@ -277,6 +294,7 @@ async def build_public_status(db) -> Dict[str, Any]:
         "tagline": "Self-correcting AI orchestration for trades businesses.",
         "agents_wedged_now": int(wedges_now),
         "agents_auto_unwedged_24h": auto_unwedged_24h,
+        "sla": sla_block,
     }
 
 
@@ -298,6 +316,7 @@ ALLOWED_KEYS = {
     "tagline",
     "agents_wedged_now",
     "agents_auto_unwedged_24h",
+    "sla",
 }
 
 # Hard-blocked substrings — must never appear anywhere in the payload.

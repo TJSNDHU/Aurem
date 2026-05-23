@@ -854,6 +854,8 @@ function Message({ m, i, prev, copy, copiedIdx }) {
         )}
         <Bubble side="left" colorBg="rgba(255,255,255,0.05)" label="ORA"
                 content={m.content} idx={i} copy={copy} copiedIdx={copiedIdx} />
+        {/* iter 329d — Thumbs up/down feedback row */}
+        <FeedbackRow messageIdx={i} messageContent={m.content} />
       </div>
     );
   }
@@ -886,6 +888,102 @@ function Message({ m, i, prev, copy, copiedIdx }) {
   }
   return null;
 }
+
+// iter 329d — Thumbs up/down feedback for every assistant reply.
+function FeedbackRow({ messageIdx, messageContent }) {
+  const [rating, setRating] = React.useState(null);   // 'up' | 'down' | null
+  const [reason, setReason] = React.useState("");
+  const [submitted, setSubmitted] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  const sessionId = (() => {
+    try { return localStorage.getItem(SESSION_KEY) || "anon"; } catch { return "anon"; }
+  })();
+  // Stable message id: session + index + hash-ish of first chars.
+  const msgId = `${sessionId}:${messageIdx}:${(messageContent || "").slice(0, 32)}`;
+
+  async function send(r, why) {
+    setErr(null);
+    try {
+      const res = await fetch(`${API}/api/ora/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_id: msgId,
+          rating:     r,
+          reason:     why || "",
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 1800);
+    } catch (e) {
+      setErr(String(e.message || e));
+    }
+  }
+
+  return (
+    <div
+      data-testid={`feedback-row-${messageIdx}`}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        margin: "2px 4px 10px 4px", fontSize: 11, color: "rgba(168,160,143,0.7)",
+      }}
+    >
+      <button
+        type="button"
+        data-testid={`feedback-up-${messageIdx}`}
+        onClick={() => { setRating("up"); send("up"); }}
+        title="This reply was correct"
+        style={{
+          padding: "3px 7px", borderRadius: 6, cursor: "pointer",
+          background: rating === "up" ? "rgba(125,211,160,0.18)" : "transparent",
+          border: "1px solid rgba(125,211,160,0.30)",
+          color: rating === "up" ? "#7DD3A0" : "rgba(168,160,143,0.7)",
+        }}
+      >👍</button>
+      <button
+        type="button"
+        data-testid={`feedback-down-${messageIdx}`}
+        onClick={() => setRating("down")}
+        title="This reply was wrong"
+        style={{
+          padding: "3px 7px", borderRadius: 6, cursor: "pointer",
+          background: rating === "down" ? "rgba(239,68,68,0.18)" : "transparent",
+          border: "1px solid rgba(239,68,68,0.30)",
+          color: rating === "down" ? "#ef4444" : "rgba(168,160,143,0.7)",
+        }}
+      >👎</button>
+      {rating === "down" && !submitted && (
+        <select
+          data-testid={`feedback-reason-${messageIdx}`}
+          value={reason}
+          onChange={(e) => { setReason(e.target.value); send("down", e.target.value); }}
+          style={{
+            background: "transparent", color: "#F0EADC",
+            border: "1px solid rgba(212,175,55,0.18)", borderRadius: 6,
+            fontSize: 11, padding: "2px 6px",
+          }}
+        >
+          <option value="">why?</option>
+          <option value="wrong_number">Wrong number</option>
+          <option value="wrong_action">Wrong action</option>
+          <option value="didnt_understand">Didn't understand</option>
+          <option value="technical_jargon">Used technical jargon</option>
+          <option value="other">Other</option>
+        </select>
+      )}
+      {submitted && (
+        <span data-testid={`feedback-thanks-${messageIdx}`}
+              style={{ color: "#7DD3A0" }}>thanks — logged</span>
+      )}
+      {err && <span style={{ color: "#ef4444" }}>· {err}</span>}
+    </div>
+  );
+}
+
+
 
 function Bubble({ side, colorBg, label, content, idx, copy, copiedIdx }) {
   return (

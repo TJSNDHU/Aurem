@@ -689,6 +689,7 @@ def register_all_routers(app, db):
         ("routers.ora_lesson_sources_router", "ORA Lesson Sources & Journal (iter 327o+p)"),
         ("routers.pipeda_sla_router",          "PIPEDA + SLA admin (iter 328b+f)"),
         ("routers.uptime_webhook_router",      "External uptime webhook (iter 328c)"),
+        ("routers.ora_feedback_router",        "ORA chat feedback (iter 329d)"),
     ]
 
     for module_path, label in _aurem_with_db:
