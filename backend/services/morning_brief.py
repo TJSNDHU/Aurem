@@ -448,6 +448,23 @@ async def generate_brief(scan: dict, auto_actions: list, tenant_id: str = None) 
 
     # Template fallback
     econ_section = f"\nECONOMIC CONTEXT:\n  {economic_line}\n" if economic_line else ""
+
+    # iter 327l — Pixel Health line. Cheap two-count check on
+    # universal_events; surfaces when the pixel pipe silently regresses
+    # (LEAN_ROUTES skip-list, CORS, pixel JS removed from a site).
+    pixel_health_line = ""
+    pixel_health_data = None
+    try:
+        from services.pixel_health import compute_pixel_health, maybe_alert_low_pixel_day
+        _db_ref = _get_db()
+        pixel_health_data = await compute_pixel_health(_db_ref)
+        pixel_health_line = pixel_health_data.get("brief_line", "")
+        # Fire-and-forget Telegram alert when classification is LOW.
+        await maybe_alert_low_pixel_day(_db_ref, pixel_health_data)
+    except Exception as _e:
+        logger.debug(f"[BRIEF] pixel health unavailable: {_e}")
+    pixel_section = f"\nPIXEL HEALTH:\n  • {pixel_health_line}\n" if pixel_health_line else ""
+
     brief_text = f"""AUREM MORNING BRIEF — {now.strftime('%B %d, %Y')} {now.strftime('%I:%M %p')} UTC
 System Health: {scan['site_health']['score']}/100
 
@@ -456,7 +473,7 @@ HANDLED OVERNIGHT (no action needed):
 
 NEEDS YOUR ATTENTION:
 {chr(10).join(f'  • {a}' for a in needs_attention) if needs_attention else '  • All clear — no items need attention'}
-{econ_section}{ssot_section}{webclaw_line}{intel_section}
+{econ_section}{ssot_section}{webclaw_line}{intel_section}{pixel_section}
 TODAY'S PRIORITIES:
 {chr(10).join(f'  {i+1}. {p}' for i, p in enumerate(priorities[:3]))}
 
@@ -495,6 +512,10 @@ REVENUE SNAPSHOT:
                 "score": scan["site_health"]["score"],
                 "issues": scan["site_health"]["issues_count"],
             },
+            # iter 327l — Pixel Health structured fields so the
+            # System Overview / chat UI can surface the same data
+            # the brief text shows.
+            "pixel_health": pixel_health_data or {},
         },
         "scan_data": scan,
         "auto_actions": auto_actions,

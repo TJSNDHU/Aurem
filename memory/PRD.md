@@ -414,3 +414,60 @@ confirm vision actually fired."
 **Tests**: `tests/test_iter327k_vision_provenance_badge.py` — 4
 cases, all green. Total touched-iter regression 159/159 green.
 
+
+## iter 327l (2026-02-23) — Pixel Health in Morning Brief
+Founder mandate: "Yesterday's universal_events count vs 7-day average.
+If count drops 50%+ below average → Telegram alert same morning."
+
+**Delivered**
+- New module `services/pixel_health.py`:
+    - `compute_pixel_health(db)` — two cheap `count_documents` calls
+      (yesterday window + prior-7-days window), returns
+      `{yesterday_count, seven_day_avg, classification, brief_line,
+      date_yesterday}`. Three classes: `normal` / `low` / `sparse`.
+      `low` = yesterday < avg × 0.5 AND avg ≥ 10.
+      `sparse` = avg < 10 (don't grade noisy baselines).
+    - `maybe_alert_low_pixel_day(db, health)` — Telegram alert via
+      existing `silent_failure_alerts._send` pipe with per-date
+      dedup fingerprint `pixel_low_<YYYY-MM-DD>` so re-running the
+      brief never double-pings.
+- `services/morning_brief.py::generate_brief` splices a new
+  PIXEL HEALTH section into `brief_text`:
+    ```
+    PIXEL HEALTH:
+      • Yesterday: 247 pixel events (7-day avg: 312) — normal
+    ```
+  AND persists structured `sections.pixel_health` so System Overview /
+  ORA brain can read the same numbers.
+- Safety net: failure in pixel_health (Mongo down, etc.) is caught at
+  DEBUG; the brief itself always renders.
+
+**Tests**: `tests/test_iter327l_pixel_health_in_morning_brief.py` —
+12 cases. Covers classification (normal/low/sparse + edge), compute
+output for the three states, db-failure soft path, alert NOT firing
+for normal/sparse, alert firing for low with the correct
+date-fingerprint + recovery hint in the body, and source-level checks
+that morning_brief wires it in.
+
+**Live preview verification**:
+```
+Yesterday: 0 pixel events (7-day avg: 0) — sparse, not enough history yet
+```
+(Preview DB has zero events — expected. In production once pixel data
+flows, this reads real numbers and the 50%-drop alarm becomes useful.)
+
+**Pytest status (322er + 326vv/ww + 327a→l): 178 / 178 green.**
+
+## Next Action Items (post next deploy)
+- Push to GitHub → redeploy aurem.live so iter 327d-l ships.
+- Verify in production tomorrow's brief that PIXEL HEALTH line shows
+  real numbers. If it stays at 0 events with `LEAN_ROUTES=1`, the
+  alert will fire automatically — exactly what was asked for.
+
+## Backlog
+- P3: Wire iter 327h /api/appointments/book to action_engine
+  per-customer OAuth Google Calendar event create (Meet link)
+- P3: Service-account staff calendar (needs GOOGLE_CALENDAR_ID +
+  GOOGLE_SERVICE_ACCOUNT_KEY)
+- P3: Tailored "report expired" copy + "Get a fresh scan" CTA on
+  the existing 404 landing page
