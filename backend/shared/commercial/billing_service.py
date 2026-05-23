@@ -643,8 +643,93 @@ class BillingService:
             }
         )
         
-        # TODO: Create usage record in Stripe for metered billing
-        # This would require setting up metered billing in Stripe
+        # iter 327a — Stripe metered billing usage record. Was a P1
+        # revenue leak: overage_messages were tracked in our own
+        # `business_workspace_usage` collection but never reported to
+        # Stripe, so customers on metered plans were never billed for
+        # them. Now we POST a MeterEvent to Stripe (current Stripe
+        # Billing Meters API, replaces the legacy UsageRecord call)
+        # AND persist an audit row in `stripe_usage_records` (success
+        # or failure). On Stripe auth failure, fire a single Telegram
+        # alert so the founder knows to investigate.
+        usage_audit = {
+            "business_id":   business_id,
+            "period":        period,
+            "plan":          plan,
+            "messages":      messages,
+            "rate_cents":    rate_cents,
+            "amount_cents":  messages * rate_cents,
+            "ts":            datetime.now(timezone.utc).isoformat(),
+            "status":        "pending",
+        }
+        try:
+            # Both the meter event name AND a stripe_customer_id are
+            # required for the new Stripe Billing Meters API.
+            meter_event_name = billing.get("stripe_meter_event_name")
+            stripe_customer_id = billing.get("stripe_customer_id")
+            if not meter_event_name or not stripe_customer_id or not stripe.api_key:
+                usage_audit["status"] = "skipped"
+                if not stripe.api_key:
+                    usage_audit["reason"] = "no_stripe_api_key"
+                elif not stripe_customer_id:
+                    usage_audit["reason"] = "no_stripe_customer_id"
+                else:
+                    usage_audit["reason"] = "no_stripe_meter_event_name"
+                logger.info(
+                    f"[Billing] usage record skipped for {business_id}: "
+                    f"{usage_audit['reason']} (tracked internally only)"
+                )
+            else:
+                ts_unix = int(datetime.now(timezone.utc).timestamp())
+                meter_event = await _stripe_call(
+                    stripe.billing.MeterEvent.create,
+                    event_name=meter_event_name,
+                    timestamp=ts_unix,
+                    payload={
+                        "stripe_customer_id": stripe_customer_id,
+                        "value":              str(messages),
+                    },
+                )
+                usage_audit["status"] = "ok"
+                usage_audit["stripe_meter_event_id"] = (
+                    meter_event.get("identifier")
+                    if isinstance(meter_event, dict)
+                    else getattr(meter_event, "identifier", None)
+                )
+                usage_audit["stripe_meter_event_name"] = meter_event_name
+                usage_audit["stripe_customer_id"] = stripe_customer_id
+                logger.info(
+                    f"[Billing] meter event posted to Stripe: "
+                    f"business={business_id} qty={messages} "
+                    f"meter={meter_event_name} customer={stripe_customer_id}"
+                )
+        except Exception as e:
+            usage_audit["status"] = "fail"
+            usage_audit["error"] = f"{type(e).__name__}: {str(e)[:240]}"
+            logger.exception(
+                f"[Billing] usage record FAILED for {business_id}: {e}"
+            )
+            try:
+                from services.silent_failure_alerts import alert_autonomous_401
+                # Reuse the iter-326pp alert plumbing for any Stripe
+                # authentication failure (revoked / rotated key).
+                if "AuthenticationError" in usage_audit["error"]:
+                    alert_autonomous_401(
+                        context="billing.metered_usage_record",
+                        status_code=401,
+                        detail=(
+                            f"business={business_id} qty={messages} "
+                            f"err={usage_audit['error']}"
+                        ),
+                        provider="stripe",
+                    )
+            except Exception as _le:
+                logger.debug(f"[Billing] alert dispatch failed: {_le}")
+        # Audit row goes in regardless of outcome
+        try:
+            await self.db.stripe_usage_records.insert_one(usage_audit)
+        except Exception as _le:
+            logger.warning(f"[Billing] usage audit write skipped: {_le}")
 
 
 # Singleton
