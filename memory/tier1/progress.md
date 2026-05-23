@@ -284,3 +284,39 @@ PIDs: []
 Updated: 2026-02-24T04:00:00Z
 ---
 
+
+
+---
+Task: iter 332b Batch A-2 — Enterprise Admin UI (Fixes 3, 4, 5, 6 of 7) + syntax repair
+Succeeded:
+  • **Critical syntax bug repaired**: enterprise_router.py had a SyntaxError at line 213 — the previous session's API Key CRUD code was inserted INSIDE the unclosed `send_email(` call of `submit_enterprise_lead`. Result: ALL `/api/enterprise/*` endpoints were dead (router import skipped at startup with `[REGISTRY] enterprise router failed: invalid syntax`). Fixed by closing the `send_email()` call cleanly and moving the inserted CRUD/Branding/Domain sections to after the function body. Backend now boots clean — no enterprise router warnings.
+  • **Fix 5 — API key management UI** SHIPPED. `/enterprise/admin/keys` page lists keys (key_preview only — full key NEVER re-shown), create form with scope dropdown (read/write/admin), reveal-once banner with Copy button, Rotate + Revoke per row with confirm prompts, all audit events written to unified_audit_log under api_key_created / api_key_rotated / api_key_revoked.
+  • **Fix 3 — White-label UI** SHIPPED. `/enterprise/admin/branding` page with Field rows for tenant_id, company_name, logo_url, native HTML color picker + hex input, plus a side-by-side live preview card that recolors the gradient + CTA button in real time. Save writes to enterprise_branding collection and stamps a unified_audit_log row.
+  • **Fix 4 — Custom domain wizard** SHIPPED. `/enterprise/admin/domain` is a 3-step wizard (animated stepper bar): Step 1 enter domain → Step 2 see CNAME instructions (Type/Name/Value/TTL) → Step 3 success card. Verify button does real DNS resolution via the existing `/api/enterprise/domain/verify` endpoint (compares A records of the customer's domain vs aurem.live).
+  • **Fix 6 — Enterprise dashboard** SHIPPED. `/enterprise/admin` (Overview) shows 4 metric tiles (audit events 24h, ORA calls 7d, security blocks 7d, $ spend 7d) + a recent audit events feed (15 rows, grid-aligned, color-coded ok/blocked/fail badges) — pulls live data from `/api/enterprise/audit` and `/api/admin/ora/specialist-cost-breakdown`.
+  • **Auth model fix**: EnterpriseAdminShell originally wrapped pages in `<DeveloperShell requireAuth>` (which checks `dev_jwt`). But admin pages use `platform_token` via `adminHeaders()` — mismatch would have redirected platform admins to /developers/signup. Fixed by dropping the `requireAuth` flag; backend 401 now drives the auth UX and admins land directly on the page.
+  • **App.js wiring**: 4 new routes registered: /enterprise/admin, /enterprise/admin/branding, /enterprise/admin/domain, /enterprise/admin/keys (+ 4 new component imports).
+  • **Shared shell**: EnterpriseAdminShell exports a Field, PrimaryButton, Banner helper trio used identically across all 4 sub-pages → consistent visual language. Pill nav bar (`enterprise-admin-nav` testid) with active-route detection.
+  • **Tests**: new file `tests/test_iter332b_enterprise_admin_ui.py` — 16 cases covering branding GET/PUT + audit row + public read, domain register + invalid-char rejection + pending row + verify on unresolvable domain, API key create/list/rotate/revoke with 404 paths + audit rows written + key never exposed in list, plus source-level wiring assertions for App.js routes and the requireAuth-removed shell. All 16 green.
+  • **Testing agent run** (E2E both backend + frontend): zero issues. Reports 100% backend + 100% frontend success rate. All 21 frontend data-testids verified (enterprise-admin-nav, overview-* tiles, branding-editor + preview + color picker, domain-wizard + 3 steps, apikey-list + create form etc.).
+  • **Active regression**: 510 / 511 pytest green across iter 327d → 332b A-2. The single fail (`test_iter327op::test_tier2_rule_table_lists_keywords_and_exists_flag`) is pre-existing — asserts `len(rules) == 3` when tier-2 has grown to 7 rules; not in scope for this slice.
+  • **Frontend smoke screenshot**: /enterprise/admin renders cleanly — Cinzel "Tenant overview" headline, ENTERPRISE / ADMIN orange eyebrow, sidebar with Home/Connect/Analytics/Examples/Tokens/API Docs/Status/Settings/Terms, 4 sub-nav pills (Overview / Branding / Domain / API Keys), 4 metric tiles, audit feed card.
+Blocker: none.
+Deferred to future sessions:
+  - **Fix 1 — RBAC complete wiring**: still queued. Per founder ("RBAC backend mein hai — enterprise prospect nahi dekhta backend code") this is intentionally NOT in this slice. Needs its own dedicated 2-3 day session for the new `user_rbac.py` with Owner/Admin/Developer/Viewer + applied across ~80 routers.
+Next:
+  • Push iter 332b A-2 to GitHub via "Save to Github" — preview is green; production redeploys from main.
+  • iter 332b Batch B — SAML 2.0 SSO (Okta, Azure AD, Google), SCIM user provisioning, Organization entity above teams.
+  • iter 332b Batch C — Data residency (Canadian cluster option), SOC 2 Type II evidence export (PDF), Enterprise SLA page + MSA template.
+Backlog:
+  • Pre-existing stale assertion in test_iter327op (1 line fix — `assert len(rules) == 3` → `>= 3`).
+  • Migration job to backfill historical rows from 5 legacy audit collections into unified_audit_log.
+  • Service-account Google Calendar API for shared staff calendar (P2).
+  • Friendlier "report expired" 404 page for stale ghost-* slugs (P2).
+  • System overview page redesign (frontend-only, ~2h).
+Cost: $0.00 USD (pytest + lint + curl smoke + testing agent only; no LLM calls)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T05:00:00Z
+---
+
