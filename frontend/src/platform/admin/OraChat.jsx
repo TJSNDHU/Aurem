@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Crown, Send, Loader2, Trash2, Copy, Check,
   Wrench, AlertTriangle, ShieldAlert, X, Wand2, Eye,
-  ChevronRight, Sparkles, Plus,
+  ChevronRight, Sparkles, Plus, Lock, Unlock,
 } from "lucide-react";
 import {
   SmartToolResult, PreviewPane, StepTracker, PlanPreview,
@@ -532,6 +532,7 @@ export default function OraChat() {
               ORA · Autonomous CTO
             </h1>
             <StatusPill busy={busy} pending={!!pending} error={!!error} />
+            <GithubLockPill />
           </div>
           <div style={{ color: TEXT_DIM, fontSize: 11, marginTop: 2 }}>
             iter 322fi · Thread {sessionId.slice(-8)} · One chat, no tabs
@@ -1033,6 +1034,68 @@ function _safeArgs(raw) {
  * - Awaiting approval: amber "🤖 NEEDS YOU"
  * - Error: red "🤖 STUCK"
  */
+/**
+ * GithubLockPill — iter 327d.
+ * Polls /api/admin/ora/github-lock every 60 s. Shows a lock icon +
+ * "GitHub: Read Only" when locked (default), "Write Enabled" if the
+ * founder has explicitly unlocked. Tooltip lists recent block attempts.
+ */
+function GithubLockPill() {
+  const [status, setStatus] = React.useState({
+    locked: true, mode: "read_only", ui_label: "Read Only",
+    recent_attempts: [],
+  });
+  const API = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+  const authHeaders = () => {
+    const tok = (typeof window !== "undefined"
+      && (sessionStorage.getItem("platform_token")
+         || localStorage.getItem("platform_token"))) || "";
+    return tok ? { Authorization: `Bearer ${tok}` } : {};
+  };
+  React.useEffect(() => {
+    let stopped = false;
+    const fetchStatus = async () => {
+      try {
+        const r = await fetch(`${API}/api/admin/ora/github-lock`, {
+          headers: authHeaders(),
+        });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!stopped && j.ok) setStatus(j);
+      } catch (_e) { /* soft */ }
+    };
+    fetchStatus();
+    const id = setInterval(fetchStatus, 60000);
+    return () => { stopped = true; clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const locked = !!status.locked;
+  const color  = locked ? AMBER : GREEN;
+  const Icon   = locked ? Lock : Unlock;
+  const recentN = (status.recent_attempts || []).length;
+  return (
+    <span data-testid="github-lock-pill"
+          data-locked={locked ? "true" : "false"}
+          title={locked
+            ? `GitHub writes are locked. ${recentN} recent block attempt${recentN === 1 ? "" : "s"}.`
+            : "GitHub writes are UNLOCKED. Treat with care."}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "3px 10px",
+            background: `${color}22`,
+            border: `1px solid ${color}66`,
+            borderRadius: 999,
+            fontSize: 10.5, fontWeight: 700,
+            color, letterSpacing: 0.5, textTransform: "uppercase",
+            marginLeft: 6, cursor: "default",
+          }}>
+      <Icon size={11} />
+      <span>GitHub: {status.ui_label || (locked ? "Read Only" : "Write Enabled")}</span>
+    </span>
+  );
+}
+
+
 function StatusPill({ busy, pending, error }) {
   let label = "IDLE", color = TEXT_DIM, pulse = false;
   if (error)       { label = "STUCK";      color = RED; }

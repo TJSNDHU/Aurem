@@ -1819,6 +1819,12 @@ async def propose_commit(
     records the proposal in `ora_commit_proposals` and stages the diff
     so the founder can review.
 
+    iter 327d — GitHub read-only lock. propose_commit itself is local
+    (writes to Mongo only), but ANY commit proposal implies the
+    founder may later push it. While the lock is engaged, refuse the
+    proposal up-front so ORA's brain reads a clean "locked" signal
+    instead of generating a proposal the founder can't act on.
+
     Args:
         title:      one-line conventional-commit summary (≤80 chars)
         body:       longer explanation (≤4KB)
@@ -1837,6 +1843,28 @@ async def propose_commit(
         return {"ok": False, "error": f"body too long (>{_COMMIT_BODY_MAX})"}
     if not isinstance(rationale, str) or len(rationale.strip()) < 10:
         return {"ok": False, "error": "rationale required (≥10 chars) — explain what changed and why"}
+
+    # iter 327d — GitHub read-only lock check.
+    try:
+        from services.github_lockdown import (
+            assert_github_writes_allowed, GitHubLockedError, log_block_attempt,
+        )
+        try:
+            await assert_github_writes_allowed("git_remote_commit")
+        except GitHubLockedError as e:
+            await log_block_attempt(
+                "git_remote_commit", actor="ora",
+                context=f"propose_commit title={title!r}",
+            )
+            return {
+                "ok":           False,
+                "error":        e.friendly,
+                "error_code":   "github_locked",
+                "operation":    e.operation,
+                "lock_state":   "read_only",
+            }
+    except ImportError:
+        pass  # lockdown service not loaded — soft-allow legacy path
 
     file_paths = file_paths or []
     if not isinstance(file_paths, list):
@@ -2557,6 +2585,31 @@ async def _ora_channel_gating_reseed() -> dict:
 
 async def _ora_git_commit_local(message: str) -> dict:
     import subprocess
+    # iter 327d — GitHub read-only lock. git_commit_local stays on the
+    # pod's filesystem only (no network) but the founder asked for a
+    # hard block on ANY commit operation while locked, so refuse here
+    # too. Local-only autofix checkpoints can be re-enabled by
+    # explicitly unlocking via /api/admin/ora/github-unlock.
+    try:
+        from services.github_lockdown import (
+            assert_github_writes_allowed, GitHubLockedError, log_block_attempt,
+        )
+        try:
+            await assert_github_writes_allowed("git_remote_commit")
+        except GitHubLockedError as e:
+            await log_block_attempt(
+                "git_remote_commit", actor="ora",
+                context=f"git_commit_local message={message!r}",
+            )
+            return {
+                "ok":           False,
+                "error":        e.friendly,
+                "error_code":   "github_locked",
+                "operation":    e.operation,
+                "lock_state":   "read_only",
+            }
+    except ImportError:
+        pass
     msg = f"ora-autofix: {(message or '')[:140]}"
     try:
         subprocess.run(["git", "add", "-A"], cwd="/app", check=True, timeout=20)
@@ -2583,6 +2636,68 @@ async def _ora_git_commit_local(message: str) -> dict:
         return {"ok": False, "error": f"git: {e.stderr or e.stdout or 'unknown'}"}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+# ─────────────────────────────────────────────────────────────────
+# iter 327d — Sentinel GitHub-write tools.
+# These exist solely so ORA's LLM brain can name them in a planned
+# tool_call and IMMEDIATELY hit the read-only lock with a clean,
+# auditable error.  Without these, the LLM would either invent
+# a tool name and hit the dispatcher's "unknown tool" path (no
+# Telegram alert) or try shell_exec(`git push ...`) (which is
+# also blocked but harder for the founder to grep).
+# ─────────────────────────────────────────────────────────────────
+
+async def _github_locked_sentinel(operation: str, **kwargs) -> dict:
+    """Single body all sentinel tools delegate to."""
+    from services.github_lockdown import (
+        assert_github_writes_allowed, GitHubLockedError, log_block_attempt,
+    )
+    try:
+        await assert_github_writes_allowed(operation)
+    except GitHubLockedError as e:
+        await log_block_attempt(operation, actor="ora",
+                                  context=str(kwargs)[:400])
+        return {
+            "ok":           False,
+            "error":        e.friendly,
+            "error_code":   "github_locked",
+            "operation":    e.operation,
+            "lock_state":   "read_only",
+        }
+    # Lock unset — would normally execute the real op here. We
+    # currently have no implementation; tell the LLM explicitly.
+    return {
+        "ok":    False,
+        "error": (
+            f"{operation} is not implemented yet. Lock is open but no "
+            "code path exists — ask the founder to wire it via Emergent's "
+            "'Save to GitHub' button instead."
+        ),
+        "error_code": "not_implemented",
+    }
+
+
+async def _ora_github_push(branch: str = "main", *, rationale: str = "") -> dict:
+    return await _github_locked_sentinel("git_push", branch=branch,
+                                            rationale=rationale)
+
+
+async def _ora_github_pr_create(title: str = "", body: str = "",
+                                  base: str = "main", head: str = "") -> dict:
+    return await _github_locked_sentinel(
+        "pr_create", title=title, body=body, base=base, head=head,
+    )
+
+
+async def _ora_github_branch_create(branch: str = "", base: str = "main") -> dict:
+    return await _github_locked_sentinel(
+        "git_branch_create", branch=branch, base=base,
+    )
+
+
+async def _ora_github_branch_delete(branch: str = "") -> dict:
+    return await _github_locked_sentinel("git_branch_delete", branch=branch)
 
 
 async def _ora_git_log(path: str = "", limit: int = 5) -> dict:
@@ -3554,6 +3669,58 @@ TOOL_REGISTRY: dict[str, dict] = {
             "accept arbitrary system paths. Use this BEFORE proposing any "
             "scary git-cleanup work — it tells you cheaply whether the file "
             "is actually tracked."
+        ),
+    },
+    # iter 327d — GitHub write-op sentinels. These exist so ORA's LLM
+    # has names to call when she thinks she needs to push / open a PR
+    # / make a branch. Each one hits the read-only lock and returns a
+    # clean error. The founder also gets a Telegram alert.
+    "github_push": {
+        "fn": _ora_github_push,
+        "args_spec": {
+            "branch":     "str — target branch (default 'main')",
+            "rationale":  "str — why you wanted to push (audit log only)",
+        },
+        "description": (
+            "LOCKED (read-only). Would push commits to GitHub.com. "
+            "Currently blocked — founder must unlock via the admin "
+            "endpoint before this can run. Will fire a Telegram alert "
+            "on every attempt while locked."
+        ),
+    },
+    "github_pr_create": {
+        "fn": _ora_github_pr_create,
+        "args_spec": {
+            "title":  "str — PR title",
+            "body":   "str — PR description / body",
+            "base":   "str — base branch (default 'main')",
+            "head":   "str — head branch with the changes",
+        },
+        "description": (
+            "LOCKED (read-only). Would open a pull request on GitHub. "
+            "Currently blocked. Will fire a Telegram alert on every "
+            "attempt while locked."
+        ),
+    },
+    "github_branch_create": {
+        "fn": _ora_github_branch_create,
+        "args_spec": {
+            "branch": "str — new branch name",
+            "base":   "str — branch to fork from (default 'main')",
+        },
+        "description": (
+            "LOCKED (read-only). Would create a remote branch on "
+            "GitHub. Currently blocked."
+        ),
+    },
+    "github_branch_delete": {
+        "fn": _ora_github_branch_delete,
+        "args_spec": {
+            "branch": "str — branch to delete",
+        },
+        "description": (
+            "LOCKED (read-only). Would delete a remote branch on "
+            "GitHub. Currently blocked."
         ),
     },
     "git_bisect": {
