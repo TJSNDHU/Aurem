@@ -92,3 +92,30 @@ PIDs: []
 Updated: 2026-02-24T00:30:00Z
 ---
 
+
+---
+Task: iter 331f Batch B — Developer Portal frontend (10 pages) + AUREM CTO brand swap
+Succeeded:
+  • Re-skinned the 10 developer-portal pages to match the live AUREM aesthetic. Two modes in a single DeveloperShell:
+    - LANDING mode (/developers, /developers/signup): exact homepage aesthetic — Cinzel serif headlines with orange→gold gradient (#FF6B00 → #E8C86A), Jost body, JetBrains Mono eyebrow pills with blinking orange dot, dark void background with subtle grid + radial glow, gold "Sign in" outlined nav button + orange-gradient "Claim 1000 tokens" CTA.
+    - DASHBOARD mode (the 8 authed pages): LuxeDashboardV2 av2-* primitives — edge-to-edge sidebar with 8 nav items, top bar with AUREM logo + live token chip + theme toggle + logout, av2-card panels in av2-grid-4 / av2-grid-2 / av2-grid-3-2 layouts.
+  • Built /developers (landing), /developers/signup, /developers/connect, /developers/dashboard, /developers/analytics, /developers/tokens, /developers/terms, /developers/settings, /developers/examples, /developers/status — all 10 routes wired into App.js with data-testids on every interactive element.
+  • Shared primitives extracted to DevDashboard.jsx: PageHeader, MetricTile, SectionTitle — reused across the 7 sibling pages so headings stay consistent.
+  • iter 331f health endpoint shipped earlier this batch: GET /api/admin/developers/health returns total/verified/abuse_flagged dev counts, active sessions sum across all accounts, token remaining/used totals, 24-h block counters (ssrf/abuse/sessions_refused), 24-h emails sent, 24-h token calls + a green/yellow/red overall status. Wired into the ORA Cockpit as `DeveloperPortalPulseTile` (30 s poll, status dot, 3 metric columns + a blocks-today row).
+  • AUREM CTO brand swap: every user-facing reference to "ORA" in marketing copy, signup pages, dashboard pages, terms, status page, welcome email, Day-3/7/25 sequence templates → "AUREM CTO". Hero headline now "Build with AUREM CTO". Welcome email subject changed to "Welcome to AUREM CTO — Your 1000 tokens are ready". Internal code symbols, log messages, file names, tier-1 memory all still say ORA (no code-level rename).
+  • Testing agent E2E run on landing + signup + connect + dashboard: all selectors found, signup → OTP → JWT → redirect flow works end-to-end. Lint clean on all 11 new/rewritten frontend files. 401 / 401 backend regression green.
+  • Three frontend testids confirmed by visual screenshot: dev-landing-hero-headline, dev-shell-logo, dev-shell-signup-cta. Auth gating on the 8 authed pages confirmed by testing agent (unauthenticated → redirect to /developers/signup).
+Blocker: none.
+Deferred:
+  • iter 331f-c minor cleanup queued: ConsentToggleCard still uses shadcn Card primitive instead of av2-card (testing agent flagged it as minor visual inconsistency). Roughly 20 LOC to swap when next touching settings.
+  • iter 332a Emergent Specialist Swarm (extend fork_context with mode="emergent", auto-escalation after 2 failures, validated solution memory with SHA256 signatures, cost tracking, smart routing rules, Specialist Cost Breakdown cockpit tile) — full spec captured by the founder, 3-4 hours of careful infra work. Queued for the next context window; pattern matches the Batch A / Batch B split that has been working.
+Next:
+  • Push iter 331f-b to GitHub via "Save to Github" — preview is green, production redeploys from main.
+  • Batch C (third context window): Stripe — products + checkout + webhook + failed-payment 3-day-grace downgrade + invoice emails. Stripe test key already in pod env per platform policy.
+  • iter 332a as described above.
+Cost: $0.00 USD (testing agent + lint + pytest only; no LLM calls)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T01:20:00Z
+---
+

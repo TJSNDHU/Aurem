@@ -505,16 +505,16 @@ def test_welcome_email_subject_and_body_construction():
         login_url="https://aurem.live/developers/login",
         connect_url="https://aurem.live/developers/connect",
     )
-    assert subject == "Welcome to ORA CTO — Your 1000 tokens are ready"
+    assert subject == "Welcome to AUREM CTO — Your 1000 tokens are ready"
     # First name only used
-    assert "Welcome to ORA CTO, Alice." in html
+    assert "Welcome to AUREM CTO, Alice." in html
     assert "1,000 free" in html
     assert "Connect your GitHub" in html
     assert "https://aurem.live/developers/login" in html
     assert "https://aurem.live/developers/connect" in html
     # 3-step content present
     assert "Log in to your dashboard" in html
-    assert "Tell ORA what you want to build" in html
+    assert "Tell AUREM CTO what you want to build" in html
 
 
 @pytest.mark.asyncio
@@ -536,7 +536,7 @@ async def test_welcome_email_sends_via_resend_wrapper(db, monkeypatch):
     ok = await _send_welcome_email(email="founder@aurem.live", name="Founder")
     assert ok is True
     assert captured["to"] == "founder@aurem.live"
-    assert captured["subject"] == "Welcome to ORA CTO — Your 1000 tokens are ready"
+    assert captured["subject"] == "Welcome to AUREM CTO — Your 1000 tokens are ready"
     assert "1,000 free" in captured["html"]
     assert "tokens" in (captured.get("text") or "").lower()
 

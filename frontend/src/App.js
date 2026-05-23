@@ -171,6 +171,18 @@ import { AdminGuard } from './platform/RouteGuards';
 
 // AUTO-EAGER (iter 301): named-export pages converted to direct imports
 import { LegalIndex, LegalDocument } from './platform/LegalPages';
+
+// iter 331f — Developer Portal (10 pages)
+import DevLanding   from './platform/developers/DevLanding';
+import DevSignup    from './platform/developers/DevSignup';
+import DevConnect   from './platform/developers/DevConnect';
+import DevDashboard from './platform/developers/DevDashboard';
+import DevAnalytics from './platform/developers/DevAnalytics';
+import DevTokens    from './platform/developers/DevTokens';
+import DevTerms     from './platform/developers/DevTerms';
+import DevSettings  from './platform/developers/DevSettings';
+import DevExamples  from './platform/developers/DevExamples';
+import DevStatus    from './platform/developers/DevStatus';
 import { PlatformLogin, PlatformSignup } from './platform/PlatformAuth';
 import AccountSecurity from './platform/AccountSecurity';
 import ORAWidget from './components/ORAWidget';
@@ -293,6 +305,18 @@ function AppRouter() {
       <Route path="/support" element={<SupportPage />} />
       <Route path="/legal" element={<LegalIndex />} />
       <Route path="/legal/:slug" element={<LegalDocument />} />
+
+      {/* iter 331f — Developer Portal (10 pages) */}
+      <Route path="/developers"           element={<DevLanding />} />
+      <Route path="/developers/signup"    element={<DevSignup />} />
+      <Route path="/developers/connect"   element={<DevConnect />} />
+      <Route path="/developers/dashboard" element={<DevDashboard />} />
+      <Route path="/developers/analytics" element={<DevAnalytics />} />
+      <Route path="/developers/tokens"    element={<DevTokens />} />
+      <Route path="/developers/terms"     element={<DevTerms />} />
+      <Route path="/developers/settings"  element={<DevSettings />} />
+      <Route path="/developers/examples"  element={<DevExamples />} />
+      <Route path="/developers/status"    element={<DevStatus />} />
       
       {/* Platform Auth */}
       <Route path="/platform/login" element={<PlatformLogin />} />

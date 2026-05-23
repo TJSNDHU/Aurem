@@ -191,7 +191,7 @@ async def _send_email(to: str, subject: str, body: str, html: str | None = None)
 
 def _welcome_email_html(name: str, login_url: str, connect_url: str) -> tuple[str, str]:
     """Returns (subject, html) for the Day-0 welcome email."""
-    subject = "Welcome to ORA CTO — Your 1000 tokens are ready"
+    subject = "Welcome to AUREM CTO — Your 1000 tokens are ready"
     display_name = (name or "there").split()[0]
     html = f"""<!doctype html>
 <html><body style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -199,7 +199,7 @@ def _welcome_email_html(name: str, login_url: str, connect_url: str) -> tuple[st
   <div style="max-width:560px;margin:0 auto;background:#10172a;
               border:1px solid #1e2a4a;border-radius:14px;padding:32px;">
     <h1 style="font-size:22px;margin:0 0 8px;letter-spacing:-0.01em;">
-      Welcome to ORA CTO, {display_name}.
+      Welcome to AUREM CTO, {display_name}.
     </h1>
     <p style="color:#9aa6c7;line-height:1.55;margin:0 0 18px;">
       Your account is verified and <strong style="color:#7ad9b6;">1,000 free
@@ -215,7 +215,7 @@ def _welcome_email_html(name: str, login_url: str, connect_url: str) -> tuple[st
             Log in to your dashboard</a> — see your token balance + project list.</li>
         <li><a href="{connect_url}" style="color:#7ad9b6;text-decoration:none;">
             Connect your GitHub</a> — so ORA can read your repos (read-only by default).</li>
-        <li>Tell ORA what you want to build. Chat, edit, test, deploy — all
+        <li>Tell AUREM CTO what you want to build. Chat, edit, test, deploy — all
             inside one window.</li>
       </ol>
     </div>
@@ -242,12 +242,12 @@ async def _send_welcome_email(email: str, name: str) -> bool:
     connect_url = f"{site}/developers/connect"
     subject, html = _welcome_email_html(name, login_url, connect_url)
     text = (
-        f"Welcome to ORA CTO, {(name or 'there').split()[0]}.\n\n"
+        f"Welcome to AUREM CTO, {(name or 'there').split()[0]}.\n\n"
         f"Your account is verified and 1,000 free tokens are ready.\n\n"
         f"Get started in 3 steps:\n"
         f"  1. Log in: {login_url}\n"
         f"  2. Connect GitHub: {connect_url}\n"
-        f"  3. Tell ORA what you want to build.\n\n"
+        f"  3. Tell AUREM CTO what you want to build.\n\n"
         f"Token costs: chat=1, file edit=2, test=3, deploy=5. BYOK any time.\n\n"
         f"Reply to this email if you get stuck."
     )

@@ -86,8 +86,8 @@ def render_day3_github_nudge(name: str) -> tuple[str, str, str]:
     subject = "Connect GitHub to get started"
     html = _shell(
         "Connect GitHub — 5-minute setup",
-        f"""<p style="color:#9aa6c7;line-height:1.55;">Hi {first}, your ORA
-        account is ready but GitHub isn't connected yet. ORA needs read access
+        f"""<p style="color:#9aa6c7;line-height:1.55;">Hi {first}, your AUREM CTO
+        account is ready but GitHub isn't connected yet. AUREM CTO needs read access
         to your repos so it can understand your codebase before making any
         changes.</p>
         <ol style="color:#9aa6c7;line-height:1.7;padding-left:18px;">
@@ -95,13 +95,13 @@ def render_day3_github_nudge(name: str) -> tuple[str, str, str]:
               style="color:#7ad9b6;text-decoration:none;">
               {site}/developers/connect</a></li>
           <li>Click "Connect GitHub" — uses GitHub OAuth, read-only by default</li>
-          <li>Pick the repo you want ORA to work on</li>
+          <li>Pick the repo you want AUREM CTO to work on</li>
         </ol>
         <p style="color:#9aa6c7;line-height:1.55;">Once connected, just chat
-        with ORA. "Add a stripe checkout button" or "fix the 500 on /api/orders"
+        with AUREM CTO. "Add a stripe checkout button" or "fix the 500 on /api/orders"
         — that's the whole API.</p>""")
     text = (
-        f"Hi {first}, your ORA account is ready but GitHub isn't connected yet.\n\n"
+        f"Hi {first}, your AUREM CTO account is ready but GitHub isn't connected yet.\n\n"
         f"Connect in 5 minutes: {site}/developers/connect\n\n"
         f"ORA needs read access so it can understand your code before any change.\n"
     )
@@ -120,7 +120,7 @@ def render_day7_halfway(name: str, tokens_remaining: int) -> tuple[str, str, str
         <p style="color:#cfd8f5;font-weight:600;margin:18px 0 6px;">Three tips
         that stretch your tokens:</p>
         <ul style="color:#9aa6c7;line-height:1.7;padding-left:18px;">
-          <li>Ask ORA to <em>plan</em> first ("show me the plan") — costs 1
+          <li>Ask AUREM CTO to <em>plan</em> first ("show me the plan") — costs 1
               token vs. 10 for a wrong edit-then-rebuild.</li>
           <li>Connect <strong>BYOK</strong> at <a href="{site}/developers/settings"
               style="color:#7ad9b6;text-decoration:none;">/developers/settings</a>
@@ -136,7 +136,7 @@ def render_day7_halfway(name: str, tokens_remaining: int) -> tuple[str, str, str
     text = (
         f"Hi {first}, you have {tokens_remaining} tokens left.\n\n"
         f"Tips to stretch them:\n"
-        f"  • Ask ORA to plan first (1 token vs. 10 for a wrong edit)\n"
+        f"  • Ask AUREM CTO to plan first (1 token vs. 10 for a wrong edit)\n"
         f"  • Connect BYOK at {site}/developers/settings\n"
         f"  • Use specific paths with run_pytest\n\n"
         f"Buy more: {site}/developers/tokens\n"
@@ -151,7 +151,7 @@ def render_day7_unused(name: str) -> tuple[str, str, str]:
     html = _shell(
         "Your 1,000 tokens are still waiting",
         f"""<p style="color:#9aa6c7;line-height:1.55;">Hi {first}, your tokens
-        haven't been used yet. ORA can build your first feature in about 10
+        haven't been used yet. AUREM CTO can build your first feature in about 10
         minutes once you've connected a repo.</p>
         <p style="color:#cfd8f5;font-weight:600;margin:18px 0 6px;">Here's the
         fastest path:</p>
@@ -160,7 +160,7 @@ def render_day7_unused(name: str) -> tuple[str, str, str]:
               style="color:#7ad9b6;text-decoration:none;">
               {site}/developers/dashboard</a></li>
           <li>Type one line: "Add a contact form that posts to /api/contact"</li>
-          <li>Hit enter. Watch ORA plan it, write it, test it, and ship a PR.</li>
+          <li>Hit enter. Watch AUREM CTO plan it, write it, test it, and ship a PR.</li>
         </ol>
         <p style="color:#9aa6c7;line-height:1.55;">Stuck? Reply to this email
         with what you're trying to build — we'll point you at the right
