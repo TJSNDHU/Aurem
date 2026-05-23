@@ -690,6 +690,7 @@ def register_all_routers(app, db):
         ("routers.pipeda_sla_router",          "PIPEDA + SLA admin (iter 328b+f)"),
         ("routers.uptime_webhook_router",      "External uptime webhook (iter 328c)"),
         ("routers.ora_feedback_router",        "ORA chat feedback (iter 329d)"),
+        ("routers.outreach_admin_router",      "Outreach health + manual triggers (iter 330)"),
     ]
 
     for module_path, label in _aurem_with_db:
@@ -3566,6 +3567,112 @@ def register_all_routers(app, db):
             misfire_grace_time=120,
         )
         logger.info("[REGISTRY] External uptime staleness cron scheduled — every 10 min")
+
+        # iter 330 FIX 1 — Closer Day-5 trigger every 30 min.
+        async def _closer_day5_job():
+            try:
+                from services.closer_day5_trigger import run_closer_day5_sweep
+                out = await run_closer_day5_sweep(db)
+                if out.get("armed") or out.get("errors"):
+                    logger.info(f"[closer-day5] {out}")
+            except Exception as e:
+                logger.warning(f"[closer-day5] failed: {e}")
+
+        aurem_scheduler.add_job(
+            _closer_day5_job,
+            "interval",
+            minutes=30,
+            id="aurem_closer_day5",
+            name="Retell Day-5 trigger (every 30 min)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
+        logger.info("[REGISTRY] Retell Day-5 trigger scheduled — every 30 min")
+
+        # iter 330 FIX 3 — Reply-inbox → ORA bridge every 5 min.
+        async def _reply_inbox_job():
+            try:
+                from services.reply_inbox_processor import reply_inbox_sweep
+                out = await reply_inbox_sweep(db)
+                if out.get("processed"):
+                    logger.info(f"[reply-inbox] {out}")
+            except Exception as e:
+                logger.warning(f"[reply-inbox] failed: {e}")
+
+        aurem_scheduler.add_job(
+            _reply_inbox_job,
+            "interval",
+            minutes=5,
+            id="aurem_reply_inbox",
+            name="Reply-inbox → ORA bridge (every 5 min)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=120,
+        )
+        logger.info("[REGISTRY] Reply-inbox bridge scheduled — every 5 min")
+
+        # iter 330 FIX 6 — Social autopilot daily 10:00 America/Toronto.
+        async def _social_autopilot_job():
+            try:
+                from services.social_autopilot import run_daily_social_post
+                out = await run_daily_social_post(db)
+                logger.info(f"[social-autopilot] {out}")
+            except Exception as e:
+                logger.warning(f"[social-autopilot] failed: {e}")
+
+        try:
+            import pytz
+            tor_tz = pytz.timezone("America/Toronto")
+            aurem_scheduler.add_job(
+                _social_autopilot_job,
+                _SCCron(hour=10, minute=0, timezone=tor_tz),
+                id="aurem_social_autopilot",
+                name="LinkedIn autopilot (10:00 America/Toronto)",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=3600,
+            )
+            logger.info("[REGISTRY] Social autopilot scheduled — daily 10:00 ET")
+        except Exception as e:
+            logger.warning(f"[REGISTRY] Social autopilot schedule failed: {e}")
+
+        # iter 330 FIX 2 — Founder-facing alert: surface missing Twilio
+        # WABA config on startup so WhatsApp isn't a silent hole. Sent
+        # once per day (fingerprint by date) so the founder isn't
+        # spammed across pod restarts.
+        try:
+            import os as _os
+            from datetime import datetime as _dt
+            tw_set = bool((_os.environ.get("TWILIO_WA_FROM_NUMBER") or "").strip())
+            whapi_disabled = (_os.environ.get("WHAPI_BLAST_DISABLED", "false").lower()
+                              in ("1", "true", "yes", "on"))
+            if not tw_set and whapi_disabled:
+                async def _wa_gap_alert():
+                    try:
+                        from services.silent_failure_alerts import _send as _tg
+                        day = _dt.utcnow().strftime("%Y-%m-%d")
+                        await _tg(
+                            "📵 WhatsApp outreach OFF — TWILIO_WA_FROM_NUMBER is empty "
+                            "and WHAPI_BLAST_DISABLED=true. Set TWILIO_WA_FROM_NUMBER "
+                            "(format: 'whatsapp:+14155238886') + TWILIO_WA_TEMPLATE_SID "
+                            "to unlock the cheapest CASL-compliant channel.",
+                            fingerprint=f"wa_outreach_gap_{day}",
+                        )
+                    except Exception:
+                        pass
+                # Fire once 60 s after boot so logs settle first.
+                aurem_scheduler.add_job(
+                    _wa_gap_alert, "date",
+                    run_date=_dt.utcnow() + timedelta(seconds=60),
+                    id="aurem_wa_gap_alert_once",
+                    replace_existing=True,
+                )
+        except Exception as e:
+            logger.debug(f"[REGISTRY] WA gap alert wiring failed: {e}")
 
     except Exception as e:
         logger.warning(f"Nightly self-check not wired: {e}")

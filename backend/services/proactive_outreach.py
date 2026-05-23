@@ -781,7 +781,23 @@ async def proactive_outreach_scheduler():
                 await asyncio.sleep(5)
             
             logger.info("[PROACTIVE] Daily outreach complete")
-            
+
+            # iter 330 FIX 4 — Always stamp a run row so the Outreach
+            # Health card shows "fired but found 0 candidates" instead
+            # of looking dead. Without this, founder can't tell the
+            # difference between "scheduler crashed" and "no eligible
+            # customers today".
+            try:
+                if _db is not None:
+                    await _db.proactive_outreach_runs.insert_one({
+                        "ts":                 datetime.now(timezone.utc),
+                        "weather_alerts":     int((weather_results or {}).get("alerts_sent", 0)),
+                        "followup_candidates": len(followup_candidates),
+                        "browse_candidates":   len(browse_candidates),
+                    })
+            except Exception as _e:
+                logger.debug(f"[PROACTIVE] run-row stamp failed: {_e}")
+
             # Wait a bit to avoid double-triggering
             await asyncio.sleep(60)
             

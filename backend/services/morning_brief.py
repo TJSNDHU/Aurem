@@ -475,6 +475,26 @@ async def generate_brief(scan: dict, auto_actions: list, tenant_id: str = None) 
         logger.debug(f"[BRIEF] feedback summary unavailable: {_e}")
     feedback_section = f"\nORA FEEDBACK:\n  • {feedback_line}\n" if feedback_line else ""
 
+    # iter 330 FIX 3 — Reply-inbox 24h summary line.
+    reply_line = ""
+    try:
+        from services.reply_inbox_processor import daily_reply_summary
+        _r = await daily_reply_summary(_get_db())
+        reply_line = _r.get("line") or ""
+    except Exception as _e:
+        logger.debug(f"[BRIEF] reply summary unavailable: {_e}")
+    reply_section = f"\nREPLY INBOX:\n  • {reply_line}\n" if reply_line else ""
+
+    # iter 330 FIX 6 — Latest LinkedIn autopilot post.
+    social_line = ""
+    try:
+        from services.social_autopilot import latest_social_post_line
+        _s = await latest_social_post_line(_get_db())
+        social_line = _s.get("line") or ""
+    except Exception as _e:
+        logger.debug(f"[BRIEF] social autopilot line unavailable: {_e}")
+    social_section = f"\nSOCIAL:\n  • {social_line}\n" if social_line else ""
+
     brief_text = f"""AUREM MORNING BRIEF — {now.strftime('%B %d, %Y')} {now.strftime('%I:%M %p')} UTC
 System Health: {scan['site_health']['score']}/100
 
@@ -483,7 +503,7 @@ HANDLED OVERNIGHT (no action needed):
 
 NEEDS YOUR ATTENTION:
 {chr(10).join(f'  • {a}' for a in needs_attention) if needs_attention else '  • All clear — no items need attention'}
-{econ_section}{ssot_section}{webclaw_line}{intel_section}{pixel_section}{feedback_section}
+{econ_section}{ssot_section}{webclaw_line}{intel_section}{pixel_section}{feedback_section}{reply_section}{social_section}
 TODAY'S PRIORITIES:
 {chr(10).join(f'  {i+1}. {p}' for i, p in enumerate(priorities[:3]))}
 

@@ -729,6 +729,54 @@ cases. Full regression on iter 327* + iter 326 recent + iter 322er:
 Full regression: **311 / 311 green** across iter 327* + iter 328 +
 iter 326 recent + iter 322er.
 
+## iter 330 series (2026-02-23) — Close the Outreach Gap (6 fixes, e2e proofed)
+
+**FIX 1 — Retell Day-5 trigger** (`services/closer_day5_trigger.py`)
+- 30-minute APScheduler cron walks `campaign_leads` where `blast_chain.next_touch_n == 4` and hands each lead to `closer_ora.arm()` for a Retell voice call.
+- CASL hard-stop (final guard before dial) + lead stamping for idempotency.
+- New collection `closer_day5_runs` for the Outreach Health card.
+- Live proof: cron ran, run row persisted to DB.
+
+**FIX 2 — WhatsApp Twilio WABA founder-visibility**
+- Code routing was already correct (Twilio WABA primary → WHAPI fallback). The real gap is `TWILIO_WA_FROM_NUMBER` env being empty.
+- Added one-shot startup Telegram alert (fingerprint by day) the moment the gap is detected; surfaces in the Outreach Health card too.
+- Once founder sets `TWILIO_WA_FROM_NUMBER=whatsapp:+1xxxxxxxxxx` + `TWILIO_WA_TEMPLATE_SID=HXxxxxx`, WhatsApp lights up green automatically.
+
+**FIX 3 — Reply Inbox → ORA bridge** (`services/reply_inbox_processor.py`)
+- 5-minute cron reads new rows from `email_inbox` + `inbound_replies`, runs cheap rule-based intent classifier (interested / question / not_interested / unclear), then:
+  - **not_interested** → auto-add to `do_not_contact` + flag lead, no founder approval needed (CASL hard-stop is the right default).
+  - **interested / question** → draft a reply, save to `reply_inbox_drafts` with `status=pending_approval`. Never auto-sends — founder reviews.
+  - **unclear** → record only; surfaced in Morning Brief for founder review.
+- Daily summary line spliced into Morning Brief: `"REPLY INBOX (24h): X interested, Y questions, Z opted out."`
+- Live proof: processed 12 historical replies; brief line generated: `REPLY INBOX (24h): 2 interested, 2 questions, 8 unclear`.
+
+**FIX 4 — Proactive Outreach run-row stamp**
+- Existing scheduler IS running (it's just that no customers qualify yet — no orders in 30-day window, no abandoned-browse aggregation hits). The fix: every loop now stamps `proactive_outreach_runs` so the Outreach Health card can show "fired but found 0 candidates" instead of looking dead.
+
+**FIX 5 — Outreach Health card** (`services/outreach_health.py` + `OutreachHealthCard.jsx`)
+- One service, one snapshot endpoint, one Cockpit card.
+- 7 channel tiles each with: green/yellow/red status, last-fire timestamp (human "5m ago"), 24h count, success %, plain-English note, and a "Run now" pill button for the manual cron triggers.
+- New router `routers/outreach_admin_router.py` with `/health` + 3 manual fire endpoints. All auth-gated (HTTP 401 from non-admin).
+- Live proof: snapshot returned all 7 channels with honest reds/yellows reflecting real state.
+
+**FIX 6 — Social Autopilot** (`services/social_autopilot.py`)
+- Daily 10:00 America/Toronto APScheduler job picks today's topic (Mon=success_story, Tue=practical_tip, Wed=market_insight, Thu=aurem_feature, Fri=founder_voice; Sat/Sun=skip), calls Claude Haiku 4.5 via Emergent universal key to draft a 100-130-word LinkedIn post, posts via Brightbean at `social.aurem.live`.
+- Idempotent per-day (`day_id`), graceful LLM fallback so the post still ships, persists every attempt to `social_autopilot_posts`.
+- Morning Brief line: `Posted to LinkedIn: "<headline>" (<url>)`.
+- Live proof: ran today (Sat) → correctly skipped with reason "weekend skip".
+
+**Live proofs (post-restart)**
+- `/api/admin/outreach/health` → HTTP 401 (auth-gated) ✅
+- `/api/admin/outreach/closer-day5/run` → HTTP 401 ✅
+- `/api/admin/outreach/reply-inbox/run` → HTTP 401 ✅
+- `/api/admin/outreach/social/post-now` → HTTP 401 ✅
+- Inline snapshot returned all 7 channels with real DB-backed status ✅
+- 12 historical replies processed into `reply_inbox_actions` ✅
+- `closer_day5_runs`: 1 row written ✅
+- Social autopilot weekend skip logic verified ✅
+
+**Tests**: `tests/test_iter330_outreach_gap_close.py` — 21 cases. Full active-suite regression: **335 / 335 green**.
+
 ## iter 329 series (2026-02-23) — Reliability pass (grounding, confidence, routing, feedback, injection, public status)
 
 - **329a Fact grounding** — `_ground_reply_against_facts` now REPLACES the entire reply when 3+ unverified numbers appear ("I don't have enough data — want me to check?"). No more soft footers; ORA never guesses.

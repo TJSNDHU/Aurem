@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { safeFetchJson } from "../../lib/safeFetchJson";
 import SlaCard from "./SlaCard";
+import OutreachHealthCard from "./OutreachHealthCard";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const POLL_MS = 25000;
@@ -162,6 +163,9 @@ export default function OraCtoCockpit() {
 
       {/* iter 328f — SLA + Error Budget card */}
       <SlaCard />
+
+      {/* iter 330 — Outreach Health card (7 channels) */}
+      <OutreachHealthCard />
 
       {/* iter 326c — Provider chain health (DeepSeek → FreeLLMAPI → Claude → Ollama → Groq) */}
       <ProviderHealthPanel
