@@ -56,3 +56,31 @@ async def fire_social_post(user: dict = Depends(_admin_dep())):
         raise HTTPException(503, "db not ready")
     from services.social_autopilot import run_daily_social_post
     return await run_daily_social_post(_db)
+
+
+@router.get("/unmatched-pixels")
+async def list_unmatched_pixels(limit: int = 50,
+                                    user: dict = Depends(_admin_dep())):
+    """iter 330b — Review pixel hits that landed without a resolvable tenant.
+
+    Returns the last `limit` rows from `unmatched_pixel_events` (cap 500)
+    plus a 24-hour count so the Outreach Health card can show a badge.
+    """
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    limit = max(1, min(int(limit or 50), 500))
+    cur = _db.unmatched_pixel_events.find(
+        {}, {"_id": 0},
+    ).sort("ts", -1).limit(limit)
+    entries = await cur.to_list(length=limit)
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    count_24h = await _db.unmatched_pixel_events.count_documents({"ts": {"$gte": cutoff}})
+    total = await _db.unmatched_pixel_events.count_documents({})
+    return {
+        "ok":         True,
+        "entries":    entries,
+        "count":      len(entries),
+        "count_24h":  count_24h,
+        "total":      total,
+    }

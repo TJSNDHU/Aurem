@@ -76,6 +76,8 @@ export default function OutreachHealthCard() {
   const [error, setError] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
+  const [unmatched, setUnmatched] = useState(null);
+  const [showUnmatched, setShowUnmatched] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +85,11 @@ export default function OutreachHealthCard() {
       const r = await fetch(`${API}/api/admin/outreach/health`, { headers: authHeaders() });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setSnap(await r.json());
+      // iter 330b — also fetch unmatched-pixel summary (cheap).
+      const r2 = await fetch(`${API}/api/admin/outreach/unmatched-pixels?limit=10`, {
+        headers: authHeaders(),
+      });
+      if (r2.ok) setUnmatched(await r2.json());
     } catch (e) {
       setError(String(e.message || e));
     } finally {
@@ -233,6 +240,68 @@ export default function OutreachHealthCard() {
           })}
         </div>
       ) : null}
+
+      {/* iter 330b — Unmatched-pixel review row */}
+      {unmatched && (unmatched.total ?? 0) > 0 && (
+        <div
+          data-testid="outreach-unmatched-pixels"
+          style={{
+            marginTop: 14, padding: "8px 12px", borderRadius: 8,
+            background: "rgba(245,196,94,0.05)",
+            border: `1px solid rgba(245,196,94,0.20)`,
+            fontSize: 11, color: TEXT_DIM,
+          }}
+        >
+          <div
+            onClick={() => setShowUnmatched((v) => !v)}
+            data-testid="outreach-unmatched-toggle"
+            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+          >
+            <AlertTriangle size={11} color={WARN} />
+            <span style={{ color: TEXT }}>Unmatched pixel hits</span>
+            <span style={{ color: WARN, fontWeight: 600 }}>
+              {unmatched.count_24h} in 24h
+            </span>
+            <span>· {unmatched.total} total</span>
+            <div style={{ flex: 1 }} />
+            <span style={{ color: TEXT_DIM, fontSize: 10 }}>
+              {showUnmatched ? "hide ▾" : "show ▸"}
+            </span>
+          </div>
+          {showUnmatched && (unmatched.entries || []).length > 0 && (
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+              {(unmatched.entries || []).map((e, i) => (
+                <div
+                  key={i}
+                  data-testid={`unmatched-pixel-row-${i}`}
+                  style={{
+                    padding: "6px 8px", borderRadius: 6,
+                    background: "rgba(0,0,0,0.18)",
+                    fontSize: 11, lineHeight: 1.4,
+                  }}
+                >
+                  <div style={{ color: TEXT }}>
+                    {e.platform}/{e.event_type}
+                    <span style={{ color: TEXT_DIM, marginLeft: 8 }}>
+                      {timeAgo(e.ts)}
+                    </span>
+                    {e.remote_addr && (
+                      <span style={{ color: TEXT_DIM, marginLeft: 8 }}>
+                        from {e.remote_addr}
+                      </span>
+                    )}
+                  </div>
+                  {e.referer && (
+                    <div style={{ color: TEXT_DIM, marginTop: 2, wordBreak: "break-all" }}>
+                      ref: {e.referer.slice(0, 80)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
