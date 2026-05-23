@@ -39,6 +39,17 @@ EXPECTED: Dict[str, List[str]] = {
     "scraping": ["IPROYAL_USERNAME", "IPROYAL_PASSWORD"],
 }
 
+# iter 327j — Groups whose vars are OPTIONAL on production. Missing
+# vars in these groups log at INFO (informational) instead of WARNING
+# (which used to read as a deploy problem). REQUIRED groups still
+# WARN so a real misconfiguration stays loud.
+OPTIONAL_GROUPS = {
+    "ollama_sovereign",   # only used when running a local Ollama sidecar
+    "scraping",           # IPRoyal proxy is a paid optional add-on
+    "groq_fallback",      # secondary LLM provider — Emergent LLM key covers prod
+}
+
+
 # Last-computed report, populated by validate_environment() on boot.
 _LAST_REPORT: Dict = {}
 
@@ -85,15 +96,35 @@ def validate_environment() -> Dict:
         "groups": groups,
     }
 
+    # iter 327j — split missing vars into REQUIRED vs OPTIONAL so prod
+    # logs don't shout about IPRoyal / Ollama / Groq when they're
+    # intentionally unset.
+    required_missing: List[str] = []
+    optional_missing: List[str] = []
+    for group, names in EXPECTED.items():
+        missing = [n for n in names if not (os.environ.get(n) or "").strip()]
+        if group in OPTIONAL_GROUPS:
+            optional_missing.extend(missing)
+        else:
+            required_missing.extend(missing)
+
     # Log once at boot.
-    if missing_total:
+    if required_missing:
         logger.warning(
-            "[startup-validation] %d env vars missing across %d groups: %s",
-            len(missing_total),
-            sum(1 for g in groups.values() if g["missing"]),
-            ", ".join(sorted(set(missing_total))),
+            "[startup-validation] %d REQUIRED env vars missing across %d groups: %s",
+            len(required_missing),
+            sum(1 for g, names in EXPECTED.items()
+                if g not in OPTIONAL_GROUPS
+                and any(not (os.environ.get(n) or "").strip() for n in names)),
+            ", ".join(sorted(set(required_missing))),
         )
-    else:
+    if optional_missing:
+        logger.info(
+            "[startup-validation] %d OPTIONAL env vars not set (feature off): %s",
+            len(optional_missing),
+            ", ".join(sorted(set(optional_missing))),
+        )
+    if not required_missing and not optional_missing:
         logger.info("[startup-validation] all expected env vars present")
     logger.info("[startup-validation] JWT_SECRET source=%s", jwt_source)
 

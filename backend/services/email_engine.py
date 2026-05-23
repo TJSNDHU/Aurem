@@ -38,18 +38,17 @@ try:
     import resend  # type: ignore
 except Exception as _resend_err:
     _engine_logger = logging.getLogger(__name__)
-    _engine_logger.warning(
-        f"[email_engine] resend top-level import failed: {_resend_err} — "
-        f"trying direct Emails import"
-    )
     try:
         # Reach past __init__ and pull the concrete classes directly.
         _emails_mod = importlib.import_module("resend.emails._emails")
         resend = types.ModuleType("resend")  # type: ignore
         resend.api_key = None                # type: ignore[attr-defined]
         resend.Emails  = _emails_mod.Emails  # type: ignore[attr-defined]
-        _engine_logger.warning(
-            "[email_engine] loaded Emails via resend.emails._emails fallback"
+        # iter 327j — single consolidated INFO line instead of two
+        # WARNINGs every boot. SDK quirk, not a real problem.
+        _engine_logger.info(
+            "[email_engine] resend top-level import quirky "
+            f"({_resend_err}); using resend.emails._emails fallback"
         )
     except Exception as _inner:
         # iter 326kk — last-resort HTTP fallback. Resend's `POST /emails`

@@ -327,3 +327,72 @@ Founder reported in production logs:
   + `GOOGLE_SERVICE_ACCOUNT_KEY` env vars. Today's per-customer
   "add to your calendar" link covers 95% of UX; this would just
   give AUREM staff visibility on a central calendar.
+
+## iter 327j (2026-02-23) — Log silencers + ORA Vision + Link Unfurls
+Founder mandate: ship cosmetic log cleanup AND the two P2 wirings in one iter.
+
+**Delivered — cosmetic log silencers (zero functional change)**
+- `services/email_engine.py` — collapsed two nested resend warnings into
+  one INFO line ("resend top-level import quirky ... using fallback").
+- `services/ora_agent.py` — warmup ConnectTimeout demoted WARNING → DEBUG
+  on all 4 providers (FreeLLMAPI / Gemini / NVIDIA / DeepSeek). Cold-pod
+  warmup failures are expected and the runtime falls back automatically.
+- `bootstrap/startup_validation.py` — split EXPECTED groups into REQUIRED
+  vs OPTIONAL_GROUPS (`ollama_sovereign`, `scraping`, `groq_fallback`).
+  Optional misses log at INFO ("OPTIONAL env vars not set (feature off)")
+  instead of shouting in WARNING.
+- `services/memoir_service.py` — git-binary-not-found path demoted to
+  DEBUG (git is never present in the deploy container).
+
+**Delivered — ORA Vision (GPT-4o wired into ORA-CTO chat)**
+- `routers/ora_attachments_router.py::attach_file` — on image upload, calls
+  the existing `services.multimodal_processor::MultiModalProcessor.
+  _analyze_image(blob)` (GPT-4o vision via emergentintegrations, built in
+  iter 322ar). Description cached on `ora_attachments.vision_description`
+  so subsequent chat turns reuse it for free.
+- `render_attachment_context` image branch now splices the cached
+  description into the context block under a clear marker:
+  `--- vision (GPT-4o description) --- ... --- end vision ---`. The LLM
+  brain stays text-only; vision call already exists; just wired.
+- Best-effort: a failing analyze degrades to the old filename + URL
+  breadcrumb. No third vision system.
+
+**Delivered — Inline link unfurls (rich card with images)**
+- `_link_preview` now extracts `og:image`, `og:site_name`, `og:title`,
+  Twitter image, and `link[rel=icon]` favicon. Falls back to URL
+  netloc when no `og:site_name` and to `/favicon.ico` when no
+  `<link rel="icon">`. All URLs absolutized.
+- Link attachment record persists `image`, `site_name`, `favicon`.
+- `render_attachment_context` link branch now includes Site, Title,
+  Description, Preview image lines so the LLM brain sees the same
+  rich context the founder's UI shows.
+- Frontend `OraChat.jsx::LinkPreviewCard` (new component): rich card
+  with image thumbnail left, site/title/description right.
+  `data-testid="attachment-preview-link-card"`,
+  `link-card-image / -domain / -title / -description`. Hover lift,
+  graceful image-load fallback (`onError → display:none`). Falls back
+  to the old emoji chip when no preview data.
+
+**Tests**: `tests/test_iter327j_log_silencers_vision_unfurls.py` —
+14 cases. Covers all 4 silencers, vision splice + fallback, link
+preview parsing + site-name fallback + favicon absolutization, record
+persistence, LinkPreviewCard component presence.
+
+**Pytest status (322er + 326ww + 327a/b/c/d/e/f/g/h/i/j): 155 / 155 green.**
+
+**Live smoke after backend restart**:
+- `GET  /api/health` → 200
+- `POST /api/universal/webhooks/generic` → 200 (pixel still flowing)
+- `GET  /api/appointments/types` → 200 (booking still serving)
+- Cosmetic verification: zero `[warmup failed]` WARNINGs and zero
+  nested resend warnings in this boot's log output.
+
+## Next Action Items (post-deploy)
+- Push to GitHub → redeploy to `aurem.live` so iter 327d-j ships.
+- Pixel Health in Morning Brief (founder pre-approved): yesterday's
+  `universal_events` count vs 7-day average, Telegram alert on
+  50%+ drop.
+
+## Backlog
+- P3: Service-account Google Calendar API for shared staff calendar.
+- P3: Friendlier "report expired" landing page for stale ghost-* slugs.

@@ -1613,7 +1613,10 @@ async def warm_freellmapi() -> bool:
             )
             return ok
     except Exception as e:
-        logger.warning(f"[ora-agent] FreeLLMAPI warmup failed: {type(e).__name__}: {e}")
+        # iter 327j — warmup ConnectTimeout is expected on cold pods.
+        # Demote from WARNING → DEBUG so the real warmup successes
+        # remain visible at INFO and pod logs stay clean.
+        logger.debug(f"[ora-agent] FreeLLMAPI warmup failed: {type(e).__name__}: {e}")
         return False
 
 
@@ -1719,7 +1722,7 @@ async def warm_gemini() -> bool:
             )
             return ok
     except Exception as e:
-        logger.warning(f"[ora-agent] Gemini warmup failed: {type(e).__name__}: {e}")
+        logger.debug(f"[ora-agent] Gemini warmup failed: {type(e).__name__}: {e}")  # iter 327j
         return False
 
 
@@ -1842,7 +1845,7 @@ async def warm_nvidia() -> bool:
             )
             return ok
     except Exception as e:
-        logger.warning(f"[ora-agent] NVIDIA warmup failed: {type(e).__name__}: {e}")
+        logger.debug(f"[ora-agent] NVIDIA warmup failed: {type(e).__name__}: {e}")  # iter 327j
         return False
 
 
@@ -1912,7 +1915,7 @@ async def warm_deepseek() -> bool:
             )
             return ok
     except Exception as e:
-        logger.warning(f"[ora-agent] DeepSeek warmup failed: {type(e).__name__}: {e}")
+        logger.debug(f"[ora-agent] DeepSeek warmup failed: {type(e).__name__}: {e}")  # iter 327j
         return False
 
 

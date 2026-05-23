@@ -126,7 +126,13 @@ def init() -> bool:
         logger.info(f"[memoir] store ready at {_STORE_PATH}")
     except Exception as e:
         _INIT_ERROR = str(e)[:200]
-        logger.warning(f"[memoir] init failed: {_INIT_ERROR}")
+        # iter 327j — git binary is never present in the deploy
+        # container; memoir is a dev-only convenience. Demote the
+        # git-not-found path to DEBUG so prod logs stay clean.
+        if "git binary not found" in _INIT_ERROR:
+            logger.debug(f"[memoir] init failed: {_INIT_ERROR}")
+        else:
+            logger.warning(f"[memoir] init failed: {_INIT_ERROR}")
         _AVAILABLE = False
     return _AVAILABLE
 

@@ -788,27 +788,30 @@ function Message({ m, i, copy, copiedIdx }) {
                           justifyContent: "flex-end",
                           marginTop: -4, marginBottom: 8 }}>
             {m.attachments.map((a, j) => (
-              <a key={j}
-                 href={a.url || "#"}
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 data-testid={`attachment-preview-${a.kind}`}
-                 style={{
-                   display: "inline-flex", alignItems: "center", gap: 6,
-                   padding: "4px 8px", fontSize: 11,
-                   background: "rgba(212,175,55,0.08)",
-                   border: "1px solid rgba(212,175,55,0.35)",
-                   borderRadius: 8, color: "#D4AF37",
-                   fontFamily: "monospace",
-                   textDecoration: "none",
-                 }}>
-                {a.kind === "image" && "🖼"}
-                {a.kind === "pdf"   && "📄"}
-                {a.kind === "doc"   && "📝"}
-                {a.kind === "video" && "🎥"}
-                {a.kind === "link"  && "🔗"}
-                {a.filename || a.title || a.url || a.kind}
-              </a>
+              a.kind === "link"
+                ? <LinkPreviewCard key={j} attachment={a} />
+                : (
+                  <a key={j}
+                     href={a.url || "#"}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     data-testid={`attachment-preview-${a.kind}`}
+                     style={{
+                       display: "inline-flex", alignItems: "center", gap: 6,
+                       padding: "4px 8px", fontSize: 11,
+                       background: "rgba(212,175,55,0.08)",
+                       border: "1px solid rgba(212,175,55,0.35)",
+                       borderRadius: 8, color: "#D4AF37",
+                       fontFamily: "monospace",
+                       textDecoration: "none",
+                     }}>
+                    {a.kind === "image" && "🖼"}
+                    {a.kind === "pdf"   && "📄"}
+                    {a.kind === "doc"   && "📝"}
+                    {a.kind === "video" && "🎥"}
+                    {a.filename || a.title || a.url || a.kind}
+                  </a>
+                )
             ))}
           </div>
         )}
@@ -1034,6 +1037,109 @@ function _safeArgs(raw) {
  * - Awaiting approval: amber "🤖 NEEDS YOU"
  * - Error: red "🤖 STUCK"
  */
+/**
+ * LinkPreviewCard — iter 327j.
+ * Rich card for link attachments: image thumbnail + site + title +
+ * description. Falls back to a simple chip when image/title are
+ * missing. Clicking opens the URL in a new tab.
+ */
+function LinkPreviewCard({ attachment }) {
+  const a = attachment || {};
+  const hasImage = !!a.image;
+  const hasTitle = !!a.title;
+  // If we have no meaningful preview, render a plain chip.
+  if (!hasTitle && !a.description && !hasImage) {
+    return (
+      <a href={a.url || "#"} target="_blank" rel="noopener noreferrer"
+         data-testid="attachment-preview-link"
+         style={{
+           display: "inline-flex", alignItems: "center", gap: 6,
+           padding: "4px 8px", fontSize: 11,
+           background: "rgba(212,175,55,0.08)",
+           border: "1px solid rgba(212,175,55,0.35)",
+           borderRadius: 8, color: "#D4AF37",
+           fontFamily: "monospace", textDecoration: "none",
+         }}>
+        🔗 {a.url}
+      </a>
+    );
+  }
+  const domain = a.site_name
+    || (() => { try { return new URL(a.url).hostname; } catch { return ""; } })();
+  return (
+    <a href={a.url || "#"} target="_blank" rel="noopener noreferrer"
+       data-testid="attachment-preview-link-card"
+       title={a.url}
+       style={{
+         display: "flex", alignItems: "stretch", gap: 0,
+         width: "min(100%, 420px)",
+         background: "rgba(255,255,255,0.04)",
+         border: "1px solid rgba(212,175,55,0.25)",
+         borderRadius: 10, overflow: "hidden",
+         textDecoration: "none", color: "#E8E2D5",
+         transition: "border-color 120ms ease, background 120ms ease",
+       }}
+       onMouseEnter={(e) => {
+         e.currentTarget.style.borderColor = "rgba(212,175,55,0.55)";
+         e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+       }}
+       onMouseLeave={(e) => {
+         e.currentTarget.style.borderColor = "rgba(212,175,55,0.25)";
+         e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+       }}>
+      {hasImage && (
+        <img src={a.image} alt=""
+             data-testid="link-card-image"
+             onError={(e) => { e.currentTarget.style.display = "none"; }}
+             style={{
+               width: 84, height: 84, objectFit: "cover",
+               flex: "0 0 auto", background: "#0d0d10",
+             }} />
+      )}
+      <div style={{
+        padding: "8px 10px", display: "flex",
+        flexDirection: "column", justifyContent: "center", gap: 2,
+        minWidth: 0, flex: 1,
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 5,
+          fontSize: 10, color: "#A89880", letterSpacing: 0.2,
+        }}>
+          {a.favicon && (
+            <img src={a.favicon} alt=""
+                 onError={(e) => { e.currentTarget.style.display = "none"; }}
+                 style={{ width: 12, height: 12 }} />
+          )}
+          <span data-testid="link-card-domain"
+                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {domain}
+          </span>
+        </div>
+        <div data-testid="link-card-title"
+             style={{
+               fontSize: 12.5, fontWeight: 600, color: "#D4AF37",
+               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+             }}>
+          {a.title || a.url}
+        </div>
+        {a.description && (
+          <div data-testid="link-card-description"
+               style={{
+                 fontSize: 11, color: "#A89880",
+                 display: "-webkit-box",
+                 WebkitLineClamp: 2,
+                 WebkitBoxOrient: "vertical",
+                 overflow: "hidden",
+               }}>
+            {a.description}
+          </div>
+        )}
+      </div>
+    </a>
+  );
+}
+
+
 /**
  * GithubLockPill — iter 327d (extended iter 327f).
  * Polls /api/admin/ora/github-lock every 30 s while unlocked (countdown),
