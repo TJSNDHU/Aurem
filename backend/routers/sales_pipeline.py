@@ -6,10 +6,13 @@ Step 1: Scan → Step 2: Find Decision Maker → Step 3: Outreach/Meeting → St
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import httpx
 import re
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -278,6 +281,7 @@ class ProposalRequest(BaseModel):
     customer_company: str
     selected_tier: str  # "basic", "professional", "business", "enterprise"
     custom_pricing: Optional[Dict] = None
+    customer_email: Optional[str] = None  # iter 327g — needed to send welcome on contract sign
 
 @router.post("/api/pipeline/generate-proposal")
 async def generate_proposal(request: ProposalRequest, authorization: str = Header(None)):
@@ -313,6 +317,7 @@ async def generate_proposal(request: ProposalRequest, authorization: str = Heade
             "created_by": user.get("user_id"),
             "customer_name": request.customer_name,
             "customer_company": request.customer_company,
+            "customer_email": (request.customer_email or "").strip().lower() or None,
             "selected_tier": request.selected_tier,
             "pricing": pricing,
             "scan_summary": {
@@ -417,6 +422,7 @@ async def generate_contract(request: ContractRequest, authorization: str = Heade
             "tenant_id": user.get("tenant_id"),
             "customer_company": proposal['customer_company'],
             "customer_name": proposal['customer_name'],
+            "customer_email": proposal.get('customer_email'),  # iter 327g — for welcome
             "service_tier": proposal['selected_tier'],
             "monthly_fee": proposal['pricing']['pricing']['monthly_fee'],
             "setup_fee": proposal['pricing']['pricing'].get('setup_fee', 0),
@@ -443,7 +449,12 @@ async def generate_contract(request: ContractRequest, authorization: str = Heade
         
         # If signed, trigger onboarding
         if contract['status'] == "signed":
-            await trigger_onboarding(contract_id, proposal['customer_company'])
+            await trigger_onboarding(
+                contract_id,
+                proposal['customer_company'],
+                customer_email=proposal.get('customer_email'),
+                customer_name=proposal['customer_name'],
+            )
         
         return {
             "success": True,
@@ -461,61 +472,205 @@ async def generate_contract(request: ContractRequest, authorization: str = Heade
 # STEP 6-8: ONBOARDING & IMPLEMENTATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-async def trigger_onboarding(contract_id: str, customer_company: str):
+async def trigger_onboarding(
+    contract_id: str,
+    customer_company: str,
+    customer_email: Optional[str] = None,
+    customer_name: Optional[str] = None,
+):
     """
-    Automatically start onboarding process
-    Creates customer account, schedules calls, sends welcome
+    iter 327g — Honest onboarding side-effects on contract signing.
+
+    Reuses the existing welcome stack (services/welcome_package.py +
+    routers/business_id_router.ensure_business_id) — does NOT introduce
+    a third welcome path. Behaviour:
+
+      1. Insert the onboarding row with step 2 status='pending'
+         (the previous code claimed 'completed' before sending).
+      2. Look up existing customer in platform_users / users by email.
+         If missing, mint a new platform_users record.
+      3. Ensure a business_id via ensure_business_id().
+      4. Call send_welcome_package(business_id, user_doc).
+      5. Update step 2 to 'completed' on real success, or 'failed'
+         with the error message if the send didn't go through.
     """
     try:
         from server import db
         import secrets
-        
+
         onboarding_id = f"onboard_{secrets.token_urlsafe(16)}"
-        
+        now_iso = datetime.now(timezone.utc).isoformat()
+
         onboarding = {
             "onboarding_id": onboarding_id,
             "contract_id": contract_id,
             "customer_company": customer_company,
+            "customer_email": (customer_email or "").strip().lower() or None,
+            "customer_name": customer_name,
             "status": "in_progress",
             "steps": [
                 {
                     "step": 1,
                     "name": "Account Setup",
-                    "status": "completed",
-                    "completed_at": datetime.now(timezone.utc).isoformat()
+                    "status": "pending",
                 },
                 {
                     "step": 2,
                     "name": "Welcome Email Sent",
-                    "status": "completed",
-                    "completed_at": datetime.now(timezone.utc).isoformat()
+                    "status": "pending",
                 },
                 {
                     "step": 3,
                     "name": "Onboarding Call Scheduled",
                     "status": "pending",
-                    "scheduled_for": (datetime.now(timezone.utc).replace(day=datetime.now(timezone.utc).day + 1)).isoformat()
+                    "scheduled_for": (
+                        datetime.now(timezone.utc) + timedelta(days=1)
+                    ).isoformat(),
                 },
-                {
-                    "step": 4,
-                    "name": "System Integration",
-                    "status": "pending"
-                },
-                {
-                    "step": 5,
-                    "name": "Go Live",
-                    "status": "pending"
-                }
+                {"step": 4, "name": "System Integration", "status": "pending"},
+                {"step": 5, "name": "Go Live", "status": "pending"},
             ],
-            "started_at": datetime.now(timezone.utc).isoformat()
+            "started_at": now_iso,
         }
-        
+
         await db.onboarding_sessions.insert_one(onboarding)
-        
-        # TODO: Send welcome email, create customer account, etc.
-        
+
+        # ── iter 327g — actually do the work the old TODO promised ──
+        await _provision_customer_and_send_welcome(
+            onboarding_id=onboarding_id,
+            customer_company=customer_company,
+            customer_email=(customer_email or "").strip().lower() or None,
+            customer_name=customer_name,
+        )
+
     except Exception as e:
-        print(f"[Onboarding] Error: {e}")
+        logger.warning(f"[Onboarding] trigger_onboarding failed: {e}")
+
+
+async def _provision_customer_and_send_welcome(
+    onboarding_id: str,
+    customer_company: str,
+    customer_email: Optional[str],
+    customer_name: Optional[str],
+):
+    """Step-2 worker — kept separate so unit tests can drive it directly
+    without rebuilding a contract + proposal upstream."""
+    from server import db
+
+    async def _mark_step(step_num: int, status: str, **extra):
+        update_doc = {"steps.$.status": status,
+                       "steps.$.updated_at": datetime.now(timezone.utc).isoformat()}
+        update_doc.update({f"steps.$.{k}": v for k, v in extra.items()})
+        await db.onboarding_sessions.update_one(
+            {"onboarding_id": onboarding_id, "steps.step": step_num},
+            {"$set": update_doc},
+        )
+
+    # Guard: no email → cannot mint account or send welcome
+    if not customer_email:
+        await _mark_step(
+            1, "failed",
+            error="customer_email missing on proposal — cannot provision account",
+        )
+        await _mark_step(
+            2, "failed",
+            error="customer_email missing on proposal — cannot send welcome email",
+        )
+        logger.warning(
+            f"[Onboarding] {onboarding_id}: no customer_email — step 1+2 marked failed"
+        )
+        return
+
+    # ── 1. Find or mint the customer account ─────────────────────
+    try:
+        user = await db.platform_users.find_one(
+            {"email": customer_email}, {"_id": 0}
+        )
+        if not user:
+            user = await db.users.find_one(
+                {"email": customer_email}, {"_id": 0}
+            )
+
+        if not user:
+            # Mint a new platform_users row. No password — the customer
+            # uses /reset-password to set one when they click the link
+            # in the welcome email.
+            first_name, _, last_name = (customer_name or "").partition(" ")
+            new_user = {
+                "email": customer_email,
+                "full_name": (customer_name or "").strip(),
+                "first_name": first_name.strip(),
+                "last_name":  last_name.strip(),
+                "company_name": customer_company,
+                "company": customer_company,
+                "role": "customer",
+                "source": "sales_pipeline",
+                "onboarding_id": onboarding_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "password_hash": None,
+                "must_set_password": True,
+            }
+            await db.platform_users.insert_one(new_user)
+            user = await db.platform_users.find_one(
+                {"email": customer_email}, {"_id": 0}
+            )
+            logger.info(
+                f"[Onboarding] minted platform_users row for {customer_email}"
+            )
+
+        await _mark_step(1, "completed")
+    except Exception as e:
+        await _mark_step(1, "failed", error=f"{type(e).__name__}: {str(e)[:200]}")
+        await _mark_step(2, "failed",
+                          error="account provisioning failed — see step 1")
+        logger.warning(f"[Onboarding] {onboarding_id}: account mint failed: {e}")
+        return
+
+    # ── 2. Ensure a business_id ──────────────────────────────────
+    try:
+        from routers.business_id_router import ensure_business_id
+        bid = await ensure_business_id(user)
+        user = await db.platform_users.find_one(
+            {"email": customer_email}, {"_id": 0}
+        ) or user
+    except Exception as e:
+        await _mark_step(
+            2, "failed",
+            error=f"business_id mint failed: {type(e).__name__}: {str(e)[:200]}",
+        )
+        logger.warning(f"[Onboarding] {onboarding_id}: ensure_business_id failed: {e}")
+        return
+
+    # ── 3. Send the welcome package ──────────────────────────────
+    try:
+        from services.welcome_package import send_welcome_package
+        result = await send_welcome_package(bid, user)
+        # send_welcome_package returns None on early-exit (missing data)
+        # or {"ok": True/False, "status": ..., "error": ...} on send.
+        ok = bool(result and result.get("ok"))
+        if ok:
+            await _mark_step(
+                2, "completed",
+                resend_id=(result or {}).get("resend_id"),
+                business_id=bid,
+            )
+            logger.info(
+                f"[Onboarding] {onboarding_id}: welcome sent to {customer_email}"
+            )
+        else:
+            err = (result or {}).get("error") or "send_welcome_package returned no confirmation"
+            await _mark_step(2, "failed", error=str(err)[:300])
+            logger.warning(
+                f"[Onboarding] {onboarding_id}: welcome send failed: {err}"
+            )
+    except Exception as e:
+        await _mark_step(
+            2, "failed",
+            error=f"{type(e).__name__}: {str(e)[:200]}",
+        )
+        logger.warning(
+            f"[Onboarding] {onboarding_id}: welcome send raised: {e}"
+        )
 
 
 @router.get("/api/pipeline/onboarding-status/{contract_id}")
