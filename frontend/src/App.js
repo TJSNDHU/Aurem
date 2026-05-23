@@ -184,6 +184,9 @@ import DevSettings  from './platform/developers/DevSettings';
 import DevExamples  from './platform/developers/DevExamples';
 import DevStatus    from './platform/developers/DevStatus';
 import DevApiDocs   from './platform/developers/DevApiDocs';
+
+// iter 332b — Contact Sales
+import ContactSales from './platform/ContactSales';
 import { PlatformLogin, PlatformSignup } from './platform/PlatformAuth';
 import AccountSecurity from './platform/AccountSecurity';
 import ORAWidget from './components/ORAWidget';
@@ -319,6 +322,9 @@ function AppRouter() {
       <Route path="/developers/examples"  element={<DevExamples />} />
       <Route path="/developers/status"    element={<DevStatus />} />
       <Route path="/developers/docs"      element={<DevApiDocs />} />
+
+      {/* iter 332b — Contact Sales */}
+      <Route path="/enterprise"           element={<ContactSales />} />
       
       {/* Platform Auth */}
       <Route path="/platform/login" element={<PlatformLogin />} />

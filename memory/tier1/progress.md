@@ -241,3 +241,46 @@ PIDs: []
 Updated: 2026-02-24T03:30:00Z
 ---
 
+
+---
+Task: iter 332a-3 (Re-teach + invoke_tool hooks) + iter 332b Batch A (Fixes 2 + 7 of 7)
+Succeeded:
+  • Re-teach button — new `POST /api/admin/ora/validated-solutions/{sig}/reteach` deletes the cached row. ValidatedSolutionsPanel.jsx now renders a small "Re-teach" button on every row; one click removes the stored fix so the next occurrence runs a fresh specialist. 64-char hex signature validation. Admin-gated.
+  • iter 332a-3 — invoke_tool hooks (30 min):
+    - `invoke_tool` now consults `smart_route` for every `fork_context` call BEFORE dispatch. Mode + task_type are auto-overridden when the brief mentions a new third-party integration (Stripe/Resend/etc.) or when `is_new_file=True` for a .jsx/.tsx. The routing decision is surfaced on the result envelope as `routing_reason` and `auto_specialist`.
+    - `invoke_tool` now feeds `record_task_failure` / `record_task_success` on every tool call (keyed on `(session_id, tool_name)`). Two consecutive ok=False results on the same tool → smart_route silently flips subsequent fork_context calls to mode="emergent".
+    - The 3 deferred E2E proofs all PASS now:
+      • Proof 1 — fork_context fails twice via invoke_tool → next smart_route picks mode="emergent"
+      • Proof 4 — fork_context brief mentioning "Integrate Stripe" routes to mode="emergent" + task_type="integration" + auto_specialist=True BEFORE any LLM call
+      • New .jsx file → mode="emergent" + task_type="design" + auto_specialist=True
+  • iter 332b Batch A (Fixes 2 + 7 SHIPPED, 5 deferred):
+    - **Fix 2 — Unified audit log** SHIPPED. New `services/unified_audit.py`:
+      • `write_event(action, resource, result, user_id, org_id, ip_address, user_agent, source_collection, extra)` — UUID4 event_id + ISO8601 timestamp + sanitized lengths + bounded `extra` dict (max 50 keys). Returns `{ok, event_id}`, never raises.
+      • `query_events(...)` — paginated query with filters: user_id / action / resource / result / source_collection / date_from / date_to. Sorted desc by timestamp.
+      • `export_events_csv(...)` — same filter set, returns a real CSV string with the 10-column header row. Capped at 10k rows.
+      • New collection `db.unified_audit_log` with indexes on (timestamp desc), event_id (unique), user_id, action.
+      • Real bug caught + fixed during test: `dict[:50]` slice was invalid Python — replaced with safe key-bound dict comprehension.
+    - **Fix 7 — Contact Sales page** SHIPPED. Public POST `/api/enterprise/leads`. AUREM homepage aesthetic Cinzel hero ("AUREM CTO for Enterprise."), 3 pillar cards (SECURITY / RESIDENCY / SUPPORT), 3 pricing tiers (Team $200/mo, Business $800/mo, Enterprise Custom), contact form with team-size select + "Tell us what you need" textarea. On submit: persists `db.enterprise_leads` row + writes unified_audit_log entry under `action="enterprise_lead_submitted"` + fires Telegram alert (best-effort) + sends Resend auto-reply ("Thanks for reaching out, [Company]") (best-effort). Smoke proven: POST returned `{"ok":true,"lead_id":"7a54..."}`; `/enterprise` page serves 200.
+    - New routes in registry: `/api/enterprise/audit` (admin), `/api/enterprise/audit/export` (admin, CSV), `/api/enterprise/leads` (public).
+  • Full regression: **471 / 471 GREEN** across iter 327d → 332b Batch A (was 449 last iter; +22 new cases all green; zero regressions in the older `fork_context` callers because the new `mode`/`session_id` kwargs are keyword-only with defaults, and `invoke_tool`'s new hooks are isolated to the `name == "fork_context"` branch).
+Blocker: none.
+Deferred from iter 332b Batch A to **iter 332b Batch A-2 (next context window)**:
+  - **Fix 1 — RBAC complete wiring** (the largest by far). Existing `shared/auth/rbac.py` is for pipeline AGENTS (Scout/Architect/etc.), not human users. Requires a NEW `user_rbac.py` with Owner/Admin/Developer/Viewer hierarchy + Permission enum + `require_permission(user, Permission.X)` decorator + applied to every endpoint that currently just checks admin-bearer presence. Honest scope: 2-3 days of focused work touching ~80 routers. Should NOT be jammed in alongside other items.
+  - **Fix 3 — White-label UI**: backend already exists (`services/white_label.py`); needs a settings page with logo upload + color picker + live preview + the runtime branding swap in the React app shell.
+  - **Fix 4 — Custom domain UI**: wizard at `/enterprise/admin/domain` (enter domain → show CNAME → verify button → DNS check).
+  - **Fix 5 — API key management UI**: list/rotate/revoke/create CRUD page.
+  - **Fix 6 — Enterprise dashboard `/enterprise/admin`**: 5 sections (Team members, Usage, Security events feeding from unified_audit_log, Billing, Settings).
+Next:
+  • Push iter 332a-3 + 332b Batch A to GitHub via "Save to Github" — preview is green.
+  • iter 332b Batch A-2 — the 5 deferred enterprise items (Fixes 1, 3, 4, 5, 6). Recommend doing Fix 1 RBAC as its own dedicated slice and Fixes 3/4/5/6 as a second slice ("Enterprise Admin Pages").
+Backlog:
+  • Migration job to copy historical rows from the 5 legacy audit collections (`audit_log`, `customer_audit_log`, `self_audit_log`, `catalog_audit_log`, `ora_tool_audit`) into `unified_audit_log` with `source_collection` tag. ~40 LOC + APScheduler job; safe to defer because all NEW writes already use unified_audit.
+  • Pro recurring auto-renew (Stripe subscription mode) when customers ask
+  • System overview page redesign (frontend-only, ~2h)
+  • Stripe webhook registration in dashboard once iter 331g ships to prod
+Cost: $0.00 USD (pytest + lint + curl smoke only; no LLM calls)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T04:00:00Z
+---
+

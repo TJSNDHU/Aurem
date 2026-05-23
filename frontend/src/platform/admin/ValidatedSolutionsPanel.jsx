@@ -48,28 +48,37 @@ export default function ValidatedSolutionsPanel() {
   const [rows, setRows] = useState([]);
   const [err, setErr]   = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [reteaching, setReteaching] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const r = await fetch(`${API}/api/admin/ora/validated-solutions?limit=20`,
-                               { headers: authHeaders() });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j = await r.json();
-        if (!cancelled) {
-          setRows(j.rows || []);
-          setErr(null);
-        }
-      } catch (e) {
-        if (!cancelled) setErr(String(e));
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
+  const load = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/api/admin/ora/validated-solutions?limit=20`,
+                             { headers: authHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      setRows(j.rows || []);
+      setErr(null);
+    } catch (e) {
+      setErr(String(e));
+    } finally { setLoaded(true); }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function reteach(sig) {
+    if (!sig || reteaching) return;
+    setReteaching(sig);
+    try {
+      const r = await fetch(
+        `${API}/api/admin/ora/validated-solutions/${sig}/reteach`,
+        { method: "POST", headers: authHeaders() },
+      );
+      if (r.ok) {
+        setRows(prev => prev.filter(x => x.signature !== sig));
+      }
+    } catch (e) { /* swallow */ }
+    finally { setReteaching(""); }
+  }
 
   return (
     <div data-testid="validated-solutions-panel" style={GLASS}>
@@ -124,8 +133,26 @@ export default function ValidatedSolutionsPanel() {
                 · used {r.use_count || 0}×
               </span>
               <span style={{ marginLeft: "auto",
-                              color: GREEN, fontSize: 11 }}>
-                {shortDate(r.last_used_at || r.last_updated_at)}
+                              display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: GREEN, fontSize: 11 }}>
+                  {shortDate(r.last_used_at || r.last_updated_at)}
+                </span>
+                <button data-testid="reteach-btn"
+                         onClick={() => reteach(r.signature)}
+                         disabled={reteaching === r.signature}
+                         title="Drop this cached fix so the next occurrence runs a fresh specialist"
+                         style={{
+                           background: "transparent",
+                           border: `1px solid ${TEXT_DIM}33`,
+                           color: TEXT_DIM, borderRadius: 6,
+                           padding: "2px 8px", fontSize: 10,
+                           cursor: "pointer",
+                           fontFamily: "'JetBrains Mono', monospace",
+                           letterSpacing: "0.1em",
+                           textTransform: "uppercase",
+                         }}>
+                  {reteaching === r.signature ? "…" : "Re-teach"}
+                </button>
               </span>
             </div>
             <p style={{ fontSize: 13, color: TEXT, lineHeight: 1.55,

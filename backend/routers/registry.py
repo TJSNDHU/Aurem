@@ -790,6 +790,30 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] ORA Specialist Cost Breakdown endpoint wired")
                 except Exception as _cr_e:
                     logger.warning(f"[REGISTRY] specialist-cost router failed: {_cr_e}")
+
+                # iter 332b Batch A — Enterprise router (audit + leads)
+                try:
+                    from routers.enterprise_router import (
+                        router as _ent_router, set_db as _set_ent_db,
+                    )
+                    app.include_router(_ent_router)
+                    _set_ent_db(db)
+                    # Ensure indexes for unified_audit_log + enterprise_leads
+                    import asyncio as _aio2
+                    async def _ent_indexes():
+                        try:
+                            await db.unified_audit_log.create_index([("timestamp", -1)])
+                            await db.unified_audit_log.create_index("event_id", unique=True)
+                            await db.unified_audit_log.create_index("user_id")
+                            await db.unified_audit_log.create_index("action")
+                            await db.enterprise_leads.create_index("created_at")
+                            await db.enterprise_leads.create_index("lead_id", unique=True)
+                        except Exception as _xe:
+                            logger.debug(f"[REGISTRY] enterprise indexes: {_xe}")
+                    _aio2.create_task(_ent_indexes())
+                    logger.info("[REGISTRY] Enterprise router wired (audit + leads)")
+                except Exception as _er_e:
+                    logger.warning(f"[REGISTRY] enterprise router failed: {_er_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

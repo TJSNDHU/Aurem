@@ -82,3 +82,19 @@ async def validated_solutions(request: Request, limit: int = 20) -> dict[str, An
     ).sort("last_used_at", -1).limit(limit)
     rows = await cursor.to_list(length=limit)
     return {"ok": True, "rows": rows, "count": len(rows)}
+
+
+@router.post("/validated-solutions/{signature}/reteach")
+async def reteach_validated_solution(
+    signature: str, request: Request,
+) -> dict[str, Any]:
+    """iter 332a-2 — 'Re-teach this' button. Drops the cached row so
+    the next occurrence runs a fresh specialist instead of trusting
+    the (suspected-bad) stored answer."""
+    _ensure_admin(request)
+    if _db is None:
+        return {"ok": False, "error": "db not ready"}
+    if not signature or len(signature) != 64:
+        return {"ok": False, "error": "invalid_signature"}
+    r = await _db.ora_validated_solutions.delete_one({"signature": signature})
+    return {"ok": True, "deleted": r.deleted_count, "signature": signature}

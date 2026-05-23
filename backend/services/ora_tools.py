@@ -4109,6 +4109,34 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
         # Light arg sanitisation — coerce dict
         if not isinstance(args, dict):
             args = {}
+
+        # iter 332a-3 — auto-route fork_context calls through smart_route
+        # so new .jsx files, new third-party integrations, and tasks
+        # that already failed twice this session skip ORA and call the
+        # right specialist directly.
+        if name == "fork_context":
+            try:
+                from services.ora_guards import smart_route
+                _sess = str(args.get("_session_id") or actor or "default")
+                _brief = str(args.get("brief") or "")
+                _files = list(args.get("relevant_files") or [])
+                _ttype = str(args.get("task_type") or "debug")
+                _is_new = bool(args.get("is_new_file"))
+                route = smart_route(
+                    task_type=_ttype, brief=_brief,
+                    relevant_files=_files, is_new_file=_is_new,
+                    session_id=_sess, task_id=_ttype,
+                )
+                # Honor smart_route's mode + task_type recommendation
+                args["mode"]      = route["mode"]
+                args["task_type"] = route["task_type"]
+                args["session_id"] = _sess
+                # Carry the routing decision so callers can see it in result
+                args["_routing_reason"]  = route["reason"]
+                args["_auto_specialist"] = route["auto_specialist"]
+            except Exception as _re:
+                logger.debug(f"[ora_tools] smart_route non-fatal: {_re}")
+
         try:
             result = await fn(**{k: v for k, v in args.items()
                                   if not k.startswith("_")})  # strip _session_id/_dev_user_id
@@ -4124,6 +4152,29 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
                        "args_passed": sorted(args.keys())}
         except Exception as e:
             result = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+        # iter 332a-3 — feed the failure counter for every tool. After
+        # ORA_ESCALATE_AFTER_FAILS consecutive ok=False results on the
+        # same (session, tool) pair, smart_route will silently flip
+        # subsequent fork_context calls to mode="emergent".
+        try:
+            from services.ora_guards import (
+                record_task_failure, record_task_success,
+            )
+            _sess_id = str(args.get("_session_id") or actor or "default")
+            _task_id = name  # one counter per (session, tool)
+            if result.get("ok") is False:
+                record_task_failure(_sess_id, _task_id)
+            elif result.get("ok") is True:
+                record_task_success(_sess_id, _task_id)
+        except Exception as _ce:
+            logger.debug(f"[ora_tools] failure-counter non-fatal: {_ce}")
+
+        # Surface the routing reason in the result envelope (debug aid)
+        if name == "fork_context" and isinstance(result, dict):
+            if "_routing_reason" in args:
+                result["routing_reason"]  = args.get("_routing_reason")
+                result["auto_specialist"] = args.get("_auto_specialist")
 
     elapsed_ms = int((time.time() - start) * 1000)
     result["tool"] = name
