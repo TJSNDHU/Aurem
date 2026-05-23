@@ -501,8 +501,24 @@ async def receive_webhook(platform: str, request: Request):
                 tenant_id = key_doc.get("tenant_id")
 
     if not tenant_id:
+        # iter 330 — Demote the warning to an audit row. Pixel webhooks
+        # without a resolvable tenant are usually new sites that haven't
+        # been linked yet, not bugs. Persist to `unmatched_pixel_events`
+        # (capped at 10k via TTL on `ts`) so the founder can review in
+        # one place instead of grep-ing logs.
         tenant_id = "unresolved"
-        logger.warning(f"[Webhook] Unresolved tenant for {platform}/{event_type}")
+        try:
+            await db.unmatched_pixel_events.insert_one({
+                "platform":     platform,
+                "event_type":   event_type,
+                "ts":           datetime.now(timezone.utc),
+                "remote_addr":  (request.client.host if request.client else None),
+                "user_agent":   request.headers.get("user-agent", "")[:200],
+                "referer":      request.headers.get("referer", "")[:300],
+                "body_excerpt": str(body)[:600],
+            })
+        except Exception as _e:
+            logger.debug(f"[Webhook] unmatched_pixel_events write failed: {_e}")
 
     event = normalize_webhook_event(platform, event_type, body, tenant_id)
 
