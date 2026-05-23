@@ -914,6 +914,8 @@ TIER_1_AUTO: set[str] = {
     "create_sandbox", "cleanup_sandbox",
     "check_process_status", "wait_for_process",
     "semantic_memory_search",
+    # iter 331b — Sprint 5: fork_context fresh-context spawn.
+    "fork_context",
 }
 
 TIER_2_APPROVE: set[str] = {
@@ -3263,6 +3265,15 @@ async def resume_after_decision(
     history = await _load_history(session_id)
 
     if approved:
+        # iter 331b Sprint 5 — if the founder just approved a build plan,
+        # mark this session as plan-approved so the plan-first guard
+        # lets subsequent create_file / safe_edit calls through.
+        if row.get("tool") == "propose_build_plan":
+            try:
+                from services.ora_guards import mark_plan_approved
+                mark_plan_approved(session_id)
+            except Exception:
+                pass
         result = await invoke_tool(
             row["tool"], row["args"] or {}, actor=f"approved:{founder_email}"
         )

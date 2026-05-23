@@ -3852,6 +3852,20 @@ except Exception as _e:  # pragma: no cover - defensive
         f"[ora_tools] failed to splice semantic tools: {_e}"
     )
 
+# iter 331b — Sprint 5: fork_context (fresh-context sub-session spawn).
+try:
+    from services import ora_fork_context as _FC
+    _added = _FC.splice_into(TOOL_REGISTRY)
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        f"[ora_tools] iter 331b — spliced {_added} fork_context tool"
+    )
+except Exception as _e:  # pragma: no cover - defensive
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"[ora_tools] failed to splice fork_context: {_e}"
+    )
+
 
 
 # FIX #2 (audit iter 322fi) — removed duplicate shadow definitions of
@@ -3936,6 +3950,51 @@ async def invoke_tool(name: str, args: dict, *, actor: str = "ora") -> dict:
         result = {"ok": False, "error": f"unknown tool: {name}",
                    "available_tools": sorted(TOOL_REGISTRY.keys())}
     else:
+        # iter 331b Sprint 5 — code-enforced guards. Run BEFORE the tool.
+        # If any guard returns level="block", refuse the call with a
+        # plain English message. This makes the skill files real
+        # contracts, not just suggestions.
+        try:
+            from services import ora_guards as _G
+            if not isinstance(args, dict):
+                args = {}
+            sess_id = str(args.get("_session_id") or actor or "default")
+            # Guard A: plan-first (create_file / safe_edit must have an
+            # approved plan in the session for NEW files).
+            gate = await _G.check_plan_first_gate(sess_id, name, args)
+            if gate.get("level") == "block":
+                result = {
+                    "ok":     False,
+                    "error":  gate["message"],
+                    "blocked_by": "plan_first_gate",
+                    "reason":     gate.get("reason"),
+                }
+                elapsed_ms = int((time.time() - start) * 1000)
+                result["tool"] = name
+                result["elapsed_ms"] = elapsed_ms
+                result["ts"] = _now_iso()
+                asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                return result
+            # Guard B: destructive-command filter (shell-style args).
+            cmd = (args.get("cmd") or args.get("command") or "")
+            if cmd:
+                d = await _G.check_destructive(cmd)
+                if d.get("level") == "block":
+                    result = {
+                        "ok":     False,
+                        "error":  d["message"],
+                        "blocked_by": "destructive_filter",
+                        "matched_pattern": d.get("matched"),
+                    }
+                    elapsed_ms = int((time.time() - start) * 1000)
+                    result["tool"] = name
+                    result["elapsed_ms"] = elapsed_ms
+                    result["ts"] = _now_iso()
+                    asyncio.create_task(_log_invocation(actor, name, args, result, elapsed_ms))
+                    return result
+        except Exception as _e:
+            logger.debug(f"[ora_tools] guard layer non-fatal: {_e}")
+
         fn = TOOL_REGISTRY[name]["fn"]
         # Light arg sanitisation — coerce dict
         if not isinstance(args, dict):

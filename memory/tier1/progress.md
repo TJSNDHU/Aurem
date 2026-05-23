@@ -19,19 +19,20 @@ Updated: 2026-MM-DDTHH:MM:SSZ
 ## Current State
 
 ---
-Task: iter 331a — Master Build COMPLETE through Sprint 4
+Task: iter 331b — Sprint 5 COMPLETE (fork_context + plan-first guard)
 Succeeded:
-  - Sprints 1+2+3+3.5+3.7 — Memory + 8 tools + 6 guards + VS Code + DB portability + deploy + 3 blindspots (git/sandbox/bg-process) + path-guard + FTS5 semantic + secrets-scrubber. (84 tests).
-  - Sprint 4 — 4 new skill files (dev_new_project 12-step, dev_self_recovery 8-step + 3-strike halt, dev_integration 8-step + hard-gate, dev_testing 6 rules). dev_debugging.md prepended with iter-331a hard-rules header. (11 new tests, 95 total).
-  - Push to GitHub unblocked by user (GitHub secret scanner false positives in test fixtures — fixed via split-literal pattern + redacted old historical secrets in ORA_MEMORY journal entry).
-  - E2E verified: founder-style queries ("Build a lead tracker", "Stripe webhook", "test failing 500", "80% coverage") all route to the correct new skill files via FTS5 semantic search.
+  - fork_context tool delivered with own tools-free LLM call path (OpenRouter primary, Emergent LLM key fallback). E2E proven with 3 real LLM round-trips: debug (zero-division bug found), qa (CODE_STANDARDS verified), integration_check (Stripe webhook sig confirmed).
+  - Plan-first hard guard in services/ora_guards.py: blocks create_file/safe_edit for brand-new files unless propose_build_plan was approved this session within the 1-hour TTL.
+  - Dispatcher (invoke_tool) wired to fire plan-first + destructive guards BEFORE any tool runs — guards are now code-enforced, not just policy.
+  - mark_plan_approved auto-called when a propose_build_plan card is approved through the existing approval flow.
+  - 110/110 regression tests passing (95 from prior sprints + 14 new Sprint 5 tests + 1 marker).
 Blocker: none
 Next:
-  - Sprint 5: fork_context fresh-context spawn (lets ORA debug in a separate context window without polluting the main session).
-  - Sprint 6: per-session metrics + ORA Health tile in Cockpit + frontend portability audit.
-  - Vanguard Security portability + Cockpit tile + Morning Brief alert.
-Cost: $0.00 (founder is executing, not ORA)
+  - Sprint 6: per-session metrics collection (ora_session_metrics) + ORA Health tile in Cockpit + Telegram alert on low score.
+  - Frontend portability audit (scan /app/frontend/src/ for hardcoded URLs).
+  - Vanguard Security portability + Cockpit tile + Morning Brief security line.
+Cost: ~$0.001 (3 real LLM calls in fork_context E2E proof)
 Branch: main
 PIDs: []
-Updated: 2026-02-23T20:55:00Z
+Updated: 2026-02-23T21:30:00Z
 ---

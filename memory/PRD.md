@@ -880,4 +880,35 @@ iter 326 recent + iter 322er.
   • E2E proof: 4 founder-style semantic queries route to the correct new skill files (`"Build a lead tracker"` → dev_new_project, `"Stripe webhook"` → dev_integration, `"test failing 500"` → dev_self_recovery, `"80% coverage rules"` → dev_testing).
   • 11 new regression tests in `test_iter331a_sprint4_skills.py`. **Total iter-331a tests: 95 across Sprints 1–4. All passing.**
 
+
+- iter 331b — Sprint 5: **fork_context + plan-first guard.**
+
+  **fork_context (`services/ora_fork_context.py`):**
+  • Tier-1 tool. Spawns a fresh-context ORA sub-session with zero main-session history.
+  • Args: `task_type` ("debug" | "qa" | "integration_check"), `brief` (≤2000 chars), `relevant_files` (≤10), `return_schema` (reserved).
+  • Returns strict `{verdict, findings, fix_suggestion, files_loaded, elapsed_s, raw_llm_text}`.
+  • Uses its OWN tools-free LLM call path (`_llm_no_tools`) — does NOT call main `_llm_turn` because that would send the LLM the full tools schema and confuse it into trying to "call view_file" instead of answering with JSON. OpenRouter (deepseek) primary, Emergent LLM key (Claude Sonnet 4.5) fallback.
+  • Files loaded through `assert_path_safe` + `scrub_secrets` so the sub-session never reads outside `/app` and never sees raw secrets.
+  • Closes the biggest architectural gap vs Emergent E1's testing/troubleshoot/integration subagents.
+
+  **Plan-first guard (`services/ora_guards.check_plan_first_gate`):**
+  • Symmetric to `check_integration_gate` (Sprint 3 Guard 5).
+  • Blocks `create_file` / `safe_edit` for brand-new files (path doesn't exist) unless `propose_build_plan` was approved within the last 1 hour of this session.
+  • Existing-file scoped edits are NEVER blocked — bar is "starting from scratch", not "any edit".
+  • Auto-marked approved when a `propose_build_plan` approval card is approved through the existing flow (1-line hook in `ora_agent.resume_after_decision`).
+  • TTL configurable via `ORA_PLAN_TTL_SECONDS` env var (default 3600).
+
+  **Dispatcher integration (`services/ora_tools.invoke_tool`):**
+  • Runs plan-first + destructive-command guards BEFORE every tool call.
+  • If a guard blocks, returns `{ok: false, blocked_by: "plan_first_gate" | "destructive_filter"}` with the plain-English message and never invokes the underlying tool.
+  • This makes the skill files (dev_new_project, dev_self_recovery, etc.) real contracts, not just policy docs.
+
+  **E2E verification (real LLM round-trips, no mocks):**
+  • Debug task with a ZeroDivisionError script → verdict=fail, finding="The function divide does not check if the divisor b is zero", fix="Add a zero-check in the divide function". 6.17s elapsed.
+  • QA task on CODE_STANDARDS → verdict=pass. 2.06s elapsed.
+  • Integration_check on Stripe playbook → verdict=pass. 5.02s elapsed.
+
+  **Tests: 14 new (`test_iter331b_sprint5_fork_and_plan_guard.py`) — all passing. Total iter-331 passing: 110.**
+
+  **Founder push to GitHub** required to ship Sprint 5 to aurem.live.
   **Founder push to GitHub** required to ship Sprint 4 to aurem.live.

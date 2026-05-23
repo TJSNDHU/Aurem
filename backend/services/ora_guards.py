@@ -408,4 +408,92 @@ __all__ = [
     "check_destructive",
     "check_integration_gate",
     "verify_package",
+    "check_plan_first_gate", "mark_plan_approved",
 ]
+
+
+# ────────────────────────────────────────────────────────────────────
+# GUARD 7 — Plan-first hard gate (iter 331b Sprint 5)
+# ────────────────────────────────────────────────────────────────────
+# Symmetric to GUARD 5 (integration_gate). When ORA tries to create a
+# brand-new file or do non-trivial editing for green-field work, we
+# require that `propose_build_plan` was approved within the last N
+# turns of THIS session. Otherwise we block the tool call.
+#
+# "Green-field" is detected by two signals:
+#   1. The target path does NOT exist yet (it's a new file).
+#   2. The session has NO record of an approved plan.
+#
+# Non-green-field edits (existing file, scoped change) are NEVER
+# blocked — we don't want to slow down bug fixes or small tweaks.
+# The bar is "starting from scratch", not "any code change".
+
+_PLAN_APPROVED_TTL_SECONDS = int(os.environ.get("ORA_PLAN_TTL_SECONDS", "3600"))
+
+# In-memory record of plan approvals per session.
+_PLAN_APPROVED: dict[str, float] = {}
+
+
+def mark_plan_approved(session_id: str) -> None:
+    """Caller invokes this when a propose_build_plan card is approved
+    via the cockpit. Persists for _PLAN_APPROVED_TTL_SECONDS."""
+    import time
+    _PLAN_APPROVED[session_id] = time.time()
+
+
+def _plan_is_fresh(session_id: str) -> bool:
+    import time
+    ts = _PLAN_APPROVED.get(session_id, 0.0)
+    return (time.time() - ts) < _PLAN_APPROVED_TTL_SECONDS
+
+
+_NEW_FILE_TOOLS = {"create_file", "safe_edit"}
+
+
+async def check_plan_first_gate(
+    session_id: str,
+    tool_name: str,
+    tool_args: dict,
+) -> dict:
+    """Block green-field code-write tools unless a plan was approved.
+
+    Returns:
+      ok      : True if the gate passes (proceed normally)
+      level   : "ok" | "block"
+      message : plain English for the founder
+      reason  : audit reason
+    """
+    if tool_name not in _NEW_FILE_TOOLS:
+        return {"ok": True, "level": "ok", "message": "",
+                "reason": "not_a_write_tool"}
+
+    path = (tool_args or {}).get("path") or ""
+    # If the target file ALREADY EXISTS, it's a scoped edit — never block.
+    from pathlib import Path
+    if path and Path(path).exists():
+        return {"ok": True, "level": "ok", "message": "",
+                "reason": "existing_file_scoped_edit"}
+
+    # Empty path or non-string — not a green-field write, let the
+    # tool itself reject the bad input.
+    if not isinstance(path, str) or not path:
+        return {"ok": True, "level": "ok", "message": "",
+                "reason": "no_path_provided"}
+
+    # Otherwise this is a new file. Was a plan approved?
+    if _plan_is_fresh(session_id):
+        return {"ok": True, "level": "ok", "message": "",
+                "reason": "plan_approved_fresh"}
+
+    msg = (
+        f"Blocked: trying to create a brand-new file (`{path}`) without "
+        f"an approved build plan. Call `propose_build_plan` first with a "
+        f"one-paragraph rationale + list of files + test plan, get my "
+        f"approval, then retry. (See dev_new_project.md for the 12-step "
+        f"playbook.)"
+    )
+    await _audit("plan_first_gate_block", {
+        "session_id": session_id, "tool": tool_name, "path": path,
+    })
+    return {"ok": False, "level": "block", "message": msg,
+            "reason": "no_plan_in_window"}
