@@ -54,26 +54,49 @@ async def test_propose_commit_rejects_too_long_title():
 
 @pytest.mark.asyncio
 async def test_propose_commit_rejects_disallowed_path():
+    """iter 327d — GitHub lock now intercepts before path validation. Unlock
+    first so the underlying write-allowed root check is exercised."""
+    import mongomock_motor
+    from services import github_lockdown as gl
     from services.ora_tools import propose_commit
-    res = await propose_commit(
-        title="trying to commit etc",
-        body="malicious",
-        file_paths=["/etc/passwd"],
-        rationale="This should be blocked by write-allowed root check",
+    db = mongomock_motor.AsyncMongoMockClient()["test_322er"]
+    gl.set_db(db)
+    await db.ora_governance.update_one(
+        {"_id": "github_lock_state"}, {"$set": {"locked": False}}, upsert=True,
     )
-    assert res["ok"] is False
-    assert "not allowed" in res["error"].lower()
+    try:
+        res = await propose_commit(
+            title="trying to commit etc",
+            body="malicious",
+            file_paths=["/etc/passwd"],
+            rationale="This should be blocked by write-allowed root check",
+        )
+        assert res["ok"] is False
+        assert "not allowed" in res["error"].lower()
+    finally:
+        gl.set_db(None)
 
 
 @pytest.mark.asyncio
 async def test_propose_commit_caps_file_count():
+    """iter 327d — unlock so the file-count cap is what trips, not the lock."""
+    import mongomock_motor
+    from services import github_lockdown as gl
     from services.ora_tools import propose_commit, _COMMIT_FILES_MAX
-    too_many = [f"/app/memory/file_{i}.md" for i in range(_COMMIT_FILES_MAX + 5)]
-    res = await propose_commit(
-        title="bulk commit",
-        body="",
-        file_paths=too_many,
-        rationale="Should be capped to prevent runaway commits",
+    db = mongomock_motor.AsyncMongoMockClient()["test_322er"]
+    gl.set_db(db)
+    await db.ora_governance.update_one(
+        {"_id": "github_lock_state"}, {"$set": {"locked": False}}, upsert=True,
     )
-    assert res["ok"] is False
-    assert "too many" in res["error"].lower()
+    try:
+        too_many = [f"/app/memory/file_{i}.md" for i in range(_COMMIT_FILES_MAX + 5)]
+        res = await propose_commit(
+            title="bulk commit",
+            body="",
+            file_paths=too_many,
+            rationale="Should be capped to prevent runaway commits",
+        )
+        assert res["ok"] is False
+        assert "too many" in res["error"].lower()
+    finally:
+        gl.set_db(None)

@@ -161,3 +161,46 @@ Shipped (all behind 430-test pytest regression):
 - Last successful scheduler run logged in `db_backup_runs`: **2026-05-19 03:00 UTC**.
 - One pytest-triggered run on 2026-05-22 04:42 UTC marked `fail` (test fixture, not prod path).
 - Manual trigger available: `POST /api/admin/backup/trigger` (super_admin only).
+
+
+## iter 327d (2026-02) — GitHub Read-Only Hard Lock
+Founder mandate: "GitHub: read-only ONLY. Lock these permanently — git push,
+git commit (over the wire), PR creation, branch create/delete, any write op.
+If ORA tries: hard block, show 'Push access is locked. Founder approval
+required to enable', send Telegram alert. UI: 'GitHub: Read Only' lock pill."
+
+**Delivered**
+- `services/github_lockdown.py` — single trusted gate. `is_github_locked()`
+  reads `ora_governance.github_lock_state` (default = locked / fail-safe).
+  `assert_github_writes_allowed(op)` raises `GitHubLockedError` and fires
+  a deduped Telegram alert via `silent_failure_alerts._send` on every
+  block.
+- `routers/ora_github_lock_router.py` — 3 admin endpoints
+  (`GET /api/admin/ora/github-lock`, `POST .../github-unlock` requires
+  reason ≥10 chars, `POST .../github-relock`). Registered in
+  `routers/registry.py` line 688; wires `github_lockdown.set_db()`.
+- `services/ora_tools.py` — 4 explicit sentinel tools registered:
+  `github_push`, `github_pr_create`, `github_branch_create`,
+  `github_branch_delete`. Each returns
+  `{ok:false, error_code:"github_locked", lock_state:"read_only"}` and
+  writes an audit row to `ora_github_block_log`. Existing local-only
+  ops `propose_commit` + `_ora_git_commit_local` also pass through the
+  lock now.
+- `services/ora_agent.py` SYSTEM_PROMPT — added "GITHUB WRITE LOCK"
+  block teaching ORA not to call any of the 6 locked surfaces.
+- `frontend/src/platform/admin/OraChat.jsx` — `GithubLockPill` component
+  with `data-testid="github-lock-pill"`, polls status every 60 s, shows
+  amber `Lock` icon + "GitHub: Read Only" when locked, green `Unlock`
+  + "Write Enabled" when unlocked, tooltip lists recent block attempts.
+- Tests: `tests/test_iter327d_github_readonly_lock.py` — 23 cases, all
+  passing. Updated `tests/test_iter_322er_git_commit_gate.py` so the
+  pre-existing path/file-count assertions unlock the gate first
+  (preserves hard-lock semantics).
+
+**Pytest status (iter 327* + 326 recent + 322er): 80 / 80 green.**
+
+## Next Action Items
+- P1: `sales_pipeline.py:515` — wire welcome email + customer account creation on signup.
+- P1: `appointment_scheduler_router.py:171-172` — Google Calendar event create + confirmation email.
+- P2: ORA Multimodal Vision (Claude image understanding on image-bearing turns).
+- P2: Inline link unfurls (rich preview cards) in ORA chat.

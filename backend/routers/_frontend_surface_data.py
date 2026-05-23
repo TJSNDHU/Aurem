@@ -9,9 +9,9 @@ that do not ship frontend source files.
 """
 from __future__ import annotations
 
-BUILT_AT: str = '2026-05-22T18:19:50.442301+00:00'
+BUILT_AT: str = '2026-05-23T01:19:52.811086+00:00'
 SRC_ROOT: str = '/app/frontend/src'
-ENDPOINT_COUNT: int = 974
+ENDPOINT_COUNT: int = 983
 
 SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'],
  '/api/accounting/summary': ['services/api.js'],
@@ -207,7 +207,15 @@ SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'
  '/api/admin/ora-settings/': ['platform/admin/OraSettings.jsx'],
  '/api/admin/ora-settings/export-audit-csv': ['platform/admin/OraSettings.jsx'],
  '/api/admin/ora-settings/github-test': ['platform/admin/OraSettings.jsx'],
+ '/api/admin/ora/cost-summary': ['platform/admin/DailySpendCard.jsx'],
+ '/api/admin/ora/decisions': ['platform/admin/RecentDecisionsPanel.jsx'],
+ '/api/admin/ora/email-health': ['platform/admin/EmailHealthCard.jsx'],
+ '/api/admin/ora/github-lock': ['platform/admin/OraChat.jsx'],
+ '/api/admin/ora/morning-brief': ['platform/admin/MorningBriefCard.jsx', 'platform/admin/MorningBriefMobile.jsx'],
  '/api/admin/ora/providers/health': ['platform/SystemOverview.jsx', 'platform/admin/OraCtoCockpit.jsx'],
+ '/api/admin/ora/skills': ['platform/admin/SkillsMarketplace.jsx'],
+ '/api/admin/ora/skills/': ['platform/admin/SkillsMarketplace.jsx'],
+ '/api/admin/ora/voice-profile/': ['platform/admin/VoiceProfileEditor.jsx'],
  '/api/admin/pillars-map/collection/': ['platform/AdminPillarsMap.jsx'],
  '/api/admin/pillars-map/endpoint-audit/summary': ['platform/AdminPillarsMap.jsx'],
  '/api/admin/pillars-map/heartbeat': ['lib/sentinel.js',
@@ -726,6 +734,7 @@ SURFACE_MANIFEST: dict[str, list[str]] = {'/api/accounting/': ['services/api.js'
  '/api/optimization/toggle/': ['platform/TenantOptimization.jsx'],
  '/api/ora/actions': ['platform/UniversalConnector.jsx'],
  '/api/ora/agent/': ['platform/admin/OraChat.jsx'],
+ '/api/ora/agent/attach': ['platform/admin/OraChat.jsx'],
  '/api/ora/agent/clear/': ['platform/admin/OraChat.jsx'],
  '/api/ora/agent/history/': ['platform/admin/OraChat.jsx'],
  '/api/ora/agent/run': ['platform/admin/OraChat.jsx'],
