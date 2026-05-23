@@ -811,6 +811,14 @@ iter 326 recent + iter 322er.
   • E2E verified live on preview: `not_found` and `already_executed` paths both return correct shape.
   • Founder needs to push to GitHub → redeploy aurem.live to ship this fix to production.
 
+- iter 330f (current): **Rule Zero hardening — 3 holes closed** (audit-driven).
+  • **(a) Hindi halt strings → plain English** in `ora_agent.py`: the consecutive-fail and transient-fail halt messages no longer say *"founder se discuss kar lo"* or *"Yeh code ki galti nahi…"* — replaced with "I need your input before continuing." and "This looks like an environment issue, not a code problem."
+  • **(b) JSON / fenced code block stripping** in `clean_prose()`: standalone `{…}` blocks (multi-line OR ≥80 chars) and ` ```…``` ` fences are now replaced with the placeholder "[details available on request]". Inline backtick refs (`` `tool_name` ``, paths) are preserved. Stats expose `json_stripped` + `fenced_stripped` counters.
+  • **(c) Prose filter on EVERY assistant turn**: added central `_assistant_append()` helper. Routed all 6 assistant-emit sites through it — prompt-injection block reply, intent fast-path, wall-clock halt, fail-ceiling halt, transient-ceiling halt, and the final LLM turn. Only ONE raw `history.append({"role": "assistant", …})` remains in the file (inside the helper itself). Enforced by `test_no_raw_assistant_history_append_outside_helper`.
+  • 13 new tests in `test_iter330f_rule_zero_hardening.py`. Full backend regression: pass count went **2773 → 2871** (+98), failures **578 → 518** (-60). The 4 ora_agent-adjacent failures are all pre-existing (stale tier-set assertions, missing `progress_cb` kwarg in fake `run_turn` shims, auth-token 401).
+  • E2E proof: ran `clean_prose()` against the exact "Proof: {…}" leak pattern from founder's screenshot — JSON and fenced blocks both collapsed to placeholder; surrounding prose intact.
+  • Founder needs to push to GitHub → redeploy aurem.live to ship 330e + 330f to production.
+
 ## Backlog
 - P2 — Splice monthly external uptime line into Morning Brief once `EXTERNAL_UPTIME_SECRET` is configured.
 - P3 — Service-account Google Calendar for shared AUREM staff calendar.

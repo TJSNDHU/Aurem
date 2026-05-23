@@ -9,7 +9,7 @@ that do not ship frontend source files.
 """
 from __future__ import annotations
 
-BUILT_AT: str = '2026-05-23T16:16:15.973710+00:00'
+BUILT_AT: str = '2026-05-23T18:02:51.596172+00:00'
 SRC_ROOT: str = '/app/frontend/src'
 ENDPOINT_COUNT: int = 998
 

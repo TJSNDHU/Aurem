@@ -2293,6 +2293,38 @@ async def _claude_text_fallback(messages: list[dict[str, Any]]) -> dict[str, Any
         return None
 
 
+# iter 330f — Rule Zero central enforcement point.
+# Every founder-visible assistant message MUST flow through this helper
+# so the prose filter (which strips AI-slop, JSON blocks, fenced code
+# and now Hindi/Urdu fragments) gets applied on EVERY append — not just
+# the final LLM turn. Hard-coded halt messages, fast-path replies,
+# wall-clock notices and prompt-injection block replies all qualify.
+def _assistant_append(history: list[dict[str, Any]], content: str) -> str:
+    """Run prose filter on `content`, append the cleaned message to
+    history, and return the cleaned string so the caller can also
+    surface it in the API response.
+
+    The filter is idempotent — running it twice changes nothing on
+    pass two. Falls back to the raw content if the filter raises.
+    """
+    cleaned = content
+    try:
+        from services.ora_prose_filter import clean_prose
+        cleaned, _stats = clean_prose(content)
+        if _stats.get("applied") and any(
+            _stats.get(k, 0) for k in
+            ("openers_removed", "hedges_removed", "standalone_filler",
+             "em_dashes", "jargon", "json_stripped", "fenced_stripped")
+        ):
+            logger.info(f"[ora_prose_filter] scrubbed (assistant turn): {_stats}")
+    except Exception as _e:
+        logger.warning(f"[ora_prose_filter] skipped (assistant turn): {_e}")
+        cleaned = content
+    history.append({"role": "assistant", "content": cleaned})
+    return cleaned
+
+
+
 # ── Session history persistence ───────────────────────────────────────
 async def _load_history(session_id: str) -> list[dict[str, Any]]:
     if _db is None:
@@ -2883,7 +2915,7 @@ async def run_turn(
             except Exception:
                 pass
             history.append({"role": "user", "content": user_text})
-            history.append({"role": "assistant", "content": _PI_BLOCK_REPLY})
+            _assistant_append(history, _PI_BLOCK_REPLY)
             await _save_history(session_id, history)
             return {
                 "ok":             True,
@@ -2929,7 +2961,7 @@ async def run_turn(
     # Intent fast-path — bypass Ollama for greetings / status queries
     fast_reply = await _maybe_fast_reply(user_text)
     if fast_reply is not None:
-        history.append({"role": "assistant", "content": fast_reply})
+        fast_reply = _assistant_append(history, fast_reply)
         await _save_history(session_id, history)
         return {
             "ok":          True,
@@ -3336,7 +3368,7 @@ async def _continue_loop(
                 "Continuing from where I left off — no need to type "
                 "anything, the next tick will resume automatically."
             )
-            history.append({"role": "assistant", "content": wall_msg})
+            wall_msg = _assistant_append(history, wall_msg)
             await _save_history(session_id, history)
             return {
                 "ok":          True,
@@ -3599,20 +3631,12 @@ async def _continue_loop(
                 except Exception as _e:
                     logger.debug(f"[ora-agent] cost footer skipped: {_e}")
 
-            # iter 323q — Stop Slop prose filter on every final assistant
-            # turn. Idempotent; logs how many AI-tells it scrubbed.
-            try:
-                from services.ora_prose_filter import clean_prose
-                content, _slop_stats = clean_prose(content)
-                if _slop_stats.get("applied") and any(
-                    _slop_stats.get(k, 0) for k in
-                    ("openers_removed", "hedges_removed",
-                     "standalone_filler", "em_dashes", "jargon")
-                ):
-                    logger.info(f"[ora_prose_filter] scrubbed: {_slop_stats}")
-            except Exception as _e:
-                logger.warning(f"[ora_prose_filter] skipped: {_e}")
-            history.append({"role": "assistant", "content": content})
+            # iter 323q — Stop Slop prose filter applied via the central
+            # _assistant_append helper (iter 330f) so EVERY assistant turn
+            # is cleaned — including hard-coded halt messages, fast-path
+            # replies and prompt-injection block replies — not just the
+            # final LLM turn.
+            content = _assistant_append(history, content)
             await _save_history(session_id, history)
             return {
                 "ok":        True,
@@ -3678,11 +3702,12 @@ async def _continue_loop(
 
             # Halt if consecutive deterministic-fail ceiling reached.
             if fail_counts.get(call["name"], 0) >= 2:
+                # iter 330f — Rule Zero: plain English only.
                 stop_msg = (
                     f"Tool `{call['name']}` failed twice consecutively. "
-                    "Stopping auto-recovery — founder se discuss kar lo."
+                    "Stopping auto-recovery — I need your input before continuing."
                 )
-                history.append({"role": "assistant", "content": stop_msg})
+                stop_msg = _assistant_append(history, stop_msg)
                 await _save_history(session_id, history)
                 return {
                     "ok":         True,
@@ -3694,12 +3719,13 @@ async def _continue_loop(
             # iter 326tt — separate, higher cap for pure-transient stalls
             # so a flapping network doesn't loop forever silently.
             if transient_counts.get(call["name"], 0) >= 5:
+                # iter 330f — Rule Zero: plain English only.
                 stop_msg = (
                     f"Tool `{call['name']}` keeps hitting transient errors "
                     "(network / 5xx / rate-limit) — paused after 5 retries. "
-                    "Yeh code ki galti nahi, environment issue lag raha hai."
+                    "This looks like an environment issue, not a code problem."
                 )
-                history.append({"role": "assistant", "content": stop_msg})
+                stop_msg = _assistant_append(history, stop_msg)
                 await _save_history(session_id, history)
                 return {
                     "ok":         True,

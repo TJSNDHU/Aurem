@@ -79,6 +79,58 @@ _JARGON_WHOLE = re.compile(
     re.IGNORECASE,
 )
 
+# ── 7. iter 330f — Rule Zero: strip raw JSON / fenced code blocks ────
+# The LLM sometimes pastes tool-result JSON or stack traces verbatim
+# into prose. Founder shouldn't see that. We replace any standalone
+# brace-block (≥2 lines OR ≥80 chars) and any ``` fenced block with
+# a neutral placeholder. Inline backtick code (`like_this`) is NEVER
+# touched, so legitimate `tool_name` / `path` references survive.
+_JSON_BLOCK = re.compile(
+    r"(?:^|\n)[ \t]*\{(?:[^{}]|\n)*?\}[ \t]*(?=\n|$)",
+    re.DOTALL,
+)
+_FENCED_BLOCK = re.compile(
+    r"```[a-zA-Z0-9_+-]*\n[\s\S]*?\n```",
+    re.MULTILINE,
+)
+_PLACEHOLDER = "[details available on request]"
+
+
+def _strip_blocks(text: str, stats: dict) -> str:
+    """Strip large JSON/code blocks; replace with neutral placeholder.
+
+    A brace block qualifies as 'large' if it spans more than one line
+    OR exceeds 80 characters. Smaller inline things like `{a:1}` are
+    left alone — they're rare in real prose and safer not to touch.
+    """
+    n_fenced = 0
+
+    def _fenced_sub(_m: "re.Match") -> str:
+        nonlocal n_fenced
+        n_fenced += 1
+        return _PLACEHOLDER
+
+    text = _FENCED_BLOCK.sub(_fenced_sub, text)
+    stats["fenced_stripped"] = stats.get("fenced_stripped", 0) + n_fenced
+
+    n_json = 0
+
+    def _json_sub(m: "re.Match") -> str:
+        nonlocal n_json
+        body = m.group(0)
+        # Heuristic: only strip "large" blocks. Skip short single-line
+        # mentions like `{ok: true}` that founders might want to see.
+        if "\n" in body or len(body) >= 80:
+            n_json += 1
+            # Preserve leading newline if present to keep paragraph flow.
+            prefix = "\n" if body.startswith("\n") else ""
+            return prefix + _PLACEHOLDER
+        return body
+
+    text = _JSON_BLOCK.sub(_json_sub, text)
+    stats["json_stripped"] = stats.get("json_stripped", 0) + n_json
+    return text
+
 
 def _split_code_fences(text: str) -> list[tuple[bool, str]]:
     """Split text into [(is_code, chunk), ...] respecting ``` fences.
@@ -121,8 +173,16 @@ def clean_prose(text: str) -> Tuple[str, dict]:
         "standalone_filler": 0,
         "em_dashes":         0,
         "jargon":            0,
+        "json_stripped":     0,
+        "fenced_stripped":   0,
         "applied":           True,
     }
+
+    # iter 330f — Rule Zero. Strip raw JSON / fenced code blocks FIRST,
+    # before the fence-aware split. After this pass there are no ```
+    # fences left to split on, so the rest of the pipeline operates
+    # on pure prose.
+    text = _strip_blocks(text, stats)
 
     cleaned_parts: list[str] = []
     for is_code, chunk in _split_code_fences(text):
