@@ -368,15 +368,20 @@ def _salvage_inline_tool_call(msg: dict[str, Any]) -> bool:
 
 def _looks_like_unhandled_tool_call(content: str) -> bool:
     """Final safety net — used in the agent loop's `if not tool_calls`
-    branch. If the model emitted what looks like a tool-call JSON BUT
+    branch. If the model emitted what looks like a tool-call BUT
     the salvage already tried and failed (malformed JSON, unrecognised
-    shape, etc), we MUST NOT deliver that raw JSON to the founder. The
-    caller substitutes an honest 'I couldn't fetch — retry' reply."""
+    shape, etc), we MUST NOT deliver that raw blob to the founder. The
+    caller substitutes an honest 'I couldn't fetch — retry' reply.
+
+    Catches two shapes:
+      1. JSON tool-call echo:  {"type":"function","name":...}
+      2. Python-style invocation: `curl_internal(endpoint="...", method="GET")`
+         (iter 327e — founder hit this exact leak in chat on 2026-02-23.)
+    """
     if not content:
         return False
     txt = content.strip()
-    # Common leak markers — pick conservatively to avoid muting valid
-    # mentions of these strings inside genuine prose.
+    # ── Shape 1: JSON tool-call echo ──
     needles = (
         '{"type": "function"',
         '{"type":"function"',
@@ -386,7 +391,25 @@ def _looks_like_unhandled_tool_call(content: str) -> bool:
         '"tool_calls":',
         '"parameters": {}',
     )
-    return any(n in txt for n in needles) and txt.startswith("{") and txt.endswith("}")
+    if any(n in txt for n in needles) and txt.startswith("{") and txt.endswith("}"):
+        return True
+    # ── Shape 2: Python-call invocation (whole message is one tool call) ──
+    # e.g. curl_internal(endpoint="/api/platform/warm-prober", method="GET")
+    # Whole-message match; we deliberately don't strip multi-line prose.
+    try:
+        from services.ora_tools import TOOL_REGISTRY as _TR
+        _tool_names = set(_TR.keys())
+    except Exception:
+        _tool_names = {
+            "curl_internal", "view_file", "db_count", "db_find",
+            "run_pytest", "verify_endpoint", "shell_exec", "safe_edit",
+            "grep_codebase", "git_log", "propose_commit",
+        }
+    import re as _re
+    m = _re.match(r"^\s*([a-zA-Z_][\w]*)\s*\([^)]*\)\s*$", txt, _re.DOTALL)
+    if m and m.group(1) in _tool_names:
+        return True
+    return False
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -2370,10 +2393,39 @@ def _serialise_tool_call(call: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _humanize_tool_error(err: str) -> str:
+    """iter 327e — Translate raw Python tracebacks / stack-frame markers
+    into plain English BEFORE the error envelope flows back into the
+    LLM context. Stops the LLM from regurgitating phrases like
+    'FileNotFoundError: [Errno 2] No such file or directory' to the
+    founder in chat. Best-effort string rewrite — never raises."""
+    if not isinstance(err, str) or not err:
+        return err
+    e = err
+    replacements = [
+        (r"FileNotFoundError:\s*\[Errno 2\]\s*No such file or directory:\s*['\"]?(\w+)['\"]?",
+         r"the \1 helper is unavailable on this pod"),
+        (r"FileNotFoundError:\s*",            "a required helper is missing — "),
+        (r"\[Errno \d+\]\s*",                 ""),
+        (r"ConnectionRefusedError:\s*",       "the service didn't answer — "),
+        (r"TimeoutError:\s*",                 "the request timed out — "),
+        (r"asyncio\.TimeoutError",            "request timed out"),
+        (r"Traceback \(most recent call last\):[\s\S]*?(?=\n\S|$)", "(internal trace omitted)"),
+    ]
+    import re as _re
+    for pat, repl in replacements:
+        e = _re.sub(pat, repl, e)
+    return e[:300]
+
+
 def _format_tool_result(name: str, result: Any) -> str:
     if not isinstance(result, dict):
         return json.dumps({"raw": str(result)[:1200]})
     safe = dict(result)
+    # iter 327e — strip tracebacks/Errno markers from `error` so the
+    # LLM cannot echo them at the founder.
+    if isinstance(safe.get("error"), str):
+        safe["error"] = _humanize_tool_error(safe["error"])
     for key in ("content", "stdout", "stderr", "output", "body"):
         v = safe.get(key)
         if isinstance(v, str) and len(v) > 1800:

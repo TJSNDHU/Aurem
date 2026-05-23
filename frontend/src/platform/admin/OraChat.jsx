@@ -1035,16 +1035,18 @@ function _safeArgs(raw) {
  * - Error: red "🤖 STUCK"
  */
 /**
- * GithubLockPill — iter 327d.
- * Polls /api/admin/ora/github-lock every 60 s. Shows a lock icon +
- * "GitHub: Read Only" when locked (default), "Write Enabled" if the
- * founder has explicitly unlocked. Tooltip lists recent block attempts.
+ * GithubLockPill — iter 327d (extended iter 327f).
+ * Polls /api/admin/ora/github-lock every 30 s while unlocked (countdown),
+ * 60 s while locked. Click to open a 15-minute unlock prompt; while
+ * unlocked, shows live mm:ss countdown until auto-relock.
  */
 function GithubLockPill() {
   const [status, setStatus] = React.useState({
     locked: true, mode: "read_only", ui_label: "Read Only",
-    recent_attempts: [],
+    recent_attempts: [], seconds_until_relock: null,
   });
+  const [busy, setBusy] = React.useState(false);
+  const [tick, setTick] = React.useState(0); // forces countdown re-render
   const API = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
   const authHeaders = () => {
     const tok = (typeof window !== "undefined"
@@ -1052,46 +1054,102 @@ function GithubLockPill() {
          || localStorage.getItem("platform_token"))) || "";
     return tok ? { Authorization: `Bearer ${tok}` } : {};
   };
-  React.useEffect(() => {
-    let stopped = false;
-    const fetchStatus = async () => {
-      try {
-        const r = await fetch(`${API}/api/admin/ora/github-lock`, {
-          headers: authHeaders(),
-        });
-        if (!r.ok) return;
-        const j = await r.json();
-        if (!stopped && j.ok) setStatus(j);
-      } catch (_e) { /* soft */ }
-    };
-    fetchStatus();
-    const id = setInterval(fetchStatus, 60000);
-    return () => { stopped = true; clearInterval(id); };
+  const fetchStatus = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/api/admin/ora/github-lock`, {
+        headers: authHeaders(),
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (j.ok) setStatus(j);
+    } catch (_e) { /* soft */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [API]);
+
+  React.useEffect(() => {
+    fetchStatus();
+    const id = setInterval(fetchStatus, status.locked ? 60000 : 30000);
+    return () => clearInterval(id);
+  }, [fetchStatus, status.locked]);
+
+  // Local 1-second tick so the mm:ss countdown updates smoothly
+  // between server polls.
+  React.useEffect(() => {
+    if (status.locked) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [status.locked]);
+
+  const unlock = async () => {
+    const reason = window.prompt(
+      "Why are you unlocking GitHub writes? (≥10 chars, 15-min auto-relock):",
+      "Manual push: ",
+    );
+    if (!reason || reason.trim().length < 10) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/api/admin/ora/github-unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ reason: reason.trim(), ttl_minutes: 15 }),
+      });
+      if (r.ok) await fetchStatus();
+    } finally { setBusy(false); }
+  };
+  const relock = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/api/admin/ora/github-relock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+      });
+      if (r.ok) await fetchStatus();
+    } finally { setBusy(false); }
+  };
+
   const locked = !!status.locked;
   const color  = locked ? AMBER : GREEN;
   const Icon   = locked ? Lock : Unlock;
   const recentN = (status.recent_attempts || []).length;
+
+  // Live countdown: prefer server's seconds_until_relock minus local tick.
+  let countdown = null;
+  if (!locked && typeof status.seconds_until_relock === "number") {
+    const remaining = Math.max(
+      0,
+      status.seconds_until_relock - tick,
+    );
+    const mm = Math.floor(remaining / 60);
+    const ss = remaining % 60;
+    countdown = `${mm}:${String(ss).padStart(2, "0")}`;
+  }
+
+  const label = locked
+    ? (status.ui_label || "Read Only")
+    : (countdown ? `${status.ui_label || "Write Enabled"} · ${countdown}` : (status.ui_label || "Write Enabled"));
+
   return (
-    <span data-testid="github-lock-pill"
-          data-locked={locked ? "true" : "false"}
-          title={locked
-            ? `GitHub writes are locked. ${recentN} recent block attempt${recentN === 1 ? "" : "s"}.`
-            : "GitHub writes are UNLOCKED. Treat with care."}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "3px 10px",
-            background: `${color}22`,
-            border: `1px solid ${color}66`,
-            borderRadius: 999,
-            fontSize: 10.5, fontWeight: 700,
-            color, letterSpacing: 0.5, textTransform: "uppercase",
-            marginLeft: 6, cursor: "default",
-          }}>
+    <button data-testid="github-lock-pill"
+            data-locked={locked ? "true" : "false"}
+            disabled={busy}
+            onClick={locked ? unlock : relock}
+            title={locked
+              ? `GitHub writes are locked. ${recentN} recent block attempt${recentN === 1 ? "" : "s"}. Click to unlock for 15 min.`
+              : `GitHub writes are UNLOCKED — auto-relock in ${countdown || "<1m"}. Click to re-lock now.`}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "3px 10px",
+              background: `${color}22`,
+              border: `1px solid ${color}66`,
+              borderRadius: 999,
+              fontSize: 10.5, fontWeight: 700,
+              color, letterSpacing: 0.5, textTransform: "uppercase",
+              marginLeft: 6, cursor: busy ? "wait" : "pointer",
+              opacity: busy ? 0.6 : 1,
+            }}>
       <Icon size={11} />
-      <span>GitHub: {status.ui_label || (locked ? "Read Only" : "Write Enabled")}</span>
-    </span>
+      <span>GitHub: {label}</span>
+    </button>
   );
 }
 

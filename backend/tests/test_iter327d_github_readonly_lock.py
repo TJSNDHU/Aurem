@@ -329,7 +329,7 @@ def test_lock_pill_polls_status_endpoint():
 
 def test_lock_pill_uses_lock_icon_when_locked():
     src = FRONTEND.read_text()
-    pill_block = src.split("function GithubLockPill")[1][:1800]
+    pill_block = src.split("function GithubLockPill")[1][:5000]
     assert "Lock" in pill_block and "Unlock" in pill_block
     assert "Read Only" in pill_block
 

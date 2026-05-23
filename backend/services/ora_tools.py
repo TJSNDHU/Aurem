@@ -378,7 +378,13 @@ async def review_code(path: str, focus: str = "all") -> dict:
 
 
 async def curl_internal(endpoint: str, method: str = "GET") -> dict:
-    """Hit our own backend (localhost:8001 only — no external URLs)."""
+    """Hit our own backend (localhost:8001 only — no external URLs).
+
+    iter 327e — switched from subprocess `curl` to httpx so the tool
+    survives pods where the curl binary is missing (founder hit
+    `FileNotFoundError: 'curl'` on the Legion pod). httpx is already a
+    backend dependency.
+    """
     if method.upper() not in ("GET",):
         return {"ok": False, "error": "P1: read-only — only GET allowed"}
     if not isinstance(endpoint, str) or not endpoint.startswith("/api/"):
@@ -387,17 +393,11 @@ async def curl_internal(endpoint: str, method: str = "GET") -> dict:
         return {"ok": False, "error": "invalid endpoint"}
     url = f"http://localhost:8001{endpoint}"
     try:
-        r = await asyncio.to_thread(
-            subprocess.run,
-            ["curl", "-s", "-w", "\n__STATUS__%{http_code}\n",
-             "--max-time", "8", url],
-            capture_output=True, text=True, timeout=10,
-        )
-        out = r.stdout or ""
-        m = re.search(r"\n__STATUS__(\d+)\n?$", out)
-        status = int(m.group(1)) if m else 0
-        body = out[:m.start()] if m else out
-        # Cap body so ORA gets a fingerprint, not a dump
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+        status = int(resp.status_code)
+        body = resp.text or ""
         return {
             "ok":         True,
             "url":        url,

@@ -199,6 +199,66 @@ required to enable', send Telegram alert. UI: 'GitHub: Read Only' lock pill."
 
 **Pytest status (iter 327* + 326 recent + 322er): 80 / 80 green.**
 
+## iter 327e (2026-02-23) — Chat jargon scrub + curl resilience + sidebar collapse
+Founder reported (photo from Legion pod) that ORA was:
+  1. Pasting raw tool-call syntax — `curl_internal(endpoint="/api/...", method="GET")` — into chat.
+  2. Showing `FileNotFoundError: [Errno 2] No such file or directory: 'curl'` to the founder.
+  3. Asking for a collapse button on the ORA-CTO sidebar.
+
+**Delivered**
+- `services/ora_tools.py::curl_internal` rewritten to use `httpx`
+  (already a backend dep) instead of subprocess-ing the `curl`
+  binary. Survives any pod regardless of whether curl is installed.
+- `services/ora_agent.py::_looks_like_unhandled_tool_call` extended
+  to catch Python-call style leaks (`tool_name(arg=...)`) for any
+  registered tool name. JSON-shape detection unchanged.
+- `services/ora_agent.py::_humanize_tool_error` (new) — strips
+  `FileNotFoundError`, `[Errno N]`, full tracebacks,
+  `ConnectionRefusedError`, `TimeoutError` from tool error
+  envelopes BEFORE they flow back into the LLM context. The LLM
+  literally cannot regurgitate phrases it never saw.
+- `frontend/src/platform/admin/OraAdminUnified.jsx` — desktop
+  sidebar now has a `ChevronLeft/Right` collapse button
+  (`data-testid="ora-admin-sidebar-collapse"`). Width animates
+  220 → 64 px; tab labels collapse to icon-only rail with hover
+  tooltips. Preference persisted in `localStorage`
+  (`ora_admin_sidebar_collapsed`).
+- Tests: `tests/test_iter327e_chat_jargon_and_curl_resilience.py`
+  — 15 cases, all green.
+
+## iter 327f (2026-02-23) — 15-minute GitHub-unlock TTL + auto-relock
+Founder mandate (verbatim): "Yes — add 15-minute unlock timer.
+One click unlock → auto-relocks after 15 min. Audit row on relock."
+
+**Delivered**
+- `routers/ora_github_lock_router.py::UnlockBody` now accepts
+  `ttl_minutes` (default 15, range 1-60). `/github-unlock` writes
+  `unlock_expires_at` to the lock row + audit, and returns
+  `seconds_until_relock` to the UI.
+- `services/github_lockdown.py::is_github_locked()` is now TTL-aware:
+  on every read, if the row says `locked=False` but
+  `unlock_expires_at` is past, lazily flips the row back to locked,
+  clears the expiry, and writes an audit entry
+  (`action='github_auto_relock_ttl'`). Concurrency-safe via a
+  filter-on-`locked:False` upsert.
+- `services/github_lockdown.py::get_lock_status()` surfaces
+  `unlock_expires_at` + `seconds_until_relock` so the UI can show
+  a live mm:ss countdown.
+- `/github-relock` now unsets `unlock_expires_at` so an early
+  manual relock doesn't leave a ghost countdown in the UI.
+- `frontend/src/platform/admin/OraChat.jsx::GithubLockPill` is now
+  a `<button>`: one-click while locked prompts for a ≥10-char
+  reason and calls `/github-unlock` with `ttl_minutes: 15`. While
+  unlocked it shows `GITHUB: WRITE ENABLED · 14:32` with a live
+  1-second tick (server poll cadence: 30 s unlocked / 60 s locked).
+  Click while unlocked re-locks immediately.
+- Tests: `tests/test_iter327f_github_unlock_ttl.py` — 11 cases,
+  all green. Covers TTL field validation, lazy auto-relock,
+  audit-row creation, status-endpoint countdown, router default,
+  and the clickable UI pill.
+
+**Pytest status (322er + 327d + 327e + 327f): 54 / 54 green.**
+
 ## Next Action Items
 - P1: `sales_pipeline.py:515` — wire welcome email + customer account creation on signup.
 - P1: `appointment_scheduler_router.py:171-172` — Google Calendar event create + confirmation email.

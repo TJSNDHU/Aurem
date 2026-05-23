@@ -78,31 +78,107 @@ def set_db(database):
 async def is_github_locked() -> bool:
     """Return True iff GitHub writes are currently locked.
     Reads from `ora_governance.github_lock_state` — default True
-    when the row is missing (fail-safe)."""
+    when the row is missing (fail-safe).
+
+    iter 327f — 15-minute auto-relock TTL. If the row says
+    `locked=False` but `unlock_expires_at` is in the past, lazily flip
+    the row back to locked (and write an audit entry) before
+    returning. This guarantees the founder's "one-click 15 minute
+    unlock" never leaves writes open forever.
+    """
     if _db is None:
         return _DEFAULT_LOCKED
     try:
         row = await _db.ora_governance.find_one(
-            {"_id": "github_lock_state"}, {"_id": 0, "locked": 1}
+            {"_id": "github_lock_state"},
+            {"_id": 0, "locked": 1, "unlock_expires_at": 1, "unlocked_by": 1},
         )
     except Exception as e:
         logger.warning(f"[github-lock] read failed: {e} — defaulting to locked")
         return _DEFAULT_LOCKED
     if not row:
         return _DEFAULT_LOCKED
-    return bool(row.get("locked", _DEFAULT_LOCKED))
+    locked = bool(row.get("locked", _DEFAULT_LOCKED))
+    if locked:
+        return True
+    # Unlocked — check TTL.
+    expires_at_iso = row.get("unlock_expires_at")
+    if expires_at_iso:
+        try:
+            expires_at = datetime.fromisoformat(expires_at_iso)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except Exception:
+            expires_at = None
+        if expires_at and datetime.now(timezone.utc) >= expires_at:
+            await _auto_relock_expired(row.get("unlocked_by") or "unknown",
+                                        expires_at_iso)
+            return True
+    return False
+
+
+async def _auto_relock_expired(prev_unlocker: str, expired_at_iso: str) -> None:
+    """Idempotent helper — flips the row back to locked and writes an
+    audit entry. Safe to call concurrently (last writer wins; the
+    audit row may dedupe on a 5s grain via mongo TTL if desired)."""
+    if _db is None:
+        return
+    try:
+        await _db.ora_governance.update_one(
+            {"_id": "github_lock_state", "locked": False},
+            {"$set": {
+                "locked":            True,
+                "auto_relocked_at":  datetime.now(timezone.utc).isoformat(),
+                "auto_relock_reason": "ttl_expired",
+            },
+             "$unset": {"unlock_expires_at": ""}},
+        )
+        await _db.ora_governance_audit.insert_one({
+            "action":           "github_auto_relock_ttl",
+            "previous_unlocker": prev_unlocker,
+            "expired_at":        expired_at_iso,
+            "ts":                datetime.now(timezone.utc).isoformat(),
+        })
+        logger.warning(
+            f"[github-lock] auto-relocked after TTL (prev unlocker={prev_unlocker!r})"
+        )
+    except Exception as e:
+        logger.debug(f"[github-lock] auto-relock failed: {e}")
 
 
 async def get_lock_status() -> dict:
     """For UI / status endpoints. Always returns the safe defaults
     even on Mongo failure."""
     locked = await is_github_locked()
+    # iter 327f — surface the 15-min unlock TTL for the UI countdown.
+    expires_at_iso = None
+    seconds_until_relock = None
+    if not locked and _db is not None:
+        try:
+            row = await _db.ora_governance.find_one(
+                {"_id": "github_lock_state"},
+                {"_id": 0, "unlock_expires_at": 1, "unlocked_by": 1},
+            ) or {}
+            expires_at_iso = row.get("unlock_expires_at")
+            if expires_at_iso:
+                try:
+                    exp = datetime.fromisoformat(expires_at_iso)
+                    if exp.tzinfo is None:
+                        exp = exp.replace(tzinfo=timezone.utc)
+                    delta = (exp - datetime.now(timezone.utc)).total_seconds()
+                    seconds_until_relock = max(0, int(delta))
+                except Exception:
+                    pass
+        except Exception:
+            pass
     return {
         "locked":              locked,
         "mode":                "read_only" if locked else "write_unlocked",
         "locked_operations":   sorted(LOCKED_OPERATIONS),
         "ui_label":            "Read Only" if locked else "Write Enabled",
         "icon":                "lock" if locked else "unlock",
+        "unlock_expires_at":   None if locked else expires_at_iso,
+        "seconds_until_relock": None if locked else seconds_until_relock,
     }
 
 

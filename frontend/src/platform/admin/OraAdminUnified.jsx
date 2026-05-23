@@ -32,7 +32,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Crown, MessageSquare, Activity, Settings as SettingsIcon,
-  Zap, Terminal, LogOut, Menu, X,
+  Zap, Terminal, LogOut, Menu, X, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 import OraChat from "./OraChat";
@@ -125,6 +125,16 @@ export default function OraAdminUnified() {
   const [active, setActive] = useState(() => tabFromUrl(location));
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
+  // iter 327e — desktop sidebar collapse. Persisted so the founder's
+  // preference survives page reloads. Collapsed = 56px icon-rail.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("ora_admin_sidebar_collapsed") === "1"; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("ora_admin_sidebar_collapsed", collapsed ? "1" : "0"); }
+    catch { /* ignore */ }
+  }, [collapsed]);
 
   // Keep URL in sync so refresh / share preserves the active tab.
   useEffect(() => {
@@ -171,32 +181,73 @@ export default function OraAdminUnified() {
       {/* DESKTOP SIDEBAR */}
       {!isMobile && (
         <aside style={{
-          width: 220, padding: "20px 14px", borderRight: `1px solid ${BORDER}`,
+          width: collapsed ? 64 : 220,
+          padding: collapsed ? "20px 8px" : "20px 14px",
+          borderRight: `1px solid ${BORDER}`,
           background: PANEL_BG, position: "sticky", top: 0, height: "100vh",
           display: "flex", flexDirection: "column", gap: 6,
+          transition: "width 180ms ease, padding 180ms ease",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 6px 18px" }}>
+          <div style={{
+            display: "flex", alignItems: "center",
+            gap: collapsed ? 0 : 10,
+            padding: "4px 6px 12px",
+            justifyContent: collapsed ? "center" : "flex-start",
+          }}>
             <Crown size={20} color={GOLD} />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>ORA</div>
-              <div style={{ fontSize: 10, color: TEXT_DIM, letterSpacing: 0.3 }}>Admin · iter 322ex</div>
-            </div>
+            {!collapsed && (
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>ORA</div>
+                <div style={{ fontSize: 10, color: TEXT_DIM, letterSpacing: 0.3 }}>Admin · iter 322ex</div>
+              </div>
+            )}
           </div>
 
+          {/* iter 327e — collapse toggle */}
+          <button
+            data-testid="ora-admin-sidebar-collapse"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            style={{
+              alignSelf: collapsed ? "center" : "flex-end",
+              width: 28, height: 28, marginBottom: 6,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              background: "transparent",
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              color: TEXT_DIM, cursor: "pointer",
+              transition: "background 120ms ease, color 120ms ease",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = TEXT; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = TEXT_DIM; }}
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+
           {TABS.map((t) => (
-            <NavButton key={t.id} tab={t} active={active === t.id} onClick={() => setActive(t.id)} />
+            <NavButton key={t.id} tab={t} active={active === t.id}
+              collapsed={collapsed}
+              onClick={() => setActive(t.id)} />
           ))}
 
           <div style={{ flex: 1 }} />
-          <div style={{ fontSize: 11, color: TEXT_DIM, padding: "10px 6px", borderTop: `1px solid ${BORDER}` }}>
-            {gate.payload?.email || "admin"}
-          </div>
+          {!collapsed && (
+            <div style={{ fontSize: 11, color: TEXT_DIM, padding: "10px 6px", borderTop: `1px solid ${BORDER}` }}>
+              {gate.payload?.email || "admin"}
+            </div>
+          )}
           <button
             data-testid="ora-admin-logout-btn"
             onClick={() => { try { localStorage.clear(); sessionStorage.clear(); } catch {} navigate("/admin/login"); }}
-            style={{ ...btn(false), justifyContent: "flex-start" }}
+            title="Logout"
+            style={{
+              ...btn(false),
+              justifyContent: collapsed ? "center" : "flex-start",
+              padding: collapsed ? "8px 0" : "8px 14px",
+            }}
           >
-            <LogOut size={14} /> Logout
+            <LogOut size={14} /> {!collapsed && "Logout"}
           </button>
         </aside>
       )}
@@ -273,15 +324,20 @@ export default function OraAdminUnified() {
   );
 }
 
-function NavButton({ tab, active, onClick }) {
+function NavButton({ tab, active, onClick, collapsed = false }) {
   const Icon = tab.icon;
   return (
     <button
       data-testid={`ora-admin-tab-${tab.id}`}
       onClick={onClick}
+      title={collapsed ? tab.label : undefined}
+      aria-label={tab.label}
       style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "10px 12px", borderRadius: 8,
+        display: "flex", alignItems: "center",
+        gap: collapsed ? 0 : 10,
+        justifyContent: collapsed ? "center" : "flex-start",
+        padding: collapsed ? "10px 0" : "10px 12px",
+        borderRadius: 8,
         border: "1px solid transparent",
         background: active ? "rgba(212,175,55,0.10)" : "transparent",
         color: active ? GOLD : TEXT,
@@ -293,7 +349,7 @@ function NavButton({ tab, active, onClick }) {
       onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
     >
       <Icon size={16} />
-      <span>{tab.label}</span>
+      {!collapsed && <span>{tab.label}</span>}
     </button>
   );
 }

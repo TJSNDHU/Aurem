@@ -14,7 +14,7 @@ audit row in `ora_governance_audit` is meaningful.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -44,6 +44,10 @@ def _get_admin_dep():
 
 class UnlockBody(BaseModel):
     reason: str = Field(min_length=10, max_length=600)
+    # iter 327f — TTL-bounded unlock. Default 15 min, hard cap 60 min.
+    # Founder's verbatim request: "One click unlock → auto-relocks
+    # after 15 min. Audit row on relock."
+    ttl_minutes: int = Field(default=15, ge=1, le=60)
 
 
 # ───────────────────────────────────────────────────────────────────
@@ -71,26 +75,42 @@ async def github_lock_status(user: dict = Depends(_get_admin_dep())):
 async def github_unlock(body: UnlockBody, user: dict = Depends(_get_admin_dep())):
     if _db is None:
         raise HTTPException(503, "db not ready")
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=body.ttl_minutes)
     await _db.ora_governance.update_one(
         {"_id": "github_lock_state"},
         {"$set": {
-            "locked":          False,
-            "unlocked_at":     datetime.now(timezone.utc).isoformat(),
-            "unlocked_by":     user.get("email") or user.get("user_id"),
-            "unlocked_reason": body.reason,
-        }},
+            "locked":             False,
+            "unlocked_at":        now.isoformat(),
+            "unlocked_by":        user.get("email") or user.get("user_id"),
+            "unlocked_reason":    body.reason,
+            "unlock_ttl_minutes": body.ttl_minutes,
+            "unlock_expires_at":  expires_at.isoformat(),
+        },
+         "$unset": {"auto_relocked_at": "", "auto_relock_reason": ""}},
         upsert=True,
     )
     await _db.ora_governance_audit.insert_one({
-        "action":  "github_unlock",
-        "actor":   user.get("email") or user.get("user_id"),
-        "reason":  body.reason,
-        "ts":      datetime.now(timezone.utc).isoformat(),
+        "action":       "github_unlock",
+        "actor":        user.get("email") or user.get("user_id"),
+        "reason":       body.reason,
+        "ttl_minutes":  body.ttl_minutes,
+        "expires_at":   expires_at.isoformat(),
+        "ts":           now.isoformat(),
     })
     logger.warning(
-        f"[github-lock] UNLOCKED by {user.get('email')} — reason: {body.reason!r}"
+        f"[github-lock] UNLOCKED by {user.get('email')} for "
+        f"{body.ttl_minutes}m — reason: {body.reason!r} — "
+        f"auto-relock at {expires_at.isoformat()}"
     )
-    return {"ok": True, "locked": False, "mode": "write_unlocked"}
+    return {
+        "ok":                  True,
+        "locked":              False,
+        "mode":                "write_unlocked",
+        "unlock_expires_at":   expires_at.isoformat(),
+        "ttl_minutes":         body.ttl_minutes,
+        "seconds_until_relock": body.ttl_minutes * 60,
+    }
 
 
 @router.post("/github-relock")
@@ -103,7 +123,8 @@ async def github_relock(user: dict = Depends(_get_admin_dep())):
             "locked":      True,
             "relocked_at": datetime.now(timezone.utc).isoformat(),
             "relocked_by": user.get("email") or user.get("user_id"),
-        }},
+        },
+         "$unset": {"unlock_expires_at": ""}},
         upsert=True,
     )
     await _db.ora_governance_audit.insert_one({
