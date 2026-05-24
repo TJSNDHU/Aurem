@@ -353,3 +353,44 @@ PIDs: []
 Updated: 2026-02-24T07:00:00Z
 ---
 
+
+---
+Task: iter 332b A-4 (session-expired toast) + Batch B-2 follow-up (full python3-saml ACS) + Batch C (data residency + SOC 2 PDF + SLA)
+Succeeded:
+  • **Session-expired toast** — RouteGuards stashes `sessionStorage['aurem_session_expired']='admin'|'customer'` on expiry/invalid token; AdminLogin reads once on mount, shows an orange banner ("Your session expired. Please sign in again."), auto-dismisses after 6s, clears the flag so a refresh doesn't show it again. data-testid `admin-login-session-expired`.
+  • **python3-saml 1.16.0 installed** (along with xmlsec 1.3.17, isodate 0.7.2 + apt libxmlsec1, libxmlsec1-dev, libxml2, pkg-config, xmlsec1). requirements.txt frozen.
+  • **Real SAML ACS handler** — services/saml_sso.py now ships:
+    - `build_saml_settings(org, cfg)` — assembles OneLogin_Saml2_Settings dict from MongoDB row + strict mode + wantAssertionsSigned.
+    - `prepare_fastapi_request(req, post, relay)` — converts FastAPI Request to the dict OneLogin_Saml2_Auth wants. Honors X-Forwarded-Proto + X-Forwarded-Host so the k8s ingress doesn't break python3-saml's Destination check.
+    - `parse_acs_response(req, response, relay, org, cfg)` — runs the full python3-saml validation (signature + audience + recipient + assertion), returns {ok, user, attributes, name_id} or {ok:false, error, detail}.
+    - `map_saml_attributes` — handles Okta + Azure AD (URN claims) + Google + OneLogin attribute shapes.
+    - `upsert_saml_user` — find-or-create the user in db.users + adds to org as default-role member.
+    - `POST /api/saml/{org_id}/acs` now mints an AUREM JWT via `create_token(user_id, is_admin, email)`, audits via unified_audit_log + saml_logins, and 303-redirects to `/saml/landing#t=<JWT>` (hash not query — JWT never lands in nginx access logs).
+  • **SamlAcsLanding.jsx** — new frontend route at `/saml/landing` that plucks `#t=` from the URL hash, writes it via setPlatformToken, strips the hash, then navigates to `/admin/mission-control`. testid `saml-acs-landing`.
+  • **Batch C Step 1 — Data residency** — services/data_residency.py: 3-region table (ca | us | eu) with PIPEDA / Law 25 / GDPR / HIPAA / FedRAMP flags. Canada is the default; orgs request a region change via routers/compliance_router.py which queues to `residency_change_requests` collection (actual cluster migration is a manual ops step).
+  • **Batch C Step 2 — SOC 2 Type II PDF** — services/soc2_export.py renders a multi-page ReportLab PDF with: cover page, CC1 control environment, CC6 logical access, CC7 audit event summary (table populated from unified_audit_log for the date window), CC8 change management, Appendix A data residency, Appendix B subprocessors. Endpoint `GET /api/compliance/{org_id}/soc2.pdf?start=&end=` streams the PDF with Content-Disposition attachment. Default window: last 90 days. Audit row written on every download.
+  • **Batch C Step 3 — Public SLA + MSA endpoint** — `GET /api/compliance/sla` returns the single source of truth for uptime targets (99.9%), incident response SLAs (15min/1h/4h/next-business-day), service credit table, MSA template URL, DPA URL, governing law (BC), and insurance limits ($2M cyber + $2M GL + $1M E&O). Frontend `/enterprise/sla` page reads from it. testid `enterprise-sla-page` + 4 sub-cards.
+  • **21 new pytest cases** across A-4 + C1 (11 SAML/toast + 10 compliance). All green. Total iter 332b regression: 90 tests.
+  • **Full active regression**: 407 / 407 green (was 386).
+  • **Live smoke**: `/api/compliance/sla` returns `99.9% / Province of British Columbia, Canada` — confirmed via curl through localhost.
+  • Fixed one MongoDB projection footgun: `find_one({...}, {"_id":0, "data_residency": 1})` returns `{}` (not None) when the projected field is absent, so `if not org` was treating a real-but-empty doc as "org not found". Switched to `if org is None`.
+Blocker: none.
+Production redeploy still pending (auth fix from iter 332b A-3 + everything since).
+Deferred (intentional — separate slices):
+  • Frontend Org switcher dropdown + Enterprise SSO/SCIM settings UI (backends ready).
+  • Frontend Enterprise Admin → Data residency settings card + SOC 2 download button (backends ready, UI wiring next slice).
+  • SAML SP-side AuthnRequest signing (currently AuthnRequest is unsigned — IdP-init flow works; SP-init signed flow is a future hardening).
+  • RBAC complete wiring across ~80 routers (still a separate 2-3 day slice).
+  • Real Stripe / Atlas cluster move automation for residency changes (currently queues, then manual ops).
+Next:
+  • Push to GitHub → redeploy aurem.live so the auth fix + Batch B + Batch C ship to production.
+  • Frontend wiring for the new compliance endpoints (residency picker + SOC 2 download button on /enterprise/admin/overview).
+  • Org switcher dropdown in AdminShell sidebar.
+  • SP-side AuthnRequest signing (next SAML slice).
+Cost: $0.00 USD (pytest + lint + curl smoke + 1 integration playbook call)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T09:00:00Z
+---
+
+

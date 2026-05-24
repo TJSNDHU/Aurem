@@ -18,7 +18,7 @@ import logging
 import os
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Form, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -177,28 +177,82 @@ async def saml_login_init(org_id: str) -> dict[str, Any]:
 
 
 @router.post("/{org_id}/acs")
-async def saml_acs_endpoint(org_id: str, request: Request) -> dict[str, Any]:
-    """STUB — receives the IdP's SAML response.
+async def saml_acs_endpoint(
+    org_id: str,
+    request: Request,
+    SAMLResponse: str = Form(...),
+    RelayState: Optional[str] = Form(default=None),
+) -> Response:
+    """IdP-initiated callback. python3-saml validates the response,
+    we mint an AUREM JWT and 302 to /admin/mission-control with the
+    token in the URL hash so the React app can pluck it client-side
+    (avoids leaking the JWT through server logs)."""
+    from fastapi.responses import RedirectResponse
+    from services.saml_sso import (
+        get_saml_config, parse_acs_response, record_saml_login,
+        upsert_saml_user,
+    )
+    from utils.auth import create_token
 
-    The full implementation validates the response signature, decrypts
-    the assertion, checks audience + recipient, extracts the email + name,
-    upserts the user in db.users, adds them to the org as a member, mints
-    a JWT, and 302s to /admin/mission-control.
-
-    For now this stub records the attempt to db.saml_logins so we know
-    the IdP is wired correctly, and returns a 501 with a clear message."""
-    from services.saml_sso import get_saml_config, record_saml_login
     cfg = await get_saml_config(org_id)
     if not cfg:
         raise HTTPException(404, "sso_not_configured")
-    body = (await request.body())[:6000]   # Cap to avoid log bloat
-    await record_saml_login(
-        org_id, email="(unknown — pre-parse)", name_id="",
-        success=False,
-        extra={"raw_bytes": len(body),
-                "user_agent": request.headers.get("user-agent", "")[:200]},
+    if cfg.get("status") != "active":
+        raise HTTPException(403, "sso_not_active")
+    if _db is None:
+        raise HTTPException(503, "db_not_ready")
+    org = await _db.organizations.find_one(
+        {"org_id": org_id}, {"_id": 0, "slug": 1, "name": 1, "org_id": 1},
     )
-    raise HTTPException(
-        501,
-        "SAML response parsing not yet wired. Config is saved — finish setup once python3-saml is installed.",
+    if not org:
+        raise HTTPException(404, "org_not_found")
+
+    parsed = await parse_acs_response(request, SAMLResponse, RelayState, org, cfg)
+    if not parsed.get("ok"):
+        await record_saml_login(
+            org_id, email="(unknown)", name_id="", success=False,
+            extra={"error": parsed.get("error"),
+                    "detail":  parsed.get("detail", "")[:300]},
+        )
+        raise HTTPException(401, parsed.get("error", "saml_failed"))
+
+    u = parsed["user"]
+    upserted = await upsert_saml_user(
+        email=u["email"], first_name=u["first_name"],
+        last_name=u["last_name"], org_id=org_id,
+        default_role=cfg.get("default_role", "member"),
+    )
+
+    # Mint the AUREM JWT.
+    jwt_token = create_token(
+        upserted["user_id"], upserted["is_admin"], email=upserted["email"],
+    )
+
+    await record_saml_login(
+        org_id, email=upserted["email"], name_id=u["name_id"],
+        success=True,
+        extra={"user_id": upserted["user_id"],
+                "created": upserted["created"]},
+    )
+    try:
+        from services.unified_audit import write_event
+        await write_event(
+            action="saml_sso_login", resource=f"user:{upserted['user_id']}",
+            result="ok", user_id=upserted["user_id"], org_id=org_id,
+            source_collection="saml_logins",
+            extra={"email": upserted["email"],
+                    "created_user": upserted["created"]},
+        )
+    except Exception:
+        pass
+
+    # The React app reads window.location.hash on mount and stores the
+    # token in the appropriate slot. Hash (not query) so the token is
+    # never logged in any nginx access log.
+    site = (os.environ.get("FRONTEND_URL") or "https://aurem.live").rstrip("/")
+    target = RelayState or f"{site}/saml/landing"
+    sep = "&" if "#" in target else "#"
+    return RedirectResponse(
+        url=f"{target}{sep}t={jwt_token}",
+        status_code=303,
     )

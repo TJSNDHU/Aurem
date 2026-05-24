@@ -28,6 +28,12 @@ const AdminLogin = () => {
   const [needTotp, setNeedTotp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // iter 332b A-4 — Session-expired toast banner.
+  // RouteGuards.jsx sets sessionStorage['aurem_session_expired'] = 'admin'
+  // when it bounces an expired/invalid JWT. We read it once on mount,
+  // show a 5-second banner above the form, then clear the flag so a
+  // future page refresh doesn't show it again.
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   // Heuristic: admin emails are on the aurem.live domain OR explicitly
   // listed below. False positives only cause an extra (empty) input to
@@ -45,6 +51,18 @@ const AdminLogin = () => {
     // Domain match — anyone on the company domain gets the TOTP field.
     return v.endsWith('@aurem.live');
   };
+
+  useEffect(() => {
+    // iter 332b A-4 — pick up the handoff flag from RouteGuards
+    try {
+      const flag = sessionStorage.getItem('aurem_session_expired');
+      if (flag === 'admin') {
+        setSessionExpired(true);
+        sessionStorage.removeItem('aurem_session_expired');
+        setTimeout(() => setSessionExpired(false), 6000);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     // Reveal TOTP as soon as the typed email looks admin-shaped.
@@ -163,6 +181,22 @@ const AdminLogin = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {sessionExpired && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 rounded-lg flex items-center gap-2 text-xs"
+              style={{
+                background: 'rgba(255,107,0,0.08)',
+                border: '1px solid rgba(255,107,0,0.30)',
+                color: '#FF6B00',
+              }}
+              data-testid="admin-login-session-expired"
+            >
+              <Shield className="size-3.5 flex-shrink-0" />
+              Your session expired. Please sign in again.
+            </motion.div>
+          )}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}

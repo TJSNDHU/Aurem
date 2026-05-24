@@ -850,6 +850,17 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] SCIM routers wired")
                 except Exception as _scim_e:
                     logger.warning(f"[REGISTRY] scim router failed: {_scim_e}")
+
+                # iter 332b Batch C — Compliance router (residency + SOC 2 + SLA)
+                try:
+                    from routers.compliance_router import (
+                        router as _comp_router, set_db as _set_comp_db,
+                    )
+                    app.include_router(_comp_router)
+                    _set_comp_db(db)
+                    logger.info("[REGISTRY] Compliance router wired")
+                except Exception as _comp_e:
+                    logger.warning(f"[REGISTRY] compliance router failed: {_comp_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

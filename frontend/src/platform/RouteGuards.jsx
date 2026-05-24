@@ -3,15 +3,9 @@
  * AdminGuard: Only admin / super_admin role can access /admin/* routes
  * TenantGuard: Any logged-in user accesses /dashboard/*
  *
- * iter 332b A-3 (2026-02-24) — Auth bug fix:
- *   • Adds JWT `exp` claim check so an expired token NEVER grants access.
- *     Without this, a stale token left in localStorage after the JWT
- *     expired would still pass the `is_admin` test, render the dashboard,
- *     and then every API call would 401 — which is exactly what the
- *     founder reported on production ("direct link lands on dashboard
- *     without asking for login", "logout moves to dashboard").
- *   • On expiry, clears the stale slot via `clearAdminAuth()` so the
- *     next visit to /admin/login shows the form cleanly.
+ * iter 332b A-3 — JWT exp check (production auth bug fix)
+ * iter 332b A-4 — Session-expired toast handoff via sessionStorage flag,
+ *                  read once by AdminLogin / Login page on mount.
  */
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
@@ -31,6 +25,14 @@ function isExpired(payload) {
   return payload.exp < nowSec;
 }
 
+function flagSessionExpired(scope) {
+  // sessionStorage so it doesn't leak across tabs/sessions; cleared by the
+  // login page after it shows the toast once.
+  try {
+    sessionStorage.setItem('aurem_session_expired', scope || 'admin');
+  } catch { /* ignore */ }
+}
+
 export const AdminGuard = ({ children }) => {
   const [status, setStatus] = useState('checking');
 
@@ -42,15 +44,14 @@ export const AdminGuard = ({ children }) => {
     }
     const payload = decodeToken(token);
     if (!payload) {
-      // Corrupt token — wipe and bounce.
       try { clearAdminAuth(); } catch { /* ignore */ }
+      flagSessionExpired('admin');
       setStatus('invalid');
       return;
     }
     if (isExpired(payload)) {
-      // Stale JWT — wipe both possible slots so the next render doesn't
-      // re-read the same dead token from a fallback slot.
       try { clearAdminAuth(); } catch { /* ignore */ }
+      flagSessionExpired('admin');
       setStatus('expired');
       return;
     }
@@ -81,11 +82,13 @@ export const TenantGuard = ({ children }) => {
     const payload = decodeToken(token);
     if (!payload) {
       try { clearCustomerAuth(); } catch { /* ignore */ }
+      flagSessionExpired('customer');
       setStatus('invalid');
       return;
     }
     if (isExpired(payload)) {
       try { clearCustomerAuth(); } catch { /* ignore */ }
+      flagSessionExpired('customer');
       setStatus('expired');
       return;
     }
