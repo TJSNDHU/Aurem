@@ -534,6 +534,29 @@ Updated: 2026-05-24T03:40:00Z
 
 
 ---
+Task: iter 332b D-11 — Free tier moved to OpenRouter (one key, three-model ladder)
+Succeeded:
+  • **One LLM key for free tier**: OPENROUTER_API_KEY. Removed standalone DEEPSEEK_API_KEY and GROQ_API_KEY from /app/backend/.env — no longer needed. OpenRouter handles model selection.
+  • **Three-model fallback ladder** in services/dev_cto_chat.py: 1) `deepseek/deepseek-chat` ($0.27/1M, primary), 2) `meta-llama/llama-3.3-70b-instruct:free` (fallback), 3) `mistralai/mistral-7b-instruct:free` (last resort). If primary 429s or 503s, fallback fires; if both fail, mistral free saves the day. Returns the actual label that answered so the dashboard tier badge stays honest.
+  • **BYOK path unchanged** — anthropic / openai / deepseek / gemini / groq / mistral / custom still routed direct to their own native endpoints. Anthropic still wins when present; OpenRouter is never called when BYOK is configured (asserted in test).
+  • **Token wall unchanged** — `{ok:false, error:"token_wall", action_required:"add_byok"}` still fires when balance hits zero.
+  • **UI copy updated** — DevCtoChatPanel tier badge now reads "FREE TIER · OpenRouter (DeepSeek → Llama → Mistral)"; /developers/connect banner explains the OpenRouter routing strategy.
+  • **18 new pytest cases** in test_iter332b_d11_openrouter_free_tier.py. Retired the 17-test D-10 file (legacy DeepSeek-direct strategy). Coverage: free-tier key reads OPENROUTER_API_KEY, FREE_TIER_MODELS ladder is exactly 3 deep with the correct order, dispatch returns first success without hitting fallback, dispatch falls through to llama on primary failure, dispatch falls through to mistral on both failures, dispatch raises clean error when all three fail, BYOK preference still wins, no Emergent LLM key reference, end-to-end happy path returns provider=deepseek + tier=free + correct token deduction, token wall returns add_byok, BYOK overrides free tier (asserts OpenRouter never called), missing OPENROUTER_API_KEY returns no_llm_configured + add_byok, env file shape (OPENROUTER present, DEEPSEEK/GROQ absent), UI copy reflects new strategy on both pages.
+  • **Full active regression iter 327d → 332b D-11: 712 / 712 GREEN** (was 711; +18 D-11 new − 17 D-10 retired = +1 net; zero regressions).
+  • **Live smoke proven**: `POST /api/developers/cto/chat` with admin JWT → `{ok:true, reply:"Python decorators are functions that modify the behavior of other functions or methods without changing their actual code.", provider:"deepseek", tier:"free", tokens_remaining:9999998, low_balance:false}`. Real OpenRouter → DeepSeek V3 round-trip with sub-second response.
+Blocker: none. **HARD STOP per founder directive.**
+Next:
+  • **Push to GitHub → redeploy aurem.live.** Production is now 10 batches behind (A-3 → D-11).
+  • OPENROUTER_API_KEY must already be set in production secrets (founder confirmed it is). No env changes required on redeploy.
+Cost: ~$0.0001 (a few free-tier OpenRouter test calls + 1 real DeepSeek V3 round-trip; below 1¢)
+Branch: main
+PIDs: []
+Updated: 2026-05-24T17:25:00Z
+---
+
+
+
+---
 Task: iter 332b D-10 — Developer-portal CTO chat + Free tier (DeepSeek + Groq) + Expanded BYOK
 Succeeded:
   • **AUREM CTO chat panel live on /developers/dashboard** — the founder's #1 gap ("I didn't see any window to write prompts or ideas"). Frontend `DevCtoChatPanel.jsx` mounts directly below the metrics tiles, posts to `POST /api/developers/cto/chat`, streams replies into a scrollable message list. Includes auto-grow textarea, Enter-to-send, busy state, error surface, and tier badge ("FREE TIER · DEEPSEEK + GROQ FALLBACK" or "BYOK · provider").

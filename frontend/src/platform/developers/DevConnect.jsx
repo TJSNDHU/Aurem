@@ -85,9 +85,10 @@ export default function DevConnect() {
             Free tier active — start building now
           </div>
           <div style={{ fontSize: 12, color: "var(--dash-text-muted)" }}>
-            We route every chat through DeepSeek V3 with Groq Llama 3.3 as
-            backup. No keys needed. When your 1000 free tokens run low,
-            add your own key below for 98% cheaper rates.
+            We route every chat through OpenRouter — DeepSeek V3 first,
+            with Llama 3.3 70B (free) and Mistral 7B (free) as automatic
+            fallbacks. No keys needed. When your 1000 free tokens run
+            low, add your own key below for unlimited usage.
           </div>
         </div>
         <button data-testid="connect-go-dashboard-btn"

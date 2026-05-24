@@ -49,15 +49,16 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
 
 ## Active regression status
 
-**711 / 711 GREEN** across iter 327d → 332b D-10.
+**712 / 712 GREEN** across iter 327d → 332b D-11.
 
 ## Latest slices
 
 - **D-6**: dev portal admin bypass + DevDashboard crash + smart sign-in + System Overview public wiring.
-- **D-7**: /admin/developer-signups page + real-time Telegram nudge on new signups.
-- **D-8**: 24h sparkline on cockpit Pulse tile + CSV export endpoint.
-- **D-9**: dedicated /developers/login page (Sign-in stopped landing on signup wizard).
-- **D-10**: AUREM CTO chat panel on dev dashboard + DeepSeek primary / Groq fallback free tier (NO Emergent LLM in dev portal) + token-low popup + /developers/connect rebuilt as optional setup with cost-per-1M comparison + expanded BYOK schema (anthropic / openai / deepseek / gemini / groq / mistral / custom).
+- **D-7**: /admin/developer-signups page + real-time Telegram nudge.
+- **D-8**: 24h sparkline on cockpit Pulse tile + CSV export.
+- **D-9**: /developers/login page (Sign-in stopped landing on signup wizard).
+- **D-10**: AUREM CTO chat panel on dev dashboard + token-low popup + /developers/connect rebuilt + expanded BYOK schema.
+- **D-11**: Free tier moved to OpenRouter (one key) with 3-model fallback ladder: DeepSeek V3 → Llama 3.3 70B free → Mistral 7B free.
 
 ## Backlog (P0 → P2)
 

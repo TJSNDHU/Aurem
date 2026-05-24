@@ -118,7 +118,7 @@ export default function DevCtoChatPanel({ onTokensUpdate }) {
                           fontFamily: "'JetBrains Mono', monospace" }}>
               {tier === "byok"
                 ? `BYOK · ${provider || "your key"}`
-                : "FREE TIER · DeepSeek + Groq fallback"}
+                : "FREE TIER · OpenRouter (DeepSeek → Llama → Mistral)"}
             </div>
           </div>
         </div>

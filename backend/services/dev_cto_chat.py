@@ -1,18 +1,19 @@
 """
-Developer-portal CTO chat service — iter 332b D-10
+Developer-portal CTO chat service — iter 332b D-11
 ================================================
 
 Powers the chat box on /developers/dashboard. Strategy per founder
 directive (no Emergent LLM key for free-tier devs):
 
-  FREE TIER (no BYOK):
-    Primary  : DeepSeek V3   (deepseek-chat, $0.27/1M tokens)
-    Fallback : Groq Llama 3.3 70B (free)
+  FREE TIER (no BYOK) — all routed through OpenRouter:
+    1. deepseek/deepseek-chat            (primary,  $0.27/1M)
+    2. meta-llama/llama-3.3-70b-instruct:free  (fallback, free)
+    3. mistralai/mistral-7b-instruct:free      (last resort, free)
+  One key for everything: OPENROUTER_API_KEY.
 
   BYOK USERS:
-    Use whichever provider key they configured. We pick the first
-    available in this order so users with multiple keys get the
-    smartest model first:
+    Use whichever provider key they configured. Picked in this order so
+    users with multiple keys get the smartest model first:
       anthropic > openai > deepseek > gemini > groq > mistral > custom
 
 Every call deducts 1 token via deduct_tokens(...). If the developer's
@@ -28,7 +29,16 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# OpenAI-compatible endpoints + default models
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Free-tier OpenRouter model ladder (primary → fallback → last resort)
+FREE_TIER_MODELS = (
+    ("deepseek/deepseek-chat",                   "deepseek"),
+    ("meta-llama/llama-3.3-70b-instruct:free",   "llama"),
+    ("mistralai/mistral-7b-instruct:free",       "mistral"),
+)
+
+# OpenAI-compatible endpoints + default models for BYOK users
 PROVIDER_ROUTES = {
     "deepseek":  {"url": "https://api.deepseek.com/chat/completions",
                   "model": "deepseek-chat"},
@@ -58,14 +68,10 @@ SYSTEM_PROMPT = (
 )
 
 
-def _free_tier_provider() -> tuple[str, str] | None:
-    """Returns (provider_name, api_key) for free-tier requests, or None
-    if neither DeepSeek nor Groq is configured on the platform."""
-    if k := os.environ.get("DEEPSEEK_API_KEY", "").strip():
-        return ("deepseek", k)
-    if k := os.environ.get("GROQ_API_KEY", "").strip():
-        return ("groq", k)
-    return None
+def _free_tier_key() -> str | None:
+    """Returns OPENROUTER_API_KEY or None if unset."""
+    k = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    return k or None
 
 
 def _pick_byok_provider(byok: dict[str, str]) -> tuple[str, str] | None:
@@ -74,6 +80,26 @@ def _pick_byok_provider(byok: dict[str, str]) -> tuple[str, str] | None:
         if v and isinstance(v, str) and v.strip():
             return (name, v.strip())
     return None
+
+
+async def _call_openrouter(
+    api_key: str, model: str, messages: list[dict[str, str]],
+) -> str:
+    payload = {"model": model, "messages": messages,
+               "max_tokens": 1024, "temperature": 0.4}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type":  "application/json",
+        # OpenRouter encourages these — helps your app appear in their leaderboard
+        "HTTP-Referer":  "https://aurem.live",
+        "X-Title":       "AUREM CTO",
+    }
+    async with httpx.AsyncClient(timeout=45.0) as c:
+        r = await c.post(OPENROUTER_URL, json=payload, headers=headers)
+    if r.status_code >= 400:
+        raise RuntimeError(f"openrouter HTTP {r.status_code}: {r.text[:200]}")
+    j = r.json()
+    return (j.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
 
 
 async def _call_openai_compatible(
@@ -137,8 +163,8 @@ async def _call_gemini(api_key: str, messages: list[dict[str, str]]) -> str:
     return "".join(p.get("text", "") for p in parts).strip()
 
 
-async def _dispatch(provider: str, api_key: str,
-                     messages: list[dict[str, str]]) -> str:
+async def _dispatch_byok(provider: str, api_key: str,
+                          messages: list[dict[str, str]]) -> str:
     if provider == "anthropic":
         return await _call_anthropic(api_key, messages)
     if provider == "gemini":
@@ -149,6 +175,22 @@ async def _dispatch(provider: str, api_key: str,
     return await _call_openai_compatible(
         route["url"], api_key, route["model"], messages,
     )
+
+
+async def _dispatch_free_tier(api_key: str,
+                               messages: list[dict[str, str]]) -> tuple[str, str]:
+    """Walk the FREE_TIER_MODELS ladder, return (reply, label_used).
+    Raises if every model fails."""
+    last_err: Exception | None = None
+    for model, label in FREE_TIER_MODELS:
+        try:
+            reply = await _call_openrouter(api_key, model, messages)
+            return reply, label
+        except Exception as e:
+            logger.warning(f"[cto_chat] free-tier {model} failed: {e}")
+            last_err = e
+            continue
+    raise RuntimeError(f"all free-tier models failed; last error: {last_err}")
 
 
 async def cto_chat(
@@ -168,14 +210,11 @@ async def cto_chat(
             logger.warning(f"[cto_chat] BYOK decrypt failed: {e}")
             byok_plain = {}
 
-    # Choose tier + provider
-    picked = _pick_byok_provider(byok_plain)
-    tier = "byok"
-    if picked is None:
-        picked = _free_tier_provider()
-        tier = "free"
+    # Choose tier
+    picked_byok = _pick_byok_provider(byok_plain)
+    tier = "byok" if picked_byok else "free"
 
-    if picked is None:
+    if tier == "free" and not _free_tier_key():
         return {
             "ok": False,
             "error": "no_llm_configured",
@@ -187,7 +226,6 @@ async def cto_chat(
             ),
             "action_required": "add_byok",
         }
-    provider, api_key = picked
 
     # Token-wall check (1 token per chat reply)
     from services.developer_portal_core import deduct_tokens
@@ -206,38 +244,22 @@ async def cto_chat(
             ),
         }
 
-    # Make the LLM call. On free-tier DeepSeek failure, try Groq fallback.
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
     try:
-        reply = await _dispatch(provider, api_key, full_messages)
-    except Exception as e:
-        logger.warning(f"[cto_chat] {provider} call failed: {e}")
-        if tier == "free" and provider == "deepseek":
-            groq_key = os.environ.get("GROQ_API_KEY", "").strip()
-            if groq_key:
-                try:
-                    reply = await _dispatch("groq", groq_key, full_messages)
-                    provider = "groq"
-                except Exception as e2:
-                    return {
-                        "ok": False, "error": "llm_failed",
-                        "tier": tier,
-                        "message": f"Both DeepSeek and Groq failed: {e2}",
-                    }
-            else:
-                return {
-                    "ok": False, "error": "llm_failed", "tier": tier,
-                    "message": str(e),
-                }
+        if tier == "byok":
+            provider, api_key = picked_byok  # type: ignore[misc]
+            reply = await _dispatch_byok(provider, api_key, full_messages)
         else:
-            return {
-                "ok": False, "error": "llm_failed", "tier": tier,
-                "message": str(e),
-            }
+            api_key = _free_tier_key() or ""
+            reply, provider = await _dispatch_free_tier(api_key, full_messages)
+    except Exception as e:
+        return {
+            "ok": False, "error": "llm_failed", "tier": tier,
+            "message": str(e),
+        }
 
     tokens_remaining = deduct.get("tokens_remaining")
     if tokens_remaining is None:
-        # Refresh from DB if deduct was an internal/no-op
         try:
             from services.developer_portal_core import _get_db
             db = _get_db()
