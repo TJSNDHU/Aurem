@@ -96,8 +96,16 @@ def reindex(force: bool = False) -> dict:
     """(Re)build the FTS5 index from all memory + skill .md files.
 
     Returns counts so the caller can log them.
+
+    iter 332b D-3 (production fix) — auto-create the parent directory
+    when missing so a fresh container without /app/memory pre-mounted
+    doesn't fail with "unable to open database file".
     """
     files = _all_md_files()
+    try:
+        _INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     conn = sqlite3.connect(str(_INDEX_PATH))
     try:
         cur = conn.cursor()
