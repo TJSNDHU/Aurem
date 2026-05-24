@@ -35,9 +35,14 @@ BASE = _resolve_base()
 
 @pytest.mark.asyncio
 async def test_public_system_overview_stats_is_unauthenticated():
-    """No bearer required + only public fields returned."""
-    async with httpx.AsyncClient(timeout=15.0) as c:
-        r = await c.get(f"{BASE}/api/public/system-overview/stats")
+    """No bearer required + only public fields returned. Sync httpx
+    inside a thread — async client hits a middleware quirk in this
+    codebase that returns 204 instead of the real status."""
+    import asyncio as _aio
+    def _call():
+        with httpx.Client(timeout=15.0) as c:
+            return c.get(f"{BASE}/api/public/system-overview/stats")
+    r = await _aio.to_thread(_call)
     assert r.status_code == 200
     body = r.json()
     assert body.get("public") is True
@@ -56,11 +61,11 @@ async def test_public_system_overview_stats_is_unauthenticated():
         )
 
 
-@pytest.mark.asyncio
-async def test_admin_system_overview_still_requires_auth():
-    """The full /api/admin/system-overview/* path must reject anon."""
-    async with httpx.AsyncClient(timeout=15.0) as c:
-        r = await c.get(f"{BASE}/api/admin/system-overview/stats")
+def test_admin_system_overview_still_requires_auth():
+    """The full /api/admin/system-overview/* path must reject anon.
+    Sync httpx — async client returns 204 due to a middleware quirk."""
+    with httpx.Client(timeout=15.0) as c:
+        r = c.get(f"{BASE}/api/admin/system-overview/stats")
     assert r.status_code in (401, 403), (
         f"Admin stats route is unprotected — got HTTP {r.status_code}."
     )

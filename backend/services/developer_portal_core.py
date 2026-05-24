@@ -438,6 +438,27 @@ async def verify_otp(email: str, otp: str) -> dict:
     except Exception as _we:
         logger.debug(f"[developer-portal] welcome email skipped: {_we}")
 
+    # iter 332b D-7 — fire-and-forget founder Telegram nudge so every new
+    # developer signup pings the chat. Dedup by email so retries don't
+    # double-fire. Best-effort: failure never blocks OTP verify.
+    try:
+        import asyncio as _aio
+        from services.telegram_bot_service import send_telegram_alert
+        msg = (
+            "📱 New developer signup\n"
+            f"Email: {account.get('email')}\n"
+            f"Name: {account.get('name') or '—'}\n"
+            f"Plan: {account.get('plan') or 'free'}\n"
+            "View in admin → /admin/developer-signups"
+        )
+        _aio.create_task(send_telegram_alert(
+            message=msg,
+            alert_type="new_dev_signup",
+            fingerprint=account.get("email"),
+        ))
+    except Exception as _te:
+        logger.debug(f"[developer-portal] telegram nudge skipped: {_te}")
+
     # Mint JWT
     token = issue_jwt(account["user_id"], account["email"])
     return {

@@ -30,6 +30,7 @@ import LuxeServicesPreview from './platform/preview/LuxeServicesPreview';
 import Admin2FAEnroll from './platform/Admin2FAEnroll';
 import BoardroomPage from './platform/BoardroomPage';
 import AdminShell from './platform/AdminShell';
+import AdminDeveloperSignups from './platform/AdminDeveloperSignups';
 import UpgradeModal from './components/UpgradeModal';
 import TrialBanner from './components/TrialBanner';
 import MyBilling from './pages/MyBilling';
@@ -430,6 +431,7 @@ function AppRouter() {
         <Route path="/admin/leads-mining" element={<AdminLeadsMining />} />
         <Route path="/admin/daily-log" element={<AdminDailyLog />} />
         <Route path="/admin/sovereignty-score" element={<AdminSovereigntyScore />} />
+        <Route path="/admin/developer-signups" element={<AdminDeveloperSignups />} />
       </Route>
 
       {/* Admin alias redirects (kept outside shell — they Navigate before shell mounts) */}

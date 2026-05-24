@@ -302,9 +302,11 @@ async def share_upload(
 def _ensure_admin(request: Request) -> None:
     try:
         from routers.admin_ora_router import _ensure_admin as _outer
-        return _outer(request)
     except Exception as e:
         raise HTTPException(503, f"admin gate unavailable: {e}")
+    # Let HTTPException (401/403) bubble up untouched — don't mask
+    # auth failures behind a generic 503.
+    return _outer(request)
 
 
 @router.get("/api/admin/developers")
