@@ -215,7 +215,14 @@
   grid-template-columns: 210px 1fr;
   min-height: 100vh;
   min-height: 100dvh;
+  transition: grid-template-columns 200ms ease;
 }
+
+/* iter 332b D-13 — collapsed sidebar variant */
+.av2-shell.av2-shell--collapsed {
+  grid-template-columns: 64px 1fr;
+}
+.av2-shell.av2-shell--collapsed .av2-sidebar { padding: 18px 6px; }
 
 .av2-sidebar {
   background: var(--dash-sidebar);

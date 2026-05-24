@@ -16,6 +16,7 @@ import {
   Home as HomeIcon, Github, Activity, BarChart3, Coins,
   ScrollText, Settings as SettingsIcon, Briefcase, ShieldCheck,
   LogOut, Sun, Moon, BookOpen,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 import "../../styles/dashboard-theme.css";
@@ -368,28 +369,59 @@ function DashboardTopbar({ me, theme, toggleTheme }) {
   );
 }
 
-function DashboardSidebar({ me }) {
+function DashboardSidebar({ me, collapsed, onToggle }) {
   const loc = useLocation();
   return (
-    <aside className="av2-sidebar av2-scroll">
+    <aside className={`av2-sidebar av2-scroll${collapsed ? " av2-sidebar--collapsed" : ""}`}
+           data-testid="dev-sidebar"
+           data-collapsed={collapsed ? "true" : "false"}>
       <div style={{ padding: "0 6px 18px 6px",
                      borderBottom: "1px solid var(--dash-divider)",
-                     marginBottom: 14 }}>
-        <div style={{
-          fontFamily: "'Cinzel', serif",
-          fontSize: 16, fontWeight: 700,
-          letterSpacing: "0.18em",
-          color: "var(--dash-gold-bright)",
-        }}>
-          AUREM
-        </div>
-        <div className="av2-section-label" style={{
-          fontSize: 10, color: "var(--dash-text-faint)",
-          letterSpacing: "0.15em", marginTop: 4,
-          textTransform: "uppercase",
-        }}>
-          Developer Portal
-        </div>
+                     marginBottom: 14,
+                     display: "flex",
+                     alignItems: "center",
+                     justifyContent: collapsed ? "center" : "space-between",
+                     gap: 8 }}>
+        {!collapsed && (
+          <div>
+            <div style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 16, fontWeight: 700,
+              letterSpacing: "0.18em",
+              color: "var(--dash-gold-bright)",
+            }}>
+              AUREM
+            </div>
+            <div className="av2-section-label" style={{
+              fontSize: 10, color: "var(--dash-text-faint)",
+              letterSpacing: "0.15em", marginTop: 4,
+              textTransform: "uppercase",
+            }}>
+              Developer Portal
+            </div>
+          </div>
+        )}
+        {/* iter 332b D-13 — collapse / expand toggle.
+            Persisted to localStorage via the parent. */}
+        <button data-testid="dev-sidebar-toggle"
+                onClick={onToggle}
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                title={collapsed ? "Expand" : "Collapse"}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--dash-divider)",
+                  color: "var(--dash-text-muted)",
+                  width: 28, height: 28, borderRadius: 6,
+                  display: "inline-flex", alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  transition: "color 160ms ease, border-color 160ms ease",
+                }}>
+          {collapsed
+            ? <ChevronRight size={14} />
+            : <ChevronLeft size={14} />}
+        </button>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {DASH_NAV.map(n => {
@@ -399,9 +431,12 @@ function DashboardSidebar({ me }) {
             <Link key={n.to} to={n.to}
                   data-testid={n.testid}
                   className="av2-nav-item"
+                  title={collapsed ? n.label : undefined}
                   style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "9px 10px",
+                    display: "flex", alignItems: "center",
+                    gap: 10,
+                    padding: collapsed ? "10px 0" : "9px 10px",
+                    justifyContent: collapsed ? "center" : "flex-start",
                     borderRadius: 8,
                     color: active
                       ? "var(--dash-orange)"
@@ -417,12 +452,14 @@ function DashboardSidebar({ me }) {
                     transition: "all 160ms ease",
                   }}>
               <Icon size={15} />
-              <span className="av2-nav-label">{n.label}</span>
+              {!collapsed && (
+                <span className="av2-nav-label">{n.label}</span>
+              )}
             </Link>
           );
         })}
       </nav>
-      {me && (
+      {me && !collapsed && (
         <div className="av2-sidebar-footer"
               style={{
                 marginTop: "auto", padding: 12,
@@ -450,11 +487,21 @@ function DashboardShell({ children, requireAuth }) {
   const [theme, setTheme] = useState(
     () => localStorage.getItem("dev_theme") || "dark"
   );
+  // iter 332b D-13 — collapsible sidebar, preference persisted.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("dev_sidebar_collapsed") === "1"
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("dev_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "dev_sidebar_collapsed", sidebarCollapsed ? "1" : "0"
+    );
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (requireAuth && !loading && !me) {
@@ -468,6 +515,7 @@ function DashboardShell({ children, requireAuth }) {
 
   return (
     <div className="aurem-v2-root" data-testid="dev-shell"
+         data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}
          style={{
            // iter 332b D-12 — Roman coin background image injected as a
            // CSS variable so dashboard-theme.css ::before can compose it
@@ -476,8 +524,10 @@ function DashboardShell({ children, requireAuth }) {
            // happy (it was failing to resolve url("/img/...") at build).
            "--dev-bg-image": `url("${process.env.PUBLIC_URL || ""}/img/aurem-dev-bg.png")`,
          }}>
-      <div className="av2-shell">
-        <DashboardSidebar me={me} />
+      <div className={`av2-shell${sidebarCollapsed ? " av2-shell--collapsed" : ""}`}>
+        <DashboardSidebar me={me}
+                          collapsed={sidebarCollapsed}
+                          onToggle={() => setSidebarCollapsed(c => !c)} />
         <div className="av2-main">
           <DashboardTopbar me={me} theme={theme} toggleTheme={toggleTheme} />
           <div className="av2-content">
