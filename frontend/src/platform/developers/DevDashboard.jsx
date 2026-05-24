@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from "react";
 import { Coins, Github, Gauge, Activity } from "lucide-react";
 import DeveloperShell, { devAuthHeaders, useDevMe } from "./DeveloperShell";
+import DevCtoChatPanel from "./DevCtoChatPanel";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -12,6 +13,7 @@ export default function DevDashboard() {
   const { me } = useDevMe();
   const [sessions, setSessions] = useState({ active: [], limit: 2 });
   const [purchases, setPurchases] = useState([]);
+  const [liveTokens, setLiveTokens] = useState(null);
   const [activity] = useState([
     { ts: new Date().toISOString(),
       text: "Account ready. Type your first task in the AUREM CTO chat to begin." },
@@ -30,7 +32,7 @@ export default function DevDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  const remaining = me?.tokens_remaining ?? 0;
+  const remaining = liveTokens ?? me?.tokens_remaining ?? 0;
   const used      = me?.tokens_total_used ?? 0;
   const total     = remaining + used;
   const pct       = total > 0 ? (remaining / total) * 100 : 100;
@@ -62,6 +64,9 @@ export default function DevDashboard() {
                     label="Lifetime usage"
                     value={used.toLocaleString()} />
       </div>
+
+      {/* iter 332b D-10 — AUREM CTO chat panel (the founder's #1 ask) */}
+      <DevCtoChatPanel onTokensUpdate={setLiveTokens} />
 
       {/* Recent purchases strip — iter 331g */}
       {purchases.length > 0 && (

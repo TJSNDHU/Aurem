@@ -219,9 +219,19 @@ async def me(authorization: str = Header(None)) -> dict[str, Any]:
 # ── BYOK ───────────────────────────────────────────────────────────
 
 class ByokBody(BaseModel):
-    anthropic: str = ""
-    deepseek:  str = ""
-    gemini:    str = ""
+    """All keys optional but at least one of the providers must be set.
+    iter 332b D-10 — expanded from {anthropic, deepseek, gemini} to the
+    full set so the dev portal can support OpenAI, Groq, Mistral, and
+    any OpenAI-compatible custom endpoint."""
+    anthropic:        str = ""
+    openai:           str = ""
+    deepseek:         str = ""
+    gemini:           str = ""
+    groq:             str = ""
+    mistral:          str = ""
+    custom_url:       str = ""
+    custom_model:     str = ""
+    custom_api_key:   str = ""
 
 
 @router.post("/api/developers/byok")
@@ -231,6 +241,35 @@ async def byok(body: ByokBody, authorization: str = Header(None)) -> dict[str, A
     r = await save_byok_keys(me["user_id"], body.model_dump())
     if not r.get("ok"):
         raise HTTPException(400, r.get("error") or "byok_failed")
+    return r
+
+
+# ── AUREM CTO chat (iter 332b D-10) ───────────────────────────────
+
+class ChatMsg(BaseModel):
+    role: str
+    content: str
+
+
+class ChatBody(BaseModel):
+    messages: list[ChatMsg]
+
+
+@router.post("/api/developers/cto/chat")
+async def cto_chat(body: ChatBody,
+                    authorization: str = Header(None)) -> dict[str, Any]:
+    """Developer-facing chat. Uses BYOK if configured, otherwise the
+    platform's DeepSeek+Groq free tier. Deducts 1 token per reply."""
+    account = await _current_dev(authorization)
+    from services.dev_cto_chat import cto_chat as _do_chat
+    msgs = [m.model_dump() for m in body.messages]
+    if not msgs or msgs[-1].get("role") != "user":
+        raise HTTPException(400, "last message must be from user")
+    r = await _do_chat(account=account, messages=msgs)
+    if not r.get("ok"):
+        # Map machine codes to a 200 with action_required so the
+        # frontend can render the upgrade modal nicely.
+        return r
     return r
 
 

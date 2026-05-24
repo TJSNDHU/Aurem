@@ -59,6 +59,11 @@ def set_db(database) -> None:
     _db = database
 
 
+def _get_db():
+    """Internal accessor — keeps callers from poking the private global."""
+    return _db
+
+
 # ── Configuration ───────────────────────────────────────────────────
 FREE_TOKEN_GRANT       = int(os.environ.get("ORA_FREE_TOKEN_GRANT", "1000"))
 REFERRED_TOKEN_GRANT   = int(os.environ.get("ORA_REFERRED_TOKEN_GRANT", "1500"))
@@ -621,9 +626,12 @@ async def save_byok_keys(user_id: str, plain_keys: dict) -> dict:
     clean = {k: v for k, v in (plain_keys or {}).items() if v and isinstance(v, str)}
     if not clean:
         return {"ok": False, "error": "at_least_one_key_required"}
-    if not set(clean) & {"anthropic", "deepseek", "gemini"}:
+    # Any one of these providers unlocks BYOK (iter 332b D-10 expansion).
+    accepted = {"anthropic", "openai", "deepseek", "gemini",
+                "groq", "mistral", "custom_api_key"}
+    if not set(clean) & accepted:
         return {"ok": False,
-                "error": "must_include_anthropic_or_deepseek_or_gemini"}
+                "error": "must_include_at_least_one_supported_provider"}
     envelope = encrypt_byok(clean)
     await _db.developer_accounts.update_one(
         {"user_id": user_id},

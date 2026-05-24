@@ -292,12 +292,26 @@ async def test_byok_save_encrypts_and_persists(db, fresh_user):
 
 @pytest.mark.asyncio
 async def test_byok_requires_one_supported_provider(db, fresh_user):
+    """iter 332b D-10 — openai/groq/mistral/custom were added to the
+    accepted set so the dev portal can support every major LLM
+    provider. The only payload that must still be rejected is an
+    empty dict or one with no recognised provider field."""
     from services.developer_portal_core import save_byok_keys, set_db
     set_db(db)
-    r = await save_byok_keys(fresh_user["user_id"],
-                              {"openai": "sk-open-x"})  # wrong provider
+    # Empty dict is the canonical rejection case
+    r = await save_byok_keys(fresh_user["user_id"], {})
     assert r["ok"] is False
-    assert "must_include" in r["error"]
+    assert r["error"] == "at_least_one_key_required"
+    # An unrecognised field must also be rejected
+    r2 = await save_byok_keys(fresh_user["user_id"],
+                               {"fictional_provider": "x"})
+    assert r2["ok"] is False
+    assert "must_include" in r2["error"]
+    # OpenAI is now a first-class supported provider — must succeed
+    r3 = await save_byok_keys(fresh_user["user_id"],
+                               {"openai": "sk-open-x"})
+    assert r3["ok"] is True
+    assert "openai" in r3["providers"]
 
 
 # ═══════════════════════════════════════════════════════════════════

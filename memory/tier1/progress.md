@@ -534,6 +534,38 @@ Updated: 2026-05-24T03:40:00Z
 
 
 ---
+Task: iter 332b D-10 — Developer-portal CTO chat + Free tier (DeepSeek + Groq) + Expanded BYOK
+Succeeded:
+  • **AUREM CTO chat panel live on /developers/dashboard** — the founder's #1 gap ("I didn't see any window to write prompts or ideas"). Frontend `DevCtoChatPanel.jsx` mounts directly below the metrics tiles, posts to `POST /api/developers/cto/chat`, streams replies into a scrollable message list. Includes auto-grow textarea, Enter-to-send, busy state, error surface, and tier badge ("FREE TIER · DEEPSEEK + GROQ FALLBACK" or "BYOK · provider").
+  • **Free tier active immediately on signup, ZERO Emergent LLM dependency.** New `services/dev_cto_chat.py` routes free-tier requests to DeepSeek V3 ($0.27 / 1M tokens) using `DEEPSEEK_API_KEY` env var. If DeepSeek raises (rate limit, outage, missing key), automatic fallback to Groq Llama 3.3 70B via `GROQ_API_KEY`. Hard test guard `test_dev_chat_service_never_imports_emergent_llm` ensures nobody re-introduces the Emergent key into the dev portal.
+  • **BYOK preference order**: anthropic > openai > deepseek > gemini > groq > mistral > custom. If a dev has multiple keys, the smartest model fires first.
+  • **Native multi-provider support**: OpenAI / DeepSeek / Groq / Mistral go through the OpenAI-compatible `/chat/completions` shape; Anthropic uses its native `/v1/messages` endpoint; Gemini uses the native `generateContent` REST API. All implemented in one small dispatcher with provider-specific calls.
+  • **Token-low popup on dashboard chat** — when `tokens_remaining < 100` after a reply, a modal slides in: "Running low — add a DeepSeek key" with two CTAs: "Add my DeepSeek key →" (deep-link to /developers/connect) or "Later" (dismiss, won't re-pop in the same session). Also fires when the backend returns `action_required: add_byok` (token wall).
+  • **Token wall logic returns clean machine codes** — `{ok: false, error: "token_wall", action_required: "add_byok", message: "..."}` for 200 OK so the frontend renders the upgrade modal nicely (no try/catch on 4xx).
+  • **/developers/connect rebuilt as "optional setup"** — big amber free-tier banner up top with a direct "Open chat" CTA; GitHub + VS Code marked "(optional)" explicitly; full BYOK provider table with cost-per-1M-tokens column (DeepSeek $0.27 highlighted as "RECOMMENDED — cheapest, ~GPT-4o quality"; Groq "Free tier"; Gemini $0.35; OpenAI $0.60; Anthropic $1.00; Mistral $0.20); every provider row has a "Get key →" deep link to the right console; "+ Add a custom OpenAI-compatible provider" toggle reveals 3 inputs (endpoint URL, model name, API key) — perfect for Together / Fireworks / Ollama-hosted endpoints.
+  • **BYOK backend schema expansion** — `ByokBody` now accepts `anthropic | openai | deepseek | gemini | groq | mistral | custom_url | custom_model | custom_api_key`. `save_byok_keys` validation widened. 331d's "openai is wrong provider" guard rewritten to assert the new validation (rejects empty / unrecognised fields, accepts openai).
+  • **conftest.py boot-grace fix** — pytest grouped runs were flaking because `os.environ.setdefault("REACT_APP_BACKEND_URL", "http://localhost:8001")` routed admin negative tests through the localhost ingress path, which middleware/health_probe.py answers with 204 during the first 90s of every restart. conftest now reads `/app/frontend/.env` first and only falls through to localhost if no preview URL is configured. Killed the entire 8-test boot-grace flake class.
+  • **17 new pytest cases** (test_iter332b_d10_dev_cto_chat.py). Cover: free-tier prefers DeepSeek, falls back to Groq, returns None when no keys, BYOK preference picks anthropic first, BYOK falls through, empty BYOK handled, NO Emergent LLM in chat path, end-to-end chat happy path with mocked dispatch + token deduction, token wall returns add_byok, BYOK overrides free tier, save_byok accepts openai/groq/mistral, save_byok accepts custom endpoint, save_byok rejects empty, DevDashboard mounts chat panel, chat panel uses correct endpoint + all testids, /developers/connect shows free-tier banner + all 6 providers + custom toggle + cost columns + GitHub/VSCode optional labels, env vars present.
+  • **Full active regression iter 327d → 332b D-10: 711 / 711 GREEN** (was 691 last slice; +20 new cases all green; zero regressions thanks to the conftest fix).
+  • **Live smoke proven**: Backend boots clean. /api/health=200. /api/developers/cto/chat with admin JWT returns a real Groq Llama 3.3 reply ("What's your engineering question or problem you're trying to solve?", provider=groq, tier=free, tokens_remaining=9999999, low_balance=false). Frontend Playwright confirms all 6 chat testids mount on /developers/dashboard + the welcome message renders + the tier badge says "FREE TIER · DEEPSEEK + GROQ FALLBACK".
+  • **Env-var slots shipped** — `DEEPSEEK_API_KEY=""` and `GROQ_API_KEY=""` added to /app/backend/.env. Founder fills these in via the Emergent secrets UI before redeploy. Currently DeepSeek is empty in preview so the fallback path is what actually responds; once the real DeepSeek key lands in production, primary path kicks in automatically.
+Blocker: none. **HARD STOP per founder directive — no more features.**
+Deferred (intentional):
+  • Auto-provision GitHub OAuth on signup (needs an Emergent OAuth app — separate slice).
+  • Auto-provision a free MongoDB sandbox per dev (needs Atlas API key + ~500 LOC).
+  • Real Atlas cluster-move automation, legacy audit backfill, RBAC slice, friendlier 404 for stale ghost-* slugs, service-account Google Calendar.
+Next:
+  • **Push to GitHub → redeploy aurem.live.** Production is now 9 batches behind. Until redeploy: 5 real devs still hit the admin-bypass crash, the dashboard crash, the missing chat panel, and the bouncing Sign-in button.
+  • **Fill DEEPSEEK_API_KEY in production secrets** before redeploy so the primary path is live. Free tier will work either way (Groq fallback) but DeepSeek is the cheaper / smarter daily driver.
+Cost: $0.00 USD (pytest + lint + curl + 1 Playwright screenshot + 1 live LLM round-trip via free-tier Groq, which is genuinely free).
+Branch: main
+PIDs: []
+Updated: 2026-05-24T16:50:00Z
+---
+
+
+
+---
 Task: iter 332b D-7 + D-8 — Admin dev-signups page + 24h sparkline + CSV export (HARD STOP)
 Succeeded:
   • **D-7 — Admin developer-signups page** at /admin/developer-signups. Table of every dev portal signup with email · name · plan · verified ✓ · GitHub handle · tokens remaining · signup date. Filter box + "Copy N emails" clipboard button. Abuse-flagged rows tinted red. Lives inside AdminShell sidebar.
