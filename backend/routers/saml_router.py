@@ -115,21 +115,31 @@ async def delete_config(org_id: str, request: Request) -> dict[str, Any]:
 
 @router.get("/{org_id}/metadata")
 async def sp_metadata(org_id: str) -> Response:
-    """Public — IdP downloads this to configure us as a Service Provider."""
+    """Public — IdP downloads this to configure us as a Service Provider.
+    iter 332b D-2: now embeds our SP X.509 cert so the IdP can verify
+    our signed AuthnRequests."""
     if _db is None:
         raise HTTPException(503, "db_not_ready")
     org = await _db.organizations.find_one(
-        {"org_id": org_id}, {"_id": 0, "slug": 1},
+        {"org_id": org_id}, {"_id": 0, "slug": 1, "org_id": 1},
     )
     if not org:
         raise HTTPException(404, "org_not_found")
+    from services.saml_sp_keys import get_sp_keypair, cert_for_metadata_xml
+    kp = await get_sp_keypair()
+    cert_b64 = cert_for_metadata_xml(kp["cert"])
     site = (os.environ.get("FRONTEND_URL") or "https://aurem.live").rstrip("/")
     xml = f"""<?xml version="1.0"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
                    entityID="{site}/saml/{org['slug']}/metadata">
-  <SPSSODescriptor AuthnRequestsSigned="false"
+  <SPSSODescriptor AuthnRequestsSigned="true"
                     WantAssertionsSigned="true"
                     protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <KeyDescriptor use="signing">
+      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+        <X509Data><X509Certificate>{cert_b64}</X509Certificate></X509Data>
+      </KeyInfo>
+    </KeyDescriptor>
     <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
     <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
                                Location="{site}/api/saml/{org_id}/acs"
@@ -162,18 +172,50 @@ async def discover_endpoint(body: DiscoverBody) -> dict[str, Any]:
 
 
 @router.get("/{org_id}/login")
-async def saml_login_init(org_id: str) -> dict[str, Any]:
-    """STUB — full SP-init AuthnRequest XML generation lands in the
-    next slice once python3-saml or onelogin-saml-py is installed.
-    Today this returns the IdP SSO URL so the UI can do a manual
-    redirect (which is how Google Workspace + Okta tier-1 setups work
-    out of the box)."""
-    from services.saml_sso import get_saml_config
+async def saml_login_init(org_id: str, request: Request) -> dict[str, Any]:
+    """SP-initiated SSO start. iter 332b D-2: builds a properly signed
+    AuthnRequest via python3-saml using our self-generated SP keypair.
+    Returns {ok, redirect_to} where redirect_to is the full IdP URL
+    with the SAMLRequest + RelayState query parameters."""
+    from services.saml_sso import (
+        get_saml_config, build_saml_settings, prepare_fastapi_request,
+    )
+    from services.saml_sp_keys import get_sp_keypair
     cfg = await get_saml_config(org_id)
     if not cfg or cfg.get("status") != "active":
         raise HTTPException(404, "sso_not_configured")
-    return {"ok": True, "redirect_to": cfg["idp_sso_url"],
-             "note": "Manual SP-init (proper signed AuthnRequest will replace this soon)"}
+    if _db is None:
+        raise HTTPException(503, "db_not_ready")
+    org = await _db.organizations.find_one(
+        {"org_id": org_id}, {"_id": 0, "slug": 1, "org_id": 1},
+    )
+    if not org:
+        raise HTTPException(404, "org_not_found")
+    try:
+        from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    except Exception:
+        # Fallback: return the unsigned IdP SSO URL.
+        return {"ok": True, "redirect_to": cfg["idp_sso_url"],
+                 "signed": False,
+                 "note": "python3-saml not available — returning raw IdP URL"}
+
+    kp = await get_sp_keypair()
+    settings = build_saml_settings(org, cfg, sp_cert=kp["cert"], sp_key=kp["key"])
+    req_data = prepare_fastapi_request(request)
+    try:
+        auth = OneLogin_Saml2_Auth(req_data, old_settings=settings)
+        site = (os.environ.get("FRONTEND_URL") or "https://aurem.live").rstrip("/")
+        relay = f"{site}/saml/landing"
+        redirect_to = auth.login(return_to=relay)
+        return {"ok": True, "redirect_to": redirect_to,
+                 "signed": True,
+                 "relay_state": relay}
+    except Exception as e:
+        logger.warning(f"[saml] login_init failed: {e}")
+        # Graceful fallback so a misconfigured IdP doesn't 500 the UI.
+        return {"ok": True, "redirect_to": cfg["idp_sso_url"],
+                 "signed": False,
+                 "note": f"AuthnRequest build failed: {str(e)[:200]}"}
 
 
 @router.post("/{org_id}/acs")

@@ -831,8 +831,10 @@ def register_all_routers(app, db):
                     from routers.saml_router import (
                         router as _saml_router, set_db as _set_saml_db,
                     )
+                    from services.saml_sp_keys import set_db as _set_spkeys_db
                     app.include_router(_saml_router)
                     _set_saml_db(db)
+                    _set_spkeys_db(db)
                     logger.info("[REGISTRY] SAML router wired")
                 except Exception as _saml_e:
                     logger.warning(f"[REGISTRY] saml router failed: {_saml_e}")
@@ -2367,6 +2369,13 @@ def register_all_routers(app, db):
             _install_oh(aurem_scheduler, db)
         except Exception as e:
             logger.warning(f"[REGISTRY] ORA Self-Heal watchdog failed to register: {e}")
+
+        # ── Renewal Nudge — daily 09:00 UTC (iter 332b D-1) ──
+        try:
+            from services.renewal_nudges import install_scheduler as _install_renewal
+            _install_renewal(aurem_scheduler, db)
+        except Exception as e:
+            logger.warning(f"[REGISTRY] Renewal nudge cron failed to register: {e}")
 
         # ── Morning Digest — 7 AM EST daily ──
         try:

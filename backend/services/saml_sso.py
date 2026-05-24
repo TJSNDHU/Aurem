@@ -142,10 +142,17 @@ async def record_saml_login(
 
 # ── python3-saml integration ────────────────────────────────────────
 
-def build_saml_settings(org: dict, cfg: dict) -> dict:
-    """Assemble OneLogin_Saml2_Settings dict from MongoDB rows."""
+def build_saml_settings(org: dict, cfg: dict,
+                          sp_cert: Optional[str] = None,
+                          sp_key:  Optional[str] = None) -> dict:
+    """Assemble OneLogin_Saml2_Settings dict from MongoDB rows.
+
+    iter 332b D-2 — accepts SP cert + private key. When both are passed,
+    the SP can SIGN its own AuthnRequest, which strict IdPs (Azure AD
+    strict mode, Okta "Verify Signature: Required") require.
+    """
     site = _site_base()
-    return {
+    settings = {
         "strict": True,
         "debug":  False,
         "sp": {
@@ -168,15 +175,21 @@ def build_saml_settings(org: dict, cfg: dict) -> dict:
             "x509cert": cfg["idp_cert"],
         },
         "security": {
-            "authnRequestsSigned":   False,
+            "authnRequestsSigned":   bool(sp_cert and sp_key),
             "wantAssertionsSigned":  True,
             "wantNameId":            True,
             "wantMessagesSigned":    False,
             "wantAssertionsEncrypted": False,
             "wantAttributeStatement": True,
             "relaxDestinationValidation": False,
+            "signatureAlgorithm": "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+            "digestAlgorithm":    "http://www.w3.org/2001/04/xmlenc#sha256",
         },
     }
+    if sp_cert and sp_key:
+        settings["sp"]["x509cert"]    = sp_cert
+        settings["sp"]["privateKey"]  = sp_key
+    return settings
 
 
 def prepare_fastapi_request(
@@ -275,7 +288,15 @@ async def parse_acs_response(
     except Exception as e:
         return {"ok": False, "error": "python3_saml_not_installed",
                  "detail": str(e)}
-    settings = build_saml_settings(org, cfg)
+    # iter 332b D-2 — load SP keypair so we can validate
+    # signed-message replies AND so the same Auth instance can be used
+    # by callers that mint AuthnRequests.
+    try:
+        from services.saml_sp_keys import get_sp_keypair
+        kp = await get_sp_keypair()
+        settings = build_saml_settings(org, cfg, sp_cert=kp["cert"], sp_key=kp["key"])
+    except Exception:
+        settings = build_saml_settings(org, cfg)
     req_data = prepare_fastapi_request(request, saml_response, relay_state)
     try:
         auth = OneLogin_Saml2_Auth(req_data, old_settings=settings)
