@@ -15,6 +15,7 @@ export default function EnterpriseDomain() {
   const [verifyResult, setVerifyResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
+  const [copied, setCopied] = useState(false);
 
   async function registerDomain() {
     setBusy(true); setErr(null);
@@ -92,7 +93,29 @@ export default function EnterpriseDomain() {
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: 13, color: "var(--dash-text)",
                     display: "grid", gap: 4,
+                    position: "relative",
                   }}>
+              <button
+                data-testid="domain-cname-copy-btn"
+                onClick={() => {
+                  const cname = `Type: CNAME\nName: ${instructions.domain}\nValue: ${instructions.cname_target}\nTTL: 300`;
+                  navigator.clipboard?.writeText(cname);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                style={{
+                  position: "absolute", top: 8, right: 8,
+                  background: copied ? "var(--dash-green)" : "rgba(255,107,0,0.12)",
+                  color: copied ? "#fff" : "var(--dash-orange)",
+                  border: `1px solid ${copied ? "var(--dash-green)" : "rgba(255,107,0,0.30)"}`,
+                  borderRadius: 4, padding: "3px 9px",
+                  fontSize: 10, letterSpacing: "0.15em",
+                  textTransform: "uppercase", cursor: "pointer",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  transition: "all 160ms ease",
+                }}>
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
               <div><span style={{ color: "var(--dash-text-muted)" }}>Type:  </span> CNAME</div>
               <div><span style={{ color: "var(--dash-text-muted)" }}>Name:  </span> {instructions.domain}</div>
               <div><span style={{ color: "var(--dash-text-muted)" }}>Value: </span> {instructions.cname_target}</div>

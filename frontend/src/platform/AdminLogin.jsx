@@ -74,7 +74,7 @@ const AdminLogin = () => {
           }).catch(() => { /* ignore */ });
           return;
         }
-        if (payload.is_super_admin || payload.role === 'super_admin') {
+        if (payload.is_admin || payload.is_super_admin || payload.role === 'admin' || payload.role === 'super_admin') {
           navigate('/admin/mission-control');
         }
       } catch { /* ignore — corrupt token, show the form */ }

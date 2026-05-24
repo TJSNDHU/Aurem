@@ -893,6 +893,29 @@ async def admin_refresh_revoke_all(request: Request):
     return {"success": True, "revoked": n}
 
 
+@router.post("/admin/logout")
+async def admin_logout(request: Request):
+    """iter 332b A-3 — Idempotent admin logout. Revokes ALL refresh tokens
+    for the bearer-authenticated admin so a background apiClient refresh
+    cannot silently re-mint a session after the founder clicked Logout.
+
+    Fail-soft: if the bearer is missing or invalid, returns ok=true anyway
+    so the client-side cleanup path is never blocked by network gunk."""
+    try:
+        user = await get_current_user(request)
+    except Exception:
+        user = None
+    revoked = 0
+    if user and user.get("id"):
+        try:
+            from services.totp_service import revoke_all_refresh_tokens
+            revoked = await revoke_all_refresh_tokens(get_auth_db(), user["id"])
+        except Exception as e:
+            logging.debug(f"[admin_logout] revoke skipped: {e}")
+    return {"ok": True, "revoked": revoked}
+
+
+
 
 
 @router.get("/me")

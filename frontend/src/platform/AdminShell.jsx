@@ -329,9 +329,21 @@ const AdminShellInner = () => {
     window.dispatchEvent(new CustomEvent('aurem:open-palette'));
   }, []);
 
-  // iter 326o — clear ONLY the admin token. Customer session in the same
-  // browser must survive an admin logout.
-  const logout = () => { clearAdminAuth(); navigate('/admin/login'); };
+  // iter 326o + 332b A-3 — clear ONLY the admin token. Customer session in
+  // the same browser must survive an admin logout. ALSO clear the refresh
+  // cookie via the backend so a background apiClient refresh can't silently
+  // re-mint a session after logout (production-bug-fix #2).
+  const logout = async () => {
+    try {
+      await fetch(`${API}/api/auth/admin/logout`, {
+        method: 'POST', credentials: 'include',
+        headers: { Authorization: `Bearer ${token || ''}` },
+      });
+    } catch { /* network failure must NOT block client-side cleanup */ }
+    try { localStorage.removeItem('aurem_admin_refresh'); } catch { /* ignore */ }
+    clearAdminAuth();
+    navigate('/admin/login', { replace: true });
+  };
 
   const W = collapsed ? COLLAPSED_PX : EXPANDED_PX;
 

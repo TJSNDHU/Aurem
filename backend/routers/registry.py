@@ -814,6 +814,42 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] Enterprise router wired (audit + leads)")
                 except Exception as _er_e:
                     logger.warning(f"[REGISTRY] enterprise router failed: {_er_e}")
+
+                # iter 332b Batch B (Step 1) — Organizations router
+                try:
+                    from routers.organizations_router import (
+                        router as _orgs_router, set_db as _set_orgs_db,
+                    )
+                    app.include_router(_orgs_router)
+                    _set_orgs_db(db)
+                    logger.info("[REGISTRY] Organizations router wired")
+                except Exception as _orgs_e:
+                    logger.warning(f"[REGISTRY] organizations router failed: {_orgs_e}")
+
+                # iter 332b Batch B (Step 2) — SAML SSO router
+                try:
+                    from routers.saml_router import (
+                        router as _saml_router, set_db as _set_saml_db,
+                    )
+                    app.include_router(_saml_router)
+                    _set_saml_db(db)
+                    logger.info("[REGISTRY] SAML router wired")
+                except Exception as _saml_e:
+                    logger.warning(f"[REGISTRY] saml router failed: {_saml_e}")
+
+                # iter 332b Batch B (Step 3) — SCIM router (admin + protocol)
+                try:
+                    from routers.scim_router import (
+                        admin_router as _scim_admin,
+                        protocol_router as _scim_proto,
+                        set_db as _set_scim_db,
+                    )
+                    app.include_router(_scim_admin)
+                    app.include_router(_scim_proto)
+                    _set_scim_db(db)
+                    logger.info("[REGISTRY] SCIM routers wired")
+                except Exception as _scim_e:
+                    logger.warning(f"[REGISTRY] scim router failed: {_scim_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
