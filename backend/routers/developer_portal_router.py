@@ -188,9 +188,16 @@ async def _current_dev(authorization: str | None) -> dict:
             raise HTTPException(403, "account_under_review")
 
     # Fall back to platform admin JWT — auto-bootstrap a dev row.
+    # iter 332b D-6 — the previous import `from utils.auth import _decode_token`
+    # silently failed (no such symbol exists in utils.auth), so the admin
+    # bypass never actually ran. Switched to a direct jwt.decode against
+    # JWT_SECRET / JWT_ALGORITHM so platform admins land on /developers
+    # with their existing admin session.
+    admin_payload: dict | None = None
     try:
-        from utils.auth import _decode_token  # type: ignore
-        admin_payload = _decode_token(token)
+        import jwt as _jwt  # PyJWT
+        from config import JWT_SECRET, JWT_ALGORITHM
+        admin_payload = _jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except Exception:
         admin_payload = None
     if admin_payload and (admin_payload.get("is_admin") or

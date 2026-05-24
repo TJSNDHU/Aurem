@@ -702,6 +702,14 @@ def register_all_routers(app, db):
             app.include_router(mod.router)
             if hasattr(mod, "set_db") and db is not None:
                 mod.set_db(db)
+            # iter 332b D-6 — system_overview_router also exposes a public
+            # router via `get_public_router()` (the /share/system-overview
+            # mirror at /api/public/system-overview/stats). Mount it too.
+            if hasattr(mod, "get_public_router"):
+                try:
+                    app.include_router(mod.get_public_router())
+                except Exception as _pe:
+                    logger.warning(f"[REGISTRY] {label} public router error: {_pe}")
             logger.info(f"[REGISTRY] {label} loaded")
         except ImportError as e:
             logger.warning(f"[REGISTRY] {label} not loaded: {e}")

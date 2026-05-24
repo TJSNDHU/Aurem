@@ -463,6 +463,46 @@ const AuremHomepage = () => {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // iter 332b D-6 — Smart sign-in routing. Click the top-right "Log In"
+  // and we send already-authenticated users straight to the dashboard
+  // that matches their session, instead of bouncing them through the
+  // public login form again. Falls back to /login for fresh visitors.
+  const handleSignIn = (e) => {
+    try {
+      if (typeof window === "undefined") return;
+      const adminTok = localStorage.getItem("platform_token")
+                    || localStorage.getItem("aurem_admin_token");
+      const devTok   = localStorage.getItem("dev_jwt");
+      const custTok  = localStorage.getItem("aurem_customer_token");
+      const isJwtFresh = (tok) => {
+        if (!tok) return false;
+        try {
+          const parts = tok.split(".");
+          if (parts.length < 2) return false;
+          const padded = parts[1] + "=".repeat((-parts[1].length) & 3);
+          const payload = JSON.parse(atob(padded.replace(/-/g, "+").replace(/_/g, "/")));
+          if (!payload.exp) return true;
+          return payload.exp * 1000 > Date.now();
+        } catch { return false; }
+      };
+      if (isJwtFresh(adminTok)) {
+        if (e) e.preventDefault();
+        navigate("/admin/mission-control");
+        return;
+      }
+      if (isJwtFresh(devTok)) {
+        if (e) e.preventDefault();
+        navigate("/developers/dashboard");
+        return;
+      }
+      if (isJwtFresh(custTok)) {
+        if (e) e.preventDefault();
+        navigate("/dashboard");
+        return;
+      }
+    } catch { /* swallow — Link's default href takes over */ }
+  };
+
   const sendChat = async () => {
     const txt = chatInput.trim();
     if (!txt || chatSending) return;
@@ -534,7 +574,7 @@ const AuremHomepage = () => {
           <button onClick={() => scrollTo("pricing")} data-testid="nav-link-pricing">Pricing</button>
         </div>
         <div className="nav-actions">
-          <Link to="/login" className="nav-login" data-testid="nav-link-login" aria-label="Log in to your AUREM account">
+          <Link to="/login" className="nav-login" data-testid="nav-link-login" aria-label="Log in to your AUREM account" onClick={handleSignIn}>
             <span className="nav-login-icon"><User size={16} strokeWidth={1.8} /></span>
             <span className="nav-login-text">Log In</span>
           </Link>

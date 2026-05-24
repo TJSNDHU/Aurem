@@ -500,3 +500,33 @@ Updated: 2026-02-24T12:30:00Z
 ---
 
 
+---
+Task: iter 332b D-6 — Founder bugfix batch (dev portal admin bypass + dashboard crash + smart sign-in + public overview wiring)
+Succeeded:
+  • **Admin → /developers bypass actually works now**. `routers/developer_portal_router.py::_current_dev` was trying `from utils.auth import _decode_token` — a symbol that does NOT exist. The bare `except Exception` swallowed the ImportError silently, so every platform-admin token hitting /api/developers/me got rejected with `invalid_or_expired_token`. Replaced the dead import with a direct `jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])` against the shared config. E2E proven: founder admin JWT now lands on /developers/dashboard with auto-provisioned `internal_admin` row (10M tokens, abuse_flagged=false). Verified via Playwright + curl.
+  • **DevDashboard crash fixed**. `frontend/src/platform/developers/DevDashboard.jsx` referenced `purchases.length` and `purchases.map(...)` without ever declaring the state — every authed dashboard render threw a ReferenceError and the page either blanked or rendered partial. Added `const [purchases, setPurchases] = useState([])` + a useEffect that fetches `/api/developers/me/purchases`. Recent-purchases strip stays hidden (no crash) when array is empty.
+  • **Homepage Sign In is now context-aware**. `AuremHomepage.jsx` `nav-link-login` button kept routing every visitor — including already-signed-in admins/devs — through the public login form. Added `handleSignIn(e)` that inspects platform_token / dev_jwt / aurem_customer_token (with `exp` claim validation), preventDefault's the Link, and routes to /admin/mission-control, /developers/dashboard, or /dashboard respectively. Anonymous visitors keep the default Link to="/login". E2E proven via Playwright: fake admin JWT → /admin/mission-control (24 nav items, ORA Command panel rendered).
+  • **Homepage background already matches aurem.live**. Visual-diff Playwright screenshots of preview vs aurem.live: identical layout, same dark void + grid, same red radial glow, same Cinzel headline, same orange→gold gradient. No code change required — background was already in parity from iter 332b C-3.
+  • **System Overview public mirror actually mounts**. `routers/system_overview_router.py::get_public_router()` was created in iter 332b D-4 but `routers/registry.py` only included `mod.router` (the admin one) — the public `_PUBLIC_ROUTER` exposing `GET /api/public/system-overview/stats` was orphaned and returned 404. Added a `if hasattr(mod, "get_public_router"): app.include_router(mod.get_public_router())` block right after the admin include — generic enough to catch any future router that exposes a public mirror. Live smoke: `{platform: {iteration: "332b", as_of: "MAY 24, 2026", ...}, public: true}`.
+  • **12 new pytest cases** (`test_iter332b_d6_dev_portal_admin_bypass.py` x8 + `test_iter332b_d6_system_overview_public.py` x4). Covers: admin JWT auto-provisions idempotently, garbage/expired/non-admin tokens rejected, regression guard that the broken `_decode_token` import never returns, DevDashboard.jsx declares `purchases` state + calls the right endpoint, homepage handleSignIn checks all 3 storage keys + has /admin/mission-control + /developers/dashboard routes, public stats endpoint requires no auth + leaks no private counters, admin route still 401s on anon, registry source guard, public router prefix guard. All 12 green.
+  • **Active iter 327d→332b regression: 680 / 680 GREEN** (was 676 last slice; +12 new cases all green, zero regressions).
+  • **Backend boots clean** post-restart; /api/health=200, /api/public/system-overview/stats=200, /api/admin/system-overview/stats=401.
+Blocker: none.
+Deferred (intentional — outside the founder's "4 fixes then stop" window):
+  • SAML SP-side AuthnRequest signing — already shipped iter 332b D-2.
+  • Real Atlas cluster-move automation for residency changes.
+  • RBAC complete wiring across ~80 routers (dedicated 2-3 day slice).
+  • Legacy audit-collection backfill.
+  • Service-account Google Calendar for shared staff calendar.
+  • Friendlier 404 for stale ghost-* slugs.
+Next:
+  • Push to GitHub → redeploy aurem.live. Production is now 6 batches (A-3 → D-6) behind. Every redeploy day costs.
+  • Once aurem.live ships D-6, founder can drop their existing admin token straight into /developers and the dashboard will populate. The blank-options bug + the dashboard crash both disappear.
+Cost: $0.00 USD (pytest + lint + curl + 3 Playwright screenshots only; no LLM calls)
+Branch: main
+PIDs: []
+Updated: 2026-05-24T03:40:00Z
+---
+
+
+

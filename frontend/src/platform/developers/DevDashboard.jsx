@@ -11,6 +11,7 @@ const API = process.env.REACT_APP_BACKEND_URL || "";
 export default function DevDashboard() {
   const { me } = useDevMe();
   const [sessions, setSessions] = useState({ active: [], limit: 2 });
+  const [purchases, setPurchases] = useState([]);
   const [activity] = useState([
     { ts: new Date().toISOString(),
       text: "Account ready. Type your first task in the AUREM CTO chat to begin." },
@@ -21,6 +22,10 @@ export default function DevDashboard() {
     fetch(`${API}/api/developers/sessions`, { headers: devAuthHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j && !cancelled) setSessions(j); })
+      .catch(() => {});
+    fetch(`${API}/api/developers/me/purchases`, { headers: devAuthHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j && !cancelled) setPurchases(j.rows || []); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
