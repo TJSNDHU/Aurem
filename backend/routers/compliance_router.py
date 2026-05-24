@@ -189,3 +189,25 @@ async def sla_msa_public() -> dict[str, Any]:
             {"name": "HIPAA",           "status": "BAA-on-request"},
         ],
     }
+
+
+@router.get("/subprocessors")
+async def subprocessors_public() -> dict[str, Any]:
+    """Public — the Trust Center page (/enterprise/security) renders this.
+    Source of truth lives in services/soc2_export.SUBPROCESSORS so the PDF
+    + the website + procurement reviewers always see the same list."""
+    from services.soc2_export import SUBPROCESSORS
+    return {
+        "ok": True,
+        "rows": [
+            {"name": n, "region": r, "purpose": p}
+            for (n, r, p) in SUBPROCESSORS
+        ],
+    }
+
+
+@router.get("/regions")
+async def regions_public() -> dict[str, Any]:
+    """Public — Trust Center shows the data-residency option matrix."""
+    from services.data_residency import REGION_TABLE
+    return {"ok": True, "rows": REGION_TABLE}

@@ -394,3 +394,42 @@ Updated: 2026-02-24T09:00:00Z
 ---
 
 
+
+---
+Task: iter 332b C-2 — Trust Center page + Compliance admin UI + Org Switcher sidebar
+Succeeded:
+  • **Trust Center page** at `/enterprise/security` — public, no auth required. AUREM aesthetic (Cinzel "Trust, in writing." headline, JetBrains Mono eyebrow, orange→gold). Pulls live data from 3 endpoints (`/api/compliance/sla`, `/api/compliance/subprocessors`, `/api/compliance/regions`) and renders 4 sections:
+    - Live status strip — uptime pill + 4 certification pills (PIPEDA, Law 25, SOC 2 in-progress, HIPAA on request)
+    - Pre-built artifacts card — SOC 2 (links to admin sign-in), SLA page (`/enterprise/sla`), MSA template (msa.pdf), DPA (dpa.pdf)
+    - Subprocessor list (7 rows from services/soc2_export.SUBPROCESSORS) — Vendor / Region / Purpose
+    - Data residency options (3 regions) with compliance pills + DEFAULT gold badge on ca
+    - Contact-sales CTA linking to `/enterprise`
+    All 15+ data-testids verified via smoke screenshot (page=1, headline=1, 4 cards present, 7 subprocessor rows, 3 region rows). Procurement teams now have ONE URL to bookmark instead of bouncing between SOC 2 page + SLA page + subprocessor PDF + DPA PDF.
+  • **2 new public endpoints**: `GET /api/compliance/subprocessors` and `GET /api/compliance/regions` — single source of truth for the Trust Center, fed from services/soc2_export.SUBPROCESSORS (one place to edit) + services/data_residency.REGION_TABLE.
+  • **Enterprise Compliance admin page** at `/enterprise/admin/compliance` — fifth pill in EnterpriseAdminShell nav (icon: ShieldCheck). Two responsibilities:
+    - Residency picker: 3-tile grid (CA / US / EU). Click a tile → "Queue migration" button → POSTs to `/api/compliance/{org_id}/residency`. Shows current region + effective-since date. Banner reports the queued ETA ("5–10 business days").
+    - SOC 2 download: date pickers default to last-90-days. Button streams the PDF via fetch+blob (so Authorization header survives), filename `aurem-soc2-{org}-{date}.pdf`.
+    - Org selector dropdown when admin owns >1 orgs. Empty-state banner if admin has 0 orgs.
+    - testids: `compliance-residency-card`, `compliance-soc2-card`, `compliance-region-${code}`, `compliance-residency-save-btn`, `compliance-soc2-download-btn`, `compliance-soc2-start`, `compliance-soc2-end`, `compliance-org-selector`.
+  • **Org Switcher sidebar component** at `/app/frontend/src/platform/OrgSwitcher.jsx` — drops into AdminShell sidebar (above the HUD strip). Lists orgs from `/api/orgs/me`, shows active one + role (caps-letterspaced eyebrow), dropdown with check-mark on selected, POSTs to `/api/orgs/switch` on click. Auto-hides when admin has 0 orgs (silent — no visual noise on single-tenant deployments). testids: `org-switcher`, `org-switcher-btn`, `org-switcher-dropdown`, `org-switcher-row-{org_id}`.
+  • **9 new pytest cases** covering the 2 new endpoints + source-level wiring sanity for all 3 new frontend pieces. All green.
+  • **Full active regression**: 416 / 416 green (was 407, +9 new). Backend boots clean.
+  • Live smoke + screenshot at `/enterprise/security` confirms: Cinzel headline rendered, 5 status pills, 4 artifact rows, 7 subprocessor rows, 3 region rows — all populated from real backend endpoints.
+Blocker: none.
+Production redeploy still pending (everything from iter 332b A-3 onward).
+Deferred:
+  • SAML SP-side AuthnRequest signing.
+  • RBAC complete wiring across ~80 routers.
+  • Real Atlas cluster-move automation for residency changes (currently manual ops).
+  • Enterprise SSO/SCIM settings UI (`/enterprise/admin/sso` page — backend already shipped).
+Next:
+  • Push to GitHub → redeploy aurem.live so Trust Center + auth fix + Batch B + Batch C all ship to production.
+  • Enterprise SSO/SCIM settings UI page (so admins can paste IdP metadata + mint SCIM tokens from the browser instead of curl).
+  • SAML SP-side AuthnRequest signing.
+Cost: $0.00 USD (lint + pytest + 1 screenshot)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T10:30:00Z
+---
+
+

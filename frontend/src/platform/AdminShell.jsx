@@ -33,6 +33,7 @@ import { getPlatformToken, clearAdminAuth } from '../utils/secureTokenStore';
 import { BACKEND_URL } from '../lib/api';
 import { PillarProvider, usePillarHealth } from './PillarHealthContext';
 import PillarGate, { PillarDot } from './PillarGate';
+import OrgSwitcher from './OrgSwitcher';
 
 const API = BACKEND_URL;
 
@@ -463,6 +464,13 @@ const AdminShellInner = () => {
             </div>
           )}
         </div>
+
+        {/* Org switcher — iter 332b C-2. Hidden when admin has 0 orgs. */}
+        {!collapsed && (
+          <div style={{ padding: '10px 14px 0' }}>
+            <OrgSwitcher />
+          </div>
+        )}
 
         {/* HUD strip — only when expanded */}
         {!collapsed && (

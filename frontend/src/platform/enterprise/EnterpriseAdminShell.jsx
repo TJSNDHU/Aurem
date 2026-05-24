@@ -11,10 +11,11 @@ import {
 import DeveloperShell from "../developers/DeveloperShell";
 
 const NAV = [
-  { to: "/enterprise/admin",         label: "Overview", icon: LayoutDashboard, testid: "ent-nav-overview" },
-  { to: "/enterprise/admin/branding", label: "Branding", icon: Palette,        testid: "ent-nav-branding" },
-  { to: "/enterprise/admin/domain",   label: "Domain",   icon: Globe,          testid: "ent-nav-domain" },
-  { to: "/enterprise/admin/keys",     label: "API Keys", icon: KeyRound,       testid: "ent-nav-keys" },
+  { to: "/enterprise/admin",            label: "Overview",   icon: LayoutDashboard, testid: "ent-nav-overview" },
+  { to: "/enterprise/admin/branding",   label: "Branding",   icon: Palette,         testid: "ent-nav-branding" },
+  { to: "/enterprise/admin/domain",     label: "Domain",     icon: Globe,           testid: "ent-nav-domain" },
+  { to: "/enterprise/admin/keys",       label: "API Keys",   icon: KeyRound,        testid: "ent-nav-keys" },
+  { to: "/enterprise/admin/compliance", label: "Compliance", icon: ShieldCheck,     testid: "ent-nav-compliance" },
 ];
 
 export default function EnterpriseAdminShell({ children, eyebrow, title, sub }) {
