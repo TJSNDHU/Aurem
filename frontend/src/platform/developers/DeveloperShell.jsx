@@ -263,7 +263,7 @@ function LandingTopNav() {
         AUREM <em>/ DEVELOPERS</em>
       </Link>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Link to="/developers/signup" className="dev-nav-login"
+        <Link to="/developers/login" className="dev-nav-login"
                data-testid="dev-shell-login-link"
                style={{ textDecoration: "none" }}>
           Sign in

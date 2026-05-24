@@ -176,6 +176,7 @@ import { LegalIndex, LegalDocument } from './platform/LegalPages';
 // iter 331f — Developer Portal (10 pages)
 import DevLanding   from './platform/developers/DevLanding';
 import DevSignup    from './platform/developers/DevSignup';
+import DevLogin     from './platform/developers/DevLogin';
 import DevConnect   from './platform/developers/DevConnect';
 import DevDashboard from './platform/developers/DevDashboard';
 import DevAnalytics from './platform/developers/DevAnalytics';
@@ -323,6 +324,8 @@ function AppRouter() {
       {/* iter 331f — Developer Portal (10 pages) */}
       <Route path="/developers"           element={<DevLanding />} />
       <Route path="/developers/signup"    element={<DevSignup />} />
+      <Route path="/developers/login"     element={<DevLogin />} />
+      <Route path="/developers/signin"    element={<DevLogin />} />
       <Route path="/developers/connect"   element={<DevConnect />} />
       <Route path="/developers/dashboard" element={<DevDashboard />} />
       <Route path="/developers/analytics" element={<DevAnalytics />} />
