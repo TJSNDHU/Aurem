@@ -19,7 +19,7 @@ export default function SystemOverviewPublic() {
         READ-ONLY PUBLIC VIEW · SHARED BY AUREM · APPLY AT
         <a href="/login" style={{ color: '#C9A84C', marginLeft: 8, textDecoration: 'underline' }}>AUREM.LIVE</a>
       </div>
-      <SystemOverview />
+      <SystemOverview publicMode={true} />
     </div>
   );
 }

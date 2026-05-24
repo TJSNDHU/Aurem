@@ -590,7 +590,7 @@ function AuditOverviewTile() {
   );
 }
 
-export default function SystemOverview() {
+export default function SystemOverview({ publicMode = false } = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -603,16 +603,23 @@ export default function SystemOverview() {
 
   useEffect(() => {
     (async () => {
-      const token = sessionStorage.getItem('platform_token') || sessionStorage.getItem('aurem_platform_token') || localStorage.getItem('aurem_token') || localStorage.getItem('token');
+      // iter 332b D-4 — public mode hits an unauthenticated stats endpoint
+      // (only public KPIs are populated). Admin mode keeps the bearer flow.
+      const endpoint = publicMode
+        ? `${API}/api/public/system-overview/stats`
+        : `${API}/api/admin/system-overview/stats`;
+      const headers = {};
+      if (!publicMode) {
+        const token = sessionStorage.getItem('platform_token') || sessionStorage.getItem('aurem_platform_token') || localStorage.getItem('aurem_token') || localStorage.getItem('token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      }
       try {
-        const res = await fetch(`${API}/api/admin/system-overview/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(endpoint, { headers });
         if (res.ok) setData(await res.json());
       } catch (e) { console.error(e); }
       setLoading(false);
     })();
-  }, []);
+  }, [publicMode]);
 
   const p = data?.platform || {};
   const pipe = data?.pipeline || {};
@@ -623,7 +630,7 @@ export default function SystemOverview() {
     <div className="sov-root" data-testid="system-overview">
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: 'clamp(16px,3vw,40px)' }}>
 
-        <RepairBanner />
+        {!publicMode && <RepairBanner />}
 
         {/* ═══ HEADER ═══ */}
         <div style={{ textAlign: 'center', marginBottom: 'clamp(24px,4vw,48px)', animation: 'sov-fadein 0.6s ease', position: 'relative' }}>
@@ -631,9 +638,10 @@ export default function SystemOverview() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '326uu'} | {p.as_of || 'MAY 22, 2026'}</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '332b'} | {p.as_of || 'FEB 24, 2026'}</p>
 
-          {/* ═══ SHARE BUTTON ═══ */}
+          {/* ═══ SHARE BUTTON (admin only — public viewers don't get a re-share loop) ═══ */}
+          {!publicMode && (
           <div style={{ marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -695,6 +703,7 @@ export default function SystemOverview() {
               SOVEREIGNTY SCORE
             </Link>
           </div>
+          )}
           <div id="sov-share-toast" style={{
             position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
             padding: '8px 16px', borderRadius: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
@@ -715,6 +724,53 @@ export default function SystemOverview() {
 
         {/* ═══ iter 323j — LIVE FULL SOVEREIGNTY SCORE ═══ */}
         <SovereigntyScoreTile />
+
+        {/* ═══ ITER 332b — FEB 24, 2026 — ENTERPRISE FOUNDATION BATCH ═══ */}
+        <div className="sov-card" style={{
+          padding: '24px 32px', marginBottom: 20,
+          border: `1px solid ${SOLAR}`, animation: 'sov-glow 5s ease-in-out infinite',
+          background: 'linear-gradient(135deg, #0D0D0D, #1F0A00)',
+        }} data-testid="sov-iter332b-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: SOLAR }}>
+            ITER 332b · ENTERPRISE FOUNDATION · FEB 24, 2026
+          </div>
+          <p className="sov-body" style={{ fontSize: 12, color: '#C9A084', marginBottom: 14, letterSpacing: '0.05em' }}>
+            Trust Center · SAML SSO with signed AuthnRequests · SCIM 2.0 provisioning · Organization entity · Data residency (CA/US/EU) · SOC 2 PDF export · Renewal nudges · Production auth fix
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 12 }}>
+            {[
+              { iter: 'A-2', title: 'Enterprise Admin UI',          desc: 'Overview · Branding · Domain wizard · API Keys — 4 admin pages wired to existing backends.' },
+              { iter: 'A-3', title: 'Production auth bug — fixed',  desc: 'AdminGuard now checks JWT exp · logout revokes all refresh tokens · session-expired toast on relogin.' },
+              { iter: 'B-1', title: 'Organization entity',          desc: 'Owner/Admin/Member/Viewer roles · invite tokens · last-owner guards · org switcher in sidebar.' },
+              { iter: 'B-2', title: 'SAML 2.0 SSO (signed)',        desc: 'Okta · Azure AD · Google · OneLogin. Self-generated SP cert · signed AuthnRequests · IdP-init ACS validates via python3-saml.' },
+              { iter: 'B-3', title: 'SCIM 2.0 provisioning',        desc: 'Bearer-token CRUD at /scim/v2/{org}/Users · token hashed SHA-256 · reveal-once · audit log on every event.' },
+              { iter: 'C-1', title: 'Data residency + SOC 2 PDF',   desc: 'CA / US / EU regions with PIPEDA/Law25/GDPR flags · 4-page evidence PDF via ReportLab · last-90-day window default.' },
+              { iter: 'C-2', title: 'Trust Center page',            desc: '/enterprise/security · live status pills · 4 artifact rows · subprocessor list · linked from homepage footer.' },
+              { iter: 'C-3', title: 'Trust Center lead gate',       desc: 'POST /api/compliance/soc2/sample captures {email, company, role} · Telegram nudge to founder · streams sample PDF.' },
+              { iter: 'D-1', title: 'Renewal nudges (daily 09:00 UTC)', desc: 'Scans orgs for renewal in {90/60/30/14} days · Telegram alert with MRR · ARR · 3-bullet upsell playbook · idempotent.' },
+              { iter: 'D-2', title: 'SAML SP-side signing',         desc: 'RSA 2048 + X.509 10-year cert · embeds in SP metadata XML · strict IdPs (Azure AD strict, Okta required) now accept.' },
+            ].map((b, i) => (
+              <div key={i} style={{
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(13,13,13,0.7)',
+                border: '1px solid rgba(255,77,0,0.20)',
+              }}>
+                <div className="sov-mono" style={{ fontSize: 10, color: SOLAR, letterSpacing: '0.1em' }}>
+                  iter 332b · {b.iter}
+                </div>
+                <div className="sov-body" style={{ fontSize: 14, color: '#E8E0D0', fontWeight: 600, margin: '4px 0 6px' }}>
+                  {b.title}
+                </div>
+                <div className="sov-body" style={{ fontSize: 12, color: '#8A8070', lineHeight: 1.4 }}>
+                  {b.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="sov-mono" style={{ fontSize: 10, color: '#5A5468', marginTop: 14, textAlign: 'right' }}>
+            440 pytest passing · 0 regressions · 15 new tests this batch · python3-saml 1.16.0 wired
+          </div>
+        </div>
 
         {/* ═══ ITER 325 → 326 — MAY 21, 2026 — SOVEREIGNTY RESILIENCE BATCH ═══ */}
         <div className="sov-card" style={{

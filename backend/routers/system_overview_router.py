@@ -262,3 +262,35 @@ async def get_system_overview(authorization: str = Header(None)):
             "security_score": latest_shannon.get("security_score") if latest_shannon else None,
         },
     }
+
+
+# ── iter 332b D-4 ── Public mirror for /share/system-overview ────────
+# Unauthenticated. Returns only the iteration label + as_of date so the
+# header is always current. No private counts.
+
+_PUBLIC_ROUTER = APIRouter(tags=["System Overview (Public)"])
+
+
+@_PUBLIC_ROUTER.get("/api/public/system-overview/stats")
+async def get_public_system_overview() -> dict:
+    """PUBLIC — no auth. Powers /share/system-overview.
+
+    Stamps the page with the live sprint label so prospects always see
+    the current iteration without us touching React on every release.
+    """
+    iter_label, as_of = _current_iteration_and_date()
+    return {
+        "platform": {
+            "iteration": iter_label,
+            "as_of":     as_of,
+            "name":      "AUREM",
+            "owner":     "Polaris Built Inc.",
+            "status":    "operational",
+        },
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "public":       True,
+    }
+
+
+def get_public_router():
+    return _PUBLIC_ROUTER
