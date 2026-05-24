@@ -122,6 +122,47 @@ export default function TrustCenter() {
   const [subs, setSubs] = useState([]);
   const [regions, setRegions] = useState({});
   const [err, setErr]   = useState(null);
+  // Lead-capture modal state
+  const [leadOpen, setLeadOpen]   = useState(false);
+  const [leadBusy, setLeadBusy]   = useState(false);
+  const [leadErr,  setLeadErr]    = useState(null);
+  const [leadDone, setLeadDone]   = useState(false);
+  const [leadForm, setLeadForm]   = useState({ email: "", company: "", role: "" });
+
+  const submitLead = async (e) => {
+    e?.preventDefault?.();
+    setLeadErr(null);
+    if (!leadForm.email || !leadForm.company) {
+      setLeadErr("Email and company are required.");
+      return;
+    }
+    setLeadBusy(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/compliance/soc2/sample`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(leadForm),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.detail || "Could not generate the sample PDF.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "aurem-soc2-sample.pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setLeadDone(true);
+    } catch (ex) {
+      setLeadErr(ex.message || "Something went wrong. Try again.");
+    } finally {
+      setLeadBusy(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -199,13 +240,23 @@ export default function TrustCenter() {
           </div>
           <ArtifactRow
             icon="PDF" title="SOC 2 Type II evidence package"
-            sub="Multi-page report covering CC1 / CC6 / CC7 / CC8 + audit event summary. Customer-scoped — sign in to your org to download yours."
+            sub="Multi-page report covering CC1 / CC6 / CC7 / CC8 + audit event summary. Email it to me and I'll send a sample copy. Customer-scoped reports are available after sign-in."
             testid="trust-artifact-soc2"
             action={
-              <ArtifactCTA href="/enterprise/admin"
-                            data-testid="trust-soc2-download-btn">
-                Sign in →
-              </ArtifactCTA>
+              <button
+                data-testid="trust-soc2-download-btn"
+                onClick={() => { setLeadOpen(true); setLeadDone(false); setLeadErr(null); }}
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 11, letterSpacing: "0.15em",
+                  textTransform: "uppercase", padding: "8px 14px",
+                  background: "transparent",
+                  border: `1px solid ${ORANGE}`, color: ORANGE,
+                  borderRadius: 4, cursor: "pointer",
+                  transition: "all 160ms ease",
+                }}>
+                Get sample →
+              </button>
             }
           />
           <ArtifactRow
@@ -339,6 +390,145 @@ export default function TrustCenter() {
             Talk to sales →
           </Link>
         </div>
+
+        {/* Lead-capture modal — fires on "Get sample" click. */}
+        {leadOpen && (
+          <div
+            data-testid="trust-lead-modal"
+            onClick={(e) => { if (e.target === e.currentTarget) setLeadOpen(false); }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 100,
+              background: "rgba(0,0,0,0.75)",
+              backdropFilter: "blur(8px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 20,
+            }}>
+            <div style={{
+              maxWidth: 460, width: "100%",
+              background: "#0d0d0d",
+              border: `1px solid ${ORANGE}`,
+              borderRadius: 8, padding: 28,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              <Eyebrow>Trust Center / SOC 2 sample</Eyebrow>
+              <div style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: 24, color: "#f6f5f1",
+                margin: "8px 0 14px",
+              }}>
+                Where should I send it?
+              </div>
+              {leadDone ? (
+                <div data-testid="trust-lead-success"
+                      style={{ color: GOLD, fontSize: 13,
+                                lineHeight: 1.7, marginBottom: 18 }}>
+                  PDF downloaded. The real one (with your org's audit
+                  events) lives at <strong>/enterprise/admin/compliance</strong>
+                  once you're signed in. I'll be in touch.
+                </div>
+              ) : (
+                <form onSubmit={submitLead}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "block", fontSize: 10,
+                                     letterSpacing: "0.20em",
+                                     textTransform: "uppercase",
+                                     color: "#888", marginBottom: 6 }}>
+                      Work email
+                    </label>
+                    <input
+                      type="email" required autoFocus
+                      data-testid="trust-lead-email"
+                      value={leadForm.email}
+                      onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                      style={{
+                        width: "100%", padding: "10px 12px",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.10)",
+                        borderRadius: 4, color: "#f6f5f1",
+                        fontFamily: "inherit", fontSize: 13,
+                      }} />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "block", fontSize: 10,
+                                     letterSpacing: "0.20em",
+                                     textTransform: "uppercase",
+                                     color: "#888", marginBottom: 6 }}>
+                      Company
+                    </label>
+                    <input
+                      type="text" required
+                      data-testid="trust-lead-company"
+                      value={leadForm.company}
+                      onChange={(e) => setLeadForm({ ...leadForm, company: e.target.value })}
+                      style={{
+                        width: "100%", padding: "10px 12px",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.10)",
+                        borderRadius: 4, color: "#f6f5f1",
+                        fontFamily: "inherit", fontSize: 13,
+                      }} />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: "block", fontSize: 10,
+                                     letterSpacing: "0.20em",
+                                     textTransform: "uppercase",
+                                     color: "#888", marginBottom: 6 }}>
+                      Your role (optional)
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="trust-lead-role"
+                      value={leadForm.role}
+                      placeholder="e.g. Head of Security"
+                      onChange={(e) => setLeadForm({ ...leadForm, role: e.target.value })}
+                      style={{
+                        width: "100%", padding: "10px 12px",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.10)",
+                        borderRadius: 4, color: "#f6f5f1",
+                        fontFamily: "inherit", fontSize: 13,
+                      }} />
+                  </div>
+                  {leadErr && (
+                    <div data-testid="trust-lead-error"
+                          style={{ color: "#EF4444", fontSize: 11,
+                                    marginBottom: 12 }}>
+                      {leadErr}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={leadBusy}
+                    data-testid="trust-lead-submit-btn"
+                    style={{
+                      width: "100%", padding: "12px",
+                      background: leadBusy ? "#555"
+                        : "linear-gradient(135deg, #FF6B00, #F2C265)",
+                      color: "#0a0a0a", border: "none", borderRadius: 4,
+                      fontFamily: "inherit", fontSize: 12,
+                      letterSpacing: "0.15em", textTransform: "uppercase",
+                      fontWeight: "bold", cursor: leadBusy ? "wait" : "pointer",
+                    }}>
+                    {leadBusy ? "Building PDF…" : "Send me the sample"}
+                  </button>
+                </form>
+              )}
+              <button
+                data-testid="trust-lead-close-btn"
+                onClick={() => setLeadOpen(false)}
+                style={{
+                  marginTop: 14, width: "100%",
+                  padding: "8px", background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  color: "#888", borderRadius: 4, cursor: "pointer",
+                  fontFamily: "inherit", fontSize: 10,
+                  letterSpacing: "0.20em", textTransform: "uppercase",
+                }}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

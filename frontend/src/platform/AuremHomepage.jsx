@@ -1020,6 +1020,8 @@ const AuremHomepage = () => {
             <button onClick={() => scrollTo("scan")} data-testid="footer-link-scan">Free Website Check</button>
             <button onClick={() => scrollTo("pricing")} data-testid="footer-link-pricing">Pricing</button>
             <Link to="/status" data-testid="footer-link-status">System Status</Link>
+            <Link to="/enterprise/security" data-testid="footer-link-trust-center">Trust Center</Link>
+            <Link to="/enterprise/sla" data-testid="footer-link-sla">SLA &amp; MSA</Link>
             <Link to="/privacy" data-testid="footer-link-privacy">Privacy Policy</Link>
             <Link to="/terms" data-testid="footer-link-terms">Terms of Use</Link>
             <Link to="/my" data-testid="footer-link-login">Log In</Link>

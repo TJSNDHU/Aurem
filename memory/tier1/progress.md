@@ -433,3 +433,37 @@ Updated: 2026-02-24T10:30:00Z
 ---
 
 
+
+---
+Task: iter 332b C-3 — Footer link to Trust Center + SSO/SCIM settings UI + SOC 2 lead gate
+Succeeded:
+  • **Footer link** — homepage `<footer>` now has 2 new entries in the links row: "Trust Center" → `/enterprise/security` and "SLA & MSA" → `/enterprise/sla`. testids `footer-link-trust-center` + `footer-link-sla`. Turns Trust Center into a passive lead magnet for SEO-driven security searches without any other change to the marketing site.
+  • **Enterprise SSO & SCIM settings page** at `/enterprise/admin/sso` (5th nav pill, Lock icon). Two stacked cards:
+    - SAML config card: provider dropdown (Okta / Azure AD / Google / OneLogin / generic), IdP entity ID, IdP SSO URL, IdP X.509 PEM textarea, status dropdown (pending / active / disabled), default-role dropdown, save button. Shows a read-only "Paste these into your IdP" box with the auto-derived SP entity ID + ACS URL once saved.
+    - SCIM token card: name input → "Issue token" button → reveal-once banner with Copy button (saves cleartext to clipboard). Table below lists existing tokens with token_preview, scopes, created/last-used dates, and per-row Revoke button (with confirm prompt).
+    - "Test connection" button hits `GET /api/saml/{org_id}/metadata` and reports `✓ SP metadata is reachable` if the XML parses.
+    - Org selector dropdown when admin owns more than one org.
+    - All testids verified: `sso-saml-{card,provider,entity-id,sso-url,cert,status,default-role,save-btn,test-btn,banner}`, `sso-sp-metadata-box`, `sso-scim-{card,name,issue-btn,reveal,copy-btn,list,row-{id},revoke-{id}}`.
+  • **SOC 2 lead-gated sample endpoint** — new public route `POST /api/compliance/soc2/sample`. Prospect submits `{email, company, role?, notes?}`; backend validates email shape, writes to `enterprise_leads` with source=`trust_center_soc2`, fires a Telegram alert to the founder (best-effort), writes a `soc2_sample_lead_captured` row to `unified_audit_log`, then generates and streams a sample PDF (using the auto-upserted `sample_org_trust_center` org so the PDF has the real layout). Returns `X-Aurem-Lead-Id` header so the founder can correlate downloads.
+  • **Trust Center modal** — the SOC 2 row's "Sign in →" button is now "Get sample →" which opens a glass-backdrop modal (`trust-lead-modal`) with email + company + role inputs. Submit → fetches the PDF as a blob → triggers browser download → shows the success banner ("The real one lives at /enterprise/admin/compliance once you're signed in. I'll be in touch.") in gold. ESC / backdrop-click / Close button all dismiss.
+  • **9 new pytest cases** covering footer assertions, lead capture (real Mongo write + PDF magic bytes), invalid-email rejection, modal source wiring, and SSO page testid surface. All green.
+  • **Full active regression**: 425 / 425 (was 416, +9). Backend boots clean.
+  • **Live smoke** — curl `POST /api/compliance/soc2/sample` returned HTTP 200 with a 5490-byte PDF starting with `%PDF` magic bytes; lead row persisted; smoke screenshot of Trust Center still passes with all 15+ data-testids.
+  • Fixed one async-loop footgun: TestClient + Motor share an event-loop bug in this codebase, so the lead-capture test calls the FastAPI route function directly via async invocation instead (same pattern as test_iter332b_enterprise_admin_ui.py).
+Blocker: none.
+Deferred (intentional, separate slices):
+  • SAML SP-side AuthnRequest signing (still unsigned IdP-init flow).
+  • Real Atlas cluster-move automation for residency changes.
+  • RBAC complete wiring across ~80 routers.
+  • Public "subprocessor changelog" RSS feed (so customers can subscribe to vendor-list updates).
+Next:
+  • Push to GitHub → redeploy aurem.live so the footer link, SSO settings page, and lead gate all ship to production. The auth fix from iter 332b A-3 is now 4 batches behind — every redeploy day costs.
+  • SAML SP-side AuthnRequest signing (next SAML hardening).
+  • Backfill historical rows from 5 legacy audit collections into `unified_audit_log`.
+Cost: $0.00 USD (pytest + lint + curl smoke only)
+Branch: main
+PIDs: []
+Updated: 2026-02-24T11:30:00Z
+---
+
+

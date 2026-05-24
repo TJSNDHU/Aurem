@@ -6,7 +6,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Palette, Globe, KeyRound, ShieldCheck,
+  LayoutDashboard, Palette, Globe, KeyRound, ShieldCheck, Lock,
 } from "lucide-react";
 import DeveloperShell from "../developers/DeveloperShell";
 
@@ -15,6 +15,7 @@ const NAV = [
   { to: "/enterprise/admin/branding",   label: "Branding",   icon: Palette,         testid: "ent-nav-branding" },
   { to: "/enterprise/admin/domain",     label: "Domain",     icon: Globe,           testid: "ent-nav-domain" },
   { to: "/enterprise/admin/keys",       label: "API Keys",   icon: KeyRound,        testid: "ent-nav-keys" },
+  { to: "/enterprise/admin/sso",        label: "SSO & SCIM", icon: Lock,            testid: "ent-nav-sso" },
   { to: "/enterprise/admin/compliance", label: "Compliance", icon: ShieldCheck,     testid: "ent-nav-compliance" },
 ];
 

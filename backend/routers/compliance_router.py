@@ -211,3 +211,110 @@ async def regions_public() -> dict[str, Any]:
     """Public — Trust Center shows the data-residency option matrix."""
     from services.data_residency import REGION_TABLE
     return {"ok": True, "rows": REGION_TABLE}
+
+
+# ── Lead-gated SOC 2 sample (PUBLIC, captures email first) ─────────
+
+class Soc2LeadBody(BaseModel):
+    email:   str = Field(..., max_length=160)
+    company: str = Field(..., max_length=160)
+    role:    Optional[str] = Field(default=None, max_length=120)
+    notes:   Optional[str] = Field(default=None, max_length=1000)
+
+
+@router.post("/soc2/sample")
+async def soc2_sample_lead_gated(
+    body: Soc2LeadBody, request: Request,
+) -> StreamingResponse:
+    """Public lead magnet: prospect submits {email, company} and we
+    return a generic SOC 2 evidence PDF (no org_id, last-90-days window
+    against a synthetic 'sample' tenant). Saves a row to enterprise_leads
+    so the founder can follow up. Fires a Telegram alert."""
+    import uuid
+    if _db is None:
+        raise HTTPException(503, "db_not_ready")
+    if "@" not in body.email or "." not in body.email.split("@", 1)[1]:
+        raise HTTPException(400, "invalid_email")
+
+    lead_id = uuid.uuid4().hex
+    lead_row = {
+        "lead_id":    lead_id,
+        "source":     "trust_center_soc2",
+        "email":      body.email.lower().strip(),
+        "company":    body.company.strip()[:160],
+        "role":       (body.role or "").strip()[:120],
+        "notes":      (body.notes or "").strip()[:1000],
+        "ip":         (request.client.host if request.client else None),
+        "user_agent": request.headers.get("user-agent", "")[:300],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status":     "new",
+    }
+    try:
+        await _db.enterprise_leads.insert_one(dict(lead_row))
+    except Exception as e:
+        logger.warning(f"[soc2-lead] insert failed: {e}")
+
+    # Telegram alert (best-effort, non-blocking)
+    try:
+        from services.telegram_bot_service import send_telegram_alert
+        await send_telegram_alert(
+            f"🔔 SOC 2 sample requested\n"
+            f"Company: {lead_row['company']}\n"
+            f"Email:   {lead_row['email']}\n"
+            f"Role:    {lead_row['role'] or '—'}\n"
+            f"Source:  Trust Center (/enterprise/security)",
+        )
+    except Exception as e:
+        logger.debug(f"[soc2-lead] telegram skipped: {e}")
+
+    # Audit
+    try:
+        from services.unified_audit import write_event
+        await write_event(
+            action="soc2_sample_lead_captured",
+            resource=f"lead:{lead_id}", result="ok",
+            user_id=None, org_id=None,
+            source_collection="enterprise_leads",
+            extra={"email":   lead_row["email"],
+                    "company": lead_row["company"]},
+        )
+    except Exception:
+        pass
+
+    # Build the sample PDF — uses an org_id we ensure exists.
+    from services.soc2_export import build_soc2_pdf
+    sample_org_id = "sample_org_trust_center"
+    try:
+        await _db.organizations.update_one(
+            {"org_id": sample_org_id},
+            {"$setOnInsert": {
+                "org_id": sample_org_id,
+                "name":   "AUREM Sample Organization",
+                "slug":   "aurem-sample",
+                "status": "active",
+                "plan":   "enterprise",
+                "data_residency": "ca",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": "trust_center_lead",
+            }},
+            upsert=True,
+        )
+    except Exception:
+        pass
+
+    end_iso   = datetime.now(timezone.utc).isoformat()
+    start_iso = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+    try:
+        pdf = await build_soc2_pdf(sample_org_id, start_iso, end_iso)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="aurem-soc2-sample.pdf"',
+            "Content-Length": str(len(pdf)),
+            "X-Aurem-Lead-Id": lead_id,
+        },
+    )

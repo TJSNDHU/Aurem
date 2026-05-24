@@ -192,6 +192,7 @@ import EnterpriseBranding from './platform/enterprise/EnterpriseBranding';
 import EnterpriseDomain from './platform/enterprise/EnterpriseDomain';
 import EnterpriseApiKeys from './platform/enterprise/EnterpriseApiKeys';
 import EnterpriseCompliance from './platform/enterprise/EnterpriseCompliance';
+import EnterpriseSSO from './platform/enterprise/EnterpriseSSO';
 import SamlAcsLanding from './platform/SamlAcsLanding';
 import EnterpriseSLA from './platform/EnterpriseSLA';
 import TrustCenter from './platform/TrustCenter';
@@ -338,6 +339,7 @@ function AppRouter() {
       <Route path="/enterprise/admin/domain"      element={<EnterpriseDomain />} />
       <Route path="/enterprise/admin/keys"        element={<EnterpriseApiKeys />} />
       <Route path="/enterprise/admin/compliance"  element={<EnterpriseCompliance />} />
+      <Route path="/enterprise/admin/sso"          element={<EnterpriseSSO />} />
       <Route path="/saml/landing"                 element={<SamlAcsLanding />} />
       <Route path="/enterprise/sla"                element={<EnterpriseSLA />} />
       <Route path="/enterprise/security"          element={<TrustCenter />} />
