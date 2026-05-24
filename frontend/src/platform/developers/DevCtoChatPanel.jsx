@@ -50,15 +50,32 @@ export default function DevCtoChatPanel({ onTokensUpdate }) {
     setInput("");
     setBusy(true);
     try {
+      // iter 332b D-14 — trim the rolling history so we never push a
+      // mega-payload that takes 90+ seconds to generate. Keep the last
+      // 6 turns and clip each message at 2000 chars (way more than any
+      // reasonable engineering question needs).
+      const history = next.slice(-6).map(m => ({
+        role: m.role,
+        content: String(m.content || "").slice(0, 2000),
+      }));
       const r = await fetch(`${API}/api/developers/cto/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...devAuthHeaders() },
-        body: JSON.stringify({
-          messages: next.slice(-12).map(m =>
-            ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify({ messages: history }),
       });
-      const j = await r.json();
+      // Cloudflare / nginx sometimes return HTML when the upstream times
+      // out (524) or rate-limits — guard the JSON parse so the user
+      // sees a friendly error instead of "Unexpected token <".
+      const raw = await r.text();
+      let j;
+      try {
+        j = JSON.parse(raw);
+      } catch {
+        const friendly = r.status === 524
+          ? "The free-tier model took too long. Please rephrase your message or try again — usually clears in 30 seconds."
+          : `The server returned an unexpected response (HTTP ${r.status}). Please retry, or simplify your request.`;
+        throw new Error(friendly);
+      }
       if (!r.ok) {
         throw new Error(j.detail || j.message || `HTTP ${r.status}`);
       }

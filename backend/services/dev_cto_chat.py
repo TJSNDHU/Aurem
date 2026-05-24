@@ -31,11 +31,22 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Free-tier OpenRouter model ladder (primary → fallback → last resort)
+# Hard per-model timeout. Cloudflare's edge gives us ~100s upstream.
+# With 3 models in the ladder we keep each attempt under 28s so even a
+# full primary→fallback→last-resort traversal lands inside the budget.
+_OPENROUTER_TIMEOUT_S = 28.0
+
+# Free-tier OpenRouter model ladder (primary → fallback → last resort).
+# We deliberately use the PAID-rate `meta-llama/llama-3.3-70b-instruct`
+# and `mistralai/mistral-7b-instruct` (no `:free` suffix) as the
+# fallback rungs — the `:free` variants queue behind paid traffic and
+# routinely exceed Cloudflare's 100s upstream timeout, returning HTML
+# 524 instead of a clean JSON error. Pennies per million tokens on
+# these paid rungs is worth not breaking the UX.
 FREE_TIER_MODELS = (
-    ("deepseek/deepseek-chat",                   "deepseek"),
-    ("meta-llama/llama-3.3-70b-instruct:free",   "llama"),
-    ("mistralai/mistral-7b-instruct:free",       "mistral"),
+    ("deepseek/deepseek-chat",                  "deepseek"),
+    ("meta-llama/llama-3.3-70b-instruct",       "llama"),
+    ("mistralai/mistral-7b-instruct",           "mistral"),
 )
 
 # OpenAI-compatible endpoints + default models for BYOK users
@@ -90,11 +101,12 @@ async def _call_openrouter(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type":  "application/json",
-        # OpenRouter encourages these — helps your app appear in their leaderboard
         "HTTP-Referer":  "https://aurem.live",
         "X-Title":       "AUREM CTO",
     }
-    async with httpx.AsyncClient(timeout=45.0) as c:
+    # iter 332b D-14 — hard timeout per model so we always fit under
+    # Cloudflare's 100s ceiling and never let it return HTML 524.
+    async with httpx.AsyncClient(timeout=_OPENROUTER_TIMEOUT_S) as c:
         r = await c.post(OPENROUTER_URL, json=payload, headers=headers)
     if r.status_code >= 400:
         raise RuntimeError(f"openrouter HTTP {r.status_code}: {r.text[:200]}")

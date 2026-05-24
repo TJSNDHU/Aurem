@@ -52,14 +52,20 @@ def test_free_tier_key_returns_none_when_unset(monkeypatch):
 
 
 def test_free_tier_model_ladder_is_three_deep():
-    """Founder spec: 1) deepseek-chat → 2) llama-3.3-70b:free →
-    3) mistral-7b:free. Order matters."""
+    """Founder spec: 1) deepseek-chat → 2) llama-3.3-70b → 3) mistral-7b.
+    iter 332b D-14 — we dropped the `:free` suffixes off rungs 2+3
+    because OpenRouter's free variants queue behind paid traffic and
+    routinely exceed Cloudflare's 100s upstream timeout."""
     from services.dev_cto_chat import FREE_TIER_MODELS
     assert len(FREE_TIER_MODELS) == 3
     assert FREE_TIER_MODELS[0][0] == "deepseek/deepseek-chat"
-    assert FREE_TIER_MODELS[1][0] == \
-        "meta-llama/llama-3.3-70b-instruct:free"
-    assert FREE_TIER_MODELS[2][0] == "mistralai/mistral-7b-instruct:free"
+    assert FREE_TIER_MODELS[1][0] == "meta-llama/llama-3.3-70b-instruct"
+    assert FREE_TIER_MODELS[2][0] == "mistralai/mistral-7b-instruct"
+    # Hard guard: no :free suffix anywhere (those rungs hang on Cloudflare).
+    for model, _label in FREE_TIER_MODELS:
+        assert ":free" not in model, (
+            f"Free variant {model!r} queues past Cloudflare timeout — keep paid."
+        )
 
 
 @pytest.mark.asyncio
