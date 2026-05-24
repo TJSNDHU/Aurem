@@ -58,17 +58,21 @@ function StatColumn({ icon: Icon, label, value, color }) {
 
 export default function DeveloperPortalPulseTile() {
   const [data, setData] = useState(null);
+  const [series, setSeries] = useState({ buckets: [], total_24h: 0 });
   const [err, setErr]   = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/api/admin/developers/health`,
-                             { headers: authHeaders() });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      if (j?.ok) {
-        setData(j);
-        setErr(null);
+      const [r1, r2] = await Promise.all([
+        fetch(`${API}/api/admin/developers/health`, { headers: authHeaders() }),
+        fetch(`${API}/api/admin/developers/timeseries`, { headers: authHeaders() }),
+      ]);
+      if (!r1.ok) throw new Error(`HTTP ${r1.status}`);
+      const j = await r1.json();
+      if (j?.ok) { setData(j); setErr(null); }
+      if (r2.ok) {
+        const s = await r2.json();
+        if (s?.ok) setSeries({ buckets: s.buckets || [], total_24h: s.total_24h || 0 });
       }
     } catch (e) {
       setErr(String(e));
@@ -118,6 +122,55 @@ export default function DeveloperPortalPulseTile() {
                     value={(data?.tokens?.remaining_total ?? 0).toLocaleString()} />
         <StatColumn icon={Activity} label="Calls 24h"
                     value={data?.tokens?.calls_today ?? 0} />
+      </div>
+
+      {/* iter 332b D-8 — 24h signups sparkline */}
+      <div data-testid="dev-pulse-signups-24h"
+           style={{ display: "flex", alignItems: "center",
+                    gap: 12, padding: "10px 12px", marginBottom: 10,
+                    background: "rgba(255,179,107,0.06)",
+                    border: "1px solid rgba(255,179,107,0.18)",
+                    borderRadius: 8 }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ color: TEXT_DIM, fontSize: 10,
+                        letterSpacing: 0.4, textTransform: "uppercase" }}>
+            Signups · 24h
+          </div>
+          <div data-testid="dev-pulse-signups-24h-count"
+               style={{ color: AMBER, fontSize: 22, fontWeight: 600 }}>
+            {series.total_24h}
+          </div>
+        </div>
+        <svg data-testid="dev-pulse-signups-sparkline"
+             viewBox="0 0 96 28" width="100%" height="28"
+             preserveAspectRatio="none"
+             style={{ flex: 1, opacity: 0.9 }}>
+          {(() => {
+            const b = series.buckets.length === 24
+                      ? series.buckets : new Array(24).fill(0);
+            const max = Math.max(1, ...b);
+            const pts = b.map((v, i) => {
+              const x = (i / 23) * 96;
+              const y = 26 - (v / max) * 24;
+              return `${x.toFixed(1)},${y.toFixed(1)}`;
+            }).join(" ");
+            return (
+              <>
+                <polyline points={pts} fill="none"
+                          stroke={AMBER} strokeWidth="1.2" />
+                <polygon points={`0,28 ${pts} 96,28`}
+                         fill="rgba(255,179,107,0.12)" />
+              </>
+            );
+          })()}
+        </svg>
+        <a data-testid="dev-pulse-view-all"
+           href="/admin/developer-signups"
+           style={{ flexShrink: 0, color: AMBER, fontSize: 11,
+                    textDecoration: "none", letterSpacing: 0.4,
+                    textTransform: "uppercase" }}>
+          View all →
+        </a>
       </div>
 
       <div style={{ display: "grid", gap: 8 }}>

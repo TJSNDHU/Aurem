@@ -57,6 +57,27 @@ export default function AdminDeveloperSignups() {
     } catch { /* clipboard unavailable */ }
   };
 
+  // iter 332b D-8 — CSV export. Streams the full file (not just the
+  // filtered subset) so the admin always gets the complete cohort.
+  const downloadCsv = async () => {
+    try {
+      const r = await fetch(`${ENT_API}/api/admin/developers/export.csv`,
+                            { headers: adminHeaders() });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aurem-developer-signups-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  };
+
   return (
     <div data-testid="admin-dev-signups-page"
          style={{ padding: "32px 40px", color: "#F0EDE8",
@@ -109,6 +130,17 @@ export default function AdminDeveloperSignups() {
                          cursor: "pointer", fontFamily: "inherit" }}>
           {copied ? "Copied to clipboard ✓"
                   : `Copy ${visible.length} email${visible.length === 1 ? "" : "s"}`}
+        </button>
+        <button data-testid="admin-dev-export-csv"
+                onClick={downloadCsv}
+                style={{ background: "transparent",
+                         color: "#E8C86A",
+                         padding: "9px 18px",
+                         border: "1px solid rgba(232,200,106,0.45)",
+                         borderRadius: 4, fontSize: 12,
+                         letterSpacing: "0.05em",
+                         cursor: "pointer", fontFamily: "inherit" }}>
+          Export CSV
         </button>
       </div>
 

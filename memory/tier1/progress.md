@@ -530,3 +530,26 @@ Updated: 2026-05-24T03:40:00Z
 
 
 
+
+
+
+---
+Task: iter 332b D-7 + D-8 — Admin dev-signups page + 24h sparkline + CSV export (HARD STOP)
+Succeeded:
+  • **D-7 — Admin developer-signups page** at /admin/developer-signups. Table of every dev portal signup with email · name · plan · verified ✓ · GitHub handle · tokens remaining · signup date. Filter box + "Copy N emails" clipboard button. Abuse-flagged rows tinted red. Lives inside AdminShell sidebar.
+  • **D-7 — Real-time founder Telegram nudge** on every successful OTP verify. Fires send_telegram_alert(alert_type="new_dev_signup", fingerprint=email) with email, name, plan, deep link back to admin page. Fire-and-forget. Dedup by email.
+  • **D-7 side-fix** — `_ensure_admin` was catching ALL exceptions including HTTPException(401) and re-raising as 503. Now lets 401/403 bubble correctly.
+  • **D-8 — 24h sparkline on cockpit Pulse tile** + new GET /api/admin/developers/timeseries returning 24 hourly buckets + total_24h. Inline SVG sparkline rendered in DeveloperPortalPulseTile with amber fill, 24h count column, and "View all →" deep link.
+  • **D-8 — CSV export** via new GET /api/admin/developers/export.csv. Streams text/csv with attachment headers + date-stamped filename. Same projection as list endpoint so secrets never leak.
+  • **11 new pytest cases** (D-7 x5 + D-8 x6). All green. Full active regression iter 327d → 332b D-8: **691 / 691 GREEN** (was 680; +11; zero regressions).
+  • **Sneaky middleware quirk documented** — middleware/health_probe.py returns 204 to all /api/admin/* requests from localhost during the first 90s of boot grace. Tests bypass via httpx.Client thread call against external preview URL.
+Blocker: none. **HARD STOP per founder directive — no more feature work.**
+Deferred (intentional):
+  • Real Atlas cluster-move automation, legacy audit backfill, RBAC slice across ~80 routers, SP cert rotation playbook, public subprocessor-changelog RSS feed, friendlier 404 for stale ghost-* slugs, service-account Google Calendar, ConsentToggleCard cleanup, SCIM PATCH + Groups.
+Next:
+  • **Push to GitHub → redeploy aurem.live.** Production is 8 batches behind (A-3 → D-8).
+Cost: $0.00 USD (pytest + lint + curl + 2 Playwright screenshots; no LLM)
+Branch: main
+PIDs: []
+Updated: 2026-05-24T04:12:00Z
+---

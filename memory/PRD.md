@@ -49,7 +49,13 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
 
 ## Active regression status
 
-**680 / 680 GREEN** across iter 327d → 332b D-6.
+**691 / 691 GREEN** across iter 327d → 332b D-8.
+
+## Latest slices
+
+- **D-6**: dev portal admin bypass + DevDashboard crash + smart sign-in + System Overview public wiring.
+- **D-7**: /admin/developer-signups page + real-time Telegram nudge on new signups + `_ensure_admin` 401→503 leak fix.
+- **D-8**: 24h sparkline on cockpit Pulse tile + CSV export endpoint + button on signups page.
 
 ## Backlog (P0 → P2)
 

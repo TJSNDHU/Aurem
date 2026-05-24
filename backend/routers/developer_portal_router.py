@@ -27,7 +27,7 @@ import hmac
 import logging
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Header
@@ -327,6 +327,78 @@ async def admin_developers_list(
     flagged = await _db.developer_accounts.count_documents({"abuse_flagged": True})
     total = await _db.developer_accounts.estimated_document_count()
     return {"ok": True, "total": total, "flagged": flagged, "rows": rows}
+
+
+# iter 332b D-8 — 24h sparkline + CSV export.
+
+@router.get("/api/admin/developers/timeseries")
+async def admin_developers_timeseries(request: Request) -> dict[str, Any]:
+    """24 hourly buckets of new dev signups (oldest first)."""
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(hours=24)).isoformat()
+    cursor = _db.developer_accounts.find(
+        {"created_at": {"$gte": cutoff}},
+        {"_id": 0, "created_at": 1},
+    )
+    buckets = [0] * 24
+    total_24h = 0
+    async for d in cursor:
+        ts = d.get("created_at") or ""
+        try:
+            t = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=timezone.utc)
+            hours_ago = int((now - t).total_seconds() // 3600)
+            if 0 <= hours_ago < 24:
+                buckets[23 - hours_ago] += 1
+                total_24h += 1
+        except Exception:
+            continue
+    return {"ok": True, "buckets": buckets, "total_24h": total_24h,
+            "generated_at": now.isoformat()}
+
+
+@router.get("/api/admin/developers/export.csv")
+async def admin_developers_export_csv(request: Request):
+    """Stream every signup as CSV. Same projection as the list endpoint
+    so secrets never leak."""
+    _ensure_admin(request)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    cursor = _db.developer_accounts.find(
+        {},
+        {"_id": 0, "email": 1, "name": 1, "plan": 1,
+         "email_verified": 1, "github_username": 1,
+         "tokens_remaining": 1, "tokens_total_used": 1,
+         "abuse_flagged": 1, "created_at": 1},
+        sort=[("created_at", -1)],
+    )
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["email", "name", "plan", "verified", "github",
+                "tokens_remaining", "tokens_used", "abuse_flagged",
+                "signed_up"])
+    async for r in cursor:
+        w.writerow([
+            r.get("email", ""), r.get("name", ""), r.get("plan", ""),
+            "yes" if r.get("email_verified") else "no",
+            r.get("github_username", ""),
+            r.get("tokens_remaining", 0), r.get("tokens_total_used", 0),
+            "yes" if r.get("abuse_flagged") else "no",
+            (r.get("created_at") or "")[:10],
+        ])
+    buf.seek(0)
+    fname = f"aurem-developer-signups-{datetime.now(timezone.utc).date()}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @router.get("/api/admin/shares")
