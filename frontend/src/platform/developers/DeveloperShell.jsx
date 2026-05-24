@@ -467,7 +467,15 @@ function DashboardShell({ children, requireAuth }) {
   }
 
   return (
-    <div className="aurem-v2-root" data-testid="dev-shell">
+    <div className="aurem-v2-root" data-testid="dev-shell"
+         style={{
+           // iter 332b D-12 — Roman coin background image injected as a
+           // CSS variable so dashboard-theme.css ::before can compose it
+           // with the dark overlay. Public folder assets are served from
+           // PUBLIC_URL at runtime, which keeps webpack's CSS-loader
+           // happy (it was failing to resolve url("/img/...") at build).
+           "--dev-bg-image": `url("${process.env.PUBLIC_URL || ""}/img/aurem-dev-bg.png")`,
+         }}>
       <div className="av2-shell">
         <DashboardSidebar me={me} />
         <div className="av2-main">

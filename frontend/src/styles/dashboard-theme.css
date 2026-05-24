@@ -103,6 +103,27 @@
   width: 100%;
   margin: 0;
   padding: 0;
+  position: relative;
+  isolation: isolate;     /* keeps the ::before bg behind everything */
+}
+
+/* iter 332b D-12 — dev portal "Roman coin" background image.
+   The image URL is injected via inline style from DeveloperShell.jsx
+   (CSS-loader was rejecting /public/* asset URLs at build time).
+   This rule only sets the dark overlay; the image itself lives in
+   the .aurem-v2-root inline style.                                */
+.aurem-v2-root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg,
+       rgba(5, 5, 8, 0.86) 0%,
+       rgba(5, 5, 8, 0.92) 50%,
+       rgba(5, 5, 8, 0.96) 100%),
+    var(--dev-bg-image, none) center/cover no-repeat fixed;
+  pointer-events: none;
 }
 
 .aurem-v2-root * { box-sizing: border-box; }
@@ -198,6 +219,10 @@
 
 .av2-sidebar {
   background: var(--dash-sidebar);
+  background: linear-gradient(180deg,
+              rgba(10, 10, 15, 0.92),
+              rgba(10, 10, 15, 0.86));
+  backdrop-filter: blur(14px);
   border-right: 1px solid var(--dash-border);
   display: flex;
   flex-direction: column;
