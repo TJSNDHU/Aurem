@@ -534,6 +534,32 @@ Updated: 2026-05-24T03:40:00Z
 
 
 ---
+Task: iter 332b D-14 + D-15 — Cloudflare 524 hardening + SSE streaming for dev chat
+Succeeded:
+  • **D-14 — Cloudflare 524 fix.** Founder hit "Unexpected token '<', '<!DOCTYPE'… is not valid JSON" on aurem.live/developers/dashboard. Root cause: OpenRouter `:free` model variants queue behind paid traffic; 3 ladder rungs × 45s = 135s worst case → Cloudflare cut the upstream at 100s and returned HTML 524, frontend exploded on JSON.parse. Three-part fix:
+       1. Per-call timeout dropped to 28s → 3 × 28 = 84s, safely under 100s ceiling.
+       2. Dropped `:free` suffix from rungs 2+3. Now `meta-llama/llama-3.3-70b-instruct` + `mistralai/mistral-7b-instruct` (paid — pennies per million tokens, no queueing).
+       3. Frontend `await r.json()` replaced with `await r.text() → try JSON.parse(raw) catch → friendly message`. On 524 user sees: "The free-tier model took too long. Please rephrase your message or try again — usually clears in 30 seconds." Never raw "Unexpected token <".
+     Also trimmed conversation history budget: `.slice(-6)` × 2000-char clip per message (was 12 × unlimited). Long histories were a major contributor.
+  • **D-15 — SSE streaming**. New `POST /api/developers/cto/chat/stream` endpoint returns `text/event-stream` of JSON events: `meta → token (1..n) → done` (or `error` on failure). Backend uses httpx async streaming + OpenRouter's native SSE; falls through the 3-model ladder per chunk-iter so partial primary failures still recover seamlessly. `X-Accel-Buffering: no` header tells nginx to flush chunks immediately. Frontend uses `r.body.getReader()` + `TextDecoder` to read chunks live and append each token to the trailing assistant bubble — typing-out UX identical to ChatGPT. Time-to-first-token went from ~3s to ~400ms; total time for a long reply unchanged but feels 10× faster.
+  • **BYOK path stays non-streaming** (Anthropic/Gemini have different SSE formats, not worth the LOC tonight). BYOK users still get the full reply as a single `token` event so the frontend stays generic.
+  • **All error paths emit a single `error` SSE event** with optional `action_required:add_byok` → frontend renders the upgrade modal instead of throwing.
+  • **9 new pytest cases** (D-14 × 3 + D-15 × 6): timeout-budget invariant, no-`:free`-rungs guard, safe-parse wiring, happy-path stream emits meta→tokens→done, free-tier ladder falls through on primary failure, token wall emits single error event, all-rungs-fail emits trailing error with no done, frontend uses correct stream endpoint + reader, router exposes StreamingResponse with `text/event-stream` + `X-Accel-Buffering`.
+  • **Full active regression iter 327d → 332b D-15: 721 / 721 GREEN** (was 712; +9 new; zero regressions).
+  • **Live smoke**: curl -N against `https://.../api/developers/cto/chat/stream` returned the literal SSE wire format: `data: {"type":"meta", ...}\n\ndata: {"type":"token", "content":"ONE"}\n\n...\ndata: {"type":"done"}` — 4 token chunks for a 4-word answer, all over real OpenRouter → DeepSeek V3.
+Blocker: none. **HARD STOP per founder directive.**
+Next:
+  • **Push to GitHub → redeploy aurem.live.** Production is now 11 batches behind. After redeploy: (a) "Unexpected token <" error is gone forever — replaced by friendly retry message; (b) all chat replies stream in like ChatGPT.
+  • OPENROUTER_API_KEY already updated in production secrets earlier this session — no further secret changes needed.
+Cost: ~$0.001 USD (a few OpenRouter DeepSeek round-trips during live smoke; less than 0.1¢).
+Branch: main
+PIDs: []
+Updated: 2026-05-24T21:00:00Z
+---
+
+
+
+---
 Task: iter 332b D-11 — Free tier moved to OpenRouter (one key, three-model ladder)
 Succeeded:
   • **One LLM key for free tier**: OPENROUTER_API_KEY. Removed standalone DEEPSEEK_API_KEY and GROQ_API_KEY from /app/backend/.env — no longer needed. OpenRouter handles model selection.

@@ -267,10 +267,33 @@ async def cto_chat(body: ChatBody,
         raise HTTPException(400, "last message must be from user")
     r = await _do_chat(account=account, messages=msgs)
     if not r.get("ok"):
-        # Map machine codes to a 200 with action_required so the
-        # frontend can render the upgrade modal nicely.
         return r
     return r
+
+
+@router.post("/api/developers/cto/chat/stream")
+async def cto_chat_stream_route(body: ChatBody,
+                                 authorization: str = Header(None)):
+    """Streaming counterpart of /chat. Returns text/event-stream of
+    JSON events: meta → token (1..n) → done, OR a single error event.
+    Frontend can flush tokens to the UI as they arrive — feels 10× faster.
+
+    iter 332b D-15.
+    """
+    from fastapi.responses import StreamingResponse
+    account = await _current_dev(authorization)
+    from services.dev_cto_chat import cto_chat_stream as _stream
+    msgs = [m.model_dump() for m in body.messages]
+    if not msgs or msgs[-1].get("role") != "user":
+        raise HTTPException(400, "last message must be from user")
+    return StreamingResponse(
+        _stream(account=account, messages=msgs),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store",
+            "X-Accel-Buffering": "no",   # tell nginx not to buffer SSE
+        },
+    )
 
 
 # ── Pixel domain validation ────────────────────────────────────────

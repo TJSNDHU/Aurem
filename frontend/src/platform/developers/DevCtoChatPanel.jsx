@@ -51,54 +51,102 @@ export default function DevCtoChatPanel({ onTokensUpdate }) {
     setBusy(true);
     try {
       // iter 332b D-14 — trim the rolling history so we never push a
-      // mega-payload that takes 90+ seconds to generate. Keep the last
-      // 6 turns and clip each message at 2000 chars (way more than any
-      // reasonable engineering question needs).
+      // mega-payload that takes 90+ seconds to generate.
       const history = next.slice(-6).map(m => ({
         role: m.role,
         content: String(m.content || "").slice(0, 2000),
       }));
-      const r = await fetch(`${API}/api/developers/cto/chat`, {
+      // iter 332b D-15 — streaming. POST to /chat/stream, read SSE
+      // chunks as they arrive, append text deltas to the trailing
+      // assistant bubble. Feels 10× faster.
+      const r = await fetch(`${API}/api/developers/cto/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...devAuthHeaders() },
         body: JSON.stringify({ messages: history }),
       });
-      // Cloudflare / nginx sometimes return HTML when the upstream times
-      // out (524) or rate-limits — guard the JSON parse so the user
-      // sees a friendly error instead of "Unexpected token <".
-      const raw = await r.text();
-      let j;
-      try {
-        j = JSON.parse(raw);
-      } catch {
+      if (!r.ok) {
+        // Server-side rejection (auth, validation). Read once + show friendly text.
+        const raw = await r.text();
         const friendly = r.status === 524
-          ? "The free-tier model took too long. Please rephrase your message or try again — usually clears in 30 seconds."
-          : `The server returned an unexpected response (HTTP ${r.status}). Please retry, or simplify your request.`;
+          ? "The free-tier model took too long. Please rephrase or try again."
+          : (() => { try { return JSON.parse(raw).detail || JSON.parse(raw).message; }
+                    catch { return `HTTP ${r.status}`; } })();
         throw new Error(friendly);
       }
-      if (!r.ok) {
-        throw new Error(j.detail || j.message || `HTTP ${r.status}`);
-      }
-      if (!j.ok && j.action_required === "add_byok") {
-        setMessages(m => [...m, {
-          role: "assistant",
-          content: j.message ||
-            "You're out of free tokens. Add your own API key to keep going.",
-          warning: true,
-        }]);
-        setShowLowModal(true);
-      } else if (!j.ok) {
-        throw new Error(j.message || j.error || "chat_failed");
-      } else {
-        setMessages(m => [...m, { role: "assistant", content: j.reply }]);
-        setTier(j.tier || "free");
-        setProvider(j.provider || "");
-        if (typeof j.tokens_remaining === "number") {
-          onTokensUpdate?.(j.tokens_remaining);
-          if (j.low_balance && !dismissed) setShowLowModal(true);
+      // Append an empty assistant bubble we'll fill as tokens arrive
+      setMessages(m => [...m, { role: "assistant", content: "" }]);
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let receivedAny = false;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // SSE events split by blank-line
+        let idx;
+        while ((idx = buffer.indexOf("\n\n")) >= 0) {
+          const chunk = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          if (!chunk.startsWith("data:")) continue;
+          let evt;
+          try { evt = JSON.parse(chunk.slice(5).trim()); }
+          catch { continue; }
+          if (evt.type === "meta") {
+            setTier(evt.tier || "free");
+            setProvider(evt.provider || "");
+          } else if (evt.type === "token") {
+            receivedAny = true;
+            setMessages(m => {
+              const copy = m.slice();
+              const last = copy[copy.length - 1];
+              if (last && last.role === "assistant") {
+                copy[copy.length - 1] = {
+                  ...last,
+                  content: (last.content || "") + (evt.content || ""),
+                };
+              }
+              return copy;
+            });
+          } else if (evt.type === "done") {
+            if (typeof evt.tokens_remaining === "number") {
+              onTokensUpdate?.(evt.tokens_remaining);
+              if (evt.low_balance && !dismissed) setShowLowModal(true);
+            }
+          } else if (evt.type === "error") {
+            if (evt.action_required === "add_byok") {
+              setMessages(m => {
+                const copy = m.slice();
+                // Replace the (probably-empty) trailing assistant bubble
+                if (copy.length && copy[copy.length - 1].role === "assistant"
+                    && !copy[copy.length - 1].content) {
+                  copy.pop();
+                }
+                copy.push({
+                  role: "assistant", warning: true,
+                  content: evt.message ||
+                    "You're out of free tokens. Add your own API key to keep going.",
+                });
+                return copy;
+              });
+              setShowLowModal(true);
+            } else {
+              throw new Error(evt.message || evt.error || "chat_failed");
+            }
+            return;
+          }
         }
       }
+      if (!receivedAny) throw new Error("No response received. Please try again.");
     } catch (e) {
+      // Roll back the empty bubble we appended if it's still blank
+      setMessages(m => {
+        if (m.length && m[m.length - 1].role === "assistant"
+            && !m[m.length - 1].content) {
+          return m.slice(0, -1);
+        }
+        return m;
+      });
       setError(String(e.message || e));
     } finally {
       setBusy(false);

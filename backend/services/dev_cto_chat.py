@@ -291,3 +291,155 @@ async def cto_chat(
         "tokens_remaining": int(tokens_remaining or 0),
         "low_balance": int(tokens_remaining or 0) < 100,
     }
+
+
+# ───────────────────────── Streaming (iter 332b D-15) ────────────────
+#
+# Server-Sent Events stream. Each line over the wire is JSON, terminated
+# by "\n\n" so browser EventSource / fetch-stream readers can parse.
+#   {"type":"meta","tier":"free","provider":"deepseek","tokens_remaining":499}
+#   {"type":"token","content":"Python "}
+#   {"type":"token","content":"decorators "}
+#   ...
+#   {"type":"done"}
+# On error:
+#   {"type":"error","message":"...","action_required":"add_byok"}
+#
+# All upstream JSON parsing failures surface as a single "error" event so
+# the frontend never sees raw HTML or partial JSON.
+
+import json as _json
+
+
+async def _stream_openrouter(api_key: str, model: str,
+                              messages: list[dict[str, str]]):
+    """Async-iter over OpenRouter SSE chunks for one model. Yields
+    plain text deltas. Raises on HTTP error so the caller can fall
+    through to the next rung on the free-tier ladder."""
+    payload = {"model": model, "messages": messages,
+               "max_tokens": 1024, "temperature": 0.4, "stream": True}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type":  "application/json",
+        "HTTP-Referer":  "https://aurem.live",
+        "X-Title":       "AUREM CTO",
+        "Accept":        "text/event-stream",
+    }
+    async with httpx.AsyncClient(timeout=_OPENROUTER_TIMEOUT_S) as c:
+        async with c.stream("POST", OPENROUTER_URL,
+                             json=payload, headers=headers) as r:
+            if r.status_code >= 400:
+                body = (await r.aread()).decode("utf-8", "replace")[:200]
+                raise RuntimeError(f"openrouter HTTP {r.status_code}: {body}")
+            async for raw in r.aiter_lines():
+                if not raw or not raw.startswith("data:"):
+                    continue
+                data = raw[5:].strip()
+                if data == "[DONE]":
+                    return
+                try:
+                    j = _json.loads(data)
+                except Exception:
+                    continue
+                delta = (j.get("choices") or [{}])[0].get("delta", {})
+                txt = delta.get("content") or ""
+                if txt:
+                    yield txt
+
+
+async def cto_chat_stream(
+    *, account: dict[str, Any], messages: list[dict[str, str]],
+):
+    """Async generator that emits SSE-formatted JSON lines. Always emits
+    at least a `meta` then either tokens+done OR an `error`. Never
+    raises out of the generator — the FastAPI route streams whatever
+    we yield."""
+    def _evt(payload: dict) -> str:
+        return f"data: {_json.dumps(payload)}\n\n"
+
+    # Decrypt BYOK
+    byok_envelope = account.get("byok_keys")
+    byok_plain: dict[str, str] = {}
+    if byok_envelope and isinstance(byok_envelope, dict):
+        try:
+            from services.developer_portal_core import decrypt_byok
+            byok_plain = decrypt_byok(byok_envelope) or {}
+        except Exception as e:
+            logger.warning(f"[cto_chat_stream] BYOK decrypt failed: {e}")
+
+    picked_byok = _pick_byok_provider(byok_plain)
+    tier = "byok" if picked_byok else "free"
+
+    if tier == "free" and not _free_tier_key():
+        yield _evt({"type": "error", "tier": "free",
+                     "error": "no_llm_configured",
+                     "action_required": "add_byok",
+                     "message": (
+                         "Free-tier LLM is currently unavailable. "
+                         "Please add your own API key on the Connect page."
+                     )})
+        return
+
+    from services.developer_portal_core import deduct_tokens
+    deduct = await deduct_tokens(account["user_id"], "chat")
+    if not deduct.get("ok", True) and not deduct.get("internal"):
+        yield _evt({"type": "error", "tier": tier,
+                     "error": "token_wall",
+                     "action_required": "add_byok",
+                     "tokens_remaining": deduct.get("tokens_remaining", 0),
+                     "message": (
+                         "You're out of free tokens. Add your own API "
+                         "key on the Connect page."
+                     )})
+        return
+
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    tokens_remaining = deduct.get("tokens_remaining", 0)
+
+    # BYOK path is non-streaming (we'd need per-provider streaming
+    # logic; not worth the LOC tonight). Emit the meta then the whole
+    # reply as one token event so the frontend code stays unchanged.
+    if tier == "byok":
+        provider, api_key = picked_byok  # type: ignore[misc]
+        yield _evt({"type": "meta", "tier": tier, "provider": provider,
+                     "tokens_remaining": int(tokens_remaining or 0)})
+        try:
+            reply = await _dispatch_byok(provider, api_key, full_messages)
+        except Exception as e:
+            yield _evt({"type": "error", "tier": tier,
+                         "error": "llm_failed", "message": str(e)})
+            return
+        yield _evt({"type": "token", "content": reply})
+        yield _evt({"type": "done",
+                     "tokens_remaining": int(tokens_remaining or 0),
+                     "low_balance": int(tokens_remaining or 0) < 100})
+        return
+
+    # Free tier: walk the OpenRouter ladder, emit tokens as they arrive
+    api_key = _free_tier_key() or ""
+    last_err: Exception | None = None
+    for model, label in FREE_TIER_MODELS:
+        try:
+            # Emit meta as soon as we know which model we're trying.
+            yield _evt({"type": "meta", "tier": tier, "provider": label,
+                         "model": model,
+                         "tokens_remaining": int(tokens_remaining or 0)})
+            got_any = False
+            async for delta in _stream_openrouter(api_key, model, full_messages):
+                got_any = True
+                yield _evt({"type": "token", "content": delta})
+            if got_any:
+                yield _evt({"type": "done",
+                             "tokens_remaining": int(tokens_remaining or 0),
+                             "low_balance": int(tokens_remaining or 0) < 100})
+                return
+            # Empty stream — try next model
+            last_err = RuntimeError(f"{model}: empty stream")
+        except Exception as e:
+            logger.warning(f"[cto_chat_stream] {model} failed: {e}")
+            last_err = e
+            continue
+
+    yield _evt({"type": "error", "tier": tier,
+                 "error": "llm_failed",
+                 "message": f"All free-tier models failed: {last_err}"})

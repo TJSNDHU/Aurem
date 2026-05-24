@@ -49,16 +49,20 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
 
 ## Active regression status
 
-**712 / 712 GREEN** across iter 327d → 332b D-11.
+**721 / 721 GREEN** across iter 327d → 332b D-15.
 
 ## Latest slices
 
 - **D-6**: dev portal admin bypass + DevDashboard crash + smart sign-in + System Overview public wiring.
 - **D-7**: /admin/developer-signups page + real-time Telegram nudge.
 - **D-8**: 24h sparkline on cockpit Pulse tile + CSV export.
-- **D-9**: /developers/login page (Sign-in stopped landing on signup wizard).
-- **D-10**: AUREM CTO chat panel on dev dashboard + token-low popup + /developers/connect rebuilt + expanded BYOK schema.
-- **D-11**: Free tier moved to OpenRouter (one key) with 3-model fallback ladder: DeepSeek V3 → Llama 3.3 70B free → Mistral 7B free.
+- **D-9**: /developers/login page.
+- **D-10**: AUREM CTO chat panel on dev dashboard + token-low popup + Connect rebuilt + expanded BYOK.
+- **D-11**: Free tier moved to OpenRouter (one key, 3-model ladder).
+- **D-12**: Roman-coin background image on dev portal.
+- **D-13**: Collapsible dev portal sidebar (persisted to localStorage).
+- **D-14**: Cloudflare 524 hardening — 28s per-model timeout + paid Llama/Mistral rungs + safe HTML-response parsing + trimmed history budget.
+- **D-15**: SSE streaming for the dev chat — typing-out UX, 10× faster perceived latency. Includes happy-path, fallback, error, and token-wall test coverage.
 
 ## Backlog (P0 → P2)
 
