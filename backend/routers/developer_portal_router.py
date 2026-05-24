@@ -165,19 +165,43 @@ async def login(body: LoginBody) -> dict[str, Any]:
 
 
 async def _current_dev(authorization: str | None) -> dict:
+    """iter 332b D-5 — admin tokens auto-bootstrap a developer account.
+
+    Founder uses platform_token (admin JWT). When they visit /developers,
+    we still want a real developer row for them so the page renders with
+    profile, settings, BYOK, etc. — instead of bouncing them to /signup.
+    """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "missing_bearer_token")
     token = authorization.split(" ", 1)[1]
-    from services.developer_portal_core import decode_dev_jwt, get_account
+    from services.developer_portal_core import (
+        decode_dev_jwt, get_account, get_or_create_account_for_admin,
+    )
+
+    # First try as a real developer JWT.
     payload = decode_dev_jwt(token)
-    if not payload or payload.get("kind") != "developer":
-        raise HTTPException(401, "invalid_or_expired_token")
-    acc = await get_account(payload["sub"])
-    if not acc:
-        raise HTTPException(401, "account_missing")
-    if acc.get("abuse_flagged"):
-        raise HTTPException(403, "account_under_review")
-    return acc
+    if payload and payload.get("kind") == "developer":
+        acc = await get_account(payload["sub"])
+        if acc and not acc.get("abuse_flagged"):
+            return acc
+        if acc and acc.get("abuse_flagged"):
+            raise HTTPException(403, "account_under_review")
+
+    # Fall back to platform admin JWT — auto-bootstrap a dev row.
+    try:
+        from utils.auth import _decode_token  # type: ignore
+        admin_payload = _decode_token(token)
+    except Exception:
+        admin_payload = None
+    if admin_payload and (admin_payload.get("is_admin") or
+                            admin_payload.get("is_super_admin")):
+        admin_email = (admin_payload.get("email")
+                        or admin_payload.get("sub") or "")
+        acc = await get_or_create_account_for_admin(admin_email)
+        if acc:
+            return acc
+
+    raise HTTPException(401, "invalid_or_expired_token")
 
 
 @router.get("/api/developers/me")

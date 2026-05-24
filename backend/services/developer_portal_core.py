@@ -524,6 +524,60 @@ async def get_account(user_id: str) -> dict | None:
     )
 
 
+async def get_or_create_account_for_admin(admin_email: str) -> dict | None:
+    """iter 332b D-5 — admin sees the dev portal without a separate signup.
+
+    When a platform admin (founder) hits /api/developers/me, we either
+    locate an existing developer row by their email OR provision a new
+    one on the fly with unlimited tokens + admin-flagged so they can
+    explore every dev portal feature with their existing admin login.
+    """
+    if _db is None or not admin_email:
+        return None
+    email = admin_email.lower().strip()
+
+    existing = await _db.developer_accounts.find_one(
+        {"email": email},
+        {"_id": 0, "password_hash": 0, "byok_keys": 0},
+    )
+    if existing:
+        # Make sure admin perks are set on any pre-existing row.
+        if not existing.get("admin_full_access"):
+            await _db.developer_accounts.update_one(
+                {"user_id": existing["user_id"]},
+                {"$set": {"admin_full_access": True,
+                           "tokens_remaining": 10_000_000,
+                           "plan":             "internal_admin",
+                           "abuse_flagged":    False}},
+            )
+            existing["admin_full_access"] = True
+            existing["tokens_remaining"]  = 10_000_000
+            existing["plan"]              = "internal_admin"
+        return existing
+
+    # Fresh provision
+    user_id = "admin_" + uuid.uuid4().hex[:20]
+    now_iso = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "user_id":           user_id,
+        "email":             email,
+        "name":              "AUREM Admin",
+        "plan":              "internal_admin",
+        "tokens_remaining":  10_000_000,
+        "admin_full_access": True,
+        "abuse_flagged":     False,
+        "created_at":        now_iso,
+        "provisioned_via":   "platform_admin_jwt",
+    }
+    try:
+        await _db.developer_accounts.insert_one(dict(doc))
+    except Exception as e:
+        logger.debug(f"[dev_portal] admin auto-provision failed: {e}")
+    doc.pop("_id", None)
+    return doc
+
+
+
 # ════════════════════════════════════════════════════════════════════
 # BYOK encryption — re-uses services.credential_crypto (Fernet)
 # ════════════════════════════════════════════════════════════════════

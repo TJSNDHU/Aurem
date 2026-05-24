@@ -30,8 +30,15 @@ export function setDevJwt(t) {
   if (t) localStorage.setItem("dev_jwt", t);
   else   localStorage.removeItem("dev_jwt");
 }
+// iter 332b D-5 — falls back to platform admin JWT so the founder can
+// browse /developers/* with their existing admin session. Backend
+// auto-provisions an internal_admin developer row when the admin
+// token hits /api/developers/me.
 export function devAuthHeaders() {
-  const t = getDevJwt();
+  const t = getDevJwt()
+         || localStorage.getItem("platform_token")
+         || localStorage.getItem("aurem_admin_token")
+         || "";
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
@@ -54,7 +61,13 @@ export function useDevMe() {
         if (!cancelled) setL(false);
       }
     }
-    if (getDevJwt()) load(); else setL(false);
+    if (getDevJwt()
+        || localStorage.getItem("platform_token")
+        || localStorage.getItem("aurem_admin_token")) {
+      load();
+    } else {
+      setL(false);
+    }
     return () => { cancelled = true; };
   }, []);
   return { me, loading, error };

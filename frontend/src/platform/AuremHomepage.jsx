@@ -534,7 +534,7 @@ const AuremHomepage = () => {
           <button onClick={() => scrollTo("pricing")} data-testid="nav-link-pricing">Pricing</button>
         </div>
         <div className="nav-actions">
-          <Link to="/my" className="nav-login" data-testid="nav-link-login" aria-label="Log in to your AUREM account">
+          <Link to="/login" className="nav-login" data-testid="nav-link-login" aria-label="Log in to your AUREM account">
             <span className="nav-login-icon"><User size={16} strokeWidth={1.8} /></span>
             <span className="nav-login-text">Log In</span>
           </Link>
