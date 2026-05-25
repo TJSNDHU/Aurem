@@ -65,8 +65,23 @@ def _safe_task(coro, name: str) -> Optional[asyncio.Task]:
     return task
 
 
-def _attach(name: str, coro, started: list, failed: list, label: str) -> None:
-    """Attach a single scheduler coroutine with uniform logging."""
+def _attach(name: str, coro, started: list, failed: list, label: str,
+            disabled: Optional[set] = None) -> None:
+    """Attach a single scheduler coroutine with uniform logging.
+
+    iter 332b D-23 — honors AUREM_DISABLE_SCHEDULERS=<csv> for surgical
+    scheduler control in the deployment env (e.g. disable just the heavy
+    QA-deep + backup-loop pair without killing observability).
+    """
+    if disabled and name in disabled:
+        print(f"[p4-worker] ⊘ {label} skipped via AUREM_DISABLE_SCHEDULERS",
+              flush=True)
+        # Properly close the unused coroutine so we don't leak a warning.
+        try:
+            coro.close()
+        except Exception:
+            pass
+        return
     try:
         _safe_task(coro, name)
         started.append(name)
@@ -92,8 +107,33 @@ def start_pillar4_worker(
 
     Factories produce the coroutine (so each lazy import happens inside the
     worker rather than at module import time — avoids circular imports).
+
+    iter 332b D-23 — deployment escape hatch.
+      • AUREM_LITE_MODE=1            — disable ALL P4 schedulers (best for
+        a memory-constrained K8s pod that's OOM-restarting).
+      • AUREM_DISABLE_SCHEDULERS=<csv> — disable specific scheduler names
+        (e.g. "qa_agent_deep,backup_loop,clawchief_daily_sweep").
     """
     global _worker_started
+    import os as _os
+    if _os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes"):
+        print("[p4-worker] LITE MODE — all 34 schedulers DISABLED via env",
+              flush=True)
+        _worker_started = True
+        return {"started": [], "failed": [], "skipped_all_lite_mode": True}
+
+    _DISABLED = {n.strip() for n in
+                 _os.environ.get("AUREM_DISABLE_SCHEDULERS", "").split(",")
+                 if n.strip()}
+    if _DISABLED:
+        print(f"[p4-worker] skipping schedulers via env: {sorted(_DISABLED)}",
+              flush=True)
+
+    # Local wrapper so every _attach call below auto-honors _DISABLED
+    # without us having to thread the kwarg through 34 call sites.
+    def _at(name, coro, label):
+        return _attach(name, coro, started, failed, label, disabled=_DISABLED)
+
     if _worker_started:
         return {"already_started": True, "tasks": [t.get_name() for t in _worker_tasks]}
 
