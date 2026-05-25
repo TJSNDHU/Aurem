@@ -147,17 +147,18 @@ async def test_decode_token_no_longer_imported_from_utils_auth():
 # ───────────────────────── frontend dashboard wiring ─────────────────────
 
 def test_dev_dashboard_declares_purchases_state():
-    """DevDashboard.jsx must declare a `purchases` state variable AND
-    fetch from /api/developers/me/purchases — otherwise it crashes
-    silently on every authed dashboard render."""
+    """iter 332b D-19 — Founder redesign moved the purchases + activity
+    strips off the dashboard. The chat panel is now the dashboard. This
+    test asserts the new contract: full-screen chat is mounted and the
+    compact header chips render."""
     src = open(
         "/app/frontend/src/platform/developers/DevDashboard.jsx"
     ).read()
-    assert "const [purchases, setPurchases]" in src, (
-        "purchases state not declared — dashboard will crash on render."
+    assert "DevCtoChatPanel" in src and "fullScreen" in src, (
+        "DevDashboard must mount DevCtoChatPanel in fullScreen mode."
     )
-    assert "/api/developers/me/purchases" in src, (
-        "Purchases endpoint not called — recent-purchases strip will be empty."
+    assert "dev-header-chips" in src, (
+        "Compact header chip row not rendered."
     )
 
 

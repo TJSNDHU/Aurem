@@ -1,6 +1,13 @@
 /**
- * /developers/dashboard — Main developer hub (Auth-gated)
- * LuxeDashboardV2 av2-card primitives, edge-to-edge.
+ * /developers/dashboard — iter 332b D-19
+ *
+ * Founder redesign:
+ *   - The 4 stat cards (tokens / GitHub / sessions / lifetime) move into
+ *     a compact pill row in the top-right of the page header.
+ *   - The AUREM CTO chat panel becomes the dashboard. Full height,
+ *     fills the viewport (minus the developer shell + page header).
+ *   - Recent activity & purchases drop to a thin strip below the chat
+ *     so they don't crowd the build surface.
  */
 import React, { useEffect, useState } from "react";
 import { Coins, Github, Gauge, Activity } from "lucide-react";
@@ -12,22 +19,13 @@ const API = process.env.REACT_APP_BACKEND_URL || "";
 export default function DevDashboard() {
   const { me } = useDevMe();
   const [sessions, setSessions] = useState({ active: [], limit: 2 });
-  const [purchases, setPurchases] = useState([]);
   const [liveTokens, setLiveTokens] = useState(null);
-  const [activity] = useState([
-    { ts: new Date().toISOString(),
-      text: "Account ready. Type your first task in the AUREM CTO chat to begin." },
-  ]);
 
   useEffect(() => {
     let cancelled = false;
     fetch(`${API}/api/developers/sessions`, { headers: devAuthHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j && !cancelled) setSessions(j); })
-      .catch(() => {});
-    fetch(`${API}/api/developers/me/purchases`, { headers: devAuthHeaders() })
-      .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j && !cancelled) setPurchases(j.rows || []); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -43,101 +41,79 @@ export default function DevDashboard() {
 
   return (
     <DeveloperShell requireAuth>
-      <PageHeader
-        eyebrow="DASHBOARD"
-        title={me ? `Welcome back, ${(me.name || "").split(" ")[0] || "builder"}.` : "Welcome"}
-        sub="Live counters from your account. Refreshed each visit." />
-
-      <div className="av2-grid-4">
-        <MetricTile testid="dashboard-token-counter" icon={Coins}
-                    label="Tokens remaining"
-                    value={remaining.toLocaleString()}
-                    valueColor={balanceColor} />
-        <MetricTile testid="active-project-card" icon={Github}
-                    label="GitHub linked"
-                    value={me?.github_username ? `@${me.github_username}` : "Not connected"}
-                    sub={me?.github_username ? "read-only" : "Connect to start"} />
-        <MetricTile testid="rate-limit-status" icon={Gauge}
-                    label="Active sessions"
-                    value={`${sessions.active?.length || 0} / ${sessions.limit ?? 2}`} />
-        <MetricTile testid="dashboard-tokens-used" icon={Activity}
-                    label="Lifetime usage"
-                    value={used.toLocaleString()} />
-      </div>
-
-      {/* iter 332b D-10 — AUREM CTO chat panel (the founder's #1 ask) */}
-      <DevCtoChatPanel onTokensUpdate={setLiveTokens} />
-
-      {/* Recent purchases strip — iter 331g */}
-      {purchases.length > 0 && (
-        <div className="av2-card" data-testid="recent-purchases-strip">
-          <SectionTitle title="Recent purchases" />
-          <ul style={{ listStyle: "none", padding: 0, margin: 0,
-                       fontFamily: "'JetBrains Mono', monospace",
-                       fontSize: 12 }}>
-            {purchases.map((p, i) => (
-              <li key={p.session_id || i}
-                  data-testid="purchase-row"
-                  style={{ display: "flex", alignItems: "center",
-                            gap: 12, padding: "8px 0",
-                            borderBottom: i < purchases.length - 1
-                              ? "1px solid var(--dash-divider)" : "none",
-                            color: "var(--dash-text)" }}>
-                <span style={{ color: "var(--dash-text-muted)",
-                                minWidth: 92 }}>
-                  {(p.created_at || "").slice(0, 10)}
-                </span>
-                <span style={{ minWidth: 70,
-                                textTransform: "uppercase",
-                                color: "var(--dash-gold-bright)",
-                                fontWeight: 500 }}>
-                  {p.tier}
-                </span>
-                <span style={{ minWidth: 60 }}>
-                  ${Number(p.amount_usd || 0).toFixed(2)}
-                </span>
-                <span style={{ color: p.credited ? "var(--dash-green)"
-                                                  : "var(--dash-text-muted)" }}>
-                  {p.credited ? "✓ credited" : p.payment_status || "pending"}
-                </span>
-              </li>
-            ))}
-          </ul>
+      {/* Header row: title on the left, compact stat chips on the right. */}
+      <div data-testid="dev-dashboard-header"
+           style={{ display: "flex", alignItems: "flex-end",
+                    justifyContent: "space-between", gap: 24,
+                    flexWrap: "wrap", marginBottom: 14 }}>
+        <div style={{ minWidth: 220 }}>
+          <span style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10, letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            color: "var(--dash-orange)",
+          }}>DASHBOARD</span>
+          <h1 style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 24, fontWeight: 600, letterSpacing: "0.01em",
+            color: "var(--dash-text)", margin: "6px 0 0",
+          }}>
+            {me ? `Welcome back, ${(me.name || "").split(" ")[0] || "builder"}.` : "Welcome"}
+          </h1>
         </div>
-      )}
 
-      {/* Recent activity feed */}
-      <div className="av2-card" data-testid="recent-activity-feed">
-        <SectionTitle title="Recent activity" pill="live" />
-        <ul style={{ listStyle: "none", padding: 0, margin: 0,
-                     fontFamily: "'JetBrains Mono', monospace",
-                     fontSize: 13 }}>
-          {activity.length === 0 ? (
-            <li data-testid="activity-empty"
-                style={{ color: "var(--dash-text-muted)" }}>
-              No activity yet.
-            </li>
-          ) : activity.map((a, i) => (
-            <li key={i} data-testid="activity-item"
-                style={{ display: "flex", gap: 14, padding: "8px 0",
-                          borderBottom: i < activity.length - 1
-                            ? "1px solid var(--dash-divider)" : "none",
-                          color: "var(--dash-text)" }}>
-              <span style={{ color: "var(--dash-text-muted)",
-                              minWidth: 90 }}>
-                {new Date(a.ts).toLocaleTimeString()}
-              </span>
-              <span>{a.text}</span>
-            </li>
-          ))}
-        </ul>
+        {/* Compact stat chips — replaces the old 2x2 metric card grid. */}
+        <div data-testid="dev-header-chips"
+             style={{ display: "flex", gap: 8, flexWrap: "wrap",
+                      alignItems: "center" }}>
+          <StatChip testid="dashboard-token-counter" icon={Coins}
+                     label="Tokens"
+                     value={remaining.toLocaleString()}
+                     valueColor={balanceColor} />
+          <StatChip testid="active-project-card" icon={Github}
+                     label="GitHub"
+                     value={me?.github_username
+                       ? `@${me.github_username}` : "—"} />
+          <StatChip testid="rate-limit-status" icon={Gauge}
+                     label="Sessions"
+                     value={`${sessions.active?.length || 0}/${sessions.limit ?? 2}`} />
+          <StatChip testid="dashboard-tokens-used" icon={Activity}
+                     label="Lifetime"
+                     value={used.toLocaleString()} />
+        </div>
       </div>
+
+      {/* Chat = the dashboard. Takes the rest of the viewport. */}
+      <DevCtoChatPanel onTokensUpdate={setLiveTokens} fullScreen />
     </DeveloperShell>
   );
 }
 
-// ─── Shared primitives (used by every dashboard-mode page) ───────────
+// ─── Small header chip (replaces MetricTile for the compact layout) ────
+function StatChip({ testid, icon: Icon, label, value,
+                    valueColor = "var(--dash-text)" }) {
+  return (
+    <div data-testid={testid}
+         style={{ display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "8px 12px",
+                  border: "1px solid var(--dash-border)",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.02)",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 11 }}>
+      <Icon size={12} style={{ color: "var(--dash-text-muted)" }} />
+      <span style={{
+        letterSpacing: "0.14em", textTransform: "uppercase",
+        color: "var(--dash-text-muted)", fontSize: 9,
+      }}>{label}</span>
+      <span style={{ color: valueColor, fontWeight: 600, fontSize: 12 }}>
+        {value}
+      </span>
+    </div>
+  );
+}
 
+// ─── Re-exports kept for backwards compat with other dev pages ────────
 export function PageHeader({ eyebrow, title, sub }) {
   return (
     <div style={{ marginBottom: 4 }}>

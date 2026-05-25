@@ -61,8 +61,10 @@ def test_frontend_safely_parses_html_response():
     assert "free-tier model took too long" in src.lower(), (
         "Friendly error message for Cloudflare 524 missing."
     )
-    # History budget — long histories were a contributor to the timeout.
-    assert "slice(-6)" in src, "History should cap at 6 turns now (was 12)."
-    assert ".slice(0, 2000)" in src, (
-        "Each message should be clipped to 2000 chars to keep payloads small."
+    # History budget — iter 332b D-19 bumped to 12 turns / 3000 chars to
+    # carry more context across persistent sessions. Still well under the
+    # 28s per-model Cloudflare ceiling because OpenRouter streams.
+    assert "slice(-12)" in src, "History should cap at 12 turns."
+    assert ".slice(0, 3000)" in src, (
+        "Each message should be clipped to 3000 chars to keep payloads sane."
     )

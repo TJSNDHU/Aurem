@@ -279,6 +279,8 @@ async def cto_chat_stream_route(body: ChatBody,
     Frontend can flush tokens to the UI as they arrive — feels 10× faster.
 
     iter 332b D-15.
+    iter 332b D-19 — wraps the generator so we can persist the full
+    conversation (user msg + assistant reply) once the stream finishes.
     """
     from fastapi.responses import StreamingResponse
     account = await _current_dev(authorization)
@@ -286,14 +288,84 @@ async def cto_chat_stream_route(body: ChatBody,
     msgs = [m.model_dump() for m in body.messages]
     if not msgs or msgs[-1].get("role") != "user":
         raise HTTPException(400, "last message must be from user")
+
+    user_id = account["user_id"]
+    user_msg = msgs[-1]
+    captured_reply: list[str] = []
+    import json as _json
+
+    async def _wrapped():
+        async for raw in _stream(account=account, messages=msgs):
+            # Sniff token deltas so we can rebuild the full assistant reply.
+            if raw.startswith("data: "):
+                try:
+                    evt = _json.loads(raw[6:].strip())
+                    if evt.get("type") == "token" and evt.get("content"):
+                        captured_reply.append(evt["content"])
+                except Exception:
+                    pass
+            yield raw
+        # Stream finished — persist the turn. Best-effort, never raises.
+        try:
+            reply_text = "".join(captured_reply).strip()
+            if reply_text and _db is not None:
+                from datetime import datetime, timezone
+                await _db.developer_chat_sessions.update_one(
+                    {"user_id": user_id, "session_id": "default"},
+                    {"$push": {"messages": {
+                        "$each": [
+                            {"role": "user", "content": user_msg.get("content", "")},
+                            {"role": "assistant", "content": reply_text},
+                        ]
+                    }},
+                     "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+                     "$setOnInsert": {"user_id": user_id,
+                                       "session_id": "default",
+                                       "created_at": datetime.now(timezone.utc).isoformat()}},
+                    upsert=True,
+                )
+        except Exception as _persist_err:
+            logger.warning(f"[cto_chat_stream] persist failed: {_persist_err}")
+
     return StreamingResponse(
-        _stream(account=account, messages=msgs),
+        _wrapped(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-store",
             "X-Accel-Buffering": "no",   # tell nginx not to buffer SSE
         },
     )
+
+
+@router.get("/api/developers/cto/chat/history")
+async def cto_chat_history(authorization: str = Header(None)) -> dict[str, Any]:
+    """Returns the developer's persisted chat history so refresh/logout
+    never wipes a build session. iter 332b D-19."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        return {"messages": []}
+    row = await _db.developer_chat_sessions.find_one(
+        {"user_id": me["user_id"], "session_id": "default"},
+        {"_id": 0, "messages": 1},
+    )
+    msgs = (row or {}).get("messages") or []
+    # Cap to last 200 turns so an extreme history doesn't choke the UI.
+    return {"messages": msgs[-200:]}
+
+
+@router.delete("/api/developers/cto/chat/history")
+async def cto_chat_history_clear(authorization: str = Header(None)) -> dict[str, Any]:
+    """Founder asked for a "start fresh" button. iter 332b D-19."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        return {"ok": True, "cleared": 0}
+    res = await _db.developer_chat_sessions.update_one(
+        {"user_id": me["user_id"], "session_id": "default"},
+        {"$set": {"messages": [], "updated_at":
+                  __import__("datetime").datetime.now(
+                      __import__("datetime").timezone.utc).isoformat()}},
+    )
+    return {"ok": True, "cleared": int(res.modified_count)}
 
 
 # ── Pixel domain validation ────────────────────────────────────────
