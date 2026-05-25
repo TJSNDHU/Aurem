@@ -5,10 +5,10 @@
  * Rate limited: 5 attempts, 15-min lockout.
  */
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Target, Mail, Lock, ArrowRight, Loader2, Shield, AlertTriangle } from 'lucide-react';
-import { setPlatformToken, setPlatformUser, getPlatformToken } from '../utils/secureTokenStore';
+import { setPlatformToken, setPlatformUser, getPlatformToken, forceLogoutAdminEverywhere, clearAdminAuth } from '../utils/secureTokenStore';
 import { BACKEND_URL } from '../lib/api';
 
 // Smart resolver: forces same-origin on aurem.live so a stale baked-in
@@ -17,6 +17,7 @@ const API_URL = BACKEND_URL;
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
@@ -75,29 +76,60 @@ const AdminLogin = () => {
   }, [email]);
 
   useEffect(() => {
-    const token = getPlatformToken();
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        // iter 326nn — verify the token isn't expired BEFORE auto-
-        // redirecting. A stale token whose `exp` is in the past would
-        // still pass the role check, bounce the user to the dashboard,
-        // and then the dashboard would fail every API call and send
-        // them right back here. Worst possible UX loop.
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (payload.exp && payload.exp < nowSec) {
-          // Stale token — clear it and let the user see the form.
-          import('../utils/secureTokenStore').then(({ clearAdminAuth }) => {
-            clearAdminAuth();
-          }).catch(() => { /* ignore */ });
-          return;
-        }
-        if (payload.is_admin || payload.is_super_admin || payload.role === 'admin' || payload.role === 'super_admin') {
-          navigate('/admin/mission-control');
-        }
-      } catch { /* ignore — corrupt token, show the form */ }
+    // iter 332b D-21 — Escape hatches for the recurring auth-loop bug.
+    //
+    // If any of these are present, NEVER auto-redirect — always render the
+    // form so the founder can sign in fresh:
+    //   • `?force=1`        — explicit override (bookmark / share link)
+    //   • `?logged_out=1`   — set by AdminShell.logout() on the redirect
+    //   • sessionStorage `aurem_just_logged_out` — tombstone the logout
+    //     button drops so the 401 interceptor + this page both refuse to
+    //     re-hydrate a session for one navigation cycle.
+    //
+    // Any of those => wipe every admin slot one more time (belt &
+    // suspenders) and bail out of the auto-redirect.
+    const params = new URLSearchParams(location.search);
+    const tombstone = (() => {
+      try { return sessionStorage.getItem('aurem_just_logged_out'); }
+      catch { return null; }
+    })();
+    if (params.get('force') === '1'
+        || params.get('logged_out') === '1'
+        || tombstone === '1') {
+      forceLogoutAdminEverywhere();
+      try { sessionStorage.removeItem('aurem_just_logged_out'); } catch { /* */ }
+      // Surface a confirmation banner when the user just logged out.
+      if (params.get('logged_out') === '1' || tombstone === '1') {
+        setSessionExpired(false);
+      }
+      return;
     }
-  }, [navigate]);
+
+    const token = getPlatformToken();
+    if (!token) return;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const nowSec = Math.floor(Date.now() / 1000);
+      // Stale token — clear it and let the user see the form. iter 326nn.
+      if (payload.exp && payload.exp < nowSec) {
+        clearAdminAuth();
+        return;
+      }
+      // Only auto-redirect when the token explicitly claims admin role.
+      const isAdmin = payload.is_admin || payload.is_super_admin
+                      || payload.role === 'admin'
+                      || payload.role === 'super_admin';
+      if (isAdmin) {
+        navigate('/admin/mission-control', { replace: true });
+      } else {
+        // Customer or unknown — DO NOT bounce. Show form.
+        clearAdminAuth();
+      }
+    } catch {
+      // Corrupt token — wipe and show form.
+      clearAdminAuth();
+    }
+  }, [navigate, location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -270,7 +302,6 @@ const AdminLogin = () => {
                   maxLength={6}
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  required
                   autoFocus
                   data-testid="admin-totp-input"
                   className="w-full pl-10 pr-4 py-3 rounded-lg text-sm tracking-[0.4em] font-mono"

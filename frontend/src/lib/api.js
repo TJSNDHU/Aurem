@@ -134,6 +134,17 @@ apiClient.interceptors.response.use(
     if (status !== 401 || !originalReq || originalReq._retried) {
       return Promise.reject(error);
     }
+    // iter 332b D-21 — recurring admin auth-loop fix.
+    // After the founder hits "Sign out", AdminShell drops a sessionStorage
+    // tombstone. If we honor it here, any background 401 that fires while
+    // the page is reloading CANNOT silently re-mint a fresh admin token
+    // via /api/auth/admin/refresh — the source of the trap.
+    try {
+      if (typeof sessionStorage !== 'undefined'
+          && sessionStorage.getItem('aurem_just_logged_out') === '1') {
+        return Promise.reject(error);
+      }
+    } catch { /* ignore */ }
     // Skip refresh attempts for the auth endpoints themselves to avoid loops.
     if ((originalReq.url || '').includes('/api/auth/')) {
       // iter 326ll — only clear the slot the FAILING request used.

@@ -29,7 +29,7 @@ import {
   // HUD
   Flame, Dot, LogOut, MessageSquare,
 } from 'lucide-react';
-import { getPlatformToken, clearAdminAuth } from '../utils/secureTokenStore';
+import { getPlatformToken, clearAdminAuth, forceLogoutAdminEverywhere } from '../utils/secureTokenStore';
 import { BACKEND_URL } from '../lib/api';
 import { PillarProvider, usePillarHealth } from './PillarHealthContext';
 import PillarGate, { PillarDot } from './PillarGate';
@@ -330,10 +330,16 @@ const AdminShellInner = () => {
     window.dispatchEvent(new CustomEvent('aurem:open-palette'));
   }, []);
 
-  // iter 326o + 332b A-3 — clear ONLY the admin token. Customer session in
-  // the same browser must survive an admin logout. ALSO clear the refresh
-  // cookie via the backend so a background apiClient refresh can't silently
-  // re-mint a session after logout (production-bug-fix #2).
+  // iter 326o + 332b A-3 + 332b D-21 — recurring admin logout-loop bug.
+  // The silent-refresh interceptor in lib/api.js was re-minting a fresh
+  // admin token via the HttpOnly cookie a moment after clearAdminAuth(),
+  // trapping the founder back on /admin/mission-control. The fix is:
+  //   1. Call backend logout to clear the HttpOnly cookie.
+  //   2. forceLogoutAdminEverywhere() — sets a sessionStorage tombstone
+  //      the 401 interceptor + AdminLogin both honor, wipes every admin
+  //      slot incl. the refresh handle.
+  //   3. window.location.replace() — full reload kills in-flight axios
+  //      requests so none can race back in with the old Bearer header.
   const logout = async () => {
     try {
       await fetch(`${API}/api/auth/admin/logout`, {
@@ -341,9 +347,12 @@ const AdminShellInner = () => {
         headers: { Authorization: `Bearer ${token || ''}` },
       });
     } catch { /* network failure must NOT block client-side cleanup */ }
-    try { localStorage.removeItem('aurem_admin_refresh'); } catch { /* ignore */ }
-    clearAdminAuth();
-    navigate('/admin/login', { replace: true });
+    forceLogoutAdminEverywhere();
+    // Full reload (not react-router navigate) so all in-flight components
+    // unmount and the refresh interceptor cannot fire after we've torn
+    // down. The `?logged_out=1` flag tells AdminLogin to show the form
+    // unconditionally on landing.
+    window.location.replace('/admin/login?logged_out=1');
   };
 
   const W = collapsed ? COLLAPSED_PX : EXPANDED_PX;

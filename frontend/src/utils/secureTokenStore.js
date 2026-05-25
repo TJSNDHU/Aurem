@@ -120,6 +120,38 @@ export function clearAdminAuth() {
   }
 }
 
+/**
+ * iter 332b D-21 — Hard logout for the founder's recurring auth-loop bug.
+ *
+ * `clearAdminAuth()` above is surgical: it only touches the admin slot so
+ * a parallel customer session in the same browser survives. That's the
+ * right default, but it ALSO leaves three other surfaces alive that the
+ * silent-refresh interceptor (lib/api.js) can use to re-mint a token a
+ * heartbeat after the user clicks "Sign out", trapping them back on
+ * /admin/mission-control:
+ *
+ *   1. `localStorage['aurem_admin_refresh']` — refresh handle
+ *   2. The HttpOnly refresh cookie set by /api/auth/admin/login
+ *   3. In-flight axios requests holding the old token in their headers
+ *
+ * `forceLogoutAdminEverywhere()` is the nuclear option for the explicit
+ * logout button: wipe every admin-related slot, set a sessionStorage
+ * tombstone the 401 interceptor + AdminLogin both honor, and dispatch
+ * a global event so live components stop polling immediately.
+ */
+export function forceLogoutAdminEverywhere() {
+  try { sessionStorage.setItem('aurem_just_logged_out', '1'); } catch { /* ignore */ }
+  clearAdminAuth();
+  // Refresh handle in localStorage (not covered by clearAdminAuth).
+  try { localStorage.removeItem('aurem_admin_refresh'); } catch { /* ignore */ }
+  try { sessionStorage.removeItem('aurem_admin_refresh'); } catch { /* ignore */ }
+  // Some legacy code persists `aurem_platform_token` directly.
+  try { localStorage.removeItem('aurem_platform_token'); } catch { /* ignore */ }
+  try { sessionStorage.removeItem('aurem_platform_token'); } catch { /* ignore */ }
+  // Kick all in-flight components.
+  try { window.dispatchEvent(new Event('aurem:force-logout')); } catch { /* ignore */ }
+}
+
 export function setCustomerToken(token) {
   _writeDual(CUSTOMER_TOKEN_KEY, token);
 }
