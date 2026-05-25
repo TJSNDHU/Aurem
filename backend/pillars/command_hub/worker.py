@@ -123,22 +123,28 @@ def start_pillar4_worker(
     import os as _os
 
     def _looks_like_production() -> bool:
-        """Best-effort sniff for the Emergent K8s production runtime."""
+        """Best-effort sniff for the Emergent K8s production runtime.
+
+        iter 332b D-26 — preview pods have HOSTNAME starting with
+        `agent-env-`. Production pods have `live-support` or `emergent.host`
+        in the hostname. The previous heuristic relied on REACT_APP_BACKEND_URL
+        which is a *frontend* var and isn't set on the backend pod — so it
+        always evaluated to "not preview" and forced LITE on preview too.
+        """
         # Explicit opt-in/out beats heuristics.
         if _os.environ.get("AUREM_FORCE_FULL_MODE", "").strip() in ("1", "true", "yes"):
             return False
         if _os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes"):
             return True
-        # Emergent production hostnames + K8s pod env vars.
         host = (_os.environ.get("HOSTNAME") or "").lower()
+        # Preview/dev pods are the agent sandbox container.
+        if host.startswith("agent-env-") or host.startswith("preview-"):
+            return False
         if "live-support" in host or "emergent.host" in host:
             return True
+        # Last-resort: in K8s with no preview signal at all.
         if _os.environ.get("KUBERNETES_SERVICE_HOST"):
-            # We're inside K8s. Combined with the absence of the standard
-            # preview-only "preview.emergentagent.com" host, treat as prod.
-            backend = (_os.environ.get("REACT_APP_BACKEND_URL")
-                        or _os.environ.get("APP_URL") or "").lower()
-            if "preview.emergentagent.com" not in backend:
+            if not _os.environ.get("preview_endpoint"):
                 return True
         return False
 

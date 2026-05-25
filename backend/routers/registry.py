@@ -27,6 +27,33 @@ from routers._registry_lean_prune import apply_lean_prune
 logger = logging.getLogger(__name__)
 
 
+def _looks_like_production_for_registry() -> bool:
+    """iter 332b D-25 + D-26 — production detection.
+
+    Preview pods have HOSTNAME starting with `agent-env-` (a sandboxed
+    dev container). Production pods have HOSTNAME containing
+    `live-support` or end in `emergent.host`.
+
+    Detection precedence: explicit env overrides → hostname check →
+    K8s presence as last-resort signal."""
+    if os.environ.get("AUREM_FORCE_FULL_MODE", "").strip() in ("1", "true", "yes"):
+        return False
+    if os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes"):
+        return True
+    host = (os.environ.get("HOSTNAME") or "").lower()
+    # Preview pods are the agent sandbox — never production.
+    if host.startswith("agent-env-") or host.startswith("preview-"):
+        return False
+    if "live-support" in host or "emergent.host" in host:
+        return True
+    # Last-resort: in K8s with no preview/agent-env signal AND no
+    # preview_endpoint env var → assume prod.
+    if os.environ.get("KUBERNETES_SERVICE_HOST"):
+        if not os.environ.get("preview_endpoint"):
+            return True
+    return False
+
+
 def register_all_routers(app, db):
     """Register every router with the FastAPI app. Must be called after DB init."""
 
@@ -3170,7 +3197,29 @@ def register_all_routers(app, db):
         # any tier2 pending action whose 30-second cancel window has
         # elapsed and runs the standard approve path. Tier 3 actions
         # are NEVER touched — those still need an explicit founder click.
+        #
+        # iter 332b D-25 — production memory mitigation. On the prod K8s
+        # pod this loop fires every 5s, and when DB reads are slow the
+        # next tick overlaps and APScheduler logs "max instances reached"
+        # every cycle. Bumping prod to 30s eliminates the overlap warning
+        # AND drops the cron load by 6×. The 30s cancel window is the
+        # natural floor — running faster than that buys nothing.
         try:
+            # iter 332b D-26 — inline production detection (the module-level
+            # helper wasn't visible inside this nested registration block on
+            # the hot-reloaded runtime, throwing NameError). Inlining is
+            # cheap and dependency-free.
+            _h = (os.environ.get("HOSTNAME") or "").lower()
+            _is_prod = (
+                ("live-support" in _h or "emergent.host" in _h)
+                or (os.environ.get("KUBERNETES_SERVICE_HOST")
+                    and not _h.startswith("agent-env-")
+                    and not _h.startswith("preview-")
+                    and not os.environ.get("preview_endpoint"))
+            )
+            if os.environ.get("AUREM_FORCE_FULL_MODE", "").strip() in ("1", "true", "yes"):
+                _is_prod = False
+            _t2_interval = 30 if _is_prod else 5
             from services.ora_agent import auto_execute_due_tier2
             from apscheduler.triggers.interval import IntervalTrigger as _IT_T2
             async def _tier2_auto_exec_tick():
@@ -3180,14 +3229,14 @@ def register_all_routers(app, db):
                     logger.debug(f"[tier2-auto-exec] tick error: {_e}")
             aurem_scheduler.add_job(
                 _tier2_auto_exec_tick,
-                _IT_T2(seconds=5),
+                _IT_T2(seconds=_t2_interval),
                 id="tier2_auto_executor",
                 name="ORA Tier 2 Auto-Executor (30s cancel window)",
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
             )
-            logger.info("[REGISTRY] tier2 auto-executor scheduled (every 5s)")
+            logger.info(f"[REGISTRY] tier2 auto-executor scheduled (every {_t2_interval}s)")
         except Exception as t2_e:
             logger.warning(f"[REGISTRY] tier2 auto-executor schedule failed: {t2_e}")
 

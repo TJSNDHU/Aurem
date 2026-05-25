@@ -49,12 +49,12 @@ def test_lite_mode_engages_when_hostname_is_emergent_host(monkeypatch):
     assert result.get("skipped_all_lite_mode") is True
 
 
-# ── Production signal 3: in K8s AND not preview ───────────────────────
-def test_lite_mode_engages_in_k8s_without_preview_url(monkeypatch):
+# ── Production signal 3: in K8s, no preview hostname, no preview_endpoint ─
+def test_lite_mode_engages_in_k8s_without_preview_signals(monkeypatch):
     _reset_worker()
     monkeypatch.setenv("HOSTNAME", "some-random-pod")
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "10.0.0.1")
-    monkeypatch.setenv("REACT_APP_BACKEND_URL", "https://aurem.live")
+    monkeypatch.delenv("preview_endpoint", raising=False)
     monkeypatch.delenv("AUREM_LITE_MODE", raising=False)
     monkeypatch.delenv("AUREM_FORCE_FULL_MODE", raising=False)
     from pillars.command_hub import worker as W
@@ -65,28 +65,18 @@ def test_lite_mode_engages_in_k8s_without_preview_url(monkeypatch):
 # ── Preview MUST keep full schedulers ─────────────────────────────────
 def test_full_mode_in_preview(monkeypatch):
     _reset_worker()
-    monkeypatch.setenv("HOSTNAME", "preview-pod-xyz")
+    monkeypatch.setenv("HOSTNAME", "agent-env-5face3c8-a8b0-4e26")
     monkeypatch.setenv("KUBERNETES_SERVICE_HOST", "10.0.0.1")
     monkeypatch.setenv(
-        "REACT_APP_BACKEND_URL",
+        "preview_endpoint",
         "https://ai-platform-preview-3.preview.emergentagent.com",
     )
     monkeypatch.delenv("AUREM_LITE_MODE", raising=False)
     monkeypatch.delenv("AUREM_FORCE_FULL_MODE", raising=False)
     from pillars.command_hub import worker as W
-    # Detection-only check: confirm _looks_like_production says NO.
-    # Don't actually start the worker (would launch real schedulers).
-    # We probe the closure by monkey-patching `_safe_task` to a no-op.
-    captured = {"started": False}
-    orig = W._safe_task
-    def _noop(coro, name):
-        captured["started"] = True
-        try: coro.close()
-        except Exception: pass
-        return None
-    monkeypatch.setattr(W, "_safe_task", _noop)
+    monkeypatch.setattr(W, "_safe_task",
+                        lambda c, n: (c.close(),) and None)
     result = W.start_pillar4_worker(db=object())
-    # In preview the worker should NOT short-circuit with LITE.
     assert "skipped_all_lite_mode" not in result, (
         "Preview must NOT engage LITE mode"
     )
