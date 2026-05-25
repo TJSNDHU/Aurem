@@ -238,8 +238,23 @@ export const useLuxeDashboardData = (token) => {
         ),
       },
       growth,
-      // iter 322bj — extra series from home aggregate (multi-line growth chart)
-      growthMulti: homeAgg?.growth || null,
+      // iter 322bj + 332b D-22 — normalize the multi-line growth payload.
+      // Backend returns an object keyed by series name. Convert it into
+      // an array of {m, revenue, leads, fixes, outreach, pixel} so the
+      // chart can render straight from `growthMulti` as a multi-line.
+      growthMulti: (() => {
+        const g = homeAgg?.growth;
+        if (!g || typeof g !== 'object' || Array.isArray(g)) return null;
+        const months = (g.revenue || g.leads || g.outreach || []).map(p => p.x);
+        return months.map((m, i) => ({
+          m,
+          revenue:  Number(g.revenue?.[i]?.y     ?? 0),
+          leads:    Number(g.leads?.[i]?.y       ?? 0),
+          fixes:    Number(g.auto_fixes?.[i]?.y  ?? 0),
+          outreach: Number(g.outreach?.[i]?.y    ?? 0),
+          pixel:    Number(g.pixel_views?.[i]?.y ?? 0),
+        }));
+      })(),
       pulseBars: homeAgg?.pulse_bars || [],
       websiteScan: {
         geo: homeAgg?.scan?.geo || scanGeo,

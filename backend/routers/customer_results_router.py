@@ -51,10 +51,14 @@ def _decode(token: str) -> dict:
 
 
 async def _ctx(request: Request) -> dict:
-    """Resolve {business_id, email} from the request JWT.
+    """Resolve {business_id, email, is_admin} from the request JWT.
 
     Falls back to looking up business_id from `platform_users` when the
     token is older and pre-dates the embedded business_id claim.
+
+    iter 332b D-22 — surfaces `is_admin` so platform-wide aggregate
+    fallbacks can light up the founder's dogfood dashboard instead of
+    sitting at zero forever.
     """
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -62,14 +66,24 @@ async def _ctx(request: Request) -> dict:
     claims = _decode(auth[7:])
     bin_id = claims.get("business_id") or ""
     email = (claims.get("email") or "").lower()
+    is_admin = bool(
+        claims.get("is_admin")
+        or claims.get("is_super_admin")
+        or claims.get("role") in ("admin", "super_admin")
+    )
     if not bin_id and email and _db is not None:
         u = await _db.platform_users.find_one(
-            {"email": email}, {"_id": 0, "business_id": 1}
+            {"email": email}, {"_id": 0, "business_id": 1, "role": 1, "is_admin": 1}
         )
         bin_id = (u or {}).get("business_id") or ""
-    if not bin_id:
+        if not is_admin:
+            is_admin = bool(
+                (u or {}).get("is_admin")
+                or (u or {}).get("role") in ("admin", "super_admin")
+            )
+    if not bin_id and not is_admin:
         raise HTTPException(403, "Token missing business context")
-    return {"business_id": bin_id, "email": email}
+    return {"business_id": bin_id, "email": email, "is_admin": is_admin}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -343,69 +357,93 @@ def _mask_handle(raw: str, channel: Optional[str]) -> str:
 # ═══════════════════════════════════════════════════════════════════════
 @router.get("/results-summary")
 async def results_summary(request: Request):
-    """4 KPIs over the last 30 days, no PII."""
+    """4 KPIs over the last 30 days, no PII.
+
+    iter 332b D-22 — admin/founder bypass: when caller is admin, drop
+    tenant filter so the dogfood dashboard shows platform-wide aggregate
+    numbers. Also pass BOTH datetime AND ISO-string `$gte` because
+    collections in the wild use both representations and a single-type
+    compare silently returns zero.
+    """
     ctx = await _ctx(request)
     bin_id = ctx["business_id"]
-    since = datetime.now(timezone.utc) - timedelta(days=30)
+    is_admin = ctx.get("is_admin")
+    since_dt = datetime.now(timezone.utc) - timedelta(days=30)
+    since_iso = since_dt.isoformat()
 
-    # Leads found — Scout writes here. We also count campaign_leads as a fallback.
+    def _scope(field: str):
+        return {} if is_admin else {field: bin_id}
+
+    def _since(field: str):
+        return {"$or": [
+            {field: {"$gte": since_dt}},
+            {field: {"$gte": since_iso}},
+        ]}
+
     leads_found = 0
     try:
         leads_found = await _db.campaign_leads.count_documents({
-            "tenant_id": bin_id, "created_at": {"$gte": since},
+            **_scope("tenant_id"), **_since("created_at"),
         })
     except Exception:
         pass
     if leads_found == 0:
         try:
             leads_found = await _db.agent_actions.count_documents({
-                "tenant_id": bin_id, "action_type": {"$in": ["scout_found", "lead_discovered"]},
-                "ts": {"$gte": since},
+                **_scope("tenant_id"),
+                "action_type": {"$in": ["scout_found", "lead_discovered"]},
+                **_since("ts"),
             })
         except Exception:
             pass
 
-    # Outreach sent — touchpoints with direction=outbound + status in {sent, delivered}
     outreach_sent = 0
     try:
         outreach_sent = await _db.touchpoints.count_documents({
-            "tenant_id": bin_id,
+            **_scope("tenant_id"),
             "direction": "outbound",
-            "ts": {"$gte": since},
+            **_since("ts"),
         })
     except Exception:
         pass
+    if outreach_sent == 0:
+        for coll in ("campaign_outbox", "messages_sent", "email_outbound"):
+            try:
+                outreach_sent += await _db[coll].count_documents({
+                    **_scope("business_id"), **_since("created_at"),
+                })
+            except Exception:
+                continue
 
-    # Responses — inbound touchpoints OR unified_inbox inbound.
     responses = 0
     try:
         responses = await _db.unified_inbox.count_documents({
-            "business_id": bin_id,
+            **_scope("business_id"),
             "direction": "inbound",
-            "timestamp": {"$gte": since},
+            **_since("timestamp"),
         })
     except Exception:
         pass
     if responses == 0:
         try:
             responses = await _db.touchpoints.count_documents({
-                "tenant_id": bin_id, "direction": "inbound", "ts": {"$gte": since},
+                **_scope("tenant_id"),
+                "direction": "inbound", **_since("ts"),
             })
         except Exception:
             pass
 
-    # Meetings booked — bookings collection.
     meetings = 0
     try:
         meetings = await _db.bookings.count_documents({
-            "business_id": bin_id,
-            "created_at": {"$gte": since},
+            **_scope("business_id"), **_since("created_at"),
         })
     except Exception:
         pass
 
     return {
         "ok": True,
+        "scope": "platform" if is_admin else "tenant",
         "window_days": 30,
         "leads_found": leads_found,
         "outreach_sent": outreach_sent,
@@ -508,11 +546,23 @@ async def results_pipeline(request: Request):
     """Lead count by pipeline stage this month. Counts only — no names.
 
     Uses `campaign_leads.lifecycle_stage` as the source of truth.
+    iter 332b D-22 — admin/founder bypass aggregates platform-wide.
     """
     ctx = await _ctx(request)
     bin_id = ctx["business_id"]
+    is_admin = ctx.get("is_admin")
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_iso = month_start.isoformat()
+
+    base_q: Dict[str, Any] = {} if is_admin else {"tenant_id": bin_id}
+    # iter 332b D-22 — `created_at` is stored as ISO string OR datetime
+    # depending on the writer. Match both with $or so a type mismatch
+    # never silently returns zero.
+    date_q = {"$or": [
+        {"created_at": {"$gte": month_start}},
+        {"created_at": {"$gte": month_iso}},
+    ]}
 
     out: List[Dict[str, Any]] = []
     total = 0
@@ -520,17 +570,29 @@ async def results_pipeline(request: Request):
         cnt = 0
         try:
             cnt = await _db.campaign_leads.count_documents({
-                "tenant_id": bin_id,
+                **base_q,
                 "lifecycle_stage": {"$in": aliases},
-                "created_at": {"$gte": month_start},
+                **date_q,
             })
         except Exception:
             pass
+        # iter 332b D-22 — fallback: many real campaign_leads rows don't
+        # carry `lifecycle_stage` at all (they're raw scout output). For
+        # the "Discovered" bucket we can fall back to ALL leads in the
+        # month so the founder sees the real top-of-funnel number.
+        if cnt == 0 and label == "Discovered":
+            try:
+                cnt = await _db.campaign_leads.count_documents({
+                    **base_q, **date_q,
+                })
+            except Exception:
+                pass
         total += cnt
         out.append({"stage": label, "count": cnt})
 
     return {
         "ok": True,
+        "scope": "platform" if is_admin else "tenant",
         "month_start": month_start.isoformat(),
         "total": total,
         "stages": out,
