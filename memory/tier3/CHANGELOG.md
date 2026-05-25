@@ -9454,3 +9454,43 @@ zero regressions).
 Live preview environment: 2-pane layout confirmed visually
 (`/admin/ora-chat` URL). All testids resolve:
 `ora-chat`, `ora-preview-column`, `preview-pane-empty`, `chat-input`.
+
+---
+
+## 2026-05-25 — iter 332b D-16 — Homepage Login Route + Admin Login 5xx Hardening
+
+### Founder bug report (Rule Zero)
+> "log in button must be land on https://aurem.live/my . and admin page
+> also not going through showing erron on signin"
+
+### Fixes
+1. **Homepage top-right "Log In"** now points at `/my` (was `/login`).
+   The smart-redirect handler (`handleSignIn` in `AuremHomepage.jsx`)
+   still short-circuits already-authenticated admin/dev/customer sessions
+   to their own dashboards — only the fallback for fresh visitors changed.
+2. **AdminLogin** now safe-parses the response body. Production 502s
+   return HTML, not JSON, so the previous `await res.json()` threw and
+   surfaced a misleading "Connection error". New branches:
+   - `502/503/504` → "Server is waking up. Wait a few seconds and try again."
+   - `5xx`         → "Server hiccup. Please try again in a moment."
+
+### Files
+- MOD `frontend/src/platform/AuremHomepage.jsx` (line 577 — Link target)
+- MOD `frontend/src/platform/AdminLogin.jsx`   (lines 107–139 — safe parse + 5xx branches)
+- NEW `backend/tests/test_iter332b_d16_login_routing.py` (3 cases, all passing)
+
+### Tests
+`test_iter332b_d16_login_routing.py` + regression on
+`test_iter332b_d6_dev_portal_admin_bypass.py` → **11 passed in 0.47 s**.
+
+### Smoke verification
+Headless screenshot on preview confirmed
+`document.querySelector('[data-testid="nav-link-login"]').href` ends in `/my`.
+
+### Note on production
+The aurem.live admin sign-in error the founder is seeing comes from a
+production-pod 502 (`https://aurem.live` and `https://live-support-3.emergent.host`
+both return Cloudflare 502 right now). The frontend fix above means
+*when production wakes up* the user will see the wake-up message and can
+retry, instead of a misleading "Connection error". The actual pod
+needs a redeploy/wake — that's an Emergent platform action.

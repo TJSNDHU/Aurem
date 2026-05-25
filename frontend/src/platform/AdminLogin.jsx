@@ -111,7 +111,14 @@ const AdminLogin = () => {
         body: JSON.stringify({ email, password, totp_code: totpCode || undefined }),
       });
 
-      const data = await res.json();
+      // iter 332b D-16 — Safe-parse the response body. On production 502
+      // gateway errors (sleeping pod, deploy in progress) the body is HTML,
+      // not JSON, so the previous `await res.json()` threw and dumped the
+      // user into a generic "Connection error" toast that hid the real
+      // cause. Now we read text, try JSON, and surface a precise message.
+      const raw = await res.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = {}; }
 
       if (res.ok && data.token) {
         setPlatformToken(data.token);
@@ -129,6 +136,10 @@ const AdminLogin = () => {
         setError('Account locked. Try again in 15 minutes.');
       } else if (res.status === 403) {
         setError('Access denied. Admin privileges required.');
+      } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+        setError('Server is waking up. Wait a few seconds and try again.');
+      } else if (res.status >= 500) {
+        setError('Server hiccup. Please try again in a moment.');
       } else {
         setError(data.detail || 'Invalid credentials');
       }
