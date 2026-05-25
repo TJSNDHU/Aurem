@@ -18,7 +18,10 @@ import AuremHomepage from "./platform/AuremHomepage";
 import BuildLog from "./platform/BuildLog";
 import CustomerEditPortal from "./pages/CustomerEditPortal";
 // AUTO-EAGER (iter 301): converted from lazy() because chunk-split hangs in this env
-import FaceIDAuthWrapper from './components/FaceIDAuthWrapper';
+// iter 332b D-17 — /login surface deleted by founder request. The old
+// FaceIDAuthWrapper page is gone; /login, /auth, /register all redirect
+// to /my which renders the Luxe customer dashboard (with its own embedded
+// auth overlay when no token is present).
 import AuremDashboard from './platform/AuremDashboard';
 import PlatformLanding from './platform/PlatformLanding';
 import AdminMissionControl from './platform/AdminMissionControl';
@@ -298,11 +301,11 @@ function AppRouter() {
       <Route path="/sample/:slug" element={<AuremSampleWebsite />} />
       <Route path="/edit" element={<CustomerEditPortal />} />
       <Route path="/platform" element={<PlatformLanding />} />
-      <Route path="/login" element={<FaceIDAuthWrapper />} />
+      <Route path="/login" element={<Navigate to="/my" replace />} />
       <Route path="/preview/luxe-dashboard" element={<LuxeDashboardPreview />} />
       <Route path="/preview/luxe-services" element={<LuxeServicesPreview />} />
-      <Route path="/auth" element={<Navigate to="/login" replace />} />
-      <Route path="/register" element={<Navigate to="/auth?mode=register" replace />} />
+      <Route path="/auth" element={<Navigate to="/my" replace />} />
+      <Route path="/register" element={<Navigate to="/my" replace />} />
       
       {/* Pricing */}
       <Route path="/pricing" element={<PricingPage />} />
