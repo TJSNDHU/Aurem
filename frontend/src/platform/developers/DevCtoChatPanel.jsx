@@ -14,8 +14,9 @@
  *      Refresh/logout never wipes a build session.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
+         Paperclip, Save, FileText, Image as ImageIcon } from "lucide-react";
 import { devAuthHeaders } from "./DeveloperShell";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -71,11 +72,48 @@ function stripContract(text) {
   return (text || "").replace(NEXTSTEPS_RE, "").trimEnd();
 }
 
+function humanSize(bytes) {
+  if (!bytes) return "0 B";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function Attachment({ att }) {
+  if (!att) return null;
+  const isImage = (att.mime || "").startsWith("image/");
+  const Icon = isImage ? ImageIcon : FileText;
+  return (
+    <a href={att.url} target="_blank" rel="noopener noreferrer"
+       data-testid="dev-cto-attachment-link"
+       style={{ display: "inline-flex", alignItems: "center", gap: 8,
+                marginTop: 6, padding: "8px 10px",
+                background: "rgba(0,0,0,0.30)",
+                border: "1px solid var(--dash-border)",
+                borderRadius: 6, fontSize: 12,
+                color: "#FFB070", textDecoration: "none",
+                maxWidth: "100%" }}>
+      <Icon size={14} />
+      <span style={{ overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap" }}>
+        {att.filename}
+      </span>
+      <span style={{ color: "var(--dash-text-faint)", fontSize: 10,
+                      fontFamily: "'JetBrains Mono', monospace" }}>
+        {humanSize(att.size)}
+      </span>
+    </a>
+  );
+}
+
 // ─── Component ─────────────────────────────────────────────────────────
 
 export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const scrollRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [messages, setMessages] = useState([WELCOME]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -88,10 +126,23 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
   const [dismissed, setDismissed] = useState(false);
   const [streamChars, setStreamChars] = useState(0);
 
-  // Load persisted history once on mount.
+  // iter 332b D-20 — uploads in progress + save-project modal state.
+  const [uploading, setUploading] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [saveDomain, setSaveDomain] = useState("");
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveOk, setSaveOk] = useState(null);
+
+  // Load persisted history OR a saved project, depending on `?project=` query.
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/api/developers/cto/chat/history`, { headers: devAuthHeaders() })
+    const params = new URLSearchParams(location.search);
+    const projectId = params.get("project");
+    const url = projectId
+      ? `${API}/api/developers/projects/${encodeURIComponent(projectId)}`
+      : `${API}/api/developers/cto/chat/history`;
+    fetch(url, { headers: devAuthHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(j => {
         if (cancelled) return;
@@ -101,7 +152,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
       })
       .catch(() => setHistoryLoaded(true));
     return () => { cancelled = true; };
-  }, []);
+  }, [location.search]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -239,6 +290,80 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
     setMessages([WELCOME]);
   }
 
+  // iter 332b D-20 — upload a file. We POST the multipart, then push a
+  // chat bubble with the attachment metadata. The model gets a textual
+  // hint with the URL so it can reference the file in its next reply.
+  async function handleFileSelect(e) {
+    const f = e.target.files?.[0];
+    e.target.value = "";  // allow re-uploading the same file
+    if (!f) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", f);
+      const r = await fetch(`${API}/api/developers/cto/uploads`, {
+        method: "POST", body: form, headers: devAuthHeaders(),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        let detail = `HTTP ${r.status}`;
+        try { detail = JSON.parse(t).detail || detail; } catch { /* */ }
+        throw new Error(detail);
+      }
+      const j = await r.json();
+      setMessages(m => [...m, {
+        role: "user",
+        content: `📎 Attached: ${j.filename} (${humanSize(j.size)})`,
+        attachment: {
+          file_id:  j.file_id,
+          filename: j.filename,
+          mime:     j.mime,
+          size:     j.size,
+          url:      `${API}${j.url}`,
+        },
+      }]);
+    } catch (err) {
+      setError(`Upload failed: ${err.message || err}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSaveProject() {
+    const title = saveTitle.trim();
+    if (!title) {
+      setSaveOk({ ok: false, msg: "Title is required." });
+      return;
+    }
+    setSaveBusy(true);
+    setSaveOk(null);
+    try {
+      const r = await fetch(`${API}/api/developers/projects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+        body: JSON.stringify({ title, domain: saveDomain.trim() || null }),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error((() => { try { return JSON.parse(t).detail; }
+                                  catch { return t; } })() || `HTTP ${r.status}`);
+      }
+      setSaveOk({ ok: true, msg: "Saved. Pinned to the sidebar." });
+      window.dispatchEvent(new Event("dev-cto-project-saved"));
+      setTimeout(() => {
+        setShowSaveModal(false);
+        setSaveTitle("");
+        setSaveDomain("");
+        setSaveOk(null);
+      }, 900);
+    } catch (err) {
+      setSaveOk({ ok: false, msg: String(err.message || err) });
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
   // Full-screen layout fills the page; embedded mode keeps the legacy card.
   const wrapperStyle = fullScreen
     ? {
@@ -289,18 +414,32 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
             </div>
           </div>
           {historyLoaded && (
-            <button data-testid="dev-cto-chat-clear"
-                     onClick={clearHistory}
-                     title="Clear chat history"
-                     style={{ background: "transparent",
-                              border: "1px solid var(--dash-border)",
-                              color: "var(--dash-text-muted)",
-                              borderRadius: 4, padding: "6px 10px",
-                              fontSize: 11, cursor: "pointer",
-                              display: "inline-flex", alignItems: "center",
-                              gap: 6 }}>
-              <Trash2 size={12} /> Clear
-            </button>
+            <>
+              <button data-testid="dev-cto-chat-save"
+                       onClick={() => setShowSaveModal(true)}
+                       title="Save this build as a project"
+                       style={{ background: "rgba(255,107,0,0.10)",
+                                border: "1px solid rgba(255,107,0,0.30)",
+                                color: "#FFB070",
+                                borderRadius: 4, padding: "6px 10px",
+                                fontSize: 11, cursor: "pointer",
+                                display: "inline-flex", alignItems: "center",
+                                gap: 6 }}>
+                <Save size={12} /> Save project
+              </button>
+              <button data-testid="dev-cto-chat-clear"
+                       onClick={clearHistory}
+                       title="Clear chat history"
+                       style={{ background: "transparent",
+                                border: "1px solid var(--dash-border)",
+                                color: "var(--dash-text-muted)",
+                                borderRadius: 4, padding: "6px 10px",
+                                fontSize: 11, cursor: "pointer",
+                                display: "inline-flex", alignItems: "center",
+                                gap: 6 }}>
+                <Trash2 size={12} /> Clear
+              </button>
+            </>
           )}
         </div>
 
@@ -339,6 +478,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
                                 ? "1px solid rgba(255,179,107,0.30)"
                                 : "1px solid rgba(255,255,255,0.06)" }}>
                   {displayed || (busy && m.role === "assistant" ? "…" : "")}
+                  {m.attachment && <Attachment att={m.attachment} />}
                 </div>
               </div>
             );
@@ -391,6 +531,27 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
         <div style={{ display: "flex", gap: 10, padding: "12px 18px",
                       borderTop: "1px solid var(--dash-divider)",
                       background: "rgba(0,0,0,0.20)" }}>
+          {/* iter 332b D-20 — upload button. Hidden native input
+              triggered by the visible icon button. */}
+          <input ref={fileInputRef}
+                  type="file"
+                  data-testid="dev-cto-chat-file-input"
+                  onChange={handleFileSelect}
+                  style={{ display: "none" }} />
+          <button data-testid="dev-cto-chat-upload"
+                   onClick={() => fileInputRef.current?.click()}
+                   disabled={uploading || busy}
+                   title="Attach a file (max 25 MB)"
+                   style={{ background: "rgba(255,255,255,0.04)",
+                            border: "1px solid var(--dash-border)",
+                            color: uploading
+                              ? "var(--dash-orange)"
+                              : "var(--dash-text-muted)",
+                            borderRadius: 4, padding: "0 12px",
+                            cursor: uploading ? "not-allowed" : "pointer",
+                            display: "flex", alignItems: "center" }}>
+            <Paperclip size={14} />
+          </button>
           <textarea data-testid="dev-cto-chat-input"
                      value={input} onChange={e => setInput(e.target.value)}
                      onKeyDown={onKey}
@@ -414,6 +575,102 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
           </button>
         </div>
       </div>
+
+      {/* iter 332b D-20 — Save-as-project modal */}
+      {showSaveModal && (
+        <div data-testid="dev-cto-save-modal"
+             style={{ position: "fixed", inset: 0,
+                      background: "rgba(0,0,0,0.78)",
+                      display: "flex", alignItems: "center",
+                      justifyContent: "center", zIndex: 9999,
+                      padding: 20 }}>
+          <div style={{ maxWidth: 460, width: "100%",
+                        background: "#0F0F1A",
+                        border: "1px solid rgba(255,107,0,0.45)",
+                        borderRadius: 8, padding: 26 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10,
+                          marginBottom: 16 }}>
+              <Save size={20} style={{ color: "#FF8C35" }} />
+              <h2 style={{ fontSize: 17, fontWeight: 600,
+                            color: "#F0EDE8", margin: 0,
+                            fontFamily: "'Cinzel', serif" }}>
+                Save this build
+              </h2>
+            </div>
+            <p style={{ fontSize: 12, color: "var(--dash-text-muted)",
+                        lineHeight: 1.6, marginBottom: 14 }}>
+              We'll snapshot the conversation and pin it to your sidebar
+              so you can come back to it anytime — even after a logout.
+            </p>
+            <label style={{ fontSize: 10, letterSpacing: "0.18em",
+                              textTransform: "uppercase",
+                              color: "var(--dash-text-muted)" }}>
+              Project title
+            </label>
+            <input data-testid="dev-cto-save-title"
+                    value={saveTitle}
+                    onChange={e => setSaveTitle(e.target.value)}
+                    placeholder="e.g. Internal admin dashboard v1"
+                    autoFocus
+                    style={{ width: "100%", marginTop: 4, marginBottom: 12,
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid var(--dash-border)",
+                              color: "#F0EDE8", padding: "9px 11px",
+                              borderRadius: 4, fontSize: 13,
+                              fontFamily: "inherit", outline: "none",
+                              boxSizing: "border-box" }} />
+            <label style={{ fontSize: 10, letterSpacing: "0.18em",
+                              textTransform: "uppercase",
+                              color: "var(--dash-text-muted)" }}>
+              Domain (optional)
+            </label>
+            <input data-testid="dev-cto-save-domain"
+                    value={saveDomain}
+                    onChange={e => setSaveDomain(e.target.value)}
+                    placeholder="e.g. admin.acme.com"
+                    style={{ width: "100%", marginTop: 4, marginBottom: 18,
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid var(--dash-border)",
+                              color: "#F0EDE8", padding: "9px 11px",
+                              borderRadius: 4, fontSize: 13,
+                              fontFamily: "'JetBrains Mono', monospace",
+                              outline: "none",
+                              boxSizing: "border-box" }} />
+            {saveOk && (
+              <div data-testid="dev-cto-save-status"
+                   style={{ fontSize: 12,
+                            color: saveOk.ok ? "var(--dash-green)" : "#FF6060",
+                            marginBottom: 12 }}>
+                {saveOk.msg}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button data-testid="dev-cto-save-confirm"
+                       onClick={handleSaveProject}
+                       disabled={saveBusy || !saveTitle.trim()}
+                       style={{ flex: 1, padding: "10px 18px",
+                                background: "linear-gradient(135deg, #FF6B00, #FF8C35)",
+                                color: "#fff", border: "none", borderRadius: 4,
+                                fontSize: 13, fontWeight: 500,
+                                cursor: saveBusy ? "not-allowed" : "pointer",
+                                opacity: saveBusy ? 0.5 : 1 }}>
+                {saveBusy ? "Saving…" : "Save project"}
+              </button>
+              <button data-testid="dev-cto-save-cancel"
+                       onClick={() => { setShowSaveModal(false); setSaveOk(null); }}
+                       disabled={saveBusy}
+                       style={{ padding: "10px 18px",
+                                background: "transparent",
+                                border: "1px solid var(--dash-border)",
+                                color: "var(--dash-text-muted)",
+                                borderRadius: 4, fontSize: 13,
+                                cursor: "pointer" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Token-low modal — unchanged */}
       {showLowModal && (

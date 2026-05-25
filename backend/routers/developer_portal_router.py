@@ -368,6 +368,174 @@ async def cto_chat_history_clear(authorization: str = Header(None)) -> dict[str,
     return {"ok": True, "cleared": int(res.modified_count)}
 
 
+# ── Projects + uploads (iter 332b D-20) ────────────────────────────
+#
+# Save-as-project flow: when CTO finishes a build the developer clicks
+# "Save project" → POSTs title + optional domain. We persist a row that
+# *snapshots* the current chat history and a file-attachments list so
+# the dev can reopen the build later from the sidebar.
+#
+# Uploads: chat-attached files are written to /app/data/dev_uploads/
+# under the dev's user_id. Served back via /api/developers/cto/uploads/
+# {file_id} with ownership check.
+
+from fastapi import UploadFile, File, Form
+from fastapi.responses import FileResponse
+from pathlib import Path
+
+_UPLOAD_ROOT = Path(os.environ.get("DEV_UPLOAD_ROOT", "/app/data/dev_uploads"))
+_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+_MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB / file
+
+
+class ProjectSaveBody(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+    domain: str | None = Field(default=None, max_length=253)
+
+
+@router.post("/api/developers/projects")
+async def save_project(body: ProjectSaveBody,
+                        authorization: str = Header(None)) -> dict[str, Any]:
+    """Snapshot the current chat session as a saved project. Domain is
+    optional and stored verbatim — no DNS check here, the dev can wire
+    it up later from /developers/connect."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    session = await _db.developer_chat_sessions.find_one(
+        {"user_id": me["user_id"], "session_id": "default"},
+        {"_id": 0, "messages": 1},
+    )
+    messages = (session or {}).get("messages") or []
+    project_id = "proj_" + secrets.token_urlsafe(9)
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "user_id":      me["user_id"],
+        "project_id":   project_id,
+        "title":        body.title.strip(),
+        "domain":       (body.domain or "").strip() or None,
+        "messages":     messages,
+        "created_at":   now,
+        "updated_at":   now,
+    }
+    await _db.developer_projects.insert_one(doc)
+    doc.pop("_id", None)
+    return {"ok": True, "project": doc}
+
+
+@router.get("/api/developers/projects")
+async def list_projects(authorization: str = Header(None)) -> dict[str, Any]:
+    """List the dev's saved projects, newest first. iter 332b D-20."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        return {"projects": []}
+    cursor = _db.developer_projects.find(
+        {"user_id": me["user_id"]},
+        {"_id": 0, "project_id": 1, "title": 1, "domain": 1,
+         "created_at": 1, "updated_at": 1},
+    ).sort("created_at", -1).limit(50)
+    rows = await cursor.to_list(length=50)
+    return {"projects": rows}
+
+
+@router.get("/api/developers/projects/{project_id}")
+async def load_project(project_id: str,
+                        authorization: str = Header(None)) -> dict[str, Any]:
+    """Load one project (with full message history). Click-to-resume in
+    the sidebar uses this. Ownership-checked: a dev can only load their
+    own projects. iter 332b D-20."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    row = await _db.developer_projects.find_one(
+        {"user_id": me["user_id"], "project_id": project_id},
+        {"_id": 0},
+    )
+    if not row:
+        raise HTTPException(404, "project_not_found")
+    return row
+
+
+@router.delete("/api/developers/projects/{project_id}")
+async def delete_project(project_id: str,
+                          authorization: str = Header(None)) -> dict[str, Any]:
+    me = await _current_dev(authorization)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    res = await _db.developer_projects.delete_one(
+        {"user_id": me["user_id"], "project_id": project_id},
+    )
+    if res.deleted_count == 0:
+        raise HTTPException(404, "project_not_found")
+    return {"ok": True}
+
+
+@router.post("/api/developers/cto/uploads")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    """Chat attachment upload. Stores under /app/data/dev_uploads/{user_id}/.
+    25 MB hard cap. Returns a stable URL the chat can render inline.
+    iter 332b D-20."""
+    me = await _current_dev(authorization)
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "empty_file")
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "file_too_large_25mb")
+    file_id = secrets.token_urlsafe(12)
+    user_dir = _UPLOAD_ROOT / me["user_id"]
+    user_dir.mkdir(parents=True, exist_ok=True)
+    # Preserve the file extension so the browser sniffs the right MIME.
+    suffix = Path(file.filename or "").suffix[:16]
+    disk_path = user_dir / f"{file_id}{suffix}"
+    disk_path.write_bytes(raw)
+    meta = {
+        "user_id":      me["user_id"],
+        "file_id":      file_id,
+        "filename":     file.filename or "upload",
+        "mime":         file.content_type or "application/octet-stream",
+        "size":         len(raw),
+        "path":         str(disk_path),
+        "created_at":   datetime.now(timezone.utc).isoformat(),
+    }
+    if _db is not None:
+        await _db.developer_uploads.insert_one(dict(meta))
+    return {
+        "ok":       True,
+        "file_id":  file_id,
+        "filename": meta["filename"],
+        "mime":     meta["mime"],
+        "size":     meta["size"],
+        "url":      f"/api/developers/cto/uploads/{file_id}",
+    }
+
+
+@router.get("/api/developers/cto/uploads/{file_id}")
+async def get_upload(file_id: str,
+                      authorization: str = Header(None)):
+    """Authenticated download. A dev can only fetch files they
+    uploaded. iter 332b D-20."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        raise HTTPException(503, "db not ready")
+    row = await _db.developer_uploads.find_one(
+        {"user_id": me["user_id"], "file_id": file_id},
+        {"_id": 0, "path": 1, "mime": 1, "filename": 1},
+    )
+    if not row:
+        raise HTTPException(404, "upload_not_found")
+    disk = Path(row["path"])
+    if not disk.exists():
+        raise HTTPException(410, "upload_purged")
+    return FileResponse(
+        path=str(disk),
+        media_type=row.get("mime") or "application/octet-stream",
+        filename=row.get("filename") or file_id,
+    )
+
+
 # ── Pixel domain validation ────────────────────────────────────────
 
 class PixelDomainBody(BaseModel):

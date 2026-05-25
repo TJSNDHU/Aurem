@@ -371,6 +371,32 @@ function DashboardTopbar({ me, theme, toggleTheme }) {
 
 function DashboardSidebar({ me, collapsed, onToggle }) {
   const loc = useLocation();
+  const navigate = useNavigate();
+  // iter 332b D-20 — saved projects list, sourced from
+  // /api/developers/projects. Click a row to deep-link to
+  // /developers/dashboard?project=<id> which the chat panel then loads.
+  const [projects, setProjects] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const r = await fetch(`${API}/api/developers/projects`,
+                               { headers: devAuthHeaders() });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled) setProjects(j.projects || []);
+      } catch { /* ignore */ }
+    }
+    load();
+    // Refresh when chat panel signals a new save.
+    function onSaved() { load(); }
+    window.addEventListener("dev-cto-project-saved", onSaved);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("dev-cto-project-saved", onSaved);
+    };
+  }, []);
+
   return (
     <aside className={`av2-sidebar av2-scroll${collapsed ? " av2-sidebar--collapsed" : ""}`}
            data-testid="dev-sidebar"
@@ -459,6 +485,72 @@ function DashboardSidebar({ me, collapsed, onToggle }) {
           );
         })}
       </nav>
+
+      {/* iter 332b D-20 — Saved projects strip. Only renders when the
+          sidebar is expanded; otherwise we'd waste vertical space. */}
+      {!collapsed && (
+        <div data-testid="dev-sidebar-projects"
+             style={{ marginTop: 18, paddingTop: 14,
+                      borderTop: "1px solid var(--dash-divider)" }}>
+          <div className="av2-section-label"
+               style={{ fontSize: 10, letterSpacing: "0.18em",
+                        color: "var(--dash-text-faint)",
+                        textTransform: "uppercase",
+                        marginBottom: 8, padding: "0 10px",
+                        display: "flex", justifyContent: "space-between" }}>
+            <span>Saved projects</span>
+            <span data-testid="dev-sidebar-projects-count">
+              {projects.length}
+            </span>
+          </div>
+          {projects.length === 0 ? (
+            <div data-testid="dev-sidebar-projects-empty"
+                 style={{ fontSize: 11, color: "var(--dash-text-faint)",
+                          padding: "6px 10px", lineHeight: 1.5 }}>
+              Save a build from the chat to pin it here.
+            </div>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0,
+                          display: "flex", flexDirection: "column", gap: 2,
+                          maxHeight: 240, overflowY: "auto" }}>
+              {projects.map(p => (
+                <li key={p.project_id}>
+                  <button data-testid={`dev-sidebar-project-${p.project_id}`}
+                           onClick={() => navigate(
+                             `/developers/dashboard?project=${encodeURIComponent(p.project_id)}`
+                           )}
+                           title={p.domain || ""}
+                           style={{ width: "100%", textAlign: "left",
+                                    background: loc.search.includes(p.project_id)
+                                      ? "var(--dash-nav-active-bg)"
+                                      : "transparent",
+                                    border: "none",
+                                    color: "var(--dash-text)",
+                                    padding: "7px 10px", borderRadius: 6,
+                                    fontSize: 12,
+                                    fontFamily: "inherit",
+                                    cursor: "pointer",
+                                    display: "flex", flexDirection: "column",
+                                    gap: 2 }}>
+                    <span style={{ overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap" }}>
+                      {p.title}
+                    </span>
+                    {p.domain && (
+                      <span style={{ fontSize: 10,
+                                      color: "var(--dash-text-faint)",
+                                      fontFamily: "'JetBrains Mono', monospace" }}>
+                        {p.domain}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {me && !collapsed && (
         <div className="av2-sidebar-footer"
               style={{
