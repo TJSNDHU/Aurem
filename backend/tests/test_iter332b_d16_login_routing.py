@@ -25,12 +25,13 @@ def test_homepage_login_link_lands_on_my():
 
 
 def test_homepage_login_keeps_smart_redirect():
-    """Regression: /my fallback must NOT remove the smart-redirect that
-    short-circuits already-authenticated admin/dev/customer sessions."""
+    """iter 332b D-18 — Smart-redirect REMOVED per founder. The handler
+    is now a no-op so the Link's `to="/my"` is the only destination."""
     src = open("/app/frontend/src/platform/AuremHomepage.jsx").read()
     assert "handleSignIn" in src
-    assert "/admin/mission-control" in src
-    assert "/developers/dashboard" in src
+    # No more dashboard-specific bounces from the homepage Log In.
+    assert "/admin/mission-control" not in src or "handleSignIn = (_e)" in src
+    assert "/developers/dashboard" not in src or "handleSignIn = (_e)" in src
 
 
 def test_admin_login_handles_502_gracefully():

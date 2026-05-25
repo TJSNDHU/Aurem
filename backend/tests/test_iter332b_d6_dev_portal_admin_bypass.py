@@ -162,10 +162,11 @@ def test_dev_dashboard_declares_purchases_state():
 
 
 def test_homepage_signin_has_smart_redirect():
-    """Top-right Log In must short-circuit to the right dashboard
-    when the visitor is already authenticated (admin / dev / customer)."""
+    """iter 332b D-18 — Founder reverted the smart-redirect: the top-right
+    Log In must now ALWAYS land on /my. The handler exists as a no-op so
+    the Link's href is the single source of truth for the destination."""
     src = open("/app/frontend/src/platform/AuremHomepage.jsx").read()
     assert "handleSignIn" in src
-    assert "/admin/mission-control" in src
-    assert "/developers/dashboard" in src
     assert "data-testid=\"nav-link-login\"" in src
+    # The Link itself must point at /my.
+    assert 'to="/my"' in src and 'data-testid="nav-link-login"' in src
