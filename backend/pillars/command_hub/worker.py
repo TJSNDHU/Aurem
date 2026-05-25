@@ -113,11 +113,38 @@ def start_pillar4_worker(
         a memory-constrained K8s pod that's OOM-restarting).
       • AUREM_DISABLE_SCHEDULERS=<csv> — disable specific scheduler names
         (e.g. "qa_agent_deep,backup_loop,clawchief_daily_sweep").
+
+    iter 332b D-24 — auto-detect production. The user's deployment UI
+    doesn't expose env-var editing, so we infer "this is production" from
+    signals K8s sets automatically and switch to LITE mode by default.
+    Preview/dev keeps the full scheduler set running.
     """
     global _worker_started
     import os as _os
-    if _os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes"):
-        print("[p4-worker] LITE MODE — all 34 schedulers DISABLED via env",
+
+    def _looks_like_production() -> bool:
+        """Best-effort sniff for the Emergent K8s production runtime."""
+        # Explicit opt-in/out beats heuristics.
+        if _os.environ.get("AUREM_FORCE_FULL_MODE", "").strip() in ("1", "true", "yes"):
+            return False
+        if _os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes"):
+            return True
+        # Emergent production hostnames + K8s pod env vars.
+        host = (_os.environ.get("HOSTNAME") or "").lower()
+        if "live-support" in host or "emergent.host" in host:
+            return True
+        if _os.environ.get("KUBERNETES_SERVICE_HOST"):
+            # We're inside K8s. Combined with the absence of the standard
+            # preview-only "preview.emergentagent.com" host, treat as prod.
+            backend = (_os.environ.get("REACT_APP_BACKEND_URL")
+                        or _os.environ.get("APP_URL") or "").lower()
+            if "preview.emergentagent.com" not in backend:
+                return True
+        return False
+
+    if _looks_like_production():
+        print("[p4-worker] PRODUCTION DETECTED — LITE MODE engaged, "
+              "all 34 schedulers DISABLED (set AUREM_FORCE_FULL_MODE=1 to override)",
               flush=True)
         _worker_started = True
         return {"started": [], "failed": [], "skipped_all_lite_mode": True}
