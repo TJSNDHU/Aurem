@@ -360,6 +360,12 @@ def _backend_pulse(coll_name: str, pillar_live_count: int, live_names: set[str])
     if _in_boot_grace():
         elapsed = int((datetime.now(timezone.utc) - _PROCESS_STARTED_AT).total_seconds())
         return "yellow", f"booting · orchestrator grace ({elapsed}s / {int(_ORCH_GRACE_SECONDS)}s)"
+    # iter D-34 — LITE-mode demote. If EVERY writer is a `p4:*` scheduler
+    # and the pod is in LITE mode, the writer is intentionally paused on
+    # prod to save RAM (D-13 work). Surface as yellow `lite_mode` instead
+    # of an outage-style red.
+    if writers and all(w.startswith("p4:") for w in writers) and _is_lite_mode():
+        return "yellow", "lite_mode — writer paused on prod (saves RAM)"
     return "red", f"0/{len(writers)} writers live"
 
 
@@ -394,6 +400,34 @@ def _pick_worst(*statuses: str) -> str:
     if "yellow" in statuses:
         return "yellow"
     return "green"
+
+
+# iter D-34 — Module-level LITE-mode detector. Memoized after first call.
+_LITE_MODE_CACHE: Optional[bool] = None
+
+
+def _is_lite_mode() -> bool:
+    """Returns True when AUREM_LITE_MODE=1 OR the pod hostname looks like
+    Emergent production (so we never alarm the founder over schedulers
+    that prod intentionally disables to save RAM)."""
+    global _LITE_MODE_CACHE
+    if _LITE_MODE_CACHE is not None:
+        return _LITE_MODE_CACHE
+    try:
+        env_flag = os.environ.get("AUREM_LITE_MODE", "").strip()
+        if env_flag in ("1", "true", "yes", "on"):
+            _LITE_MODE_CACHE = True
+            return True
+        host = (os.environ.get("HOSTNAME") or "").lower()
+        is_prod_pod = (
+            ("live-support" in host or "emergent.host" in host)
+            and not host.startswith("agent-env-")
+        )
+        _LITE_MODE_CACHE = bool(is_prod_pod)
+    except Exception:
+        _LITE_MODE_CACHE = False
+    return _LITE_MODE_CACHE
+
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1021,6 +1055,21 @@ async def _check_flow(flow: dict, live_names: set[str]) -> dict:
     sched_alive = [s for s in sched_required if s in live_names]
     sched_missing = [s for s in sched_required if s not in live_names]
 
+    # iter D-34 — LITE-mode awareness at the FLOW level.
+    # Production runs with AUREM_LITE_MODE=1 to suppress 34 heavy P4
+    # schedulers (saves ~700Mi RAM per pod). When the schedulers are
+    # disabled ON PURPOSE, every flow that lists `p4:*` in its
+    # required_schedulers would otherwise paint RED on the production
+    # dashboard. Downgrade these to a "lite_mode" green-with-info state
+    # so the founder sees calm "lite mode" instead of an outage.
+    if sched_missing and _is_lite_mode():
+        lite_disabled = [s for s in sched_missing if s.startswith("p4:")]
+        still_required = [s for s in sched_missing if not s.startswith("p4:")]
+        if lite_disabled and not still_required:
+            sched_missing = []          # don't paint red
+            # capture for downstream display:
+            flow["_lite_disabled_schedulers"] = lite_disabled
+
     if be_error:
         be_side = "red"
         be_reason = f"endpoint error: {be_error}"
@@ -1196,9 +1245,23 @@ async def _gather_pillar(key: str, spec: dict) -> dict:
 
         silent = False
         if expects_writes and n and n > 0 and (last_write is None or last_write < threshold):
-            db_side = "red"
-            db_reason = f"no writes within {coll_threshold_min} min (silent failure)"
-            silent = True
+            # iter D-34 — LITE-mode demote. If the writer for this
+            # collection is a `p4:*` scheduler and we're running LITE
+            # (prod), the staleness is BY DESIGN — surface it as
+            # `lite_mode` (yellow-info) rather than red silent-failure.
+            writers = COLLECTION_WRITERS.get(coll_name, []) or []
+            all_p4 = writers and all(w.startswith("p4:") for w in writers)
+            if all_p4 and _is_lite_mode():
+                db_side = "yellow"
+                db_reason = (
+                    f"lite_mode — writer paused on prod to save RAM "
+                    f"(last write {coll_threshold_min}min+ ago)"
+                )
+                silent = False
+            else:
+                db_side = "red"
+                db_reason = f"no writes within {coll_threshold_min} min (silent failure)"
+                silent = True
         elif n == 0 and not empty_ok:
             db_side = "yellow"
             db_reason = "collection empty (seed expected)"
