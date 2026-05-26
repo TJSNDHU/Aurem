@@ -898,6 +898,17 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] Compliance router wired")
                 except Exception as _comp_e:
                     logger.warning(f"[REGISTRY] compliance router failed: {_comp_e}")
+
+                # iter 332b D-30 — Developer self-deploy + domain linking
+                try:
+                    from routers.developer_deploy_router import (
+                        router as _dep_router, set_db as _set_dep_db,
+                    )
+                    app.include_router(_dep_router)
+                    _set_dep_db(db)
+                    logger.info("[REGISTRY] developer_deploy_router wired")
+                except Exception as _dep_e:
+                    logger.warning(f"[REGISTRY] developer_deploy_router not loaded: {_dep_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

@@ -898,6 +898,13 @@ SYSTEM_FLOWS: list[dict] = [
         "required_schedulers": [],
     },
     # iter 282al-5 — Legion Sovereign Node (Ollama local LLM) — Infra pillar.
+    # iter 332b D-30 — non_blocking: Ollama is an OPT-IN sovereign local LLM
+    # node. Most tenants (including the founder's preview + production) do
+    # not run Ollama, so `local_llm_usage` is naturally stale. This flow
+    # still surfaces red in the UI for visibility but MUST NOT escalate
+    # admin_worst → red and trigger the global "broken" badge. The previous
+    # logic was painting the entire admin dashboard red purely because
+    # nobody was using the optional Ollama feature.
     {
         "id": "admin_legion_sovereign_node",
         "surface": "admin",
@@ -907,6 +914,7 @@ SYSTEM_FLOWS: list[dict] = [
         "required_collections": [],
         "activity_collections": ["local_llm_usage"],
         "required_schedulers": [],
+        "non_blocking": True,
     },
 ]
 
@@ -1108,6 +1116,7 @@ async def _check_flow(flow: dict, live_names: set[str]) -> dict:
         "fe_route": flow["fe_route"],
         "be_endpoint": flow["be_endpoint"],
         "status":   overall,
+        "non_blocking": bool(flow.get("non_blocking", False)),
         "triple_pulse": {
             "db":       {"status": db_side, "reason": db_reason,
                          "collections": coll_names,
@@ -1539,11 +1548,15 @@ async def overview(authorization: Optional[str] = Header(None)):
     sentinel_overlay = await _fetch_sentinel_overlay()
     _merge_sentinel_into_pillar(pillars, sentinel_overlay)
 
-    # Interface desync
+    # Interface desync — only BLOCKING flows escalate admin/customer worst.
+    # iter 332b D-30 — advisory flows (e.g. opt-in Ollama node) stay visible
+    # in the UI but no longer flip the global verdict.
     admin_flows = [f for f in flows if f["surface"] == "admin"]
     customer_flows = [f for f in flows if f["surface"] == "customer"]
-    admin_worst = _pick_worst(*[f["status"] for f in admin_flows]) if admin_flows else "green"
-    customer_worst = _pick_worst(*[f["status"] for f in customer_flows]) if customer_flows else "green"
+    admin_blocking = [f for f in admin_flows if not f.get("non_blocking")]
+    customer_blocking = [f for f in customer_flows if not f.get("non_blocking")]
+    admin_worst = _pick_worst(*[f["status"] for f in admin_blocking]) if admin_blocking else "green"
+    customer_worst = _pick_worst(*[f["status"] for f in customer_blocking]) if customer_blocking else "green"
     interface_desync = (
         admin_worst == "green" and customer_worst in ("red", "yellow")
     ) or (
@@ -1569,13 +1582,16 @@ async def overview(authorization: Optional[str] = Header(None)):
     wires_red = wires_red_blocking + wires_red_advisory
     wires_yellow = sum(1 for w in wires if w["status"] == "yellow" and not w.get("non_blocking"))
     wires_idle = sum(1 for w in wires if w["status"] == "idle")
-    flows_red = sum(1 for f in flows if f["status"] == "red")
+    flows_red_blocking = sum(1 for f in flows if f["status"] == "red" and not f.get("non_blocking"))
+    flows_red_advisory = sum(1 for f in flows if f["status"] == "red" and f.get("non_blocking"))
+    flows_red = flows_red_blocking + flows_red_advisory
+    flows_yellow_blocking = sum(1 for f in flows if f["status"] == "yellow" and not f.get("non_blocking"))
     flows_yellow = sum(1 for f in flows if f["status"] == "yellow")
 
-    # Wiring failure escalates pillar verdict — but ONLY blocking wires
-    if wires_red_blocking > 0 or flows_red > 0:
+    # Wiring failure escalates pillar verdict — but ONLY blocking wires/flows
+    if wires_red_blocking > 0 or flows_red_blocking > 0:
         worst = "red"
-    elif (wires_yellow > 0 or flows_yellow > 0) and worst == "green":
+    elif (wires_yellow > 0 or flows_yellow_blocking > 0) and worst == "green":
         worst = "yellow"
 
     snapshot = {
@@ -1600,6 +1616,8 @@ async def overview(authorization: Optional[str] = Header(None)):
             "wires_idle": wires_idle,
             "flows_total": len(flows),
             "flows_red": flows_red,
+            "flows_red_blocking": flows_red_blocking,
+            "flows_red_advisory": flows_red_advisory,
             "flows_yellow": flows_yellow,
         },
         "silent_failure_threshold_minutes": SILENT_FAILURE_MINUTES,
@@ -1661,9 +1679,12 @@ async def flows(authorization: Optional[str] = Header(None)):
     admin_rows = [f for f in flow_rows if f["surface"] == "admin"]
     customer_rows = [f for f in flow_rows if f["surface"] == "customer"]
 
-    # Interface Desync detection: admin all green but customer has red/yellow
-    admin_worst = _pick_worst(*[f["status"] for f in admin_rows]) if admin_rows else "green"
-    customer_worst = _pick_worst(*[f["status"] for f in customer_rows]) if customer_rows else "green"
+    # Interface Desync — only blocking flows escalate the verdict.
+    # iter 332b D-30 — see overview() for rationale.
+    admin_blocking = [f for f in admin_rows if not f.get("non_blocking")]
+    customer_blocking = [f for f in customer_rows if not f.get("non_blocking")]
+    admin_worst = _pick_worst(*[f["status"] for f in admin_blocking]) if admin_blocking else "green"
+    customer_worst = _pick_worst(*[f["status"] for f in customer_blocking]) if customer_blocking else "green"
     interface_desync = (
         admin_worst == "green" and customer_worst in ("red", "yellow")
     ) or (

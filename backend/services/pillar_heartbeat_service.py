@@ -78,15 +78,55 @@ async def pillar_heartbeat_scheduler(db) -> None:
                 if p.get("status") == "yellow":
                     worst = "yellow"
 
-            wires_red = sum(1 for w in wires if w["status"] == "red")
-            wires_yellow = sum(1 for w in wires if w["status"] == "yellow")
+            from routers.pillars_map_router import _pick_worst as _pw
+            # iter 332b D-30 — exclude non_blocking flows from verdict escalation.
+            # Advisory flows (e.g. opt-in Ollama Sovereign Node) stay visible
+            # red in the UI but do NOT flip the global "Broken" badge.
+            wires_red_blocking = sum(
+                1 for w in wires
+                if w["status"] == "red" and not w.get("non_blocking")
+            )
+            wires_red_advisory = sum(
+                1 for w in wires
+                if w["status"] == "red" and w.get("non_blocking")
+            )
+            wires_red = wires_red_blocking + wires_red_advisory
+            wires_yellow = sum(
+                1 for w in wires
+                if w["status"] == "yellow" and not w.get("non_blocking")
+            )
             wires_idle = sum(1 for w in wires if w["status"] == "idle")
-            flows_red = sum(1 for f in flows if f["status"] == "red")
+            flows_red_blocking = sum(
+                1 for f in flows
+                if f["status"] == "red" and not f.get("non_blocking")
+            )
+            flows_red_advisory = sum(
+                1 for f in flows
+                if f["status"] == "red" and f.get("non_blocking")
+            )
+            flows_red = flows_red_blocking + flows_red_advisory
+            flows_yellow_blocking = sum(
+                1 for f in flows
+                if f["status"] == "yellow" and not f.get("non_blocking")
+            )
             flows_yellow = sum(1 for f in flows if f["status"] == "yellow")
-            if wires_red > 0 or flows_red > 0:
+            if wires_red_blocking > 0 or flows_red_blocking > 0:
                 worst = "red"
-            elif (wires_yellow > 0 or flows_yellow > 0) and worst == "green":
+            elif (wires_yellow > 0 or flows_yellow_blocking > 0) and worst == "green":
                 worst = "yellow"
+
+            # admin/customer surface verdicts — only BLOCKING flows count.
+            admin_flows = [f for f in flows if f.get("surface") == "admin"]
+            customer_flows = [f for f in flows if f.get("surface") == "customer"]
+            admin_blocking = [f for f in admin_flows if not f.get("non_blocking")]
+            customer_blocking = [f for f in customer_flows if not f.get("non_blocking")]
+            admin_worst = _pw(*[f["status"] for f in admin_blocking]) if admin_blocking else "green"
+            customer_worst = _pw(*[f["status"] for f in customer_blocking]) if customer_blocking else "green"
+            interface_desync = (
+                admin_worst == "green" and customer_worst in ("red", "yellow")
+            ) or (
+                customer_worst == "green" and admin_worst in ("red", "yellow")
+            )
 
             snapshot = {
                 "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -94,19 +134,27 @@ async def pillar_heartbeat_scheduler(db) -> None:
                 "pillars": clean,
                 "wires": wires,
                 "flows": flows,
+                "admin_worst": admin_worst,
+                "customer_worst": customer_worst,
+                "interface_desync": interface_desync,
                 "totals": {
-                    "collections":     sum(p["collections"]["total"] for p in clean),
-                    "silent_failures": sum(p["collections"].get("silent_failures", 0) for p in clean),
-                    "unreachable":     sum(p["collections"]["unreachable"] for p in clean),
-                    "backend_red":     sum(p["collections"].get("backend_red", 0) for p in clean),
-                    "wires_total":     len(wires),
-                    "wires_red":       wires_red,
-                    "wires_yellow":    wires_yellow,
-                    "wires_idle":      wires_idle,
-                    "flows_total":     len(flows),
-                    "flows_red":       flows_red,
-                    "flows_yellow":    flows_yellow,
+                    "collections":         sum(p["collections"]["total"] for p in clean),
+                    "silent_failures":     sum(p["collections"].get("silent_failures", 0) for p in clean),
+                    "unreachable":         sum(p["collections"]["unreachable"] for p in clean),
+                    "backend_red":         sum(p["collections"].get("backend_red", 0) for p in clean),
+                    "wires_total":         len(wires),
+                    "wires_red":           wires_red,
+                    "wires_red_blocking":  wires_red_blocking,
+                    "wires_red_advisory":  wires_red_advisory,
+                    "wires_yellow":        wires_yellow,
+                    "wires_idle":          wires_idle,
+                    "flows_total":         len(flows),
+                    "flows_red":           flows_red,
+                    "flows_red_blocking":  flows_red_blocking,
+                    "flows_red_advisory":  flows_red_advisory,
+                    "flows_yellow":        flows_yellow,
                 },
+                "sentinel_overlay": sentinel_overlay,
                 "silent_failure_threshold_minutes": 15,
             }
             set_cached_snapshot(snapshot)

@@ -16,7 +16,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
-         Paperclip, Save, FileText, Image as ImageIcon } from "lucide-react";
+         Paperclip, Save, FileText, Image as ImageIcon,
+         Copy, Check } from "lucide-react";
 import { devAuthHeaders } from "./DeveloperShell";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -468,6 +469,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
                               padding: "10px 14px", borderRadius: 6,
                               fontSize: 13, lineHeight: 1.55,
                               whiteSpace: "pre-wrap",
+                              position: "relative",
                               background: m.role === "user"
                                 ? "rgba(255,107,0,0.12)"
                                 : m.warning
@@ -479,6 +481,9 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
                                 : "1px solid rgba(255,255,255,0.06)" }}>
                   {displayed || (busy && m.role === "assistant" ? "…" : "")}
                   {m.attachment && <Attachment att={m.attachment} />}
+                  {m.role === "assistant" && displayed && !busy && (
+                    <CopyMessageButton text={displayed} index={i} />
+                  )}
                 </div>
               </div>
             );
@@ -778,5 +783,57 @@ function ProgressBar({ progress, chars }) {
         }
       `}</style>
     </div>
+  );
+}
+
+
+// ─── Copy-to-clipboard button on assistant messages (P2 D-30) ─────────
+function CopyMessageButton({ text, index }) {
+  const [copied, setCopied] = React.useState(false);
+  const onClick = React.useCallback(async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        document.execCommand("copy"); document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }, [text]);
+  return (
+    <button
+      data-testid={`dev-cto-copy-btn-${index}`}
+      onClick={onClick}
+      aria-label={copied ? "Copied" : "Copy message"}
+      title={copied ? "Copied" : "Copy message"}
+      style={{
+        position: "absolute",
+        right: 6, bottom: 6,
+        width: 26, height: 26,
+        display: "inline-flex",
+        alignItems: "center", justifyContent: "center",
+        background: copied
+          ? "rgba(80,200,120,0.12)"
+          : "rgba(255,255,255,0.05)",
+        border: copied
+          ? "1px solid rgba(80,200,120,0.45)"
+          : "1px solid rgba(255,255,255,0.10)",
+        borderRadius: 4,
+        color: copied ? "#50C878" : "#9CA3AF",
+        cursor: "pointer",
+        transition: "all 140ms ease",
+        opacity: 0.85,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+    </button>
   );
 }

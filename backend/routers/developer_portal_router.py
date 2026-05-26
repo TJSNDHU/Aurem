@@ -538,6 +538,113 @@ async def get_upload(file_id: str,
 
 # ── Pixel domain validation ────────────────────────────────────────
 
+
+# ── GitHub PAT link / unlink / me  (iter 332b D-30) ─────────────────
+#
+# Why PAT not OAuth: OAuth requires a callback URL + client_id/secret
+# rotation. PAT works the moment the dev pastes it.
+# The token is stored AES-encrypted via the SAME fernet path the BYOK
+# keys use (see services.byok_store) so we never log/return plaintext.
+
+class GitHubLinkBody(BaseModel):
+    pat: str = Field(..., min_length=20, max_length=200)
+
+
+@router.get("/api/developers/github/me")
+async def github_me(authorization: str = Header(None)) -> dict[str, Any]:
+    """Returns {login, avatar, repos_count} if the dev has linked
+    GitHub, or 404 if not. Iter 332b D-30."""
+    me = await _current_dev(authorization)
+    if _db is None:
+        raise HTTPException(404, "not_linked")
+    row = await _db.developer_github_links.find_one(
+        {"user_id": me["user_id"]},
+        {"_id": 0, "login": 1, "avatar_url": 1, "repos_count": 1,
+         "linked_at": 1},
+    )
+    if not row:
+        raise HTTPException(404, "not_linked")
+    return {
+        "login":       row.get("login"),
+        "avatar":      row.get("avatar_url"),
+        "repos_count": row.get("repos_count", 0),
+        "linked_at":   row.get("linked_at"),
+    }
+
+
+@router.post("/api/developers/github/link")
+async def github_link(body: GitHubLinkBody,
+                       authorization: str = Header(None)) -> dict[str, Any]:
+    """Validate the PAT against api.github.com/user, then encrypt & store.
+    Returns the same shape as GET /github/me on success."""
+    me = await _current_dev(authorization)
+    pat = body.pat.strip()
+    if not (pat.startswith("github_pat_") or pat.startswith("ghp_")):
+        raise HTTPException(400, "bad_token_format")
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=8.0) as c:
+            r = await c.get("https://api.github.com/user",
+                             headers={"Authorization": f"Bearer {pat}",
+                                      "Accept": "application/vnd.github+json"})
+            if r.status_code != 200:
+                raise HTTPException(401, "github_rejected_token")
+            user = r.json()
+            r2 = await c.get("https://api.github.com/user/repos?per_page=1",
+                              headers={"Authorization": f"Bearer {pat}"})
+            # Repos count comes from the user record (public_repos only).
+            # The /user/repos probe just confirms the scope grants access.
+            if r2.status_code >= 400:
+                raise HTTPException(403, "github_repo_scope_missing")
+            repos_count = int(user.get("public_repos", 0))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"[github-link] probe failed: {e}")
+        raise HTTPException(502, "github_unreachable")
+
+    # Encrypt the PAT using the BYOK fernet helper (reuse — keeps key
+    # rotation centralized). Falls back to a base64 wrap if the helper
+    # isn't available (dev mode).
+    try:
+        from services.byok_store import _encrypt as _enc
+        ct = _enc(pat)
+    except Exception:
+        import base64 as _b64
+        ct = "b64:" + _b64.b64encode(pat.encode()).decode()
+
+    if _db is not None:
+        await _db.developer_github_links.update_one(
+            {"user_id": me["user_id"]},
+            {"$set": {
+                "user_id":     me["user_id"],
+                "pat_enc":     ct,
+                "login":       user.get("login"),
+                "avatar_url":  user.get("avatar_url"),
+                "repos_count": repos_count,
+                "linked_at":   datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+    return {
+        "login":       user.get("login"),
+        "avatar":      user.get("avatar_url"),
+        "repos_count": repos_count,
+        "linked_at":   datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.delete("/api/developers/github/link")
+async def github_unlink(authorization: str = Header(None)) -> dict[str, Any]:
+    me = await _current_dev(authorization)
+    if _db is None:
+        return {"ok": True}
+    await _db.developer_github_links.delete_one({"user_id": me["user_id"]})
+    return {"ok": True}
+
+
+# ── Pixel domain validation (legacy section) ──────────────────────
+
 class PixelDomainBody(BaseModel):
     domain: str
 
