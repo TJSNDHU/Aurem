@@ -87,6 +87,17 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Gap 4 (Engagement)**: `aurem_cto/routers/engagement.py` — `/aurem-cto/referrals/my` (ref link = `aurem.live/?ref=<user_id>`, reuses `referrals` + `verified_referrals`), `/aurem-cto/streak/me` (consecutive daily debits from `onboarding_token_wallets.ledger`). Streak chip + gallery toggle render on workspace header.
   - **Tests**: 9/9 in `/app/aurem_cto/tests/` green (3 isolation + 6 gap regression).
   - **Module isolation maintained** — 3 host imports declared; new whitelist entry for `aurem_cto_public_gallery` + 7 read-only host collections (developer_accounts, onboarding_*, referrals, external_uptime_pings) documented in the isolation test.
+- **D-35 (this slice — Dogfood: aurem.live as a project)**:
+  - **`is_production_dogfood` flag** on `onboarding_projects` with `production_warning`, `github_repo_url`, `production_host` fields. View serializer exposes them.
+  - **Admin endpoint** `POST /api/onboarding/projects/dogfood/aurem-live-init` — idempotent seed of the `aurem-live-production` project for the calling admin. Skips the preview surface (`preview_url=""`), sets `progress=1.0`/`phase=production`/`domain.done=true` (aurem.live already lives). Non-admins blocked (401/403).
+  - **Status endpoint** `GET /api/onboarding/projects/dogfood/aurem-live-status` — returns `github_linked`, `deploy_configured`, `indexer_fresh`, `last_dry_run`, `last_real_run`, `real_deploy_unlocked`.
+  - **Dry-run deploy mode** added to `/aurem-cto/deploy/run` — runs `git fetch && docker compose config --quiet && echo DRY_RUN_OK` (no `git pull`, no `up -d`). Safe staging check.
+  - **Production guard** — for projects with `is_production_dogfood=true`, a real `deploy` or `revert_to` is rejected with HTTP 409 `dry_run_required` unless a `dry_run` status=ok run exists for the same user within the last 24h. `rollback` stays unrestricted (emergency exit).
+  - **Indexer fix** — `_fetch_user_pat` now reads `developer_github_links.pat_enc` (where `/api/developers/github/link` actually writes) with `developer_accounts` as legacy fallback. `_fetch_user_repo_url` prefers the project's saved repo URL.
+  - **Frontend `ProjectWorkspace`** — red production-warning banner at top when `is_production_dogfood`, preview card hidden, new `DogfoodDeployPanel` showing GitHub/Server/Indexer pills + Refresh Index + Dry-Run + Real Deploy (gated on dry-run).
+  - **Frontend `NewProjectFlow`** — admin-only `DogfoodSeedCard` (auto-hides on 403) with a one-click "Add aurem.live as project" button.
+  - **Tests**: 5/5 new in `/app/backend/tests/test_dogfood_d35.py`; full active suite 20/20 green (5 D-35 + 6 D-32 + 9 aurem_cto isolation/gap).
+  - **Status**: Scaffold complete. Real test deploy still needs the user to (1) paste GitHub PAT under `/developers/connect` → GitHub card, (2) save SSH host + private key under the Deploy card, then click "Refresh Index" and "Run dry-run deploy" inside the aurem-live-production workspace.
 
 ## Backlog (P0 → P2)
 

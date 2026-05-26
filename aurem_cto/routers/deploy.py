@@ -120,7 +120,18 @@ def _deploy_command(cfg: dict, mode: str = "deploy") -> str:
     compose = cfg.get("compose_file", "docker-compose.yml")
     if not repo:
         return "echo 'no repo_path configured' && exit 2"
-    if mode == "rollback":
+    if mode == "dry_run":
+        # D-35 — safe staging check. Verifies SSH auth, repo access and
+        # docker-compose validity WITHOUT pulling code or restarting
+        # containers. Used to gate the real-deploy button on production
+        # dogfood projects.
+        seq = (
+            f"cd {repo} && "
+            f"git fetch --all --prune && "
+            f"docker compose -f {compose} config --quiet && "
+            f"echo DRY_RUN_OK"
+        )
+    elif mode == "rollback":
         seq = (
             f"cd {repo} && "
             f"git reset --hard HEAD~1 && "
@@ -226,9 +237,11 @@ async def _run_deploy_remote(user_id: str, run_id: str,
 
 
 class DeployRunBody(BaseModel):
-    mode:      str = Field("deploy", pattern="^(deploy|rollback|revert_to)$")
+    mode:      str = Field("deploy",
+                            pattern="^(deploy|rollback|revert_to|dry_run)$")
     sha:       str = Field("", max_length=64)   # only used when mode=revert_to
     message_id: str = Field("", max_length=64)  # optional chat-message link
+    project_id: str = Field("", max_length=64)  # optional dogfood project link
 
 
 @router.post("/run")
@@ -241,6 +254,36 @@ async def run_deploy(body: DeployRunBody = DeployRunBody(),
     )
     if not cfg:
         raise HTTPException(400, "deploy_not_configured")
+
+    # D-35 — Production dogfood guard.
+    # If the caller links this run to a project flagged
+    # is_production_dogfood, the REAL deploy (mode in deploy/revert_to)
+    # is blocked until a dry-run for the SAME user has completed with
+    # status=ok in the last 24h. Rollback is always allowed (it's the
+    # emergency exit).
+    if body.project_id and body.mode in ("deploy", "revert_to"):
+        proj = await db.onboarding_projects.find_one(
+            {"project_id": body.project_id, "user_id": me["user_id"]},
+            {"_id": 0, "is_production_dogfood": 1},
+        )
+        if proj and proj.get("is_production_dogfood"):
+            from datetime import timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            ok_dry = await db.aurem_cto_deploy_runs.find_one(
+                {"user_id":   me["user_id"],
+                 "mode":      "dry_run",
+                 "status":    "ok",
+                 "started_at": {"$gte": cutoff}},
+                {"_id": 0, "run_id": 1},
+            )
+            if not ok_dry:
+                raise HTTPException(409, {
+                    "code": "dry_run_required",
+                    "msg":  "Production dogfood requires a successful "
+                            "dry-run within the last 24h before a real "
+                            "deploy.",
+                })
+
     if body.mode == "revert_to":
         cfg = {**cfg, "_revert_sha": body.sha}
     run_id = uuid.uuid4().hex[:16]
@@ -252,6 +295,7 @@ async def run_deploy(body: DeployRunBody = DeployRunBody(),
         "host":        cfg.get("host"),
         "branch":      cfg.get("branch", "main"),
         "message_id":  body.message_id or None,
+        "project_id":  body.project_id or None,
         "command":     cmd,
         "status":      "running",
         "exit_code":   None,

@@ -187,6 +187,12 @@ def _public_project_view(p: dict) -> dict:
         "preview_url":  p.get("preview_url"),
         "manifest":     p.get("manifest") or {},
         "go_live_ready": float(p.get("progress", 0.0)) >= 0.80,
+        # D-35 dogfood (aurem.live as a self-managed project)
+        "is_production_dogfood": bool(p.get("is_production_dogfood")),
+        "production_warning":    p.get("production_warning") or "",
+        "github_repo_url":       p.get("github_repo_url") or "",
+        "production_host":       p.get("production_host") or "",
+        "go_live":               p.get("go_live") or {},
         "created_at":   p.get("created_at"),
         "updated_at":   p.get("updated_at"),
     }
@@ -511,8 +517,162 @@ async def admin_decide_share(claim_id: str,
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Index bootstrap (run once at startup)
+# D-35 — Dogfood: aurem.live as a self-managed project
 # ──────────────────────────────────────────────────────────────────────
+#
+# Watchdog rule (2026-02): every fix that reaches aurem.live must flow
+# through AUREM CTO itself. This endpoint seeds (or returns) the
+# "aurem-live-production" project for the calling admin so they can
+# wire GitHub, server, run an index refresh, and execute a dry-run
+# deploy from the same Developer page any customer uses.
+#
+# Safety:
+#   - Admin-only.
+#   - Idempotent — calling twice returns the same project.
+#   - Skips the multi-tenant preview surface (preview_url set to "").
+#   - Sets is_production_dogfood=True so the UI renders the red warning
+#     banner and unlocks the dry-run-first deploy panel.
+
+DOGFOOD_PROJECT_ID    = "aurem-live-production"
+DOGFOOD_PROJECT_NAME  = "aurem-live-production"
+DOGFOOD_WARNING       = (
+    "This is your production system — aurem.live serves real customers. "
+    "Always run a dry-run deploy first; the real deploy button stays "
+    "locked until a dry-run succeeds."
+)
+
+
+class DogfoodInitBody(BaseModel):
+    github_repo_url: str = Field("", max_length=400,
+        description="https://github.com/<owner>/<repo> for the aurem.live source")
+    production_host: str = Field("", max_length=255,
+        description="hostname of the prod server (informational; "
+                    "the SSH key is saved separately via /aurem-cto/deploy/config)")
+
+
+@router.post("/api/onboarding/projects/dogfood/aurem-live-init")
+async def dogfood_aurem_live_init(body: DogfoodInitBody = DogfoodInitBody(),
+                                   authorization: str = Header(None)) -> dict[str, Any]:
+    """Admin-only. Creates or returns the aurem-live-production project."""
+    me = await _require_admin(authorization)
+    if _db is None:
+        raise HTTPException(503, "db_not_ready")
+    await _ensure_wallet(me["user_id"])
+
+    existing = await _db.onboarding_projects.find_one(
+        {"project_id": DOGFOOD_PROJECT_ID}, {"_id": 0},
+    )
+    if existing:
+        # Idempotent — just update the optional repo/host hints if passed.
+        upd: dict[str, Any] = {"updated_at": _now_iso()}
+        if body.github_repo_url:
+            upd["github_repo_url"] = body.github_repo_url.strip()
+        if body.production_host:
+            upd["production_host"] = body.production_host.strip()
+        if upd != {"updated_at": _now_iso()} or True:
+            await _db.onboarding_projects.update_one(
+                {"project_id": DOGFOOD_PROJECT_ID}, {"$set": upd},
+            )
+        row = await _db.onboarding_projects.find_one(
+            {"project_id": DOGFOOD_PROJECT_ID}, {"_id": 0},
+        )
+        return _public_project_view(row)
+
+    now = _now_iso()
+    doc = {
+        "project_id":  DOGFOOD_PROJECT_ID,
+        "user_id":     me["user_id"],
+        "slug":        "aurem-live-production",
+        "name":        DOGFOOD_PROJECT_NAME,
+        "intent":      ("AUREM's own production site (aurem.live). All "
+                        "fixes flow through AUREM CTO itself; Emergent "
+                        "is watchdog only."),
+        "stack":       "react-fastapi",
+        # Skip the preview build phase — this project IS live in prod.
+        "progress":    1.0,
+        "phase":       "production",
+        "preview_url": "",  # no preview; project points at the real site
+        "is_production_dogfood": True,
+        "production_warning":    DOGFOOD_WARNING,
+        "github_repo_url":       body.github_repo_url.strip(),
+        "production_host":       body.production_host.strip(),
+        "manifest": {
+            "title":   "aurem.live (production)",
+            "tagline": "Self-managed via AUREM CTO. Dry-run first.",
+            "sections": [],
+            "primary_cta": None,
+            "theme": {"accent": "#FF6060", "bg": "#0B0B0E"},
+        },
+        "go_live": {
+            "github":  {"done": False, "linked_at": None},
+            "server":  {"done": False, "linked_at": None},
+            "domain":  {"done": True,
+                         "linked_at": now,
+                         "domain": "aurem.live"},
+            "byok":    {"done": False, "linked_at": None},
+        },
+        "created_at": now,
+        "updated_at": now,
+    }
+    await _db.onboarding_projects.insert_one(dict(doc))
+    return _public_project_view(doc)
+
+
+@router.get("/api/onboarding/projects/dogfood/aurem-live-status")
+async def dogfood_aurem_live_status(authorization: str = Header(None)) -> dict[str, Any]:
+    """Returns wiring status: github_linked, deploy_configured,
+    indexer_fresh — so the UI can show big green/red dots and gate
+    the real-deploy button on a successful dry-run."""
+    me = await _require_admin(authorization)
+    if _db is None:
+        raise HTTPException(503, "db_not_ready")
+
+    proj = await _db.onboarding_projects.find_one(
+        {"project_id": DOGFOOD_PROJECT_ID}, {"_id": 0},
+    )
+    gh = await _db.developer_github_links.find_one(
+        {"user_id": me["user_id"]},
+        {"_id": 0, "login": 1, "linked_at": 1, "repos_count": 1},
+    )
+    cfg = await _db.aurem_cto_deploy_configs.find_one(
+        {"user_id": me["user_id"]},
+        {"_id": 0, "host": 1, "branch": 1, "repo_path": 1, "updated_at": 1},
+    )
+    idx = await _db.aurem_cto_codebase_index.find_one(
+        {"user_id": me["user_id"]},
+        {"_id": 0, "repo_owner": 1, "repo_name": 1, "default_branch": 1,
+         "file_count": 1, "refreshed_at": 1},
+    )
+
+    # Find the most recent dry-run + real run for this project's runs.
+    last_dry = await _db.aurem_cto_deploy_runs.find_one(
+        {"user_id": me["user_id"], "mode": "dry_run"},
+        {"_id": 0, "run_id": 1, "status": 1, "started_at": 1,
+         "finished_at": 1},
+        sort=[("started_at", -1)],
+    )
+    last_real = await _db.aurem_cto_deploy_runs.find_one(
+        {"user_id": me["user_id"], "mode": {"$in": ["deploy", "rollback"]}},
+        {"_id": 0, "run_id": 1, "mode": 1, "status": 1, "started_at": 1},
+        sort=[("started_at", -1)],
+    )
+    return {
+        "project":            _public_project_view(proj) if proj else None,
+        "github_linked":      bool(gh),
+        "github":             gh or None,
+        "deploy_configured":  bool(cfg),
+        "deploy_config":      cfg or None,
+        "indexer_fresh":      bool(idx),
+        "index":              idx or None,
+        "last_dry_run":       last_dry,
+        "last_real_run":      last_real,
+        "real_deploy_unlocked": bool(
+            last_dry and last_dry.get("status") == "ok"
+        ),
+    }
+
+
+
 
 async def ensure_indexes() -> None:
     if _db is None:

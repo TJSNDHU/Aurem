@@ -258,41 +258,75 @@ async def build_context_block(user_id: str,
 
 
 async def _fetch_user_pat(user_id: str) -> Optional[str]:
-    """Whitelisted host import #1: services.byok_store fernet decrypt."""
+    """Whitelisted host import: services.byok_store fernet decrypt.
+
+    Looks first in `developer_github_links` (where /api/developers/github/link
+    actually writes the PAT), then falls back to `developer_accounts`
+    for older accounts."""
     db = get_db()
     if db is None:
         return None
-    row = await db.developer_accounts.find_one(
-        {"user_id": user_id, "github_pat_enc": {"$ne": None}},
-        {"_id": 0, "github_pat_enc": 1, "github_repo_url": 1},
+    # Primary location (live since iter 332b D-30).
+    row = await db.developer_github_links.find_one(
+        {"user_id": user_id, "pat_enc": {"$ne": None}},
+        {"_id": 0, "pat_enc": 1},
     )
-    if not row:
+    enc = (row or {}).get("pat_enc")
+    if not enc:
+        # Legacy location for older accounts.
+        legacy = await db.developer_accounts.find_one(
+            {"user_id": user_id, "github_pat_enc": {"$ne": None}},
+            {"_id": 0, "github_pat_enc": 1},
+        )
+        enc = (legacy or {}).get("github_pat_enc")
+    if not enc:
         return None
     try:
         from services.byok_store import _decrypt  # whitelisted
-        return _decrypt(row["github_pat_enc"])
+        return _decrypt(enc)
     except Exception as e:
         logger.warning(f"[indexer] PAT decrypt failed for {user_id}: {e}")
         return None
 
 
+async def _fetch_user_repo_url(user_id: str,
+                                project_id: Optional[str] = None) -> Optional[str]:
+    """Resolves the repo URL. If a project_id is given and that project
+    has `github_repo_url` saved, that wins. Otherwise falls back to
+    the legacy `developer_accounts.github_repo_url`."""
+    db = get_db()
+    if db is None:
+        return None
+    if project_id:
+        proj = await db.onboarding_projects.find_one(
+            {"project_id": project_id, "user_id": user_id},
+            {"_id": 0, "github_repo_url": 1},
+        )
+        url = (proj or {}).get("github_repo_url")
+        if url:
+            return url
+    legacy = await db.developer_accounts.find_one(
+        {"user_id": user_id, "github_repo_url": {"$ne": None}},
+        {"_id": 0, "github_repo_url": 1},
+    )
+    return (legacy or {}).get("github_repo_url")
+
+
 # ─── HTTP surface ────────────────────────────────────────────────────
 
 @router.post("/refresh")
-async def refresh_route(authorization: str = Header(None)) -> dict:
+async def refresh_route(project_id: str = "",
+                        authorization: str = Header(None)) -> dict:
     """Customer (or the chat-stream pre-hook) calls this to re-pull
-    the index. Auto-grabs the saved PAT + repo URL from
-    developer_accounts."""
+    the index. Auto-grabs the saved PAT from developer_github_links,
+    and the repo URL from the project doc (preferred) or the legacy
+    developer_accounts row."""
     me = await current_dev(authorization)
     pat = await _fetch_user_pat(me["user_id"])
     if not pat:
         raise HTTPException(400, "no_github_pat_saved")
-    db = get_db()
-    row = await db.developer_accounts.find_one(
-        {"user_id": me["user_id"]},
-        {"_id": 0, "github_repo_url": 1},
-    )
-    repo_url = (row or {}).get("github_repo_url")
+    repo_url = await _fetch_user_repo_url(me["user_id"],
+                                            project_id or None)
     if not repo_url:
         raise HTTPException(400, "no_github_repo_saved")
     return await refresh_index(me["user_id"], repo_url, pat)

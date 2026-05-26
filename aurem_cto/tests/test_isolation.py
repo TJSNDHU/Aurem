@@ -121,6 +121,7 @@ def test_collections_namespaced():
     coll_re = _re.compile(r"db\.([a-z_][a-z0-9_]*)")
     HOST_READS = {
         "developer_accounts",       # for PAT lookup in codebase_indexer
+        "developer_github_links",   # D-35: actual GitHub PAT storage
         "onboarding_projects",      # gallery + chat-commits hydration
         "onboarding_token_wallets", # streak counter
         "referrals",                # referral counts

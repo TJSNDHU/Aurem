@@ -11,7 +11,9 @@
  */
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ExternalLink, Coins, Loader2, Flame, Eye, EyeOff } from "lucide-react";
+import { ExternalLink, Coins, Loader2, Flame, Eye, EyeOff,
+         AlertTriangle, ShieldCheck, RefreshCcw, PlayCircle,
+         Rocket, Github, Server } from "lucide-react";
 import DeveloperShell, { devAuthHeaders } from "./DeveloperShell";
 import DevCtoChatPanel from "./DevCtoChatPanel";
 import { GoLiveChecklist } from "./NewProjectFlow";
@@ -104,6 +106,34 @@ export default function ProjectWorkspace() {
       <div data-testid="project-workspace"
            style={{ display: "grid", gap: 18 }}>
 
+        {/* D-35 — production-dogfood warning banner */}
+        {project.is_production_dogfood && (
+          <div data-testid="production-warning-banner"
+               style={{ display: "flex", alignItems: "flex-start",
+                          gap: 12, padding: "14px 18px",
+                          borderRadius: 6,
+                          background: "rgba(255,96,96,0.08)",
+                          border: "1px solid rgba(255,96,96,0.45)" }}>
+            <AlertTriangle size={20} style={{ color: "#FF6060",
+                                                flexShrink: 0,
+                                                marginTop: 2 }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600,
+                             color: "#FF8C8C",
+                             letterSpacing: "0.04em",
+                             textTransform: "uppercase" }}>
+                Production system — deploy carefully
+              </div>
+              <div style={{ marginTop: 4, fontSize: 13,
+                             color: "rgba(240,237,232,0.82)",
+                             lineHeight: 1.5 }}>
+                {project.production_warning ||
+                  "This is your production system — deploy carefully."}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Top bar — name + progress + wallet */}
         <div data-testid="project-header" className="av2-card"
              style={{ display: "grid",
@@ -176,27 +206,35 @@ export default function ProjectWorkspace() {
           )}
         </div>
 
-        {/* Preview surface */}
-        <div data-testid="project-preview-card" className="av2-card">
-          <div style={{ display: "flex", alignItems: "center",
-                          gap: 8, marginBottom: 8,
-                          color: "var(--dash-text-muted)",
-                          fontSize: 11, letterSpacing: "0.15em",
-                          textTransform: "uppercase" }}>
-            Live preview
-            <a href={project.preview_url} target="_blank" rel="noreferrer"
-               data-testid="project-preview-link"
-               style={{ marginLeft: "auto",
-                         color: "#FF8C35", fontSize: 11,
-                         textDecoration: "none",
-                         display: "inline-flex", alignItems: "center",
-                         gap: 4 }}>
-              {project.preview_url} <ExternalLink size={11} />
-            </a>
+        {/* Preview surface — skipped for production-dogfood projects */}
+        {!project.is_production_dogfood && (
+          <div data-testid="project-preview-card" className="av2-card">
+            <div style={{ display: "flex", alignItems: "center",
+                            gap: 8, marginBottom: 8,
+                            color: "var(--dash-text-muted)",
+                            fontSize: 11, letterSpacing: "0.15em",
+                            textTransform: "uppercase" }}>
+              Live preview
+              <a href={project.preview_url} target="_blank" rel="noreferrer"
+                 data-testid="project-preview-link"
+                 style={{ marginLeft: "auto",
+                           color: "#FF8C35", fontSize: 11,
+                           textDecoration: "none",
+                           display: "inline-flex", alignItems: "center",
+                           gap: 4 }}>
+                {project.preview_url} <ExternalLink size={11} />
+              </a>
+            </div>
+            <ProjectPreviewRender manifest={project.manifest || {}}
+                                   projectId={project.project_id} />
           </div>
-          <ProjectPreviewRender manifest={project.manifest || {}}
-                                 projectId={project.project_id} />
-        </div>
+        )}
+
+        {/* Dogfood deploy panel (production projects only) */}
+        {project.is_production_dogfood && (
+          <DogfoodDeployPanel projectId={project.project_id}
+                              onChange={refresh} />
+        )}
 
         {/* Chat — every turn debits wallet + may PATCH project progress */}
         <div data-testid="project-chat-card" className="av2-card"
@@ -315,4 +353,213 @@ function SectionRender({ s, accent }) {
         </div>
       );
   }
+}
+
+
+// ─── Dogfood Deploy Panel (D-35) ──────────────────────────────────────
+// Shown only when the project is `is_production_dogfood=true`. Surfaces
+// the three wiring states (GitHub, Server, Indexer), the last dry-run /
+// real-deploy result, and gates the real-deploy button on a successful
+// dry-run within the last 24h.
+
+function DogfoodDeployPanel({ projectId, onChange }) {
+  const [status, setStatus] = useState(null);
+  const [busy,   setBusy]   = useState("");
+  const [msg,    setMsg]    = useState("");
+  const [err,    setErr]    = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch(
+        `${API}/api/onboarding/projects/dogfood/aurem-live-status`,
+        { headers: devAuthHeaders() });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail?.msg || j.detail || "load_failed");
+      setStatus(j); setErr("");
+    } catch (e) { setErr(String(e.message || e)); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const id = setInterval(load, 6000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  async function refreshIndex() {
+    setBusy("index"); setMsg(""); setErr("");
+    try {
+      const r = await fetch(
+        `${API}/aurem-cto/codebase/refresh?project_id=${encodeURIComponent(projectId)}`,
+        { method: "POST", headers: devAuthHeaders() });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail?.msg || j.detail || "refresh_failed");
+      setMsg(`Indexed ${j.file_count} files from ${j.owner}/${j.name}@${j.branch}.`);
+      await load(); onChange?.();
+    } catch (e) { setErr(String(e.message || e)); }
+    finally   { setBusy(""); }
+  }
+
+  async function runDeploy(mode) {
+    if (mode === "deploy" &&
+        !window.confirm(
+          "This will push the latest commit to PRODUCTION aurem.live. " +
+          "Proceed?")) return;
+    setBusy(mode); setMsg(""); setErr("");
+    try {
+      const r = await fetch(`${API}/aurem-cto/deploy/run`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+        body:    JSON.stringify({ mode, project_id: projectId }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        const code = j.detail?.code || j.detail || "run_failed";
+        throw new Error(code === "dry_run_required"
+          ? "Run a successful dry-run first."
+          : (j.detail?.msg || String(code)));
+      }
+      setMsg(`${mode} started — run_id ${j.run_id}.`);
+      await load(); onChange?.();
+    } catch (e) { setErr(String(e.message || e)); }
+    finally   { setBusy(""); }
+  }
+
+  if (!status) {
+    return (
+      <div data-testid="dogfood-deploy-loading" className="av2-card"
+           style={{ color: "var(--dash-text-muted)" }}>
+        Loading deploy status…
+      </div>
+    );
+  }
+
+  const ghLinked    = status.github_linked;
+  const cfgReady    = status.deploy_configured;
+  const idxFresh    = status.indexer_fresh;
+  const lastDry     = status.last_dry_run;
+  const lastReal    = status.last_real_run;
+  const realUnlocked = status.real_deploy_unlocked;
+
+  const Pill = ({ ok, label, hint }) => (
+    <div data-testid={`dogfood-pill-${label.toLowerCase().replace(/\s+/g,'-')}`}
+         style={{ display: "flex", flexDirection: "column", gap: 2,
+                   padding: "10px 12px", borderRadius: 4,
+                   background: ok ? "rgba(80,200,120,0.07)"
+                                  : "rgba(255,140,53,0.05)",
+                   border: "1px solid " + (ok
+                     ? "rgba(80,200,120,0.35)"
+                     : "rgba(255,140,53,0.30)") }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6,
+                     fontSize: 12, fontWeight: 600,
+                     color: ok ? "#50C878" : "#FF8C35" }}>
+        {ok ? <ShieldCheck size={13} /> : <AlertTriangle size={13} />}
+        {label}
+      </div>
+      <div style={{ fontSize: 11,
+                     color: "var(--dash-text-muted)" }}>{hint}</div>
+    </div>
+  );
+
+  return (
+    <div data-testid="dogfood-deploy-panel" className="av2-card">
+      <div style={{ display: "flex", alignItems: "center", gap: 8,
+                     marginBottom: 14 }}>
+        <Rocket size={16} style={{ color: "#FF8C35" }} />
+        <h3 style={{ margin: 0, fontSize: 14, color: "#F0EDE8",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase" }}>
+          Production Deploy — aurem.live
+        </h3>
+      </div>
+
+      <div style={{ display: "grid",
+                     gridTemplateColumns: "repeat(3, 1fr)",
+                     gap: 10, marginBottom: 14 }}>
+        <Pill ok={ghLinked}  label="GitHub linked"
+              hint={ghLinked
+                ? `${status.github?.login || "linked"} · ${status.github?.repos_count ?? "?"} repos`
+                : "Link a PAT in /developers/connect"} />
+        <Pill ok={cfgReady}  label="Server configured"
+              hint={cfgReady
+                ? `${status.deploy_config?.host} · branch ${status.deploy_config?.branch || "main"}`
+                : "Save SSH host + key under Deploy card"} />
+        <Pill ok={idxFresh}  label="Codebase indexed"
+              hint={idxFresh
+                ? `${status.index?.file_count} files · ${status.index?.repo_owner}/${status.index?.repo_name}`
+                : "Hit Refresh Index after linking GitHub"} />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button data-testid="dogfood-refresh-index-btn"
+                disabled={!ghLinked || busy === "index"}
+                onClick={refreshIndex}
+                style={btnStyle(!ghLinked || busy === "index", "neutral")}>
+          <RefreshCcw size={13} />
+          {busy === "index" ? "Indexing…" : "Refresh codebase index"}
+        </button>
+        <button data-testid="dogfood-dry-run-btn"
+                disabled={!cfgReady || busy === "dry_run"}
+                onClick={() => runDeploy("dry_run")}
+                style={btnStyle(!cfgReady || busy === "dry_run", "primary")}>
+          <PlayCircle size={13} />
+          {busy === "dry_run" ? "Running dry-run…" : "Run dry-run deploy"}
+        </button>
+        <button data-testid="dogfood-real-deploy-btn"
+                disabled={!realUnlocked || !cfgReady || busy === "deploy"}
+                onClick={() => runDeploy("deploy")}
+                title={!realUnlocked
+                  ? "Locked — run a successful dry-run first"
+                  : "Push latest commit to aurem.live"}
+                style={btnStyle(!realUnlocked || !cfgReady || busy === "deploy",
+                                 "danger")}>
+          <Server size={13} />
+          {busy === "deploy" ? "Deploying…" : "Real deploy to aurem.live"}
+        </button>
+      </div>
+
+      {(msg || err) && (
+        <div data-testid="dogfood-msg"
+             style={{ marginTop: 12, fontSize: 12, fontFamily: "monospace",
+                       color: err ? "#FF6060" : "#50C878" }}>
+          {err || msg}
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, fontSize: 11,
+                     color: "var(--dash-text-muted)",
+                     fontFamily: "JetBrains Mono, monospace" }}>
+        Last dry-run:&nbsp;
+        <span data-testid="dogfood-last-dry-run">
+          {lastDry
+            ? `${lastDry.status} (${lastDry.run_id})`
+            : "never"}
+        </span>
+        &nbsp;·&nbsp;Last real run:&nbsp;
+        <span data-testid="dogfood-last-real-run">
+          {lastReal
+            ? `${lastReal.mode}/${lastReal.status} (${lastReal.run_id})`
+            : "never"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function btnStyle(disabled, tone) {
+  const palette = {
+    neutral: { fg: "#F0EDE8", bg: "rgba(255,255,255,0.06)",
+                bd: "var(--dash-border)" },
+    primary: { fg: "#FF8C35", bg: "rgba(255,140,53,0.08)",
+                bd: "rgba(255,140,53,0.45)" },
+    danger:  { fg: "#FF6060", bg: "rgba(255,96,96,0.06)",
+                bd: "rgba(255,96,96,0.40)" },
+  }[tone] || {};
+  return {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    padding: "8px 14px", borderRadius: 4, fontSize: 12,
+    background: palette.bg, color: palette.fg,
+    border: `1px solid ${palette.bd}`,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.55 : 1,
+  };
 }

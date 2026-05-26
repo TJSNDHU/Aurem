@@ -67,6 +67,11 @@ export default function NewProjectFlow() {
         {/* Token wallet strip — visible from the start */}
         <TokenStrip wallet={wallet} />
 
+        {/* D-35 — Admin-only dogfood seed card (silently hides for
+            non-admins via 403). Lets the founder add aurem.live as a
+            self-managed project in one click. */}
+        <DogfoodSeedCard onSeeded={refresh} />
+
         {/* Existing projects (if any) */}
         {projects.length > 0 && (
           <ExistingProjectsList projects={projects} />
@@ -242,6 +247,97 @@ function TokenStrip({ wallet }) {
     </div>
   );
 }
+
+
+// ─── D-35: Dogfood seed card (admin-only, auto-hides on 403) ─────────
+function DogfoodSeedCard({ onSeeded }) {
+  const navigate = useNavigate();
+  const [show, setShow]   = useState(false);
+  const [exists, setExists] = useState(false);
+  const [busy, setBusy]   = useState(false);
+  const [err, setErr]     = useState("");
+
+  useEffect(() => {
+    fetch(`${API}/api/onboarding/projects/dogfood/aurem-live-status`,
+          { headers: devAuthHeaders() })
+      .then(r => { if (r.status === 200) { setShow(true); return r.json(); }
+                   return null; })
+      .then(j => { if (j?.project) setExists(true); })
+      .catch(() => {});
+  }, []);
+
+  if (!show) return null;
+
+  async function seed() {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(
+        `${API}/api/onboarding/projects/dogfood/aurem-live-init`,
+        { method: "POST",
+          headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+          body:    JSON.stringify({}) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail?.msg || j.detail || "init_failed");
+      onSeeded?.();
+      navigate(`/my/projects/${j.project_id}`);
+    } catch (e) { setErr(String(e.message || e)); }
+    finally   { setBusy(false); }
+  }
+
+  return (
+    <div className="av2-card"
+         data-testid="dogfood-seed-card"
+         style={{ background:
+                   "linear-gradient(135deg, rgba(255,96,96,0.06), rgba(255,140,53,0.04))",
+                  border: "1px solid rgba(255,96,96,0.30)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start",
+                     gap: 12 }}>
+        <Rocket size={20} style={{ color: "#FF6060",
+                                     flexShrink: 0, marginTop: 2 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600,
+                         color: "#F0EDE8" }}>
+            Dogfood: aurem.live as a self-managed project
+          </div>
+          <p style={{ fontSize: 12, marginTop: 4, marginBottom: 10,
+                       color: "var(--dash-text-muted)",
+                       maxWidth: 640, lineHeight: 1.5 }}>
+            Add aurem.live as a project in your own Developer page —
+            same flow as any customer. After you wire GitHub + server,
+            every fix flows through AUREM CTO and Emergent stays
+            watchdog-only. A dry-run is required before each real deploy.
+          </p>
+          <button data-testid="dogfood-seed-btn"
+                  disabled={busy}
+                  onClick={() => exists
+                    ? navigate("/my/projects/aurem-live-production")
+                    : seed()}
+                  style={{ display: "inline-flex", alignItems: "center",
+                            gap: 6, padding: "8px 14px", borderRadius: 4,
+                            border: "1px solid rgba(255,96,96,0.45)",
+                            background: "rgba(255,96,96,0.08)",
+                            color: "#FF8C8C", fontSize: 12,
+                            cursor: busy ? "not-allowed" : "pointer",
+                            opacity: busy ? 0.55 : 1 }}>
+            {busy
+              ? <Loader2 size={13} className="onb-spin" />
+              : <ArrowRight size={13} />}
+            {exists ? "Open aurem-live-production"
+                    : (busy ? "Seeding…" : "Add aurem.live as project")}
+          </button>
+          {err && (
+            <div data-testid="dogfood-seed-error"
+                 style={{ color: "#FF6060", fontSize: 11,
+                           marginTop: 6 }}>
+              {err}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 
 // ─── Existing projects ────────────────────────────────────────────────
