@@ -22,6 +22,8 @@ export default function NewProjectFlow() {
   const navigate = useNavigate();
   const [wallet, setWallet]     = useState(null);
   const [projects, setProjects] = useState([]);
+  const [stacks, setStacks]     = useState([]);
+  const [stackId, setStackId]   = useState("react-fastapi");
   const [name, setName]         = useState("");
   const [intent, setIntent]     = useState("");
   const [busy, setBusy]         = useState(false);
@@ -31,11 +33,13 @@ export default function NewProjectFlow() {
 
   async function refresh() {
     try {
-      const [w, p] = await Promise.all([
+      const [w, p, s] = await Promise.all([
         fetch(`${API}/api/onboarding/wallet`, { headers: devAuthHeaders() }).then(r => r.json()),
         fetch(`${API}/api/onboarding/projects`, { headers: devAuthHeaders() }).then(r => r.json()),
+        fetch(`${API}/aurem-cto/stacks`).then(r => r.json()).catch(() => ({stacks:[]})),
       ]);
       setWallet(w); setProjects(p.projects || []);
+      setStacks(s.stacks || []);
     } catch (e) { /* silent */ }
   }
 
@@ -46,7 +50,7 @@ export default function NewProjectFlow() {
       const r = await fetch(`${API}/api/onboarding/projects`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...devAuthHeaders() },
-        body:    JSON.stringify({ name, intent }),
+        body:    JSON.stringify({ name, intent, stack: stackId }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || "create_failed");
@@ -104,6 +108,47 @@ export default function NewProjectFlow() {
                        rows={5}
                        style={{ ...inputStyle, resize: "vertical",
                                 fontFamily: "inherit" }} />
+            {stacks.length > 0 && (
+              <div data-testid="stack-selector"
+                   style={{ display: "grid", gap: 6, marginTop: 4 }}>
+                <div style={{ fontSize: 10, letterSpacing: "0.18em",
+                                textTransform: "uppercase",
+                                color: "var(--dash-text-muted)" }}>
+                  Stack — React + FastAPI is the default
+                </div>
+                <div style={{ display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                                gap: 8 }}>
+                  {stacks.map(s => (
+                    <button key={s.id}
+                            data-testid={`stack-${s.id}`}
+                            type="button"
+                            onClick={() => setStackId(s.id)}
+                            style={{
+                              padding: "10px 12px", borderRadius: 4,
+                              textAlign: "left",
+                              cursor: "pointer",
+                              background: stackId === s.id
+                                ? "rgba(255,107,0,0.10)"
+                                : "rgba(255,255,255,0.03)",
+                              border: stackId === s.id
+                                ? "1px solid rgba(255,107,0,0.45)"
+                                : "1px solid var(--dash-border)",
+                              color: "#F0EDE8",
+                            }}>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>
+                        {s.label}
+                      </div>
+                      <div style={{ fontSize: 10, marginTop: 4,
+                                      color: "var(--dash-text-muted)",
+                                      lineHeight: 1.4 }}>
+                        {s.tagline}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10,
                             alignItems: "center", marginTop: 4 }}>
               <button data-testid="new-project-submit"

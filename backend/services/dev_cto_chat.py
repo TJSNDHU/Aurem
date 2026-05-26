@@ -554,6 +554,25 @@ async def cto_chat_stream(
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
 
+    # iter D-33 — Gap 1: inject the customer's codebase index as an
+    # extra system message before the user turn. Best-effort, never
+    # raises. Skips silently when the customer hasn't connected GitHub
+    # or hasn't called /aurem-cto/codebase/refresh yet.
+    try:
+        if account and account.get("user_id"):
+            from aurem_cto.services.codebase_indexer import build_context_block
+            ctx = await build_context_block(account["user_id"], max_chars=6000)
+            if ctx:
+                full_messages = [
+                    full_messages[0],
+                    {"role": "system", "content": ctx},
+                    *full_messages[1:],
+                ]
+    except Exception as _ctx_err:
+        import logging as _lg
+        _lg.getLogger(__name__).debug(
+            f"[dev-cto] codebase context skipped: {_ctx_err}")
+
     # iter 332b D-29 — internet access for the Dev CTO chat.
     # Detect a search-intent in the user's latest message (the word
     # "search" / "look up" / "latest" / "/search ..." prefix etc.) and

@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ExternalLink, Coins, Loader2 } from "lucide-react";
+import { ExternalLink, Coins, Loader2, Flame, Eye, EyeOff } from "lucide-react";
 import DeveloperShell, { devAuthHeaders } from "./DeveloperShell";
 import DevCtoChatPanel from "./DevCtoChatPanel";
 import { GoLiveChecklist } from "./NewProjectFlow";
@@ -23,22 +23,42 @@ export default function ProjectWorkspace() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [wallet, setWallet]   = useState(null);
+  const [streak, setStreak]   = useState(null);
+  const [galleryOptedIn, setGalleryOptedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [p, w] = await Promise.all([
+      const [p, w, s, g] = await Promise.all([
         fetch(`${API}/api/onboarding/projects/${project_id}`,
               { headers: devAuthHeaders() }).then(r => r.json()),
         fetch(`${API}/api/onboarding/wallet`,
               { headers: devAuthHeaders() }).then(r => r.json()),
+        fetch(`${API}/aurem-cto/streak/me`,
+              { headers: devAuthHeaders() }).then(r => r.json()).catch(()=>null),
+        fetch(`${API}/aurem-cto/gallery`)
+              .then(r => r.json()).catch(() => ({projects:[]})),
       ]);
       if (p?.detail) throw new Error(p.detail);
-      setProject(p); setWallet(w);
+      setProject(p); setWallet(w); setStreak(s);
+      setGalleryOptedIn(
+        (g?.projects || []).some(x => x.project_id === project_id));
     } catch (e) { setErr(String(e.message || e)); }
     finally   { setLoading(false); }
   }, [project_id]);
+
+  async function toggleGallery() {
+    const target = galleryOptedIn ? "opt-out" : "opt-in";
+    try {
+      await fetch(`${API}/aurem-cto/gallery/${target}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+        body: JSON.stringify({ project_id }),
+      });
+      setGalleryOptedIn(!galleryOptedIn);
+    } catch (e) { /* silent */ }
+  }
 
   useEffect(() => { refresh(); }, [refresh]);
   // Poll every 8s so progress + manifest stay fresh while the build runs.
@@ -116,11 +136,42 @@ export default function ProjectWorkspace() {
           {wallet && (
             <div data-testid="project-wallet"
                  style={{ display: "flex", alignItems: "center",
-                          gap: 8, fontSize: 12,
+                          gap: 14, fontSize: 12,
                           color: "var(--dash-text-muted)",
                           fontFamily: "'JetBrains Mono', monospace" }}>
-              <Coins size={14} style={{ color: "#C9A84C" }} />
-              {(wallet.balance || 0).toLocaleString()} tokens left
+              {streak && streak.current_streak > 0 && (
+                <span data-testid="project-streak"
+                      style={{ display: "inline-flex", alignItems: "center",
+                                gap: 5, color: "#FF8C35" }}>
+                  <Flame size={14} />
+                  {streak.current_streak}-day build streak
+                </span>
+              )}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Coins size={14} style={{ color: "#C9A84C" }} />
+                {(wallet.balance || 0).toLocaleString()} tokens left
+              </span>
+              <button data-testid="gallery-toggle-btn"
+                       onClick={toggleGallery}
+                       title={galleryOptedIn
+                         ? "Currently shown on the public gallery"
+                         : "Show this project on /gallery"}
+                       style={{ display: "inline-flex",
+                                 alignItems: "center", gap: 5,
+                                 padding: "4px 10px",
+                                 borderRadius: 4, fontSize: 11,
+                                 cursor: "pointer",
+                                 background: galleryOptedIn
+                                   ? "rgba(80,200,120,0.10)"
+                                   : "transparent",
+                                 border: galleryOptedIn
+                                   ? "1px solid rgba(80,200,120,0.40)"
+                                   : "1px solid var(--dash-border)",
+                                 color: galleryOptedIn
+                                   ? "#50C878" : "var(--dash-text-muted)" }}>
+                {galleryOptedIn ? <Eye size={11} /> : <EyeOff size={11} />}
+                {galleryOptedIn ? "On gallery" : "Show on gallery"}
+              </button>
             </div>
           )}
         </div>

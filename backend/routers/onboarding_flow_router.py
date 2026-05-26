@@ -181,6 +181,7 @@ def _public_project_view(p: dict) -> dict:
         "slug":         p.get("slug"),
         "name":         p.get("name"),
         "intent":       p.get("intent"),
+        "stack":        p.get("stack", "react-fastapi"),
         "progress":     float(p.get("progress", 0.0)),
         "phase":        p.get("phase", "drafting"),
         "preview_url":  p.get("preview_url"),
@@ -194,6 +195,7 @@ def _public_project_view(p: dict) -> dict:
 class ProjectCreateBody(BaseModel):
     name:   str = Field(..., min_length=2, max_length=80)
     intent: str = Field(..., min_length=5, max_length=2000)
+    stack:  str = Field("react-fastapi", max_length=40)
 
 
 @router.post("/api/onboarding/projects")
@@ -221,6 +223,7 @@ async def create_project(body: ProjectCreateBody,
         "slug":       base_slug,
         "name":       body.name.strip(),
         "intent":     body.intent.strip(),
+        "stack":      body.stack.strip() or "react-fastapi",
         "progress":   0.0,
         "phase":      "drafting",
         "preview_url": preview_url,

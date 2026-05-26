@@ -910,22 +910,21 @@ def register_all_routers(app, db):
                 except Exception as _dep_e:
                     logger.warning(f"[REGISTRY] developer_deploy_router not loaded: {_dep_e}")
 
-                # iter D-31 — Isolated AUREM CTO module PARKED on branch.
-                # Watchdog moved onboarding flow to P0 (preview hosting +
-                # token UI + Go-Live checklist). D-31 skeleton lives at
-                # /app/aurem_cto/ — re-enable the block below once
-                # onboarding ships and we resume Hetzner P0 work.
-                #
-                # try:
-                #     import sys as _sys
-                #     if "/app" not in _sys.path:
-                #         _sys.path.insert(0, "/app")
-                #     import aurem_cto as _act
-                #     app.include_router(_act.build_router())
-                #     _act.set_db(db)
-                #     logger.info(f"[REGISTRY] aurem_cto module wired (v{_act.VERSION})")
-                # except Exception as _act_e:
-                #     logger.warning(f"[REGISTRY] aurem_cto module not loaded: {_act_e}")
+                # iter D-33 — AUREM CTO module RE-ENABLED. Mount /aurem-cto/*
+                try:
+                    import sys as _sys
+                    for _p in ("/app", "/app/backend"):
+                        if _p not in _sys.path:
+                            _sys.path.insert(0, _p)
+                    import aurem_cto as _act
+                    app.include_router(_act.build_router())
+                    _act.set_db(db)
+                    logger.info(f"[REGISTRY] aurem_cto module wired (v{_act.VERSION})")
+                except Exception as _act_e:
+                    import traceback as _tb
+                    logger.warning(f"[REGISTRY] aurem_cto module not loaded: "
+                                    f"{type(_act_e).__name__}: {_act_e}\n"
+                                    f"{_tb.format_exc()[-800:]}")
 
                 # iter D-32 — Onboarding flow (projects + tokens + share + Go-Live)
                 try:

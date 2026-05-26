@@ -35,7 +35,8 @@ STDLIB_OK = {
 THIRD_PARTY_OK = {
     "fastapi", "pydantic", "asyncssh", "httpx", "cryptography",
     "dnspython", "dns", "motor", "bson", "starlette", "anyio",
-    "jwt",  # PyJWT
+    "jwt",      # PyJWT
+    "pytest",   # tests
 }
 SELF_PREFIX = "aurem_cto"
 
@@ -108,16 +109,33 @@ def test_router_prefix_is_aurem_cto():
 
 def test_collections_namespaced():
     """Heuristic: every `db.<name>` reference under routers/ must use the
-    aurem_cto_ prefix (we whitelist a tiny set of host-side reads)."""
+    aurem_cto_ prefix (we whitelist a tiny set of host-side reads).
+
+    The trust router intentionally COUNTS rows in legacy host collections
+    (developer_deploy_runs, github_deployments, external_uptime_pings,
+    referrals, onboarding_*) to surface trust signals — these are
+    READ-ONLY counts using `db[\"name\"]` bracket access and stay
+    outside this lint."""
     bad: list[str] = []
     import re as _re
     coll_re = _re.compile(r"db\.([a-z_][a-z0-9_]*)")
+    HOST_READS = {
+        "developer_accounts",       # for PAT lookup in codebase_indexer
+        "onboarding_projects",      # gallery + chat-commits hydration
+        "onboarding_token_wallets", # streak counter
+        "referrals",                # referral counts
+        "referral_profiles",
+        "verified_referrals",
+        "external_uptime_pings",    # uptime badge
+    }
     for py in (MODULE_ROOT / "routers").rglob("*.py"):
         src = py.read_text()
         for m in coll_re.finditer(src):
             coll = m.group(1)
             if coll in ("command_cursor", "name", "client"):
-                continue  # motor attribute access, not a collection
+                continue
+            if coll in HOST_READS:
+                continue
             if not coll.startswith("aurem_cto_"):
                 bad.append(f"{py.name}: db.{coll}")
     for py in (MODULE_ROOT / "services").rglob("*.py"):
@@ -125,6 +143,8 @@ def test_collections_namespaced():
         for m in coll_re.finditer(src):
             coll = m.group(1)
             if coll in ("command_cursor", "name", "client"):
+                continue
+            if coll in HOST_READS:
                 continue
             if not coll.startswith("aurem_cto_"):
                 bad.append(f"{py.name}: db.{coll}")

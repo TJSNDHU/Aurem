@@ -22,7 +22,11 @@ from .routers.harden import router as _harden_router
 from .routers.chat_commits import router as _chat_commits_router
 from .routers.unlock import router as _unlock_router
 from .routers.vault import router as _vault_router
+from .routers.stacks import router as _stacks_router
+from .routers.trust import router as _trust_router
+from .routers.engagement import router as _engagement_router
 from .services import db as _db_service
+from .services.codebase_indexer import router as _codebase_router
 
 __all__ = ["build_router", "set_db", "VERSION"]
 
@@ -39,6 +43,10 @@ def build_router() -> APIRouter:
     root.include_router(_chat_commits_router)
     root.include_router(_unlock_router)
     root.include_router(_vault_router)
+    root.include_router(_codebase_router)
+    root.include_router(_stacks_router)
+    root.include_router(_trust_router)
+    root.include_router(_engagement_router)
     return root
 
 

@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Paperclip, Save, FileText, Image as ImageIcon,
-         Copy, Check } from "lucide-react";
+         Copy, Check, Eye, Rocket } from "lucide-react";
 import { devAuthHeaders } from "./DeveloperShell";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -116,6 +116,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   const location = useLocation();
   const scrollRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);   // iter D-33 — auto-grow textarea
 
   const [messages, setMessages] = useState([WELCOME]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -161,6 +162,16 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, busy]);
+
+  // iter D-33 — auto-resize textarea up to 40vh, scroll INSIDE after.
+  const autoResize = React.useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const max = Math.floor(window.innerHeight * 0.4);
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+  }, []);
+  useEffect(() => { autoResize(); }, [input, autoResize]);
 
   const lastAssistant = [...messages].reverse()
     .find(m => m.role === "assistant" && m.content);
@@ -491,6 +502,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
               <div key={i}
                    data-testid={m.role === "user"
                      ? "dev-cto-msg-user" : "dev-cto-msg-assistant"}
+                   className={m.role === "assistant" ? "dev-cto-msg-bubble" : ""}
                    style={{ marginBottom: 14,
                             display: "flex",
                             flexDirection: m.role === "user" ? "row-reverse" : "row" }}>
@@ -513,6 +525,11 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                   {m.paywall && <PaywallBlock info={m.paywall} />}
                   {m.role === "assistant" && displayed && !busy && (
                     <CopyMessageButton text={displayed} index={i} />
+                  )}
+                  {m.role === "assistant" && displayed && !busy
+                    && !m.warning && containsCodeChange(displayed) && (
+                    <MessageActionButtons index={i}
+                                          projectId={projectId} />
                   )}
                 </div>
               </div>
@@ -587,17 +604,26 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                             display: "flex", alignItems: "center" }}>
             <Paperclip size={14} />
           </button>
-          <textarea data-testid="dev-cto-chat-input"
-                     value={input} onChange={e => setInput(e.target.value)}
+          <textarea ref={textareaRef}
+                     data-testid="dev-cto-chat-input"
+                     value={input}
+                     onChange={e => {
+                       setInput(e.target.value);
+                       autoResize();
+                     }}
                      onKeyDown={onKey}
                      placeholder="Tell AUREM CTO what to build — frontend first, then backend. Type /search <query> or include a URL to use live web search."
-                     rows={2}
+                     rows={1}
                      style={{ flex: 1, background: "rgba(255,255,255,0.04)",
                               border: "1px solid var(--dash-border)",
                               color: "#F0EDE8", padding: "10px 12px",
                               borderRadius: 4, fontSize: 13,
                               fontFamily: "inherit", outline: "none",
-                              resize: "vertical" }} />
+                              resize: "none",
+                              minHeight: 40,
+                              maxHeight: "40vh",
+                              overflowY: "auto",
+                              transition: "height 80ms ease" }} />
           <button data-testid="dev-cto-chat-send"
                    onClick={() => send()} disabled={busy || !input.trim()}
                    style={{ background: "linear-gradient(135deg, #FF6B00, #FF8C35)",
@@ -921,5 +947,111 @@ function PaywallBlock({ info }) {
       </div>
     </div>
   );
+}
+
+
+// ─── iter D-33: hover-reveal Preview + Deploy buttons ────────────────
+// We surface them only when the assistant reply contains the literal
+// markers we already emit for builds (fenced code blocks, MANIFEST_PATCH,
+// or "[step N/M]"). The buttons sit at the BUBBLE bottom-right and fade
+// in on hover via the `.dev-cto-msg-bubble:hover .dev-cto-msg-actions`
+// CSS rule injected at the end of the panel.
+
+function containsCodeChange(text) {
+  if (!text) return false;
+  if (text.includes("```")) return true;
+  if (/\bMANIFEST_PATCH\s*:/i.test(text)) return true;
+  if (/\[step\s+\d+\/\d+\]/i.test(text)) return true;
+  return false;
+}
+
+function MessageActionButtons({ index, projectId }) {
+  const preview = projectId
+    ? `https://preview.aurem.live/${projectId}`
+    : "/my/projects";
+
+  async function triggerDeploy() {
+    // Best effort — if the customer has wired the D-30 deploy target,
+    // fire `POST /api/developers/deploy/run` (mode=deploy). Otherwise
+    // route them to /developers/connect#deploy to set it up.
+    try {
+      const r = await fetch(
+        `${API}/api/developers/deploy/run`,
+        { method: "POST",
+          headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+          body: JSON.stringify({ mode: "deploy", message_id: String(index) }) });
+      const j = await r.json();
+      if (r.status === 400 && j.detail === "deploy_not_configured") {
+        window.location.href = "/developers/connect#deploy";
+        return;
+      }
+      if (!r.ok) throw new Error(j.detail || "deploy_failed");
+      window.location.href = `/developers/connect#deploy-${j.run_id || ""}`;
+    } catch (e) {
+      window.alert(`Deploy failed: ${e.message || e}. Open the Connect page to configure your deploy target.`);
+    }
+  }
+
+  return (
+    <div className="dev-cto-msg-actions"
+         data-testid={`dev-cto-msg-actions-${index}`}
+         style={{ position: "absolute",
+                   right: 6, bottom: 6,
+                   display: "inline-flex", gap: 6,
+                   opacity: 0,
+                   pointerEvents: "none",
+                   transition: "opacity 160ms ease" }}>
+      <a data-testid={`dev-cto-preview-btn-${index}`}
+         href={preview} target="_blank" rel="noreferrer"
+         title="Open live preview in a new tab"
+         style={actionBtnStyle("preview")}>
+        <Eye size={11} /> Preview
+      </a>
+      <button data-testid={`dev-cto-deploy-btn-${index}`}
+              onClick={triggerDeploy}
+              title="Deploy this build to your server"
+              style={actionBtnStyle("deploy")}>
+        <Rocket size={11} /> Deploy
+      </button>
+    </div>
+  );
+}
+
+function actionBtnStyle(kind) {
+  const accent = kind === "deploy" ? "#50C878" : "#FF8C35";
+  return {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    padding: "4px 9px",
+    background: "rgba(0,0,0,0.55)",
+    border: `1px solid ${accent}40`,
+    color: accent, borderRadius: 4,
+    fontSize: 10, fontWeight: 500,
+    fontFamily: "'JetBrains Mono', monospace",
+    letterSpacing: "0.05em",
+    textDecoration: "none",
+    cursor: "pointer",
+    backdropFilter: "blur(6px)",
+  };
+}
+
+// Inject the hover CSS rule once at module load.
+if (typeof document !== "undefined"
+    && !document.getElementById("dev-cto-msg-actions-css")) {
+  const s = document.createElement("style");
+  s.id = "dev-cto-msg-actions-css";
+  s.textContent = `
+    .dev-cto-msg-bubble:hover .dev-cto-msg-actions {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+    /* Touch devices have no hover — show always */
+    @media (hover: none) {
+      .dev-cto-msg-actions {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+    }
+  `;
+  document.head.appendChild(s);
 }
 

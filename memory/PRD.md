@@ -78,7 +78,15 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Stripe paywall UI gate**: `PaywallBlock` component renders inside the `insufficient_tokens` assistant message with one CTA to `/pricing` (existing Builder/Pro tiers) and one shortcut to `/my/projects/new#share` for the 2500-token earn flow. Zero new Stripe integration.
   - **Preview hosting setup doc**: `/app/aurem_cto/docs/PREVIEW_HOSTING_SETUP.md` — exact DNS A record + Caddy block + verification commands for `preview.aurem.live` (user runs on prod box).
   - **DB scan** completed before any gap code — 38 shadcn components, tailwind config live, parallel referral/wallet/deploy/health systems mapped, Docker templates already at `/app/aurem-cto/` (hyphen folder, distinct from D-31 underscore folder).
-  - **D-31 still parked, Hetzner P0 blocked** waiting for the founder to actually paste the Hetzner Cloud API token (the literal string `[paste your token]` was sent two messages ago, never replaced).
+  - **AUREM CTO module re-enabled** — fixed sys.path init in registry block so `/aurem-cto/*` routes mount on boot. Verified by GET `/aurem-cto/vault/audit-log` returning HTTP 200.
+  - **UI fix 1**: hover-reveal Preview + Deploy buttons on every assistant message that contains a code change (fenced ```code```, MANIFEST_PATCH, or `[step N/M]`). Mobile fallback via `@media (hover: none)`. Test-ids `dev-cto-preview-btn-<idx>` + `dev-cto-deploy-btn-<idx>`.
+  - **UI fix 2**: auto-expanding chat textarea grows from 1 row up to 40vh, then scrolls inside. JS resize handler runs on every change.
+  - **Gap 1 (Codebase Indexer)**: `aurem_cto/services/codebase_indexer.py` — pulls customer repo via existing BYOK PAT, indexes routes/models/components/deps, exposes `build_context_block(user_id)` which the chat-stream now injects as a system message before every turn.
+  - **Gap 2 (Stack Selector)**: 4 templates at `aurem_cto/templates/stacks/` (react-fastapi default + nextjs-node + vue-express + plain-html), each with `docker-compose.yml` + `README.md`. Stack selector grid renders on `/my/projects/new`; `stack` field saved on project doc.
+  - **Gap 3 (Trust Signals)**: `aurem_cto/routers/trust.py` — `/aurem-cto/trust/deploy-count` (aggregates 5 legacy collections), `/aurem-cto/trust/uptime` (24h % from `external_uptime_pings`), `/aurem-cto/gallery` (opt-in showcase). New collection `aurem_cto_public_gallery`. Public `/gallery` page lives at `PublicGallery.jsx`.
+  - **Gap 4 (Engagement)**: `aurem_cto/routers/engagement.py` — `/aurem-cto/referrals/my` (ref link = `aurem.live/?ref=<user_id>`, reuses `referrals` + `verified_referrals`), `/aurem-cto/streak/me` (consecutive daily debits from `onboarding_token_wallets.ledger`). Streak chip + gallery toggle render on workspace header.
+  - **Tests**: 9/9 in `/app/aurem_cto/tests/` green (3 isolation + 6 gap regression).
+  - **Module isolation maintained** — 3 host imports declared; new whitelist entry for `aurem_cto_public_gallery` + 7 read-only host collections (developer_accounts, onboarding_*, referrals, external_uptime_pings) documented in the isolation test.
 
 ## Backlog (P0 → P2)
 
