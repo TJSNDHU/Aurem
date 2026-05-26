@@ -148,17 +148,35 @@ async def _transition(
 @router.post("/{proposal_id}/approve")
 async def approve(proposal_id: str, authorization: Optional[str] = Header(None)):
     payload = verify_admin(authorization)
-    if (payload.get("sealed_blocked") or False) is True:
-        # cosmetic: not relevant on token, kept for symmetry
-        pass
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database not wired")
+    # iter D-34 — Pre-flight seal check BEFORE transition. The previous
+    # version updated `status` to "approved" then raised 409 if sealed,
+    # leaving the DB in an inconsistent state. Now we refuse the write
+    # entirely when sealed_blocked is set.
+    pre = await db.ora_dev_actions.find_one(
+        {"proposal_id": proposal_id},
+        {"sealed_blocked": 1, "status": 1, "_id": 0},
+    )
+    if not pre:
+        raise HTTPException(404, f"Proposal {proposal_id} not found")
+    if pre.get("status") != "pending":
+        raise HTTPException(
+            409, f"Cannot approve from `{pre.get('status')}` — already past pending"
+        )
+    if pre.get("sealed_blocked"):
+        raise HTTPException(
+            409,
+            {"code": "sealed_blocked",
+             "msg":  "Proposal touches sealed file(s) — manual unseal required."},
+        )
     doc = await _transition(
         proposal_id,
         new_status="approved",
         admin_email=payload.get("email"),
         allowed_from={"pending"},
     )
-    if doc.get("sealed_blocked"):
-        raise HTTPException(409, "Proposal touches sealed file(s) — cannot approve")
     # iter 282e — browser-action proposals auto-execute on approve.
     # Other proposal kinds (code change, ORA action, etc.) stay at
     # "approved" and wait for their existing applier paths.
@@ -415,3 +433,171 @@ async def prepare_pr(proposal_id: str, authorization: Optional[str] = Header(Non
             "workflow."
         ),
     }
+
+
+# ─── iter D-34: bulk approve safe proposals ──────────────────────────
+# Watchdog-approved Path B — clear the 1055-proposal backlog with one
+# click per SAFE category. A proposal is "safe to bulk-approve" only
+# when ALL of the following are true:
+#   • status == "pending"
+#   • sealed_blocked is not set / False
+#   • does NOT touch files matching the danger glob (auth/billing/schema)
+#   • diff_size (added + removed lines) <= 50 — anything bigger is a
+#     single-click decision, not a sweep.
+#
+# Caller picks a `kind` filter so they can sweep one bucket at a time
+# (e.g. "copy_only" or "css_only") — see _classify_kind below.
+
+import re as _re
+
+_DANGEROUS_PATH_RE = _re.compile(
+    r"(auth|login|password|jwt|stripe|payment|invoice|"
+    r"migration|schema|\.env|secrets?\.|credentials)",
+    _re.IGNORECASE,
+)
+
+
+def _classify_kind(doc: Dict[str, Any]) -> str:
+    """Cheap heuristic — what bucket does this proposal fall in?"""
+    files = doc.get("files_touched") or doc.get("paths") or []
+    if not files and doc.get("diff"):
+        files = _re.findall(r"^[+-]{3}\s+[ab]/(\S+)", doc.get("diff", ""), _re.MULTILINE)
+    files = [f for f in files if isinstance(f, str)]
+    if not files:
+        return "unknown"
+    if all(f.endswith((".md", ".txt")) for f in files):
+        return "docs"
+    if all(f.endswith((".css", ".scss")) for f in files):
+        return "css_only"
+    if all(_DANGEROUS_PATH_RE.search(f) for f in files):
+        return "risky_auth_or_billing"
+    if any(_DANGEROUS_PATH_RE.search(f) for f in files):
+        return "mixed_with_risky"
+    if all(f.startswith(("frontend/src/", "app/frontend/src/")) for f in files):
+        return "frontend_only"
+    if all(f.startswith(("backend/", "app/backend/")) for f in files):
+        return "backend_only"
+    return "mixed"
+
+
+def _diff_size(doc: Dict[str, Any]) -> int:
+    d = doc.get("diff") or ""
+    if not d:
+        return int(doc.get("added_lines", 0)) + int(doc.get("removed_lines", 0))
+    return sum(1 for line in d.splitlines()
+                if line and line[0] in ("+", "-")
+                and not line.startswith(("+++", "---")))
+
+
+_SAFE_KINDS = {"docs", "css_only", "frontend_only", "backend_only"}
+
+
+@router.get("/buckets")
+async def buckets(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Returns the kind-classified summary of the pending queue so the
+    UI can offer category-level bulk approve."""
+    verify_admin(authorization)
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database not wired")
+    out: Dict[str, Dict[str, Any]] = {}
+    async for doc in db.ora_dev_actions.find(
+        {"status": "pending"},
+        {"_id": 0, "proposal_id": 1, "sealed_blocked": 1,
+         "files_touched": 1, "paths": 1, "diff": 1,
+         "added_lines": 1, "removed_lines": 1},
+    ).limit(2000):
+        kind = _classify_kind(doc)
+        size = _diff_size(doc)
+        sealed = bool(doc.get("sealed_blocked"))
+        bucket = out.setdefault(kind, {
+            "kind":   kind,
+            "safe":   kind in _SAFE_KINDS,
+            "total":  0,
+            "sealed": 0,
+            "small_diffs": 0,
+            "large_diffs": 0,
+            "sample_ids": [],
+        })
+        bucket["total"] += 1
+        if sealed:
+            bucket["sealed"] += 1
+        elif size <= 50:
+            bucket["small_diffs"] += 1
+        else:
+            bucket["large_diffs"] += 1
+        if len(bucket["sample_ids"]) < 5:
+            bucket["sample_ids"].append(doc.get("proposal_id"))
+    return {"ok": True, "buckets": list(out.values())}
+
+
+@router.post("/bulk-approve")
+async def bulk_approve(
+    body: Dict[str, Any],
+    authorization: Optional[str] = Header(None),
+) -> Dict[str, Any]:
+    """Bulk-approve every pending proposal in the given `kind` bucket
+    that passes the safety guards. Returns counts of approved / skipped
+    plus the IDs of the skipped ones so the admin can review them.
+
+    Body:
+      { "kind": "css_only" | "docs" | "frontend_only" | "backend_only",
+        "max":  100  (optional cap, default 100, hard limit 500) }
+    """
+    payload = verify_admin(authorization)
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database not wired")
+    kind   = (body or {}).get("kind", "").strip().lower()
+    max_n  = min(int((body or {}).get("max", 100)), 500)
+    if kind not in _SAFE_KINDS:
+        raise HTTPException(400, {
+            "code": "kind_not_safe",
+            "msg":  f"`{kind}` is not in the bulk-approvable list "
+                    f"({sorted(_SAFE_KINDS)}). Use single-click approve.",
+        })
+    admin_email = payload.get("email") or "admin"
+    approved: list[str] = []
+    skipped:  list[dict] = []
+    cursor = db.ora_dev_actions.find(
+        {"status": "pending"},
+        {"_id": 0, "proposal_id": 1, "sealed_blocked": 1,
+         "files_touched": 1, "paths": 1, "diff": 1,
+         "added_lines": 1, "removed_lines": 1},
+    ).limit(max_n * 3)  # over-fetch since most may filter out
+    async for doc in cursor:
+        if len(approved) >= max_n:
+            break
+        pid = doc.get("proposal_id")
+        # Safety gate
+        if _classify_kind(doc) != kind:
+            continue
+        if doc.get("sealed_blocked"):
+            skipped.append({"proposal_id": pid, "why": "sealed_blocked"})
+            continue
+        if _diff_size(doc) > 50:
+            skipped.append({"proposal_id": pid, "why": "diff_too_large"})
+            continue
+        # Approve.
+        try:
+            await _transition(
+                pid,
+                new_status="approved",
+                admin_email=admin_email,
+                allowed_from={"pending"},
+                extra={"approved_via": "bulk", "approved_kind": kind},
+            )
+            approved.append(pid)
+        except HTTPException as e:
+            skipped.append({"proposal_id": pid, "why": f"http_{e.status_code}"})
+    return {
+        "ok":         True,
+        "kind":       kind,
+        "approved":   len(approved),
+        "skipped":    len(skipped),
+        "approved_ids": approved[:20],
+        "skipped_sample": skipped[:20],
+        "approved_via": "bulk",
+        "approved_by":  admin_email,
+    }
+
