@@ -1,19 +1,22 @@
 """
 test_isolation.py — Enforces the AUREM CTO isolation contract.
 
-Scans every `.py` file under /app/aurem_cto/ and asserts that the only
-imports from the host application are the 3 paths declared in
-DEPENDENCIES.md. Any new top-level host import fails this test.
+Scans every `.py` file under the aurem_cto package and asserts that
+the only imports from the host application are the 3 paths declared
+in DEPENDENCIES.md. Any new top-level host import fails this test.
 
 Run via pytest:
-    pytest /app/aurem_cto/tests/test_isolation.py -v
+    pytest backend/aurem_cto/tests/test_isolation.py -v
 """
 from __future__ import annotations
 
 import ast
 import pathlib
 
-MODULE_ROOT = pathlib.Path("/app/aurem_cto")
+# D-35-deploy-fix — resolve module root from this file's location so
+# the test works whether the package lives at /app/aurem_cto/ or
+# /app/backend/aurem_cto/ (production image).
+MODULE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 # These are the only `from X import Y` / `import X` patterns that may
 # reach outside the aurem_cto package. Anything else = fail.

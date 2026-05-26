@@ -98,6 +98,7 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Frontend `NewProjectFlow`** — admin-only `DogfoodSeedCard` (auto-hides on 403) with a one-click "Add aurem.live as project" button.
   - **Tests**: 5/5 new in `/app/backend/tests/test_dogfood_d35.py`; full active suite 20/20 green (5 D-35 + 6 D-32 + 9 aurem_cto isolation/gap).
   - **Status**: Scaffold complete. Real test deploy still needs the user to (1) paste GitHub PAT under `/developers/connect` → GitHub card, (2) save SSH host + private key under the Deploy card, then click "Refresh Index" and "Run dry-run deploy" inside the aurem-live-production workspace.
+- **D-35-deploy-fix (2026-02)** — Production deploy logs showed `ModuleNotFoundError: No module named 'aurem_cto'`. Root cause: the package lived at `/app/aurem_cto/`, outside the backend container's shipped tree (only `/app/backend/` and `/app/frontend/` are packaged for Atlas-backed prod). Fix: **moved `/app/aurem_cto/` → `/app/backend/aurem_cto/`** so it ships with the backend image. Dropped the sys.path-mangling block in `registry.py` (now a plain `import aurem_cto`). `test_isolation.py` MODULE_ROOT now resolves from `__file__` instead of the hard-coded path. 20/20 tests still green; preview confirms `/aurem-cto/stacks` returns 200 after restart. **NO docker, supervisor, or env changes were needed.**
 
 ## Backlog (P0 → P2)
 
