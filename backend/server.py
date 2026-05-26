@@ -258,6 +258,8 @@ import httpx
 # Import Whapi service
 
 sys.path.insert(0, str(Path(__file__).parent))
+# iter D-31 — also add /app so the isolated `aurem_cto` package resolves.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 # Import Twilio service (replaces WHAPI) with backwards-compatible function names
 from services.twilio_service import (
     validate_whatsapp_number,

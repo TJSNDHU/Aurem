@@ -189,6 +189,8 @@ import DevSettings  from './platform/developers/DevSettings';
 import DevExamples  from './platform/developers/DevExamples';
 import DevStatus    from './platform/developers/DevStatus';
 import DevApiDocs   from './platform/developers/DevApiDocs';
+import NewProjectFlow   from './platform/developers/NewProjectFlow';     // iter D-32
+import ProjectWorkspace from './platform/developers/ProjectWorkspace';   // iter D-32
 
 // iter 332b — Contact Sales + Enterprise Admin (4 pages) + SAML ACS landing
 import ContactSales from './platform/ContactSales';
@@ -338,6 +340,11 @@ function AppRouter() {
       <Route path="/developers/examples"  element={<DevExamples />} />
       <Route path="/developers/status"    element={<DevStatus />} />
       <Route path="/developers/docs"      element={<DevApiDocs />} />
+
+      {/* iter D-32 — Watchdog-approved onboarding: build-first, deploy-last */}
+      <Route path="/my/projects/new"        element={<NewProjectFlow />} />
+      <Route path="/my/projects/:project_id" element={<ProjectWorkspace />} />
+      <Route path="/my/projects"            element={<NewProjectFlow />} />
 
       {/* iter 332b — Contact Sales + Enterprise Admin */}
       <Route path="/enterprise"                   element={<ContactSales />} />

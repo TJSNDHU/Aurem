@@ -64,7 +64,7 @@ export default function DevSignup() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || "verify failed");
       setDevJwt(j.jwt); setStep(3);
-      setTimeout(() => navigate("/developers/connect"), 1500);
+      setTimeout(() => navigate("/my/projects/new"), 1500);
     } catch (e) {
       setError(String(e.message || e));
     } finally { setBusy(false); }

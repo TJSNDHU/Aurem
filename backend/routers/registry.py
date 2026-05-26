@@ -909,6 +909,38 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] developer_deploy_router wired")
                 except Exception as _dep_e:
                     logger.warning(f"[REGISTRY] developer_deploy_router not loaded: {_dep_e}")
+
+                # iter D-31 — Isolated AUREM CTO module PARKED on branch.
+                # Watchdog moved onboarding flow to P0 (preview hosting +
+                # token UI + Go-Live checklist). D-31 skeleton lives at
+                # /app/aurem_cto/ — re-enable the block below once
+                # onboarding ships and we resume Hetzner P0 work.
+                #
+                # try:
+                #     import sys as _sys
+                #     if "/app" not in _sys.path:
+                #         _sys.path.insert(0, "/app")
+                #     import aurem_cto as _act
+                #     app.include_router(_act.build_router())
+                #     _act.set_db(db)
+                #     logger.info(f"[REGISTRY] aurem_cto module wired (v{_act.VERSION})")
+                # except Exception as _act_e:
+                #     logger.warning(f"[REGISTRY] aurem_cto module not loaded: {_act_e}")
+
+                # iter D-32 — Onboarding flow (projects + tokens + share + Go-Live)
+                try:
+                    from routers.onboarding_flow_router import (
+                        router as _onb_router,
+                        set_db as _set_onb_db,
+                        ensure_indexes as _onb_indexes,
+                    )
+                    app.include_router(_onb_router)
+                    _set_onb_db(db)
+                    import asyncio as _aio_onb
+                    _aio_onb.create_task(_onb_indexes())
+                    logger.info("[REGISTRY] onboarding_flow_router wired")
+                except Exception as _onb_e:
+                    logger.warning(f"[REGISTRY] onboarding_flow_router not loaded: {_onb_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

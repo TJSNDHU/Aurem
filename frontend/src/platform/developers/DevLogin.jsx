@@ -45,7 +45,7 @@ export default function DevLogin() {
         throw new Error(msg);
       }
       setDevJwt(j.jwt);
-      navigate("/developers/dashboard");
+      navigate("/my/projects/new");
     } catch (e) {
       setError(String(e.message || e));
     } finally {
