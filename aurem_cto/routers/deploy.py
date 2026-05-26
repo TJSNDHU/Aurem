@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 
 from ..services.auth import current_dev
-from ..services.crypto import encrypt, decrypt
+from ..services.crypto import encrypt, decrypt, is_vault_available
 from ..services.db import require_db
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,12 @@ async def save_config(body: DeployConfigBody,
                       authorization: str = Header(None)) -> dict[str, Any]:
     me = await current_dev(authorization)
     db = require_db()
+    if not is_vault_available():
+        raise HTTPException(503, {
+            "code": "vault_unavailable",
+            "msg":  "AUREM_CTO_MASTER_KEY not set on this deployment — "
+                    "ask an admin to configure the vault env var.",
+        })
     pk = body.private_key.strip()
     if "BEGIN" not in pk or "PRIVATE KEY" not in pk:
         raise HTTPException(400, "private_key_must_be_pem")

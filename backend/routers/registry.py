@@ -911,10 +911,17 @@ def register_all_routers(app, db):
                     logger.warning(f"[REGISTRY] developer_deploy_router not loaded: {_dep_e}")
 
                 # iter D-33 — AUREM CTO module RE-ENABLED. Mount /aurem-cto/*
+                # Path-discovery is portable: we walk up from this file
+                # (routers/registry.py) to find the repo root so prod
+                # containers that don't use the literal `/app` mount
+                # still resolve the `aurem_cto` package.
                 try:
                     import sys as _sys
-                    for _p in ("/app", "/app/backend"):
-                        if _p not in _sys.path:
+                    import pathlib as _pl
+                    _repo_root = _pl.Path(__file__).resolve().parents[2]   # …/backend/routers/registry.py → repo root
+                    _candidates = [str(_repo_root), str(_repo_root.parent), "/app", "/app/backend"]
+                    for _p in _candidates:
+                        if _p and _p not in _sys.path:
                             _sys.path.insert(0, _p)
                     import aurem_cto as _act
                     app.include_router(_act.build_router())
