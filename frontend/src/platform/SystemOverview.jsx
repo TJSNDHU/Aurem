@@ -638,7 +638,7 @@ export default function SystemOverview({ publicMode = false } = {}) {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0D0D0D" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           </div>
           <h1 className="sov-hdr" style={{ fontSize: 'clamp(20px,4vw,32px)', margin: 0 }}>AUREM SYSTEM OVERVIEW</h1>
-          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '332b'} | {p.as_of || 'FEB 24, 2026'}</p>
+          <p className="sov-body" style={{ color: '#6A6070', fontSize: 14, marginTop: 6, letterSpacing: '0.15em' }}>POLARIS BUILT INC. | SOVEREIGN COMMAND | ITER {p.iteration || '332b D-35'} | {p.as_of || 'FEB 26, 2026'}</p>
 
           {/* ═══ SHARE BUTTON (admin only — public viewers don't get a re-share loop) ═══ */}
           {!publicMode && (
@@ -724,6 +724,57 @@ export default function SystemOverview({ publicMode = false } = {}) {
 
         {/* ═══ iter 323j — LIVE FULL SOVEREIGNTY SCORE ═══ */}
         <SovereigntyScoreTile />
+
+        {/* ═══ ITER 332b D-30 → D-35 — FEB 26, 2026 — DEV PORTAL · AUREM CTO · DOGFOOD ═══ */}
+        <div className="sov-card" style={{
+          padding: '24px 32px', marginBottom: 20,
+          border: `1px solid ${GOLD}`, animation: 'sov-glow 5s ease-in-out infinite',
+          background: 'linear-gradient(135deg, #0D0D0D, #1A1408)',
+        }} data-testid="sov-iter332b-d35-builds">
+          <div className="sov-hdr" style={{ fontSize: 14, marginBottom: 6, color: GOLD }}>
+            ITER 332b · D-30 → D-35 · DEV PORTAL + AUREM CTO MODULE + DOGFOOD · FEB 26, 2026
+          </div>
+          <p className="sov-body" style={{ fontSize: 12, color: '#C9A084', marginBottom: 14, letterSpacing: '0.05em' }}>
+            Developer self-deploy · isolated /aurem_cto module · build-first onboarding with token wallet · Stripe paywall UI · codebase indexer · stack selector · trust signals · referrals + build streak · LITE-mode dashboard fix · aurem.live as a self-managed dogfood project (deploy gated on dry-run)
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 12 }}>
+            {[
+              { iter: 'D-30', title: 'Pillar 4 false-red + self-deploy',
+                desc: 'Pillar 4 backend map no longer shows fake RED in LITE mode · Developer self-deploy (SSH + Docker) wired · Domain linking wizard · CTO chat copy-button.' },
+              { iter: 'D-31', title: '/app/backend/aurem_cto/ isolated module',
+                desc: 'Portable internal lib mimicking a standalone product · 3 whitelisted host imports · 3/3 isolation tests green · namespace prefix /aurem-cto/ for every route + collection + env var.' },
+              { iter: 'D-32', title: 'Build-first onboarding + token wallet',
+                desc: 'Post-signup lands on /my/projects/new — no GitHub/server prompts · multi-tenant preview at preview.aurem.live/<project_id> · wallet (1000 signup grant, cheap=1 / frontier=5) atomically debited per chat turn · social-share auto-scrape +2500 with admin approval queue.' },
+              { iter: 'D-33', title: 'Stripe paywall · indexer · stacks · trust · streak',
+                desc: 'PaywallBlock at insufficient-tokens with /pricing CTA · Codebase Indexer pulls customer repo via BYOK PAT and injects context every chat turn · 4 starter stacks (React+FastAPI / Next+Node / Vue+Express / plain HTML) · Trust tiles (deploy count, 24h uptime %, opt-in gallery) · referrals + consecutive-day build streak.' },
+              { iter: 'D-34', title: 'LITE-mode dashboard truth-fix',
+                desc: 'Production pods auto-disable heavy schedulers — dashboard now reports YELLOW "lite_mode" instead of false RED · registry hardened against missing AUREM_CTO_MASTER_KEY.' },
+              { iter: 'D-35', title: 'aurem.live as dogfood project',
+                desc: 'Admin one-click "Add aurem.live as project" · red production warning banner · DogfoodDeployPanel with GitHub / Server / Indexer pills · dry-run mode (git fetch + docker compose config --quiet) · real deploy gated on a successful dry-run within 24h · 5/5 new pytest green.' },
+              { iter: 'D-35*', title: 'Production deploy fix',
+                desc: 'Resolved "ModuleNotFoundError: aurem_cto" in production by relocating package to /app/backend/aurem_cto/ so it ships inside the backend container · plain import, no sys.path hack · isolation test path now resolves from __file__.' },
+            ].map((b, i) => (
+              <div key={i} style={{
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(13,13,13,0.7)',
+                border: `1px solid ${GOLD}33`,
+              }}>
+                <div className="sov-mono" style={{ fontSize: 10, color: GOLD, letterSpacing: '0.1em' }}>
+                  iter 332b · {b.iter}
+                </div>
+                <div className="sov-body" style={{ fontSize: 14, color: '#E8E0D0', fontWeight: 600, margin: '4px 0 6px' }}>
+                  {b.title}
+                </div>
+                <div className="sov-body" style={{ fontSize: 12, color: '#8A8070', lineHeight: 1.4 }}>
+                  {b.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="sov-mono" style={{ fontSize: 10, color: '#5A5468', marginTop: 14, textAlign: 'right' }}>
+            20 pytest active for this batch · 0 regressions · /aurem-cto/* routes live · production deploy unblocked
+          </div>
+        </div>
 
         {/* ═══ ITER 332b — FEB 24, 2026 — ENTERPRISE FOUNDATION BATCH ═══ */}
         <div className="sov-card" style={{
