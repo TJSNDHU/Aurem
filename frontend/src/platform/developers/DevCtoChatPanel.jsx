@@ -240,7 +240,10 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
               if (evt.low_balance && !dismissed) setShowLowModal(true);
             }
           } else if (evt.type === "error") {
-            // iter D-32 — onboarding wallet ran out. Show paywall.
+            // iter D-32 / D-33 — onboarding wallet ran out. Surface the
+            // structured paywall instead of a plain text apology so the
+            // customer sees the Builder/Pro upgrade option + the share-to-
+            // earn shortcut in one place.
             if (evt.code === "insufficient_tokens") {
               setMessages(m => {
                 const copy = m.slice();
@@ -250,7 +253,11 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                 }
                 copy.push({
                   role: "assistant", warning: true,
-                  content: `You're out of build tokens (${evt.balance || 0} left, this turn costs ${evt.cost}). Share AUREM to earn +2500 free tokens, or upgrade to Builder / Pro to keep going.`,
+                  paywall: {
+                    balance: evt.balance || 0,
+                    cost:    evt.cost || 1,
+                  },
+                  content: `You're out of build tokens — ${evt.balance || 0} left, this turn needs ${evt.cost || 1}.`,
                 });
                 return copy;
               });
@@ -503,6 +510,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                                 : "1px solid rgba(255,255,255,0.06)" }}>
                   {displayed || (busy && m.role === "assistant" ? "…" : "")}
                   {m.attachment && <Attachment att={m.attachment} />}
+                  {m.paywall && <PaywallBlock info={m.paywall} />}
                   {m.role === "assistant" && displayed && !busy && (
                     <CopyMessageButton text={displayed} index={i} />
                   )}
@@ -859,3 +867,59 @@ function CopyMessageButton({ text, index }) {
     </button>
   );
 }
+
+// ─── Paywall block (iter D-33) ───────────────────────────────────────
+// Renders inside the assistant bubble when the backend returns the
+// `insufficient_tokens` SSE error. Existing Stripe Builder/Pro tiers
+// already live at /pricing; this is a UI gate only — no new Stripe
+// integration. Share-to-earn shortcut routes back to /my/projects/new
+// where the existing ShareForTokensCard lives.
+function PaywallBlock({ info }) {
+  const balance = info?.balance ?? 0;
+  const cost    = info?.cost    ?? 1;
+  return (
+    <div data-testid="paywall-block"
+         style={{ marginTop: 12, padding: 14, borderRadius: 6,
+                   background: "rgba(255,107,0,0.08)",
+                   border: "1px solid rgba(255,107,0,0.35)" }}>
+      <div style={{ fontSize: 11, letterSpacing: "0.15em",
+                     textTransform: "uppercase",
+                     color: "#FF8C35", marginBottom: 6 }}>
+        Tokens — {balance} left · this turn needs {cost}
+      </div>
+      <div style={{ fontSize: 13, color: "#F0EDE8",
+                     marginBottom: 12 }}>
+        Two ways to keep building right now:
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <a data-testid="paywall-upgrade-btn"
+           href="/pricing"
+           style={{ display: "inline-flex", alignItems: "center", gap: 6,
+                     padding: "10px 18px",
+                     background: "linear-gradient(135deg, #FF6B00, #FF8C35)",
+                     color: "#fff", textDecoration: "none",
+                     border: "none", borderRadius: 6,
+                     fontSize: 13, fontWeight: 500 }}>
+          Upgrade to Builder or Pro
+        </a>
+        <a data-testid="paywall-share-btn"
+           href="/my/projects/new#share"
+           style={{ display: "inline-flex", alignItems: "center", gap: 6,
+                     padding: "10px 16px",
+                     background: "transparent",
+                     border: "1px solid rgba(201,168,76,0.45)",
+                     color: "#C9A84C", borderRadius: 6,
+                     fontSize: 13, fontWeight: 500,
+                     textDecoration: "none" }}>
+          Share AUREM → +2500 free tokens
+        </a>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 11,
+                     color: "rgba(240,237,232,0.55)" }}>
+        Builder gets 50,000 tokens / month + priority frontier models. Pro
+        is unlimited cheap-tier + 200k frontier tokens.
+      </div>
+    </div>
+  );
+}
+

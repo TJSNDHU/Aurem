@@ -72,6 +72,13 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - Social-share scrape (`+2500` on auto-approve) with admin pending queue + manual decide endpoint.
   - Go-Live checklist component (GitHub / server / domain / BYOK) — locked dashed-card until `progress >= 0.80`, unlocked green card after.
   - DevSignup + DevLogin redirect to `/my/projects/new` instead of `/developers/connect` and `/developers/dashboard`.
+  - **Chat ↔ wallet ↔ progress wired**: `/api/developers/cto/chat/stream` accepts `project_id` + `model_tier`, debits the wallet atomically, parses `progress:` / `phase:` / `MANIFEST_PATCH:{…}` markers (balanced-brace JSON extractor) from the LLM reply, and emits `insufficient_tokens` SSE error when wallet is dry. PROGRESS CONTRACT added to the AUREM CTO system prompt.
+  - Public preview at `/preview/:project_id` (no auth) reading the public manifest endpoint with 6s live-refresh.
+- **D-33 (this slice)**:
+  - **Stripe paywall UI gate**: `PaywallBlock` component renders inside the `insufficient_tokens` assistant message with one CTA to `/pricing` (existing Builder/Pro tiers) and one shortcut to `/my/projects/new#share` for the 2500-token earn flow. Zero new Stripe integration.
+  - **Preview hosting setup doc**: `/app/aurem_cto/docs/PREVIEW_HOSTING_SETUP.md` — exact DNS A record + Caddy block + verification commands for `preview.aurem.live` (user runs on prod box).
+  - **DB scan** completed before any gap code — 38 shadcn components, tailwind config live, parallel referral/wallet/deploy/health systems mapped, Docker templates already at `/app/aurem-cto/` (hyphen folder, distinct from D-31 underscore folder).
+  - **D-31 still parked, Hetzner P0 blocked** waiting for the founder to actually paste the Hetzner Cloud API token (the literal string `[paste your token]` was sent two messages ago, never replaced).
 
 ## Backlog (P0 → P2)
 
