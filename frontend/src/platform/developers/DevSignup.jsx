@@ -4,6 +4,7 @@
  * homepage chrome (orange/gold), not the dashboard sidebar.
  */
 import React, { useState } from "react";
+import SEO from "../../components/SEO";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, CheckCircle2 } from "lucide-react";
 import DeveloperShell, { setDevJwt } from "./DeveloperShell";
@@ -71,6 +72,21 @@ export default function DevSignup() {
 
   return (
     <DeveloperShell mode="landing">
+      <SEO
+        title="Developer Sign Up — Get Free AUREM API Tokens"
+        description="Create your AUREM developer account. Free-tier OpenRouter chat (DeepSeek V3 → Llama 3.3 → Mistral). BYOK support, SSE streaming, PIPEDA-compliant. 60-second setup."
+        path="/developers/signup"
+        keywords={["AUREM signup", "developer API tokens", "free LLM API", "BYOK"]}
+        schema={["Organization", "SoftwareApplication"]}
+        appName="AUREM Developer Portal"
+        appCategory="DeveloperApplication"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Developers", url: "/developers" },
+          { name: "Sign Up", url: "/developers/signup" },
+        ]}
+        aiSummary="AUREM developer signup gives every dev a free-tier account with OpenRouter LLM access (DeepSeek V3 → Llama 3.3 → Mistral fallback ladder), BYOK support for production scale, real-time SSE streaming chat, and PIPEDA-compliant Canadian data residency. 60-second setup, no credit card."
+      />
       <section style={{ minHeight: "82vh", padding: "120px 5% 60px",
                          display: "flex", justifyContent: "center" }}>
         <div style={{ width: "100%", maxWidth: 480 }}>

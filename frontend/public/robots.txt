@@ -1,33 +1,41 @@
-# ═══════════════════════════════════════════════════════
-# AUREM — robots.txt (Search engines + AI crawlers)
-# ═══════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════
+# AUREM — robots.txt
+# iter 332b D-28
+# https://aurem.live/robots.txt
+# ════════════════════════════════════════════════════════════════════
 
-# Default: allow well-behaved bots
 User-agent: *
 Allow: /
-Allow: /audit
-Allow: /share/system-overview
-Allow: /framework
-Allow: /privacy
-Allow: /terms
-Allow: /support
-Allow: /login
-Allow: /forgot-password
+Allow: /developers
+Allow: /developers/signup
+Allow: /developers/api-docs
+Allow: /services
+Allow: /pricing
+Allow: /enterprise
+Allow: /trust
+Allow: /about
 
-Disallow: /dashboard
+# Authenticated surfaces — don't waste crawl budget.
+Disallow: /my
+Disallow: /admin
+Disallow: /developers/dashboard
+Disallow: /developers/login
+Disallow: /developers/connect
+Disallow: /developers/tokens
+Disallow: /developers/usage
+Disallow: /developers/billing
+Disallow: /api/
+
+# Generative-AI crawler allowlist (GEO).
+# These crawlers respect User-agent — explicit lines below let them
+# index the public site for citation in ChatGPT / Perplexity / Gemini /
+# Claude search experiences.
+
+User-agent: GPTBot
+Allow: /
 Disallow: /my
 Disallow: /admin
 Disallow: /api/
-Disallow: /settings
-Disallow: /reset-password
-Disallow: /verify-email
-
-# ═══════════════════════════════════════════════════════
-# AI CRAWLERS — Explicit allow (GEO / Generative Engine Optimization)
-# ═══════════════════════════════════════════════════════
-# OpenAI (ChatGPT, GPT browser)
-User-agent: GPTBot
-Allow: /
 
 User-agent: OAI-SearchBot
 Allow: /
@@ -35,75 +43,27 @@ Allow: /
 User-agent: ChatGPT-User
 Allow: /
 
-# Anthropic (Claude)
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
 User-agent: ClaudeBot
 Allow: /
 
 User-agent: Claude-Web
 Allow: /
 
-User-agent: anthropic-ai
-Allow: /
-
-# Google (Gemini + AI Overviews)
-User-agent: Google-Extended
-Allow: /
-
-User-agent: GoogleOther
-Allow: /
-
-# Perplexity
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Perplexity-User
-Allow: /
-
-# Meta AI (Llama)
-User-agent: Meta-ExternalAgent
-Allow: /
-
-User-agent: FacebookBot
-Allow: /
-
-# ByteDance (Doubao)
-User-agent: Bytespider
-Allow: /
-
-# Cohere
-User-agent: cohere-ai
-Allow: /
-
-# Common Crawl (foundation for many LLM training sets)
 User-agent: CCBot
 Allow: /
 
-# Apple Intelligence
-User-agent: Applebot
+User-agent: anthropic-ai
 Allow: /
 
-User-agent: Applebot-Extended
-Allow: /
-
-# Diffbot (indexes for AI answer engines)
-User-agent: Diffbot
-Allow: /
-
-# You.com
-User-agent: YouBot
-Allow: /
-
-# Mistral
-User-agent: MistralAI-User
-Allow: /
-
-# DuckDuckGo AI
-User-agent: DuckAssistBot
-Allow: /
-
-# ═══════════════════════════════════════════════════════
-# LLM-readable manifest
-# ═══════════════════════════════════════════════════════
-# AI platforms are learning to read /llms.txt for structured knowledge
+# AI-summary spec (https://llmstxt.org) — point all AI crawlers at the
+# canonical fact-dense summary file.
 Sitemap: https://aurem.live/sitemap.xml
-Host: aurem.live

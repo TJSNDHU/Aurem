@@ -1256,6 +1256,32 @@ async def _gather_pillar(key: str, spec: dict) -> dict:
     else:
         overall = "green"
 
+    # iter 332b D-28 — LITE-mode awareness for Pillar 4.
+    # Production auto-engages LITE mode (D-24) which intentionally
+    # disables all 34 P4 schedulers. Without this check the dashboard
+    # showed "Broken" with red status, alarming the founder unnecessarily.
+    # Now we detect "no workers expected" and label it `lite_mode` =
+    # green with reason, so the founder sees calm "LITE MODE BY DESIGN"
+    # instead of red "0 LIVE WORKERS / BROKEN".
+    lite_mode_active = False
+    if key == "p4_command_hub" and len(workers_live) == 0 and len(workers_done) == 0:
+        try:
+            _host = (os.environ.get("HOSTNAME") or "").lower()
+            _is_prod_pod = (
+                ("live-support" in _host or "emergent.host" in _host)
+                and not _host.startswith("agent-env-")
+            )
+            _lite_env = os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes")
+            if _is_prod_pod or _lite_env:
+                lite_mode_active = True
+                # Downgrade reds caused by missing-worker → not a real failure
+                # in LITE mode. The collections themselves are fine; their
+                # writers are just paused on purpose.
+                if not unreachable and not silent_failures:
+                    overall = "green"
+        except Exception:
+            pass
+
     # iter 322 — breaker-aware downgrade: when the cause of red is an OPEN
     # external breaker (Twilio / Resend / OpenRouter / Groq quota or rate
     # limit), the system itself is healthy — only the upstream is throttled.
@@ -1293,6 +1319,7 @@ async def _gather_pillar(key: str, spec: dict) -> dict:
         "color": spec["color"],
         "status": overall,
         "throttled_by": throttled_by or None,
+        "lite_mode": lite_mode_active,
         "workers": {
             "live": len(workers_live),
             "done": len(workers_done),

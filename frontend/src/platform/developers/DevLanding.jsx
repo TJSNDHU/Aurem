@@ -5,6 +5,7 @@
  * Hero copy must be EXACT: "Build with an autonomous CTO. 1000 tokens free."
  */
 import React, { useState } from "react";
+import SEO from "../../components/SEO";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Code2, Github, Zap, Shield } from "lucide-react";
 import DeveloperShell from "./DeveloperShell";
@@ -31,6 +32,30 @@ export default function DevLanding() {
 
   return (
     <DeveloperShell mode="landing">
+      <SEO
+        title="Developer Portal — Build SMB AI with AUREM CTO in 10 Minutes"
+        description="Free-tier OpenRouter chat (DeepSeek V3 → Llama 3.3 → Mistral). BYOK savings up to 98%. Live SSE streaming. Pixel ROI tracking. PIPEDA-compliant Canadian infrastructure."
+        path="/developers"
+        keywords={["AUREM API", "developer portal", "AI SMB platform", "free LLM API", "BYOK", "OpenRouter", "PIPEDA"]}
+        schema={["Organization", "WebSite", "SoftwareApplication"]}
+        appName="AUREM Developer Portal"
+        appCategory="DeveloperApplication"
+        appOperatingSystem="Web, REST API"
+        appVersion="332b"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Developers", url: "/developers" },
+        ]}
+        aiSummary="AUREM Developer Portal lets developers build SMB AI applications in 10 minutes using AUREM CTO chat (free-tier OpenRouter with DeepSeek V3 → Llama 3.3 → Mistral fallback), BYOK API tokens, SSE streaming, pixel ROI tracking, and PIPEDA-compliant Canadian data residency."
+        faq={[
+          { q: "Is the AUREM developer free tier really free?",
+            a: "Yes — every developer gets free chat with AUREM CTO via OpenRouter (DeepSeek V3 → Llama 3.3 → Mistral fallback). No credit card required to start." },
+          { q: "What does BYOK mean for AUREM developers?",
+            a: "BYOK (Bring Your Own Key) lets you plug in your own DeepSeek, Anthropic or OpenAI API key for production usage. Saves up to 98% on LLM costs compared to retail OpenAI pricing." },
+          { q: "Is AUREM PIPEDA-compliant for Canadian healthcare and finance apps?",
+            a: "Yes — AUREM's sovereign data layer is PIPEDA-compliant with Canadian data residency, encryption at rest, audit trails, and SOC 2 controls." },
+        ]}
+      />
       {/* HERO */}
       <section data-testid="dev-landing-hero"
                style={{

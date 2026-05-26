@@ -137,7 +137,19 @@ function PillarCard({ pillar, onOpen }) {
       </div>
 
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
-        <StatusBadge status={status} testId={`pillar-badge-${pillar.key}`} />
+        {pillar.lite_mode ? (
+          <span data-testid={`pillar-badge-${pillar.key}`}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-semibold"
+                style={{ background: 'rgba(255,107,0,0.12)',
+                          color: '#FFB070',
+                          border: '1px solid rgba(255,107,0,0.30)' }}>
+            <span style={{ display: 'inline-block', width: 6, height: 6,
+                            borderRadius: 999, background: '#FF8C35' }} />
+            LITE Mode · By Design
+          </span>
+        ) : (
+          <StatusBadge status={status} testId={`pillar-badge-${pillar.key}`} />
+        )}
         <span className="text-xs text-gray-400 flex items-center gap-1 group-hover:text-gray-200">
           Drill in <ExternalLink className="size-3" />
         </span>

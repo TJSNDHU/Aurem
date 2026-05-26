@@ -10,6 +10,7 @@
  *     so they don't crowd the build surface.
  */
 import React, { useEffect, useState } from "react";
+import SEO from "../../components/SEO";
 import { Coins, Github, Gauge, Activity } from "lucide-react";
 import DeveloperShell, { devAuthHeaders, useDevMe } from "./DeveloperShell";
 import DevCtoChatPanel from "./DevCtoChatPanel";
@@ -41,6 +42,17 @@ export default function DevDashboard() {
 
   return (
     <DeveloperShell requireAuth>
+      <SEO
+        title="Developer Dashboard"
+        description="Your AUREM developer dashboard — chat with CTO, view tokens, GitHub, sessions and lifetime usage. Save projects + sidebar history."
+        path="/developers/dashboard"
+        noindex
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Developers", url: "/developers" },
+          { name: "Dashboard", url: "/developers/dashboard" },
+        ]}
+      />
       {/* Header row: title on the left, compact stat chips on the right. */}
       <div data-testid="dev-dashboard-header"
            style={{ display: "flex", alignItems: "flex-end",

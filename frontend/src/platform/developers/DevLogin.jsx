@@ -8,6 +8,7 @@
  * existing accounts can sign in with email + password in one screen.
  */
 import React, { useState } from "react";
+import SEO from "../../components/SEO";
 import { Link, useNavigate } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import DeveloperShell, { setDevJwt } from "./DeveloperShell";
@@ -54,6 +55,17 @@ export default function DevLogin() {
 
   return (
     <DeveloperShell mode="landing">
+      <SEO
+        title="Developer Sign In"
+        description="Access your AUREM developer dashboard. Manage tokens, BYOK keys, sessions, and chat with AUREM CTO for fast SMB AI builds."
+        path="/developers/login"
+        noindex
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Developers", url: "/developers" },
+          { name: "Sign In", url: "/developers/login" },
+        ]}
+      />
       <section style={{ minHeight: "82vh", padding: "120px 5% 60px",
                         display: "flex", justifyContent: "center" }}>
         <div style={{ width: "100%", maxWidth: 440 }}>

@@ -4,6 +4,7 @@
  * (developer routes only), pre-fills the bearer auth from localStorage.
  */
 import React, { useEffect, useRef } from "react";
+import SEO from "../../components/SEO";
 import DeveloperShell, { getDevJwt } from "./DeveloperShell";
 import { PageHeader } from "./DevDashboard";
 
@@ -64,6 +65,21 @@ export default function DevApiDocs() {
 
   return (
     <DeveloperShell requireAuth>
+      <SEO
+        title="REST API Reference — AUREM Developer Docs"
+        description="Full REST API reference for AUREM Developer Portal. Try-it-out console with pre-filled JWT. Streaming chat, BYOK key management, pixel events, billing, tokens."
+        path="/developers/api-docs"
+        keywords={["AUREM REST API", "OpenAPI docs", "Swagger", "SSE streaming", "BYOK"]}
+        schema={["Organization", "APIReference"]}
+        apiName="AUREM Developer Portal REST API"
+        apiDocsUrl="https://aurem.live/developers/api-docs"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Developers", url: "/developers" },
+          { name: "API Docs", url: "/developers/api-docs" },
+        ]}
+        aiSummary="The AUREM Developer Portal exposes a REST API for chat (SSE streaming), token management, BYOK API key registration, pixel event ingestion, billing, and project history. All endpoints are JWT-authenticated and PIPEDA-compliant."
+      />
       <PageHeader eyebrow="API DOCS"
                   title="REST API reference"
                   sub="All developer-portal endpoints. Your JWT is pre-filled. Hit 'Try it out' to call against your own account." />

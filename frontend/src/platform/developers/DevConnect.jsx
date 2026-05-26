@@ -4,6 +4,7 @@
  * with cost-per-1M comparison so devs make smart choices.
  */
 import React, { useState } from "react";
+import SEO from "../../components/SEO";
 import { useNavigate } from "react-router-dom";
 import { Github, Code2, Sparkles, Check } from "lucide-react";
 import DeveloperShell, { devAuthHeaders } from "./DeveloperShell";
@@ -68,6 +69,18 @@ export default function DevConnect() {
 
   return (
     <DeveloperShell requireAuth>
+      <SEO
+        title="Connect — Optional GitHub, BYOK & Tools"
+        description="Connect your DeepSeek, Anthropic, or OpenAI API key to AUREM (BYOK saves up to 98% on LLM costs). Optional GitHub integration for auto-provisioned dev sandboxes."
+        path="/developers/connect"
+        noindex
+        keywords={["BYOK", "DeepSeek API", "Anthropic API", "GitHub integration"]}
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Developers", url: "/developers" },
+          { name: "Connect", url: "/developers/connect" },
+        ]}
+      />
       <PageHeader eyebrow="CONNECT" title="Optional setup."
                   sub="Free tier is active — you can chat with AUREM CTO right now from the Dashboard. Connect tools here to unlock more autonomy." />
 

@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { User } from "lucide-react";
+import SEO from "../components/SEO";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -526,6 +527,31 @@ const AuremHomepage = () => {
 
   return (
     <div className="aurem-home" data-testid="aurem-homepage">
+      <SEO
+        title="Sovereign AI Workforce for Canadian SMBs"
+        description="Six autonomous AI agents (Scout, Hunter, Closer, Envoy, Follow-up, Referral) hunt, qualify and close leads 24/7 in 20+ languages. PIPEDA-compliant. Free website security + SEO audit included."
+        path="/"
+        keywords={[
+          "AUREM", "AI workforce Canada", "AI sales automation",
+          "SMB AI platform Toronto", "PIPEDA AI", "autonomous lead generation",
+          "free website audit", "Canadian AI compliance",
+        ]}
+        schema={["Organization", "WebSite", "SoftwareApplication"]}
+        appName="AUREM Sovereign AI Workforce"
+        appCategory="BusinessApplication"
+        appPriceRange="Free tier · Pro $49/mo · Enterprise custom"
+        aiSummary="AUREM is the sovereign AI workforce platform for Canadian SMBs. It deploys six autonomous AI agents — Scout (discovery), Hunter (qualification), Closer (deals), Envoy (multilingual outreach), Follow-up (re-engagement), Referral (loops) — that work 24/7 in 20+ languages. The platform is PIPEDA-compliant with Canadian data residency, SOC 2 controls, and a free website security + SEO audit on every signup. Founded 2024 by Tejinder Sandhu (Polaris Built Inc., Mississauga, Ontario)."
+        faq={[
+          { q: "What is AUREM?",
+            a: "AUREM is a sovereign AI workforce platform for Canadian small and medium businesses. It deploys six autonomous AI agents that hunt, qualify, and close leads 24/7 in 20+ languages, with full PIPEDA compliance and Canadian data residency." },
+          { q: "Is AUREM PIPEDA-compliant?",
+            a: "Yes. AUREM stores all customer data on Canadian infrastructure with encryption at rest, audit trails, SOC 2 controls, and explicit consent management — meeting PIPEDA, GDPR, and CASL requirements." },
+          { q: "How does the free website security audit work?",
+            a: "Every visitor gets one free real-time scan covering TLS, CSP, HSTS, headers, Lighthouse SEO, and accessibility — no signup required. Sign up to schedule recurring scans and auto-fix recommendations." },
+          { q: "What are the six AUREM agents?",
+            a: "Scout discovers leads, Hunter qualifies them, Closer drives deals, Envoy handles multilingual outreach (20+ languages), Follow-up re-engages cold leads, and Referral builds growth loops. All six work autonomously 24/7." },
+        ]}
+      />
       <style>{HOMEPAGE_CSS}</style>
       <BackgroundVideo />
       <div className="bg-glow" />
