@@ -110,7 +110,8 @@ function Attachment({ att }) {
 
 // ─── Component ─────────────────────────────────────────────────────────
 
-export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) {
+export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
+                                          projectId = "", modelTier = "cheap" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const scrollRef = useRef(null);
@@ -185,7 +186,11 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
       const r = await fetch(`${API}/api/developers/cto/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...devAuthHeaders() },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({
+          messages: history,
+          project_id: projectId || "",   // iter D-32 — debit wallet + patch progress
+          model_tier: modelTier || "cheap",
+        }),
       });
       if (!r.ok) {
         const raw = await r.text();
@@ -235,6 +240,23 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
               if (evt.low_balance && !dismissed) setShowLowModal(true);
             }
           } else if (evt.type === "error") {
+            // iter D-32 — onboarding wallet ran out. Show paywall.
+            if (evt.code === "insufficient_tokens") {
+              setMessages(m => {
+                const copy = m.slice();
+                if (copy.length && copy[copy.length - 1].role === "assistant"
+                    && !copy[copy.length - 1].content) {
+                  copy.pop();
+                }
+                copy.push({
+                  role: "assistant", warning: true,
+                  content: `You're out of build tokens (${evt.balance || 0} left, this turn costs ${evt.cost}). Share AUREM to earn +2500 free tokens, or upgrade to Builder / Pro to keep going.`,
+                });
+                return copy;
+              });
+              setShowLowModal(true);
+              return;
+            }
             if (evt.action_required === "add_byok") {
               setMessages(m => {
                 const copy = m.slice();

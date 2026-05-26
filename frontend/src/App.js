@@ -191,6 +191,7 @@ import DevStatus    from './platform/developers/DevStatus';
 import DevApiDocs   from './platform/developers/DevApiDocs';
 import NewProjectFlow   from './platform/developers/NewProjectFlow';     // iter D-32
 import ProjectWorkspace from './platform/developers/ProjectWorkspace';   // iter D-32
+import PublicProjectPreview from './platform/PublicProjectPreview';      // iter D-32
 
 // iter 332b — Contact Sales + Enterprise Admin (4 pages) + SAML ACS landing
 import ContactSales from './platform/ContactSales';
@@ -345,6 +346,8 @@ function AppRouter() {
       <Route path="/my/projects/new"        element={<NewProjectFlow />} />
       <Route path="/my/projects/:project_id" element={<ProjectWorkspace />} />
       <Route path="/my/projects"            element={<NewProjectFlow />} />
+      {/* Public preview surface — Caddy fronts preview.aurem.live → / */}
+      <Route path="/preview/:project_id"    element={<PublicProjectPreview />} />
 
       {/* iter 332b — Contact Sales + Enterprise Admin */}
       <Route path="/enterprise"                   element={<ContactSales />} />

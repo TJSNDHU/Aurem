@@ -253,6 +253,11 @@ class ChatMsg(BaseModel):
 
 class ChatBody(BaseModel):
     messages: list[ChatMsg]
+    # iter D-32 — onboarding wiring. Optional so legacy /api/developers/cto/chat
+    # callers still work; when project_id is set we debit the wallet and
+    # PATCH the project after each turn.
+    project_id: str = ""
+    model_tier: str = "cheap"  # "cheap" or "frontier"
 
 
 @router.post("/api/developers/cto/chat")
@@ -294,6 +299,29 @@ async def cto_chat_stream_route(body: ChatBody,
     captured_reply: list[str] = []
     import json as _json
 
+    # ── iter D-32: debit token wallet BEFORE streaming starts ─────────
+    # If a project_id is supplied, this turn is part of the onboarding
+    # build flow. We charge cheap=1 / frontier=5 atomically. On HTTP 402
+    # we abort the stream with a single error event so the UI can show
+    # the paywall instead of replaying the LLM.
+    debit_info = None
+    if body.project_id:
+        from services.onboarding_wallet import debit_for_chat_turn
+        debit_info = await debit_for_chat_turn(
+            user_id=user_id, project_id=body.project_id,
+            model_tier=body.model_tier,
+        )
+        if not debit_info.get("ok"):
+            async def _err_stream():
+                evt = {"type": "error", "code": "insufficient_tokens",
+                       "balance": debit_info.get("balance", 0),
+                       "cost":    debit_info.get("cost", 1)}
+                yield f"data: {_json.dumps(evt)}\n\n"
+            return StreamingResponse(_err_stream(),
+                                      media_type="text/event-stream",
+                                      headers={"Cache-Control": "no-cache, no-store",
+                                               "X-Accel-Buffering": "no"})
+
     async def _wrapped():
         async for raw in _stream(account=account, messages=msgs):
             # Sniff token deltas so we can rebuild the full assistant reply.
@@ -324,6 +352,17 @@ async def cto_chat_stream_route(body: ChatBody,
                                        "created_at": datetime.now(timezone.utc).isoformat()}},
                     upsert=True,
                 )
+            # iter D-32 — derive progress + manifest hints from the reply
+            # and PATCH the project doc so the customer sees the bar advance.
+            if body.project_id and reply_text:
+                try:
+                    from services.onboarding_wallet import apply_progress_from_reply
+                    await apply_progress_from_reply(
+                        user_id=user_id, project_id=body.project_id,
+                        reply_text=reply_text,
+                    )
+                except Exception as _prog_err:
+                    logger.warning(f"[cto_chat_stream] progress patch failed: {_prog_err}")
         except Exception as _persist_err:
             logger.warning(f"[cto_chat_stream] persist failed: {_persist_err}")
 

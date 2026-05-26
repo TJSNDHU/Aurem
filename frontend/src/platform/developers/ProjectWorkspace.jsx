@@ -13,6 +13,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ExternalLink, Coins, Loader2 } from "lucide-react";
 import DeveloperShell, { devAuthHeaders } from "./DeveloperShell";
+import DevCtoChatPanel from "./DevCtoChatPanel";
 import { GoLiveChecklist } from "./NewProjectFlow";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -144,6 +145,14 @@ export default function ProjectWorkspace() {
           </div>
           <ProjectPreviewRender manifest={project.manifest || {}}
                                  projectId={project.project_id} />
+        </div>
+
+        {/* Chat — every turn debits wallet + may PATCH project progress */}
+        <div data-testid="project-chat-card" className="av2-card"
+             style={{ padding: 0, overflow: "hidden", minHeight: 520 }}>
+          <DevCtoChatPanel projectId={project.project_id}
+                            modelTier="cheap"
+                            onTokensUpdate={refresh} />
         </div>
 
         {/* Go-Live checklist (locked until progress >= 0.80) */}
