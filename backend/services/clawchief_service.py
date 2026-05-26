@@ -198,35 +198,63 @@ async def run_heartbeat() -> Dict:
         alert_level = "CALM"
 
     # 6. Adversarial Critic Review (every heartbeat via Step Flash for speed)
+    #
+    # iter 332b D-27 — Emergent Support flagged this as the prod-crash culprit.
+    # The adversarial_review call invokes an LLM (Step Flash) on every
+    # heartbeat tick. When the LLM stalls, returns malformed JSON, or
+    # times out, the whole heartbeat hangs — keeping the asyncio task
+    # alive and blocking the next tick. Skip entirely in production OR
+    # when AUREM_DISABLE_CRITIC=1. Heartbeat itself remains useful; only
+    # the AI-second-opinion step is removed.
     adversarial_result = None
-    try:
-        from services.critic_agent import adversarial_review, set_db as set_critic_db
-        set_critic_db(db)
-        adversarial_result = await adversarial_review(
-            data={
-                "pipeline_value": checks.get("pipeline", {}).get("total_value", 0),
-                "deal_count": checks.get("pipeline", {}).get("deal_count", 0),
-                "at_risk": checks.get("pipeline", {}).get("at_risk", 0),
-                "sentiment_panics": checks.get("sentiment", {}).get("panics_1h", 0),
-                "high_quality_leads": checks.get("leads", {}).get("high_quality", 0),
-                "agent_failures": checks.get("agents", {}).get("failures_4h", 0),
-            },
-            context="heartbeat_pipeline_integrity",
-            model_hint="heartbeat",
-        )
-        checks["adversarial_critic"] = {
-            "status": "ALERT" if adversarial_result.get("verdict") == "CHALLENGED" else "OK",
-            "verdict": adversarial_result.get("verdict", "UNKNOWN"),
-            "challenges_count": len(adversarial_result.get("challenges", [])),
-        }
+    _host = (os.environ.get("HOSTNAME") or "").lower()
+    _is_prod_pod = ("live-support" in _host or "emergent.host" in _host) and \
+                   not _host.startswith("agent-env-")
+    _disable_critic = (
+        _is_prod_pod
+        or os.environ.get("AUREM_DISABLE_CRITIC", "").strip() in ("1", "true", "yes")
+        or os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes")
+    )
+    if _disable_critic:
+        checks["adversarial_critic"] = {"status": "OK", "verdict": "DISABLED",
+                                          "reason": "prod_safety_gate_iter_332b_d27"}
+    else:
+        try:
+            from services.critic_agent import adversarial_review, set_db as set_critic_db
+            set_critic_db(db)
+            # Hard timeout so a wedged LLM call cannot block the heartbeat.
+            adversarial_result = await asyncio.wait_for(
+                adversarial_review(
+                    data={
+                        "pipeline_value": checks.get("pipeline", {}).get("total_value", 0),
+                        "deal_count": checks.get("pipeline", {}).get("deal_count", 0),
+                        "at_risk": checks.get("pipeline", {}).get("at_risk", 0),
+                        "sentiment_panics": checks.get("sentiment", {}).get("panics_1h", 0),
+                        "high_quality_leads": checks.get("leads", {}).get("high_quality", 0),
+                        "agent_failures": checks.get("agents", {}).get("failures_4h", 0),
+                    },
+                    context="heartbeat_pipeline_integrity",
+                    model_hint="heartbeat",
+                ),
+                timeout=15.0,
+            )
+            checks["adversarial_critic"] = {
+                "status": "ALERT" if adversarial_result.get("verdict") == "CHALLENGED" else "OK",
+                "verdict": adversarial_result.get("verdict", "UNKNOWN"),
+                "challenges_count": len(adversarial_result.get("challenges", [])),
+            }
 
-        # Escalate alert if Critic challenges the data
-        if adversarial_result.get("verdict") == "CHALLENGED":
-            if alert_level == "CALM":
-                alert_level = "ELEVATED"
-            logger.warning("[ClawChief] Adversarial Critic CHALLENGED heartbeat data")
-    except Exception as adv_err:
-        logger.warning(f"[ClawChief] Adversarial review skipped: {adv_err}")
+            # Escalate alert if Critic challenges the data
+            if adversarial_result.get("verdict") == "CHALLENGED":
+                if alert_level == "CALM":
+                    alert_level = "ELEVATED"
+                logger.warning("[ClawChief] Adversarial Critic CHALLENGED heartbeat data")
+        except asyncio.TimeoutError:
+            checks["adversarial_critic"] = {"status": "OK", "verdict": "TIMEOUT",
+                                              "reason": "llm_call_exceeded_15s"}
+            logger.warning("[ClawChief] Adversarial review timed out — skipped")
+        except Exception as adv_err:
+            logger.warning(f"[ClawChief] Adversarial review skipped: {adv_err}")
 
     heartbeat = {
         "timestamp": now.isoformat(),
@@ -478,11 +506,29 @@ _pipeline_audit_running = False
 
 
 async def heartbeat_scheduler():
-    """Runs heartbeat every 15 minutes."""
+    """Runs heartbeat every 15 minutes.
+
+    iter 332b D-27 — Production safety gate. Support flagged the
+    Adversarial Critic component as the prod-crash culprit. The
+    adversarial review inside `run_heartbeat()` is already disabled in
+    prod (D-27 inner gate), but as a belt-and-suspenders measure we
+    also disable the entire heartbeat loop in production so even a
+    bug deeper in the heartbeat path can't wedge the pod. Set
+    `AUREM_FORCE_HEARTBEAT=1` to re-enable explicitly.
+    """
     global _heartbeat_running
     if _heartbeat_running:
         return
     _heartbeat_running = True
+
+    _host = (os.environ.get("HOSTNAME") or "").lower()
+    _is_prod_pod = ("live-support" in _host or "emergent.host" in _host) and \
+                   not _host.startswith("agent-env-")
+    if _is_prod_pod and os.environ.get("AUREM_FORCE_HEARTBEAT", "") not in ("1", "true", "yes"):
+        logger.info("[ClawChief] Heartbeat scheduler DISABLED in production "
+                    "(iter 332b D-27 — Adversarial Critic prod-crash mitigation). "
+                    "Set AUREM_FORCE_HEARTBEAT=1 to override.")
+        return
 
     logger.info("[ClawChief] Heartbeat scheduler started (first run in 30s, then every 15 min)")
     # iter 285.8 — shortened startup delay (was 180s) so we don't leave
