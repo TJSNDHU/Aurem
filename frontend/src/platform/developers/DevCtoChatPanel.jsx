@@ -409,8 +409,8 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
                           letterSpacing: "0.15em", textTransform: "uppercase",
                           fontFamily: "'JetBrains Mono', monospace" }}>
               {tier === "byok"
-                ? `BYOK · ${provider || "your key"}`
-                : "FREE TIER · OpenRouter (DeepSeek → Llama → Mistral)"}
+                ? `BYOK · ${provider || "your key"} · 🌐 Live web`
+                : "FREE TIER · OpenRouter · 🌐 Live web search"}
             </div>
           </div>
           {historyLoaded && (
@@ -555,7 +555,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false }) 
           <textarea data-testid="dev-cto-chat-input"
                      value={input} onChange={e => setInput(e.target.value)}
                      onKeyDown={onKey}
-                     placeholder="Tell AUREM CTO what to build — frontend gets designed first, then the backend wires up."
+                     placeholder="Tell AUREM CTO what to build — frontend first, then backend. Type /search <query> or include a URL to use live web search."
                      rows={2}
                      style={{ flex: 1, background: "rgba(255,255,255,0.04)",
                               border: "1px solid var(--dash-border)",

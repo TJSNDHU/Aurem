@@ -75,6 +75,14 @@ SYSTEM_PROMPT = (
     "production-grade code. Be direct, practical, and concise. Plain English. "
     "Skip pleasantries. Never refuse a legitimate engineering question.\n"
     "\n"
+    "INTERNET ACCESS — you DO have live web search. When the developer asks "
+    "about \"latest\", \"current\", \"recent\", a specific URL, or says "
+    "\"/search …\" or \"look up …\", a tool layer fetches fresh Tavily web "
+    "results and injects them into your context as a system message *before* "
+    "the user's question. Read those results and ground your reply in them. "
+    "If you weren't given search results, just say so plainly — don't claim "
+    "you have no internet access ever.\n"
+    "\n"
     "OUTPUT CONTRACT — follow this format on EVERY reply:\n"
     "\n"
     "1. If the developer asked for a build / feature / debug task, ALWAYS "
@@ -100,6 +108,116 @@ SYSTEM_PROMPT = (
     "\"Show me the test file\", \"Refactor for performance\"). If the task is "
     "truly complete, use [\"Mark as done\", \"Start next task\", \"Show summary\"]."
 )
+
+
+# ── Web search injection — iter 332b D-29 ─────────────────────────────
+#
+# Why this exists:
+#   Founder noticed the Dev CTO chat said it had no internet access. We
+#   already pay for Tavily (used by Scout) so the LLM can absolutely
+#   look stuff up — we just weren't wiring those results in.
+#
+# How it works:
+#   1. Sniff the latest user message for search intent.
+#   2. If found, call services.tier1_upgrades.tavily_search() with a
+#      hard 6-second budget.
+#   3. Inject the top 3 hits as a "tool_result"-style system message
+#      right before the user turn.  The LLM grounds its reply on
+#      those facts (URLs, titles, 300-char snippets) instead of
+#      guessing or refusing.
+#
+# Search-intent triggers (case-insensitive):
+#   • Explicit prefix:   "/search ", "/web "
+#   • Direct keywords:   "search for", "look up", "google", "find me"
+#   • Recency triggers:  "latest", "today", "current", "recent",
+#                         "in 2026", "this week", "right now"
+#   • URLs in the prompt (the LLM probably needs to read them).
+import re as _re
+
+_SEARCH_PREFIX_RE = _re.compile(r"^\s*/(search|web)\s+(.+)$", _re.I)
+_SEARCH_INTENT_RE = _re.compile(
+    r"\b(search for|look\s*up|google|find me|fetch|latest|today's|today|"
+    r"current|recent|right now|this (?:week|month|year)|in (?:202[4-9]|203\d))\b",
+    _re.I,
+)
+_URL_RE = _re.compile(r"https?://[^\s)<>\"']+", _re.I)
+
+
+def _extract_search_query(user_msg: str) -> str | None:
+    """Returns a query string when the user's message implies they
+    want fresh web info, or None to skip search. Heuristics only —
+    we don't want to spend Tavily quota on every "hello"."""
+    if not user_msg or len(user_msg) > 1000:
+        return None
+    m = _SEARCH_PREFIX_RE.match(user_msg)
+    if m:
+        return m.group(2).strip()[:200]
+    # URL anywhere → research the URL.
+    urls = _URL_RE.findall(user_msg)
+    if urls:
+        return urls[0]
+    if _SEARCH_INTENT_RE.search(user_msg):
+        # Use the whole question as the query (Tavily handles natural language).
+        return user_msg.strip()[:200]
+    return None
+
+
+async def _maybe_inject_web_search(
+    full_messages: list[dict[str, str]],
+    original_messages: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Detect search-intent on the last user turn and inject Tavily
+    results as a system message. Never raises — silently no-ops on
+    any failure (no key, network down, etc.).
+
+    iter 332b D-29.
+    """
+    if not original_messages:
+        return full_messages
+    last = original_messages[-1]
+    if last.get("role") != "user":
+        return full_messages
+    query = _extract_search_query(str(last.get("content") or ""))
+    if not query:
+        return full_messages
+    try:
+        import asyncio as _aio
+        from services.tier1_upgrades import tavily_search
+        result = await _aio.wait_for(
+            tavily_search(query, max_results=3, search_depth="basic"),
+            timeout=6.0,
+        )
+        hits = result.get("results") or []
+        if not hits:
+            return full_messages
+
+        # Build a compact tool-result block. Keep it short so it doesn't
+        # eat the whole context window.
+        lines = [f"[Live web search results for: {query!r}]"]
+        ans = (result.get("answer") or "").strip()
+        if ans:
+            lines.append(f"Summary: {ans[:400]}")
+        for i, h in enumerate(hits[:3], 1):
+            title = (h.get("title") or "")[:90]
+            url = h.get("url") or ""
+            content = (h.get("content") or "")[:280].replace("\n", " ")
+            lines.append(f"{i}. {title}\n   {url}\n   {content}")
+        lines.append(
+            "[Use these results to answer. If they don't cover the question, "
+            "say so plainly — don't hallucinate.]"
+        )
+        injection = {"role": "system", "content": "\n".join(lines)}
+        # Insert RIGHT BEFORE the user's question so the LLM sees the
+        # fresh facts as immediate context.
+        out = list(full_messages)
+        out.insert(-1, injection)
+        return out
+    except Exception as e:
+        logger.warning(f"[cto_chat] web search injection skipped: {e}")
+        return full_messages
+
+
+
 
 
 def _free_tier_key() -> str | None:
@@ -280,6 +398,8 @@ async def cto_chat(
         }
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    # iter 332b D-29 — inject web-search context (see helper docstring).
+    full_messages = await _maybe_inject_web_search(full_messages, messages)
     try:
         if tier == "byok":
             provider, api_key = picked_byok  # type: ignore[misc]
@@ -417,6 +537,14 @@ async def cto_chat_stream(
         return
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+
+    # iter 332b D-29 — internet access for the Dev CTO chat.
+    # Detect a search-intent in the user's latest message (the word
+    # "search" / "look up" / "latest" / "/search ..." prefix etc.) and
+    # inject the top Tavily hits as an extra system message so the LLM
+    # has fresh facts to ground its reply.
+    full_messages = await _maybe_inject_web_search(full_messages, messages)
+
     tokens_remaining = deduct.get("tokens_remaining", 0)
 
     # BYOK path is non-streaming (we'd need per-provider streaming
