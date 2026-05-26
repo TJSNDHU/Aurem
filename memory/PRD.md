@@ -63,6 +63,11 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
 - **D-13**: Collapsible dev portal sidebar (persisted to localStorage).
 - **D-14**: Cloudflare 524 hardening — 28s per-model timeout + paid Llama/Mistral rungs + safe HTML-response parsing + trimmed history budget.
 - **D-15**: SSE streaming for the dev chat — typing-out UX, 10× faster perceived latency. Includes happy-path, fallback, error, and token-wall test coverage.
+- **D-30 (this slice)**:
+  - Pillar 4 false yellow/red on Admin Dashboard fixed — `non_blocking` flag added to the opt-in Legion Sovereign Node flow so it stays visible but no longer escalates `admin_worst` / `overall_status` to red.
+  - Developer Portal Connect page gained two new modules: **Deploy** (SSH-driven `git pull && docker compose up -d`, polled live log stream, history of last 20 runs, one-click rollback) and **Domain linking** (auto-generates the A records to add at your registrar plus a paste-ready Caddyfile that auto-provisions Let's Encrypt TLS).
+  - Dev CTO chat now shows a Copy-to-clipboard button on every assistant message (test-id `dev-cto-copy-btn-<index>`).
+  - Backend: new router `developer_deploy_router.py` (asyncssh-driven) wired into registry after compliance_router. 15/15 backend tests green.
 
 ## Backlog (P0 → P2)
 
@@ -72,6 +77,7 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   + dead admin /developers bypass + dashboard crash.
 
 ### P1 — Next slice
+- GitHub OAuth flow for one-click connect (PAT already shipped in D-30).
 - Real Atlas cluster-move automation for residency change requests
   (currently queues to `residency_change_requests` for manual ops).
 - Backfill historical rows from 5 legacy audit collections into
