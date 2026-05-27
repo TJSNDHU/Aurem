@@ -61,8 +61,15 @@ async def _generate_content(action: str, context: Dict) -> str:
             city=context.get("city", ""),
             memo=context.get("memo", ""),
         )
+        # iter D-36 — append AUREM Design System so customer-site
+        # HTML/CSS uses Sonner toast patterns + animation rules.
+        try:
+            from services.aurem_design_prompt import design_prompt_for_native_provider
+            _design_suffix = design_prompt_for_native_provider()
+        except Exception:
+            _design_suffix = ""
         chat = LlmChat(api_key=key, session_id=f"edit-{context.get('email','')}-{datetime.now(timezone.utc).timestamp()}",
-                       system_message="You generate production-ready HTML/CSS. Return code only, no commentary.")
+                       system_message="You generate production-ready HTML/CSS. Return code only, no commentary." + _design_suffix)
         chat.with_model("anthropic", "claude-sonnet-4-5-20250929")
         response = await chat.send_message(UserMessage(text=prompt))
         return response or ""

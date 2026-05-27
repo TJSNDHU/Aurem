@@ -1,0 +1,43 @@
+/* aurem-design.css — Global design-system baseline for aurem.live
+ * iter D-36 — Same rules applied to every customer-site template are
+ * applied here on the AUREM platform itself so dogfood is honest.
+ */
+
+:root {
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+button,
+.button,
+a.button,
+[role="button"] {
+  transition: transform 160ms var(--ease-out);
+}
+button:active,
+.button:active,
+a.button:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
+[data-radix-popper-content-wrapper] [data-state="open"] {
+  transform-origin: var(--radix-popover-content-transform-origin,
+                          var(--radix-popper-transform-origin, center));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hoverable:hover { transform: scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

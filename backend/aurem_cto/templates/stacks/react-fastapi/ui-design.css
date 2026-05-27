@@ -1,0 +1,59 @@
+/* aurem-design.css — AUREM Design System baseline
+ * Auto-shipped with every React stack template scaffolded by AUREM CTO.
+ * Adapted from Emil Kowalski's design-engineering rules.
+ */
+
+:root {
+  /* Custom easing curves — stronger than CSS built-ins */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Universal pressable feedback. Every button/anchor/role=button feels
+ * the press immediately, on every site AUREM CTO builds. */
+button,
+.button,
+a.button,
+[role="button"] {
+  transition: transform 160ms var(--ease-out);
+}
+button:active,
+.button:active,
+a.button:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* Popovers (Radix / shadcn) scale from trigger, not center. */
+[data-radix-popper-content-wrapper] [data-state="open"] {
+  transform-origin: var(--radix-popover-content-transform-origin,
+                          var(--radix-popper-transform-origin, center));
+}
+
+/* Sonner toast easing override — slightly slower / more elegant feel */
+[data-sonner-toaster] [data-sonner-toast] {
+  --transition: opacity 400ms ease, transform 400ms ease;
+}
+
+/* Vaul drawer adopts iOS curve */
+[data-vaul-drawer] {
+  transition: transform 500ms var(--ease-drawer);
+}
+
+/* Touch-device hover gate — only fine-pointer devices get hover animations */
+@media (hover: hover) and (pointer: fine) {
+  .hoverable:hover { transform: scale(1.02); }
+}
+
+/* Honor user preference — keep opacity/color, kill movement */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

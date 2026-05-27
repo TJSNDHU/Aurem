@@ -202,10 +202,13 @@ async def _run_mode_2(db, text: str, session_id: str, user: str) -> Dict[str, An
     proposal_text = "Generation failed."
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
+        # iter D-36 — append AUREM Design System rules so any UI/React
+        # work ORA proposes follows Sonner/Vaul/animation conventions.
+        from services.aurem_design_prompt import design_prompt_for_native_provider
         chat = LlmChat(
             api_key=os.environ.get("EMERGENT_LLM_KEY", ""),
             session_id=f"ora_devmode_{session_id}",
-            system_message=_MODE_2_SYSTEM_PROMPT,
+            system_message=_MODE_2_SYSTEM_PROMPT + design_prompt_for_native_provider(),
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
         proposal_text = (await chat.send_message(UserMessage(text=text))).strip()
     except Exception as e:

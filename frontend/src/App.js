@@ -12,6 +12,7 @@ import { AccessibilityWrapper } from "./components/AccessibilityWrapper";
 import "./theme/theme.css";
 import "./theme/unified-theme.css";
 import "./App.css";
+import "./styles/aurem-design.css";  // iter D-36 — AUREM design system baseline
 // Eager imports for landing routes — lazy() hangs in some envs (webpack chunk
 // not resolving), keeping the splash forever. These pages are tiny enough.
 import AuremHomepage from "./platform/AuremHomepage";

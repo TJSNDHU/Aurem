@@ -291,11 +291,12 @@ async def _call_openai_compatible(
 
 
 async def _call_anthropic(api_key: str, messages: list[dict[str, str]]) -> str:
+    from services.aurem_design_prompt import design_prompt_for_native_provider
     url = "https://api.anthropic.com/v1/messages"
     body = {
         "model": "claude-3-5-sonnet-20241022",
         "max_tokens": 1024,
-        "system": SYSTEM_PROMPT,
+        "system": SYSTEM_PROMPT + design_prompt_for_native_provider(),
         "messages": [m for m in messages if m["role"] != "system"],
     }
     async with httpx.AsyncClient(timeout=45.0) as c:
@@ -312,13 +313,14 @@ async def _call_anthropic(api_key: str, messages: list[dict[str, str]]) -> str:
 
 
 async def _call_gemini(api_key: str, messages: list[dict[str, str]]) -> str:
+    from services.aurem_design_prompt import design_prompt_for_native_provider
     user_text = "\n\n".join(m["content"] for m in messages if m["role"] != "system")
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-2.0-flash:generateContent?key={api_key}"
     )
     body = {
-        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT + design_prompt_for_native_provider()}]},
         "contents": [{"role": "user", "parts": [{"text": user_text}]}],
         "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.4},
     }
@@ -414,6 +416,10 @@ async def cto_chat(
         }
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    # iter D-36 — AUREM Design System (Sonner/Vaul/animation rules) for
+    # every UI-generation turn. See services.aurem_design_prompt.
+    from services.aurem_design_prompt import inject_design_prompt
+    full_messages = inject_design_prompt(full_messages)
     # iter 332b D-29 — inject web-search context (see helper docstring).
     full_messages = await _maybe_inject_web_search(full_messages, messages)
     try:
@@ -553,6 +559,10 @@ async def cto_chat_stream(
         return
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+
+    # iter D-36 — AUREM Design System for every UI generation turn.
+    from services.aurem_design_prompt import inject_design_prompt
+    full_messages = inject_design_prompt(full_messages)
 
     # iter D-33 — Gap 1: inject the customer's codebase index as an
     # extra system message before the user turn. Best-effort, never

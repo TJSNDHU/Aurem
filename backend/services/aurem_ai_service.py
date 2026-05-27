@@ -16,6 +16,16 @@ load_dotenv(override=False)
 
 logger = logging.getLogger(__name__)
 
+
+def _aurem_design_suffix() -> str:
+    """iter D-36 — lazy import + safe fallback so we never break the
+    session loop if the prompt file is moved."""
+    try:
+        from services.aurem_design_prompt import design_prompt_for_native_provider
+        return design_prompt_for_native_provider()
+    except Exception:
+        return ""
+
 # LLM Integration
 try:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -300,7 +310,11 @@ Be concise but thorough. Focus on business outcomes."""
             self.sessions[session_id] = LlmChat(
                 api_key=self.api_key,
                 session_id=session_id,
-                system_message=system_prompt or default_prompt
+                # iter D-36 — append AUREM Design System for any UI work.
+                system_message=(
+                    (system_prompt or default_prompt)
+                    + _aurem_design_suffix()
+                ),
             ).with_model("openai", "gpt-4o")
         
         return self.sessions[session_id]
