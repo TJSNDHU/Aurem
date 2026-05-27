@@ -75,6 +75,35 @@ SYSTEM_PROMPT = (
     "production-grade code. Be direct, practical, and concise. Plain English. "
     "Skip pleasantries. Never refuse a legitimate engineering question.\n"
     "\n"
+    "AUDIENCE DETECTION (iter D-40 — non-technical customers come here too):\n"
+    "  At the start of EVERY turn, scan the conversation. If the customer\n"
+    "  shows non-technical signals — they describe an IDEA in business\n"
+    "  terms instead of stack terms, they never used words like 'API',\n"
+    "  'database', 'React', 'endpoint', 'deploy', they ask 'how do I\n"
+    "  build' instead of 'how do I implement', they use phrases like\n"
+    "  'ek app banana chahta hoon', 'main ek website chahta hoon',\n"
+    "  'I want to build something' without any tech keyword — switch to\n"
+    "  NON-TECH MODE:\n"
+    "    NEVER show:\n"
+    "      ✗ code snippets, Python/JavaScript/SQL\n"
+    "      ✗ pseudo-code (def foo, if/else, dictionaries, function calls)\n"
+    "      ✗ technical jargon: API, database, endpoint, schema, framework,\n"
+    "        stack, MVP, ROI, integration, microservice\n"
+    "      ✗ the Plan + [step N/M] + MANIFEST_PATCH format\n"
+    "    ALWAYS use:\n"
+    "      ✓ everyday analogies (\"like Uber but for X\", \"like WhatsApp\n"
+    "        but with Y\")\n"
+    "      ✓ 2-3 concrete next steps in plain words\n"
+    "      ✓ ONE clarifying question at a time, never a wall of them\n"
+    "      ✓ encouraging tone: 'great idea', 'good thinking'\n"
+    "      ✓ price points and time estimates in plain numbers\n"
+    "        (\"$29/month\", \"1 week\", \"start tomorrow\")\n"
+    "      ✓ the customer's language — Hinglish in, Hinglish out\n"
+    "    GOAL of a non-tech reply: customer leaves the chat KNOWING what\n"
+    "    to do next AND feeling like a real human guided them. No code.\n"
+    "    No Python. No technical scaffolding. If they later use a tech\n"
+    "    word, you can switch back to dev mode.\n"
+    "\n"
     "WHAT YOU ACTUALLY ARE (iter D-39 — never invent capabilities, never "
     "claim work you didn't do):\n"
     "  - You run on aurem.live, built by Polaris Built Inc. (Mississauga, ON).\n"
@@ -462,17 +491,25 @@ async def cto_chat(
     # / unknown) from the LATEST user message and append the matching
     # output contract so greetings, simple lookups, and casual turns no
     # longer get the rigid build-scaffold treatment.
+    # iter D-40 — also check if the customer is non-technical; if yes
+    # append the NON-TECH MODE suffix (strips code/jargon/Plan format).
     try:
-        from services.aurem_cto_intent import classify_intent, system_prompt_for
+        from services.aurem_cto_intent import (
+            classify_intent, system_prompt_for, is_non_technical,
+        )
         latest_user = next(
             (m["content"] for m in reversed(messages) if m.get("role") == "user"),
             "",
         )
-        _intent = classify_intent(latest_user)
+        _intent      = classify_intent(latest_user)
+        _non_tech    = is_non_technical(latest_user)
+        _suffix      = system_prompt_for(_intent, non_technical=_non_tech)
         full_messages.insert(
             1,
             {"role": "system",
-             "content": f"[INTENT={_intent}]\n" + system_prompt_for(_intent)},
+             "content": (f"[INTENT={_intent}]"
+                          + (" [NON-TECH]" if _non_tech else "")
+                          + "\n" + _suffix)},
         )
     except Exception as _intent_e:
         logger.warning(f"[cto_chat] intent classification failed: {_intent_e}")
@@ -622,17 +659,24 @@ async def cto_chat_stream(
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
 
     # iter D-37 — intent-aware system prompt for the streaming path too.
+    # iter D-40 — plus NON-TECH audience override.
     try:
-        from services.aurem_cto_intent import classify_intent, system_prompt_for
+        from services.aurem_cto_intent import (
+            classify_intent, system_prompt_for, is_non_technical,
+        )
         _latest = next(
             (m["content"] for m in reversed(messages) if m.get("role") == "user"),
             "",
         )
-        _intent = classify_intent(_latest)
+        _intent   = classify_intent(_latest)
+        _non_tech = is_non_technical(_latest)
+        _suffix   = system_prompt_for(_intent, non_technical=_non_tech)
         full_messages.insert(
             1,
             {"role": "system",
-             "content": f"[INTENT={_intent}]\n" + system_prompt_for(_intent)},
+             "content": (f"[INTENT={_intent}]"
+                          + (" [NON-TECH]" if _non_tech else "")
+                          + "\n" + _suffix)},
         )
     except Exception:
         _intent = "unknown"
