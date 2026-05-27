@@ -86,7 +86,24 @@ _STRATEGIC_RE = re.compile(
     re.I,
 )
 
-# Question — starts with question word OR ends with "?".
+# Introspective / "describe yourself" signals — these mean the dev is
+# asking the AI about ITSELF, not asking for code. Beats build-verb hits.
+_INTROSPECTIVE_RE = re.compile(
+    r"\b(how\s+(?:do\s+)?you\s+(?:work|think|reason|process|reply|behave|decide|plan)|"
+    r"how\s+r\s+u|how's\s+ur|"                # casual variants
+    r"your\s+(?:workflow|process|architecture|capabilities|abilities|"
+    r"limits?|prompt|model|memory|tools?|stack|system)|"
+    r"what\s+(?:can|can'?t|do)\s+you\s+do|"
+    r"what\s+are\s+you|who\s+are\s+you|"
+    # Hinglish / Hindi introspection — covers the founder's own
+    # phrasing examples (e.g. "tum kya kar sakte ho", "aap kaise kaam karte ho").
+    r"tum\s+(?:kaise|kya)(?:\s+(?:kaam|sochte|samajhte|karte|karoge"
+    r"|kar\s+sakte))?|"
+    r"aap\s+(?:kaise|kya)(?:\s+(?:kaam|sochte|samajhte|karte|karoge"
+    r"|kar\s+sakte))?)",
+    re.I,
+)
+
 _QUESTION_OPENER_RE = re.compile(
     r"^\s*(what|how|why|where|when|which|who|whose|whom|"
     r"can|could|would|should|do|does|did|is|are|am|was|were|"
@@ -115,6 +132,12 @@ def classify_intent(text: str) -> str:
     # Strongest signal: error/exception/broken language → diagnostic.
     if _DIAGNOSTIC_RE.search(t_lower):
         return "diagnostic"
+
+    # Introspective ("how do YOU work", "your workflow", "tum kaise
+    # kaam karte ho") → question, ALWAYS. Beats build/strategic hits
+    # because the word "plan" or "workflow" alone can otherwise misfire.
+    if _INTROSPECTIVE_RE.search(t_lower):
+        return "question"
 
     if _STRATEGIC_RE.search(t_lower):
         return "strategic"
@@ -163,6 +186,14 @@ _PROMPT_QUESTION = """\
 INTENT FOR THIS TURN: question / explanation request.
 Reply naturally in 1-3 short paragraphs of plain English. NO Plan,
 NO `[step N/M]` markers, NO progress / phase / MANIFEST_PATCH lines.
+
+If the question is about YOU (the AUREM CTO platform — how you work,
+what you can/can't do, your memory/tools), answer from the "WHAT YOU
+ACTUALLY ARE" block in your base system prompt. Use plain sentences,
+never Python pseudo-code. NEVER invent statistics about past work
+(e.g. "I found N bugs across M rounds") — if a number is not in your
+explicit context, say so plainly.
+
 End with ONE NEXT_STEPS line containing follow-up actions like
 [\"Show me the code\", \"Explain deeper\", \"Skip\"].
 """
