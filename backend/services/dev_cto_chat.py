@@ -75,6 +75,27 @@ SYSTEM_PROMPT = (
     "production-grade code. Be direct, practical, and concise. Plain English. "
     "Skip pleasantries. Never refuse a legitimate engineering question.\n"
     "\n"
+    "ABSOLUTE RULE — ILLUSTRATIVE PSEUDO-CODE IS BANNED (iter D-40b):\n"
+    "  You may ONLY output a code block when the developer asked you to\n"
+    "  PRODUCE CODE FOR THEIR ACTUAL PROJECT. You may NEVER use code\n"
+    "  blocks to explain your own methodology, your approach, your\n"
+    "  process, or what a non-tech reply would look like. That means:\n"
+    "    ✗ NO `def distill_idea(...)` to explain how you think\n"
+    "    ✗ NO `if customer_type == 'founder':` to show branching logic\n"
+    "    ✗ NO `patterns = {...}` dictionaries to enumerate categories\n"
+    "    ✗ NO ```python / ```js fences to wrap pseudo-code or examples\n"
+    "    ✗ NO function signatures, class skeletons, or type stubs as\n"
+    "      illustration\n"
+    "  When you would normally reach for pseudo-code, use INSTEAD:\n"
+    "    ✓ a short numbered list in plain words\n"
+    "    ✓ a real-world analogy (\"like the way Uber matches drivers\")\n"
+    "    ✓ a worked example written as natural prose dialogue\n"
+    "    ✓ a sample reply quoted in plain text (no fences)\n"
+    "  This rule wins over every other format rule in this prompt. If\n"
+    "  you catch yourself writing ```python anywhere in a reply that is\n"
+    "  NOT building real code for the dev's project — delete it and\n"
+    "  rewrite in prose. NO exceptions.\n"
+    "\n"
     "AUDIENCE DETECTION (iter D-40 — non-technical customers come here too):\n"
     "  At the start of EVERY turn, scan the conversation. If the customer\n"
     "  shows non-technical signals — they describe an IDEA in business\n"
@@ -514,6 +535,7 @@ async def cto_chat(
     except Exception as _intent_e:
         logger.warning(f"[cto_chat] intent classification failed: {_intent_e}")
         _intent = "unknown"
+        _non_tech = False
     # iter D-36 — AUREM Design System (Sonner/Vaul/animation rules) for
     # every UI-generation turn. See services.aurem_design_prompt.
     from services.aurem_design_prompt import inject_design_prompt
@@ -532,6 +554,16 @@ async def cto_chat(
             "ok": False, "error": "llm_failed", "tier": tier,
             "message": str(e),
         }
+
+    # iter D-40b — strip illustrative pseudo-code from non-build replies.
+    # Safety net for when the LLM ignores the prompt-level ban.
+    try:
+        from services.aurem_cto_output_guard import strip_illustrative_code
+        reply = strip_illustrative_code(
+            reply, intent=_intent, non_technical=_non_tech,
+        )
+    except Exception as _guard_e:
+        logger.warning(f"[cto_chat] output guard skipped: {_guard_e}")
 
     tokens_remaining = deduct.get("tokens_remaining")
     if tokens_remaining is None:
@@ -680,6 +712,7 @@ async def cto_chat_stream(
         )
     except Exception:
         _intent = "unknown"
+        _non_tech = False
 
     # iter D-36 — AUREM Design System for every UI generation turn.
     from services.aurem_design_prompt import inject_design_prompt
@@ -713,6 +746,16 @@ async def cto_chat_stream(
 
     tokens_remaining = deduct.get("tokens_remaining", 0)
 
+    # iter D-40b — when the turn is NOT a build/fix (or the customer is
+    # non-tech), we buffer tokens, strip illustrative pseudo-code, and
+    # then emit the cleaned reply as one chunk. For build turns we keep
+    # the live token-by-token UX so dev sees code appear as it's typed.
+    _should_buffer = (_intent != "build") or _non_tech
+    try:
+        from services.aurem_cto_output_guard import strip_illustrative_code as _strip_pc
+    except Exception:
+        _strip_pc = None  # type: ignore[assignment]
+
     # BYOK path is non-streaming (we'd need per-provider streaming
     # logic; not worth the LOC tonight). Emit the meta then the whole
     # reply as one token event so the frontend code stays unchanged.
@@ -726,6 +769,11 @@ async def cto_chat_stream(
             yield _evt({"type": "error", "tier": tier,
                          "error": "llm_failed", "message": str(e)})
             return
+        if _should_buffer and _strip_pc:
+            try:
+                reply = _strip_pc(reply, intent=_intent, non_technical=_non_tech)
+            except Exception:
+                pass
         yield _evt({"type": "token", "content": reply})
         yield _evt({"type": "done",
                      "tokens_remaining": int(tokens_remaining or 0),
@@ -742,10 +790,26 @@ async def cto_chat_stream(
                          "model": model,
                          "tokens_remaining": int(tokens_remaining or 0)})
             got_any = False
+            buffered: list[str] = []
             async for delta in _stream_openrouter(api_key, model, full_messages):
                 got_any = True
-                yield _evt({"type": "token", "content": delta})
+                if _should_buffer:
+                    buffered.append(delta)
+                else:
+                    yield _evt({"type": "token", "content": delta})
             if got_any:
+                if _should_buffer:
+                    full_reply = "".join(buffered)
+                    if _strip_pc:
+                        try:
+                            full_reply = _strip_pc(
+                                full_reply,
+                                intent=_intent,
+                                non_technical=_non_tech,
+                            )
+                        except Exception:
+                            pass
+                    yield _evt({"type": "token", "content": full_reply})
                 yield _evt({"type": "done",
                              "tokens_remaining": int(tokens_remaining or 0),
                              "low_balance": int(tokens_remaining or 0) < 100})
