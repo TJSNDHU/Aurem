@@ -96,6 +96,33 @@ SYSTEM_PROMPT = (
     "  NOT building real code for the dev's project — delete it and\n"
     "  rewrite in prose. NO exceptions.\n"
     "\n"
+    "AUREM-FIRST RULE — NEVER SUGGEST EXTERNAL DEV TOOLS (iter D-41):\n"
+    "  AUREM is the platform. Every dev workflow has a built-in AUREM\n"
+    "  equivalent. You may NEVER recommend, suggest, link to, or list\n"
+    "  competing or off-platform tools in the same sentence as a\n"
+    "  workflow step. Specifically banned (non-exhaustive):\n"
+    "    ✗ Figma, FigJam, Sketch, Adobe XD, Penpot — for design / prototyping\n"
+    "    ✗ Vercel, Netlify, Heroku, Railway, Render, Fly.io, Glitch — for hosting\n"
+    "    ✗ CodeSandbox, StackBlitz, Replit, JSFiddle — for code preview\n"
+    "    ✗ Bolt.new, Lovable, V0, Cursor, Windsurf, Devin — for AI build tools\n"
+    "    ✗ Mock Service Worker, JSON Server, Mockoon, Beeceptor — for mock APIs\n"
+    "    ✗ Loom, Tella, ScreenStudio — for share-back recordings\n"
+    "    ✗ Postman, Insomnia, Hoppscotch — when AUREM has its own API tester\n"
+    "  USE INSTEAD (AUREM's native surfaces):\n"
+    "    ✓ design / prototype           → AUREM Design System + workspace preview\n"
+    "    ✓ instant UI preview           → preview.aurem.live/<project-id>\n"
+    "    ✓ ship to production           → AUREM Deploy button (SSH + Docker)\n"
+    "    ✓ share progress with customer → AUREM public preview link\n"
+    "    ✓ collaboration / feedback     → AUREM chat + per-message rollback\n"
+    "    ✓ mock backend before real DB  → AUREM `mock_backend=true` in the\n"
+    "                                     stack template (no JSON Server needed)\n"
+    "    ✓ try an API quickly           → /api/docs (Swagger UI lives in-app)\n"
+    "  Only mention an external tool when (a) the dev explicitly asked\n"
+    "  about it, OR (b) it's an upstream dependency the dev already chose\n"
+    "  (GitHub, Docker, Stripe, AWS). Never in a 'recommendations',\n"
+    "  'tools I use', or 'try X' list. If the dev asks 'where do I host\n"
+    "  this?' the answer is AUREM Deploy, not Vercel.\n"
+    "\n"
     "AUDIENCE DETECTION (iter D-40 — non-technical customers come here too):\n"
     "  At the start of EVERY turn, scan the conversation. If the customer\n"
     "  shows non-technical signals — they describe an IDEA in business\n"
@@ -555,11 +582,13 @@ async def cto_chat(
             "message": str(e),
         }
 
-    # iter D-40b — strip illustrative pseudo-code from non-build replies.
-    # Safety net for when the LLM ignores the prompt-level ban.
+    # iter D-40b + D-41 — strip illustrative pseudo-code AND append
+    # AUREM-first correction footer when reply recommends Figma/Vercel/
+    # CodeSandbox/etc. Defense-in-depth for when the LLM ignores the
+    # prompt-level bans.
     try:
-        from services.aurem_cto_output_guard import strip_illustrative_code
-        reply = strip_illustrative_code(
+        from services.aurem_cto_output_guard import apply_output_guards
+        reply = apply_output_guards(
             reply, intent=_intent, non_technical=_non_tech,
         )
     except Exception as _guard_e:
@@ -746,15 +775,16 @@ async def cto_chat_stream(
 
     tokens_remaining = deduct.get("tokens_remaining", 0)
 
-    # iter D-40b — when the turn is NOT a build/fix (or the customer is
-    # non-tech), we buffer tokens, strip illustrative pseudo-code, and
-    # then emit the cleaned reply as one chunk. For build turns we keep
-    # the live token-by-token UX so dev sees code appear as it's typed.
+    # iter D-40b + D-41 — when the turn is NOT a build/fix (or the
+    # customer is non-tech), we buffer tokens, strip illustrative
+    # pseudo-code, AND append the AUREM-first correction footer when
+    # Figma/Vercel/CodeSandbox/etc. were recommended. Build turns keep
+    # the live token-by-token UX (code blocks are legit there).
     _should_buffer = (_intent != "build") or _non_tech
     try:
-        from services.aurem_cto_output_guard import strip_illustrative_code as _strip_pc
+        from services.aurem_cto_output_guard import apply_output_guards as _apply_guards
     except Exception:
-        _strip_pc = None  # type: ignore[assignment]
+        _apply_guards = None  # type: ignore[assignment]
 
     # BYOK path is non-streaming (we'd need per-provider streaming
     # logic; not worth the LOC tonight). Emit the meta then the whole
@@ -769,9 +799,19 @@ async def cto_chat_stream(
             yield _evt({"type": "error", "tier": tier,
                          "error": "llm_failed", "message": str(e)})
             return
-        if _should_buffer and _strip_pc:
+        if _should_buffer and _apply_guards:
             try:
-                reply = _strip_pc(reply, intent=_intent, non_technical=_non_tech)
+                reply = _apply_guards(reply, intent=_intent, non_technical=_non_tech)
+            except Exception:
+                pass
+        elif not _should_buffer:
+            # Build path: still run the AUREM-first correction (safe
+            # append-only, no-op when no banned tool was suggested).
+            try:
+                from services.aurem_cto_output_guard import (
+                    append_aurem_first_correction,
+                )
+                reply = append_aurem_first_correction(reply)
             except Exception:
                 pass
         yield _evt({"type": "token", "content": reply})
@@ -793,16 +833,22 @@ async def cto_chat_stream(
             buffered: list[str] = []
             async for delta in _stream_openrouter(api_key, model, full_messages):
                 got_any = True
-                if _should_buffer:
-                    buffered.append(delta)
-                else:
+                # Always buffer so we can run guards at end. For build
+                # turns we ALSO yield each delta live (typing UX); for
+                # non-build turns we hold tokens back until the strip
+                # + correction has run.
+                buffered.append(delta)
+                if not _should_buffer:
                     yield _evt({"type": "token", "content": delta})
             if got_any:
+                full_reply = "".join(buffered)
                 if _should_buffer:
-                    full_reply = "".join(buffered)
-                    if _strip_pc:
+                    # Non-build path: run full guard chain (strip +
+                    # correction) and emit the cleaned reply as one
+                    # chunk.
+                    if _apply_guards:
                         try:
-                            full_reply = _strip_pc(
+                            full_reply = _apply_guards(
                                 full_reply,
                                 intent=_intent,
                                 non_technical=_non_tech,
@@ -810,6 +856,24 @@ async def cto_chat_stream(
                         except Exception:
                             pass
                     yield _evt({"type": "token", "content": full_reply})
+                else:
+                    # Build path: live tokens already streamed. Only
+                    # check for off-platform tool recommendations and
+                    # append the AUREM-first footer as a final token if
+                    # the correction added one.
+                    if _apply_guards:
+                        try:
+                            from services.aurem_cto_output_guard import (
+                                append_aurem_first_correction,
+                            )
+                            corrected = append_aurem_first_correction(full_reply)
+                            if corrected != full_reply:
+                                footer = corrected[len(full_reply):]
+                                if footer.strip():
+                                    yield _evt({"type": "token",
+                                                 "content": footer})
+                        except Exception:
+                            pass
                 yield _evt({"type": "done",
                              "tokens_remaining": int(tokens_remaining or 0),
                              "low_balance": int(tokens_remaining or 0) < 100})
