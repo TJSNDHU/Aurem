@@ -86,6 +86,13 @@ _INTERNAL_PROBE_PREFIXES = (
     "/api/qa/",
 )
 
+# iter D-38 — paths that must NEVER be short-circuited by the boot
+# grace window. The admin Integration Health tracker reads live data
+# and any 204 confuses the UI into thinking the endpoint is empty.
+_BOOT_GRACE_EXCLUDE = (
+    "/api/admin/integrations/",
+)
+
 
 def _in_boot_grace() -> bool:
     return (time.monotonic() - _BOOT_TS) < _BOOT_GRACE_SECONDS
@@ -215,6 +222,7 @@ class HealthProbeMiddleware:
             and _in_boot_grace()
             and path
             and path.startswith(_INTERNAL_PROBE_PREFIXES)
+            and not path.startswith(_BOOT_GRACE_EXCLUDE)  # iter D-38
         ):
             client = scope.get("client") or ("", 0)
             client_host = client[0] if isinstance(client, (tuple, list)) and client else ""

@@ -911,11 +911,17 @@ def register_all_routers(app, db):
                     logger.warning(f"[REGISTRY] developer_deploy_router not loaded: {_dep_e}")
 
                 # iter D-33 — AUREM CTO module RE-ENABLED. Mount /aurem-cto/*
-                # D-35-deploy-fix — the package now lives at
-                # /app/backend/aurem_cto/ (inside the backend image) so
-                # production containers that only ship `/app/backend/`
-                # still resolve the import. No sys.path mangling needed.
+                # D-35-deploy-fix — the package lives at
+                # /app/backend/aurem_cto/ so the production container
+                # (which only ships /app/backend/) can find it.
+                # D-38 path-fix — preview cwd is /app, prod cwd is
+                # /app/backend; ensure /app/backend is on sys.path so the
+                # plain `import aurem_cto` works in BOTH environments.
                 try:
+                    import sys as _sys, pathlib as _pl
+                    _backend_root = _pl.Path(__file__).resolve().parents[1]   # …/backend/routers/registry.py → backend
+                    if str(_backend_root) not in _sys.path:
+                        _sys.path.insert(0, str(_backend_root))
                     import aurem_cto as _act
                     app.include_router(_act.build_router())
                     _act.set_db(db)
@@ -940,6 +946,18 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] onboarding_flow_router wired")
                 except Exception as _onb_e:
                     logger.warning(f"[REGISTRY] onboarding_flow_router not loaded: {_onb_e}")
+
+                # iter D-38 — Admin integrations health tracker
+                # (read-only dashboard for every 3rd-party API in use)
+                try:
+                    from routers.admin_integrations_router import (
+                        router as _int_router, set_db as _set_int_db,
+                    )
+                    app.include_router(_int_router)
+                    _set_int_db(db)
+                    logger.info("[REGISTRY] admin_integrations_router wired")
+                except Exception as _int_e:
+                    logger.warning(f"[REGISTRY] admin_integrations_router not loaded: {_int_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

@@ -21,7 +21,7 @@ import {
   // ORA Agents
   Network, Sword, Terminal, Camera, Pickaxe,
   // Health
-  Map, Shield, GitBranch, RotateCcw,
+  Map, Shield, GitBranch, RotateCcw, KeyRound,
   // Build
   Hammer, Sparkles, FileText,
   // Settings
@@ -89,6 +89,7 @@ const SECTIONS = [
       { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity,   hint: 'g h' },
       { to: '/admin/stem-fix',           label: 'Stem-Fix · Refactor', icon: GitBranch,  hint: '' },
       { to: '/admin/self-repair',        label: 'Self-Repair',         icon: RotateCcw,  hint: '' },
+      { to: '/admin/integrations',       label: 'Integrations',        icon: KeyRound,   hint: 'g i' },
       { to: '/admin/git-gate',           label: 'Git Commit Gate',     icon: GitBranch,  hint: '' },
     ],
   },

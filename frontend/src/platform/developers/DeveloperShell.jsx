@@ -16,7 +16,7 @@ import {
   Home as HomeIcon, Github, Activity, BarChart3, Coins,
   ScrollText, Settings as SettingsIcon, Briefcase, ShieldCheck,
   LogOut, Sun, Moon, BookOpen,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Menu, X,
 } from "lucide-react";
 
 import "../../styles/dashboard-theme.css";
@@ -316,7 +316,7 @@ const DASH_NAV = [
   { to: "/developers/terms",     label: "Terms",      icon: ScrollText,  testid: "dev-nav-terms" },
 ];
 
-function DashboardTopbar({ me, theme, toggleTheme }) {
+function DashboardTopbar({ me, theme, toggleTheme, onMobileMenu, mobileOpen }) {
   const navigate = useNavigate();
   function logout() {
     setDevJwt("");
@@ -325,6 +325,14 @@ function DashboardTopbar({ me, theme, toggleTheme }) {
   return (
     <div className="av2-topbar" data-testid="dev-shell-topbar">
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* iter D-38 — hamburger; CSS hides on >=768px */}
+        <button className="av2-icon-btn av2-mobile-menu-btn"
+                onClick={onMobileMenu}
+                data-testid="dev-shell-mobile-menu"
+                aria-label={mobileOpen ? "Close menu" : "Open menu"}
+                aria-expanded={mobileOpen}>
+          {mobileOpen ? <X size={16} /> : <Menu size={16} />}
+        </button>
         <ShieldCheck size={18} style={{ color: "var(--dash-orange)" }} />
         <span style={{
           fontFamily: "'Cinzel', serif",
@@ -583,6 +591,9 @@ function DashboardShell({ children, requireAuth }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("dev_sidebar_collapsed") === "1"
   );
+  // iter D-38 — mobile sidebar open/close. On <768px the sidebar is a
+  // slide-in drawer toggled by the hamburger in the topbar.
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -594,6 +605,11 @@ function DashboardShell({ children, requireAuth }) {
       "dev_sidebar_collapsed", sidebarCollapsed ? "1" : "0"
     );
   }, [sidebarCollapsed]);
+
+  // iter D-38 — auto-close the mobile drawer on route change so links
+  // navigate AND collapse the menu in one click.
+  const loc = useLocation();
+  useEffect(() => { setMobileSidebarOpen(false); }, [loc.pathname]);
 
   useEffect(() => {
     if (requireAuth && !loading && !me) {
@@ -616,12 +632,21 @@ function DashboardShell({ children, requireAuth }) {
            // happy (it was failing to resolve url("/img/...") at build).
            "--dev-bg-image": `url("${process.env.PUBLIC_URL || ""}/img/aurem-dev-bg.png")`,
          }}>
-      <div className={`av2-shell${sidebarCollapsed ? " av2-shell--collapsed" : ""}`}>
+      <div className={`av2-shell${sidebarCollapsed ? " av2-shell--collapsed" : ""}${mobileSidebarOpen ? " av2-shell--mobile-open" : ""}`}>
+        {/* iter D-38 — backdrop dims the page when the mobile drawer
+            is open. Tap to dismiss. */}
+        {mobileSidebarOpen && (
+          <div className="av2-mobile-backdrop"
+               data-testid="dev-mobile-backdrop"
+               onClick={() => setMobileSidebarOpen(false)} />
+        )}
         <DashboardSidebar me={me}
                           collapsed={sidebarCollapsed}
                           onToggle={() => setSidebarCollapsed(c => !c)} />
         <div className="av2-main">
-          <DashboardTopbar me={me} theme={theme} toggleTheme={toggleTheme} />
+          <DashboardTopbar me={me} theme={theme} toggleTheme={toggleTheme}
+                            onMobileMenu={() => setMobileSidebarOpen(o => !o)}
+                            mobileOpen={mobileSidebarOpen} />
           <div className="av2-content">
             {children}
           </div>

@@ -17,7 +17,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Paperclip, Save, FileText, Image as ImageIcon,
-         Copy, Check, Eye, Rocket } from "lucide-react";
+         Copy, Check, Eye, Rocket, Undo2 } from "lucide-react";
 import { devAuthHeaders } from "./DeveloperShell";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -524,12 +524,10 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                   {m.attachment && <Attachment att={m.attachment} />}
                   {m.paywall && <PaywallBlock info={m.paywall} />}
                   {m.role === "assistant" && displayed && !busy && (
-                    <CopyMessageButton text={displayed} index={i} />
-                  )}
-                  {m.role === "assistant" && displayed && !busy
-                    && !m.warning && containsCodeChange(displayed) && (
-                    <MessageActionButtons index={i}
-                                          projectId={projectId} />
+                    <BubbleActionRow text={displayed}
+                                      index={i}
+                                      messageId={m.id}
+                                      projectId={projectId} />
                   )}
                 </div>
               </div>
@@ -577,6 +575,13 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
               </button>
             ))}
           </div>
+        )}
+
+        {/* iter D-38 — chat footer actions bar (Preview + Deploy moved
+            here so they no longer cover the in-bubble Copy/Rollback
+            buttons on hover). Shows only when a project is loaded. */}
+        {projectId && (
+          <ChatFooterActions projectId={projectId} busy={busy} />
         )}
 
         {/* Input */}
@@ -957,6 +962,193 @@ function PaywallBlock({ info }) {
 // in on hover via the `.dev-cto-msg-bubble:hover .dev-cto-msg-actions`
 // CSS rule injected at the end of the panel.
 
+// iter D-38 — Bubble action row.
+// Sits at the bottom-right of every assistant bubble. Replaces the
+// hover-only Preview/Deploy reveal that used to overlap the Copy
+// button. Two buttons that ALWAYS render (no hover dependency):
+//   • Copy  — clipboard
+//   • Rollback — restores the project to the snapshot taken right
+//                BEFORE this assistant turn (best-effort; opens the
+//                Connect page when no snapshot exists yet).
+// Preview + Deploy moved to ChatFooterActions below the chat stream.
+function BubbleActionRow({ text, index, messageId, projectId }) {
+  const [copied,  setCopied]  = React.useState(false);
+  const [rolling, setRolling] = React.useState(false);
+
+  async function copy() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        document.execCommand("copy"); document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch { setCopied(false); }
+  }
+
+  async function rollback() {
+    if (!projectId) {
+      window.location.href = "/developers/connect#deploy";
+      return;
+    }
+    if (!window.confirm("Rollback to the state BEFORE this AUREM CTO reply?\nYour project will revert to the previous snapshot.")) {
+      return;
+    }
+    setRolling(true);
+    try {
+      const r = await fetch(`${API}/api/developers/deploy/run`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+        body:    JSON.stringify({ mode: "rollback",
+                                    message_id: messageId || String(index),
+                                    project_id: projectId }),
+      });
+      const j = await r.json();
+      if (r.status === 400 && j.detail === "deploy_not_configured") {
+        window.location.href = "/developers/connect#deploy";
+        return;
+      }
+      if (!r.ok) throw new Error(j.detail?.msg || j.detail || "rollback_failed");
+      window.location.href = `/developers/connect#deploy-${j.run_id || ""}`;
+    } catch (e) {
+      window.alert(`Rollback failed: ${e.message || e}.`);
+    } finally {
+      setRolling(false);
+    }
+  }
+
+  return (
+    <div className="dev-cto-bubble-actions"
+         data-testid={`dev-cto-bubble-actions-${index}`}
+         style={{ position: "absolute", right: 6, bottom: 6,
+                   display: "inline-flex", gap: 4 }}>
+      <button data-testid={`dev-cto-copy-btn-${index}`}
+              onClick={copy}
+              aria-label={copied ? "Copied" : "Copy message"}
+              title={copied ? "Copied" : "Copy message"}
+              style={bubbleBtnStyle(copied
+                ? { fg: "#50C878", bg: "rgba(80,200,120,0.12)",
+                    bd: "rgba(80,200,120,0.45)" }
+                : { fg: "#9CA3AF", bg: "rgba(255,255,255,0.05)",
+                    bd: "rgba(255,255,255,0.10)" })}>
+        {copied ? <Check size={12} /> : <Copy size={12} />}
+      </button>
+      <button data-testid={`dev-cto-rollback-btn-${index}`}
+              onClick={rollback}
+              disabled={rolling}
+              aria-label="Rollback to before this reply"
+              title="Rollback this build to the snapshot taken before this reply"
+              style={bubbleBtnStyle({
+                fg: rolling ? "#666" : "#FFB36B",
+                bg: "rgba(255,140,53,0.07)",
+                bd: "rgba(255,140,53,0.30)",
+              })}>
+        <Undo2 size={12} />
+      </button>
+    </div>
+  );
+}
+
+function bubbleBtnStyle({ fg, bg, bd }) {
+  return {
+    width: 26, height: 26,
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    background: bg, border: `1px solid ${bd}`, borderRadius: 4,
+    color: fg, cursor: "pointer",
+    transition: "all 140ms cubic-bezier(0.23, 1, 0.32, 1)",
+    opacity: 0.9,
+  };
+}
+
+// iter D-38 — Chat footer actions (Preview + Deploy).
+// Sits BETWEEN the next-steps chip row and the input box. Replaces the
+// hover-only buttons that used to live INSIDE assistant bubbles and
+// covered the Copy/Rollback controls.
+function ChatFooterActions({ projectId, busy }) {
+  const [deploying, setDeploying] = React.useState(false);
+  const preview = `https://preview.aurem.live/${projectId}`;
+
+  async function deploy() {
+    if (!window.confirm("Deploy the latest changes to your project?")) return;
+    setDeploying(true);
+    try {
+      const r = await fetch(`${API}/api/developers/deploy/run`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+        body:    JSON.stringify({ mode: "deploy", project_id: projectId }),
+      });
+      const j = await r.json();
+      if (r.status === 400 && j.detail === "deploy_not_configured") {
+        window.location.href = "/developers/connect#deploy";
+        return;
+      }
+      if (r.status === 409) {
+        // D-35 production-dogfood guard
+        window.alert("Run a successful dry-run first — production protection is active.");
+        return;
+      }
+      if (!r.ok) throw new Error(j.detail?.msg || j.detail || "deploy_failed");
+      window.location.href = `/developers/connect#deploy-${j.run_id || ""}`;
+    } catch (e) {
+      window.alert(`Deploy failed: ${e.message || e}. Open the Connect page to configure your deploy target.`);
+    } finally {
+      setDeploying(false);
+    }
+  }
+
+  return (
+    <div className="dev-cto-footer-actions"
+         data-testid="dev-cto-chat-footer-actions"
+         style={{ display: "flex", gap: 8,
+                    padding: "10px 18px",
+                    borderTop: "1px solid var(--dash-divider)",
+                    background: "rgba(0,0,0,0.12)",
+                    flexWrap: "wrap" }}>
+      <span style={{ fontSize: 9, letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      color: "var(--dash-text-muted)",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      padding: "6px 4px" }}>
+        Project:
+      </span>
+      <a data-testid="dev-cto-footer-preview-btn"
+         href={preview} target="_blank" rel="noreferrer"
+         title="Open the live preview in a new tab"
+         style={footerBtnStyle("preview", busy)}>
+        <Eye size={12} /> Preview
+      </a>
+      <button data-testid="dev-cto-footer-deploy-btn"
+              onClick={deploy}
+              disabled={busy || deploying}
+              title="Deploy the latest changes to your server"
+              style={footerBtnStyle("deploy", busy || deploying)}>
+        <Rocket size={12} /> {deploying ? "Deploying…" : "Deploy"}
+      </button>
+    </div>
+  );
+}
+
+function footerBtnStyle(kind, disabled) {
+  const accent = kind === "deploy" ? "#50C878" : "#FF8C35";
+  return {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    padding: "7px 14px",
+    background: `${accent}14`,
+    border: `1px solid ${accent}55`,
+    color: accent, borderRadius: 4,
+    fontSize: 12, fontWeight: 500,
+    fontFamily: "'JetBrains Mono', monospace",
+    letterSpacing: "0.05em", textDecoration: "none",
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.5 : 1,
+    transition: "all 140ms cubic-bezier(0.23, 1, 0.32, 1)",
+  };
+}
+
 function containsCodeChange(text) {
   if (!text) return false;
   if (text.includes("```")) return true;
@@ -965,56 +1157,10 @@ function containsCodeChange(text) {
   return false;
 }
 
-function MessageActionButtons({ index, projectId }) {
-  const preview = projectId
-    ? `https://preview.aurem.live/${projectId}`
-    : "/my/projects";
-
-  async function triggerDeploy() {
-    // Best effort — if the customer has wired the D-30 deploy target,
-    // fire `POST /api/developers/deploy/run` (mode=deploy). Otherwise
-    // route them to /developers/connect#deploy to set it up.
-    try {
-      const r = await fetch(
-        `${API}/api/developers/deploy/run`,
-        { method: "POST",
-          headers: { "Content-Type": "application/json", ...devAuthHeaders() },
-          body: JSON.stringify({ mode: "deploy", message_id: String(index) }) });
-      const j = await r.json();
-      if (r.status === 400 && j.detail === "deploy_not_configured") {
-        window.location.href = "/developers/connect#deploy";
-        return;
-      }
-      if (!r.ok) throw new Error(j.detail || "deploy_failed");
-      window.location.href = `/developers/connect#deploy-${j.run_id || ""}`;
-    } catch (e) {
-      window.alert(`Deploy failed: ${e.message || e}. Open the Connect page to configure your deploy target.`);
-    }
-  }
-
-  return (
-    <div className="dev-cto-msg-actions"
-         data-testid={`dev-cto-msg-actions-${index}`}
-         style={{ position: "absolute",
-                   right: 6, bottom: 6,
-                   display: "inline-flex", gap: 6,
-                   opacity: 0,
-                   pointerEvents: "none",
-                   transition: "opacity 160ms ease" }}>
-      <a data-testid={`dev-cto-preview-btn-${index}`}
-         href={preview} target="_blank" rel="noreferrer"
-         title="Open live preview in a new tab"
-         style={actionBtnStyle("preview")}>
-        <Eye size={11} /> Preview
-      </a>
-      <button data-testid={`dev-cto-deploy-btn-${index}`}
-              onClick={triggerDeploy}
-              title="Deploy this build to your server"
-              style={actionBtnStyle("deploy")}>
-        <Rocket size={11} /> Deploy
-      </button>
-    </div>
-  );
+function _unused_legacy_MessageActionButtons({ index, projectId }) {
+  // Kept here as a no-op stub so any external import doesn't crash.
+  // The real footer-based Preview/Deploy lives in ChatFooterActions.
+  return null;
 }
 
 function actionBtnStyle(kind) {

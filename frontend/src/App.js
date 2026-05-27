@@ -42,6 +42,7 @@ import AdminSSOT from './platform/AdminSSOT';
 import AdminConsole from './platform/AdminConsole';
 import AdminAntigravitySkills from './platform/AdminAntigravitySkills';
 import AdminMemoir from './platform/AdminMemoir';
+import AdminIntegrations from './platform/AdminIntegrations';
 import AWBCockpit from './platform/AWBCockpit';
 import AdminDiagnostics from './platform/AdminDiagnostics';
 import LeadsDashboard from './platform/LeadsDashboard';
@@ -393,6 +394,7 @@ function AppRouter() {
         <Route path="/admin/console" element={<AdminConsole />} />
         <Route path="/admin/skills-library" element={<AdminAntigravitySkills />} />
         <Route path="/admin/memoir" element={<AdminMemoir />} />
+        <Route path="/admin/integrations" element={<AdminIntegrations />} />
         <Route path="/admin/awb-cockpit" element={<AWBCockpit />} />
         <Route path="/admin/boardroom" element={<BoardroomPage />} />
         <Route path="/admin/mission-control" element={<AdminMissionControl />} />
