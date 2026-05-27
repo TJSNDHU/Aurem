@@ -1,7 +1,7 @@
 # HEARTBEAT.md — System Pulse Monitor
 
 > ClawChief OS | AUREM Automation Intelligence
-> Last Check: 2026-05-27 02:01 EDT
+> Last Check: 2026-05-27 14:12 EDT
 > Status: ELEVATED
 
 ---
@@ -10,12 +10,12 @@
 
 | Component | Status | Last Check |
 |-----------|--------|------------|
-| Sentiment | OK | 02:01 EDT |
-| Pipeline | OK | 02:01 EDT |
-| Leads | OK | 02:01 EDT |
-| Agents | OK | 02:01 EDT |
-| Audit_Chain | OK | 02:01 EDT |
-| Adversarial_Critic | ALERT | 02:01 EDT |
+| Sentiment | OK | 14:12 EDT |
+| Pipeline | OK | 14:12 EDT |
+| Leads | OK | 14:12 EDT |
+| Agents | OK | 14:12 EDT |
+| Audit_Chain | OK | 14:12 EDT |
+| Adversarial_Critic | ALERT | 14:12 EDT |
 
 ## Alert Level: ELEVATED
 

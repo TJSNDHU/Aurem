@@ -416,6 +416,26 @@ async def cto_chat(
         }
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+    # iter D-37 — intent-aware system prompt. Pick the conversation
+    # branch (build / question / conversational / diagnostic / strategic
+    # / unknown) from the LATEST user message and append the matching
+    # output contract so greetings, simple lookups, and casual turns no
+    # longer get the rigid build-scaffold treatment.
+    try:
+        from services.aurem_cto_intent import classify_intent, system_prompt_for
+        latest_user = next(
+            (m["content"] for m in reversed(messages) if m.get("role") == "user"),
+            "",
+        )
+        _intent = classify_intent(latest_user)
+        full_messages.insert(
+            1,
+            {"role": "system",
+             "content": f"[INTENT={_intent}]\n" + system_prompt_for(_intent)},
+        )
+    except Exception as _intent_e:
+        logger.warning(f"[cto_chat] intent classification failed: {_intent_e}")
+        _intent = "unknown"
     # iter D-36 — AUREM Design System (Sonner/Vaul/animation rules) for
     # every UI-generation turn. See services.aurem_design_prompt.
     from services.aurem_design_prompt import inject_design_prompt
@@ -559,6 +579,22 @@ async def cto_chat_stream(
         return
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+
+    # iter D-37 — intent-aware system prompt for the streaming path too.
+    try:
+        from services.aurem_cto_intent import classify_intent, system_prompt_for
+        _latest = next(
+            (m["content"] for m in reversed(messages) if m.get("role") == "user"),
+            "",
+        )
+        _intent = classify_intent(_latest)
+        full_messages.insert(
+            1,
+            {"role": "system",
+             "content": f"[INTENT={_intent}]\n" + system_prompt_for(_intent)},
+        )
+    except Exception:
+        _intent = "unknown"
 
     # iter D-36 — AUREM Design System for every UI generation turn.
     from services.aurem_design_prompt import inject_design_prompt

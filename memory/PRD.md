@@ -106,6 +106,17 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Stack template baseline** — `aurem_cto/templates/stacks/react-fastapi/ui-design.css` ships with `--ease-out / --ease-drawer / --ease-in-out` curves, universal `:active scale(0.97)`, popover transform-origin override, Sonner toast easing, Vaul iOS drawer curve, `prefers-reduced-motion` guard. README updated to mandate Sonner + Vaul + lucide-react.
   - **Dogfood on aurem.live itself** — `frontend/src/styles/aurem-design.css` created and imported in `App.js` so the same rules render in production. Browser confirms `:root --ease-out` and `--ease-drawer` are live.
   - **Tests**: 9/9 new pytest in `test_design_skill_d36.py` (sentinel, idempotent injection, AUREM CTO BYOK path, AuremIntelligence session creation, stack template CSS + README, frontend CSS import). Full active suite **29/29 green**.
+- **D-37 (2026-02 — Intent-aware AUREM CTO output contract)** — The single rigid prompt that forced `Plan + [step N/M] + NEXT_STEPS + progress + MANIFEST_PATCH` on every turn caused robotic replies for greetings, casual questions, and bug reports.
+  - **`services/aurem_cto_intent.py`** — pure-heuristic classifier with 6 buckets (`build / question / conversational / diagnostic / strategic / unknown`). Zero extra LLM call per turn — ~0.1 ms latency. Each bucket has its own output-contract suffix appended as a system message tagged `[INTENT=<bucket>]`.
+  - **Wired** into both `cto_chat()` and the SSE streaming path in `services/dev_cto_chat.py`. Latest user message is classified once, the matching suffix is inserted at index 1 of the messages list (right after the base AUREM CTO prompt, before the AUREM Design System suffix and the codebase context).
+  - **Output contracts:**
+    - *conversational*: 1-2 sentences, no markers, no NEXT_STEPS.
+    - *question*: 1-3 paragraphs of plain English, no plan/steps, one NEXT_STEPS line.
+    - *diagnostic*: root-cause first, then one fix with file path.
+    - *strategic*: pull real numbers, 3 paragraphs or a table, decision-style chips.
+    - *build*: full plan + step markers + progress + MANIFEST_PATCH + NEXT_STEPS (unchanged from D-32).
+    - *unknown*: ask one clarifying question.
+  - **Tests**: 34/34 new pytest in `test_intent_d37.py` (22 classifier table cases + 6 system-prompt-branch tests + 4 chat-integration tests verifying the right `[INTENT=...]` system message lands in the LLM message stack). Full active suite **63/63 green** across D-32 + D-33 + D-35 + D-36 + D-37 + aurem_cto isolation.
 
 ## Backlog (P0 → P2)
 
