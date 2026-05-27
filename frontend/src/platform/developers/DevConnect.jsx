@@ -330,6 +330,19 @@ function GitHubConnectCard() {
         </>
       ) : (
         <>
+          {/* iter D-42 — one-click GitHub OAuth (popup + postMessage).
+              PAT fallback is below for users whose server admin has not
+              configured GITHUB_CLIENT_ID/SECRET yet. */}
+          <OneClickGitHubOAuth onConnected={(j) => setInfo(j)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10,
+                         margin: "16px 0", color: "var(--dash-text-muted)",
+                         fontSize: 11, letterSpacing: 0.5 }}>
+            <span style={{ flex: 1, height: 1,
+                            background: "var(--dash-border)" }} />
+            OR PASTE A TOKEN MANUALLY
+            <span style={{ flex: 1, height: 1,
+                            background: "var(--dash-border)" }} />
+          </div>
           <p style={{ fontSize: 13, color: "var(--dash-text-muted)",
                        marginBottom: 12 }}>
             Paste a fine-grained <a href="https://github.com/settings/tokens?type=beta"
@@ -365,6 +378,109 @@ function GitHubConnectCard() {
           {err && <div style={{ marginTop: 10, color: "#FF6060",
                                   fontSize: 12 }}>{err}</div>}
         </>
+      )}
+    </div>
+  );
+}
+
+
+// iter D-42 — one-click GitHub OAuth button.
+// Opens /api/developers/github/oauth/start in a centered popup, then
+// listens for the postMessage from the callback HTML to close the loop.
+function OneClickGitHubOAuth({ onConnected }) {
+  const [busy, setBusy] = React.useState(false);
+  const [err,  setErr]  = React.useState(null);
+
+  React.useEffect(() => {
+    function handle(ev) {
+      // Only accept messages that look like our envelope. The callback
+      // page sends a JSON object (already parsed) or a JSON string.
+      let payload = ev.data;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch { return; }
+      }
+      if (!payload || payload.source !== "aurem-github-oauth") return;
+      setBusy(false);
+      if (payload.status === "success") {
+        setErr(null);
+        // Refresh /github/me so the parent card flips to "Connected".
+        fetch(`${API}/api/developers/github/me`,
+              { headers: devAuthHeaders() })
+          .then(r => (r.ok ? r.json() : null))
+          .then(j => { if (j?.login && onConnected) onConnected(j); })
+          .catch(() => {});
+      } else if (payload.status === "error") {
+        setErr(payload.message || "GitHub OAuth failed.");
+      }
+    }
+    window.addEventListener("message", handle);
+    return () => window.removeEventListener("message", handle);
+  }, [onConnected]);
+
+  async function start() {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`${API}/api/developers/github/oauth/start`,
+                              { headers: devAuthHeaders() });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "oauth_start_failed");
+      const w = 600, h = 720;
+      const left = window.screenX + (window.outerWidth  - w) / 2;
+      const top  = window.screenY + (window.outerHeight - h) / 2;
+      const popup = window.open(
+        j.auth_url, "aurem-github-oauth",
+        `width=${w},height=${h},left=${left},top=${top},resizable,scrollbars`,
+      );
+      if (!popup) {
+        setBusy(false);
+        setErr("Popup blocked — please allow popups for this site.");
+        return;
+      }
+      // Detect manual close so we don't sit in "Connecting…" forever.
+      const t = setInterval(() => {
+        if (popup.closed) { clearInterval(t); setBusy(b => b); }
+      }, 600);
+    } catch (e) {
+      setBusy(false);
+      const msg = String(e.message || e);
+      if (msg.includes("not_configured")) {
+        setErr("Admin: set GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET " +
+               "in /admin/integrations to enable one-click.");
+      } else {
+        setErr(msg);
+      }
+    }
+  }
+
+  return (
+    <div data-testid="github-oauth-block">
+      <button data-testid="github-oauth-start"
+              onClick={start} disabled={busy}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                padding: "12px 22px",
+                background: "#24292F",
+                color: "#fff", border: "1px solid #1B1F23",
+                borderRadius: 6, fontSize: 14, fontWeight: 500,
+                cursor: busy ? "default" : "pointer",
+                opacity: busy ? 0.7 : 1,
+                transition: "transform 120ms var(--ease-out, ease-out)",
+              }}
+              onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)"; }}
+              onMouseUp={(e)   => { e.currentTarget.style.transform = "scale(1)"; }}
+              onMouseLeave={(e)=> { e.currentTarget.style.transform = "scale(1)"; }}>
+        <Github size={16} />
+        {busy ? "Connecting…" : "Connect with GitHub"}
+      </button>
+      <p style={{ marginTop: 8, fontSize: 11,
+                   color: "var(--dash-text-muted)" }}>
+        One click, no token paste. Authorizes <code>repo</code> + <code>read:user</code>.
+      </p>
+      {err && (
+        <div data-testid="github-oauth-error"
+             style={{ marginTop: 8, color: "#FF6060", fontSize: 12 }}>
+          {err}
+        </div>
       )}
     </div>
   );

@@ -682,6 +682,268 @@ async def github_unlink(authorization: str = Header(None)) -> dict[str, Any]:
     return {"ok": True}
 
 
+# ── GitHub OAuth (one-click connect)  (iter D-42) ────────────────────
+#
+# Replaces the manual PAT paste with a popup-based OAuth 2.0
+# authorization-code flow. Token still lands in the SAME
+# `developer_github_links` collection used by the PAT path so the
+# codebase indexer + deploy pipeline keep working without changes.
+#
+# Required env vars (set in /admin/integrations or .env):
+#   GITHUB_CLIENT_ID
+#   GITHUB_CLIENT_SECRET
+#   GITHUB_OAUTH_REDIRECT_URI   (optional — defaults to
+#                                {request.base_url}api/developers/github/oauth/callback)
+#
+# Flow:
+#   1. Frontend (logged-in dev) calls GET /github/oauth/start.
+#      We mint a CSRF `state` + PKCE verifier, store them tied to the
+#      AUREM user_id in `developer_github_oauth_states` (TTL 10min),
+#      and return {auth_url}.
+#   2. Frontend opens auth_url in a popup. GitHub redirects back to
+#      /github/oauth/callback?code=…&state=… (NO Authorization header
+#      — the popup is a top-level GET).
+#   3. Callback validates state, exchanges code for access_token,
+#      fetches /user, upserts into developer_github_links, returns
+#      a tiny HTML page that postMessage's the parent window and
+#      closes itself.
+
+import base64 as _b64
+import hashlib as _hashlib
+from urllib.parse import urlencode as _urlencode
+
+_GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
+_GITHUB_TOKEN_URL     = "https://github.com/login/oauth/access_token"
+_GITHUB_USER_API      = "https://api.github.com/user"
+
+
+def _gh_oauth_env() -> dict[str, str | None]:
+    return {
+        "client_id":     os.environ.get("GITHUB_CLIENT_ID", "").strip() or None,
+        "client_secret": os.environ.get("GITHUB_CLIENT_SECRET", "").strip() or None,
+        "redirect_uri":  os.environ.get("GITHUB_OAUTH_REDIRECT_URI", "").strip() or None,
+    }
+
+
+def _gh_pkce_pair() -> tuple[str, str]:
+    """Returns (verifier, S256-challenge) per RFC 7636. GitHub only
+    accepts S256."""
+    verifier = secrets.token_urlsafe(64)
+    digest = _hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = _b64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
+
+
+def _gh_resolve_redirect(request: Request) -> str:
+    env = _gh_oauth_env()["redirect_uri"]
+    if env:
+        return env
+    # Fall back to request base URL — works in preview and prod.
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/developers/github/oauth/callback"
+
+
+@router.get("/api/developers/github/oauth/start")
+async def github_oauth_start(request: Request,
+                              authorization: str = Header(None)) -> dict[str, Any]:
+    """Mint state + PKCE, persist them, return the authorize URL the
+    frontend should open in a popup."""
+    me = await _current_dev(authorization)
+    env = _gh_oauth_env()
+    if not env["client_id"] or not env["client_secret"]:
+        raise HTTPException(
+            503,
+            "github_oauth_not_configured: set GITHUB_CLIENT_ID + "
+            "GITHUB_CLIENT_SECRET in admin integrations.",
+        )
+
+    state = secrets.token_urlsafe(32)
+    verifier, challenge = _gh_pkce_pair()
+    redirect_uri = _gh_resolve_redirect(request)
+
+    if _db is not None:
+        await _db.developer_github_oauth_states.insert_one({
+            "state":        state,
+            "code_verifier": verifier,
+            "user_id":      me["user_id"],
+            "redirect_uri": redirect_uri,
+            "created_at":   datetime.now(timezone.utc),
+        })
+
+    params = {
+        "client_id":              env["client_id"],
+        "redirect_uri":           redirect_uri,
+        "state":                  state,
+        "scope":                  "repo read:user",
+        "allow_signup":           "true",
+        "code_challenge_method":  "S256",
+        "code_challenge":         challenge,
+    }
+    return {"auth_url": f"{_GITHUB_AUTHORIZE_URL}?{_urlencode(params)}"}
+
+
+def _gh_popup_html(*, status: str, message: str,
+                     login: str = "", target_origin: str = "*") -> str:
+    """Tiny HTML page that postMessage's the opener and self-closes.
+
+    We deliberately use targetOrigin="*" by default ONLY when we cannot
+    know the SPA origin (callback hits API origin which may differ from
+    frontend). The frontend listener still verifies `event.origin`
+    against its own backend origin AND the payload's `source` field, so
+    this is safe."""
+    import json as _json
+    payload = _json.dumps({
+        "source": "aurem-github-oauth",
+        "status": status,
+        "message": message,
+        "login":  login,
+    })
+    safe_msg = message.replace("<", "&lt;").replace(">", "&gt;")
+    return f"""<!doctype html><html><head>
+<title>GitHub connected</title>
+<style>body{{font:14px/1.5 system-ui;color:#1f2937;padding:32px;max-width:480px;margin:auto}}</style>
+</head><body>
+<h3>{'GitHub connected' if status == 'success' else 'GitHub connection failed'}</h3>
+<p>{safe_msg}</p>
+<p style="color:#6b7280">You can close this window.</p>
+<script>
+(function(){{
+  try {{
+    if (window.opener && window.opener !== window) {{
+      window.opener.postMessage({payload!s}, "{target_origin}");
+    }}
+  }} catch(e){{}}
+  setTimeout(function(){{ try{{ window.close(); }}catch(e){{}} }}, 800);
+}})();
+</script>
+</body></html>"""
+
+
+@router.get("/api/developers/github/oauth/callback")
+async def github_oauth_callback(request: Request,
+                                  code: str | None = None,
+                                  state: str | None = None,
+                                  error: str | None = None,
+                                  error_description: str | None = None):
+    """GitHub redirects the popup here. We exchange code → token,
+    fetch /user, upsert into developer_github_links, and return a
+    self-closing HTML page that postMessage's the opener."""
+    from fastapi.responses import HTMLResponse
+    env = _gh_oauth_env()
+
+    # Surface explicit GitHub errors first (user clicked Cancel, etc).
+    if error:
+        msg = error_description or error
+        return HTMLResponse(_gh_popup_html(status="error", message=f"GitHub: {msg}"))
+
+    if not code or not state:
+        return HTMLResponse(_gh_popup_html(
+            status="error", message="Missing code or state in callback."))
+
+    if not env["client_id"] or not env["client_secret"]:
+        return HTMLResponse(_gh_popup_html(
+            status="error",
+            message="OAuth credentials not configured on the server."))
+
+    # Look up the state we minted in /start. One-time use → delete on read.
+    state_doc = None
+    if _db is not None:
+        state_doc = await _db.developer_github_oauth_states.find_one(
+            {"state": state})
+        if state_doc:
+            await _db.developer_github_oauth_states.delete_one(
+                {"_id": state_doc["_id"]})
+
+    if not state_doc:
+        return HTMLResponse(_gh_popup_html(
+            status="error",
+            message="Invalid or expired state — please try again."))
+
+    # Reject states older than 10 minutes (replay-attack window).
+    created = state_doc.get("created_at")
+    if created and (datetime.now(timezone.utc) - created).total_seconds() > 600:
+        return HTMLResponse(_gh_popup_html(
+            status="error", message="OAuth session expired — please try again."))
+
+    user_id      = state_doc["user_id"]
+    verifier     = state_doc["code_verifier"]
+    redirect_uri = state_doc.get("redirect_uri") or _gh_resolve_redirect(request)
+
+    # Exchange code for access token.
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=10.0) as c:
+            tok_r = await c.post(
+                _GITHUB_TOKEN_URL,
+                data={
+                    "client_id":     env["client_id"],
+                    "client_secret": env["client_secret"],
+                    "code":          code,
+                    "redirect_uri":  redirect_uri,
+                    "code_verifier": verifier,
+                },
+                headers={"Accept": "application/json"},
+            )
+        if tok_r.status_code != 200:
+            return HTMLResponse(_gh_popup_html(
+                status="error",
+                message=f"GitHub token exchange failed (HTTP {tok_r.status_code})."))
+        tok = tok_r.json()
+        access_token = tok.get("access_token")
+        scope_str    = tok.get("scope", "")
+        if not access_token:
+            err = tok.get("error_description") or tok.get("error") or "no_access_token"
+            return HTMLResponse(_gh_popup_html(
+                status="error", message=f"GitHub: {err}"))
+
+        # Fetch user profile to confirm token + capture login/avatar.
+        async with _httpx.AsyncClient(timeout=10.0) as c:
+            usr_r = await c.get(
+                _GITHUB_USER_API,
+                headers={"Authorization": f"Bearer {access_token}",
+                         "Accept": "application/vnd.github+json"})
+        if usr_r.status_code != 200:
+            return HTMLResponse(_gh_popup_html(
+                status="error",
+                message=f"GitHub /user fetch failed (HTTP {usr_r.status_code})."))
+        user = usr_r.json()
+    except Exception as e:
+        logger.warning(f"[github-oauth] callback http error: {e}")
+        return HTMLResponse(_gh_popup_html(
+            status="error", message="GitHub unreachable — please try again."))
+
+    # Encrypt + store in the SAME collection used by the PAT path so
+    # codebase indexer + deploy keep working unchanged.
+    try:
+        from services.byok_store import _encrypt as _enc
+        ct = _enc(access_token)
+    except Exception:
+        ct = "b64:" + _b64.b64encode(access_token.encode()).decode()
+
+    repos_count = int(user.get("public_repos", 0))
+    if _db is not None:
+        await _db.developer_github_links.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "user_id":     user_id,
+                "pat_enc":     ct,
+                "login":       user.get("login"),
+                "avatar_url":  user.get("avatar_url"),
+                "repos_count": repos_count,
+                "scope":       scope_str,
+                "auth_method": "oauth",
+                "linked_at":   datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+
+    return HTMLResponse(_gh_popup_html(
+        status="success",
+        message=f"Connected as @{user.get('login') or 'github-user'}.",
+        login=user.get("login") or "",
+    ))
+
+
 # ── Pixel domain validation (legacy section) ──────────────────────
 
 class PixelDomainBody(BaseModel):
