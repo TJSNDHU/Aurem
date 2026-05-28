@@ -1001,6 +1001,19 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] security_keys_router wired")
                 except Exception as _sk_e:
                     logger.warning(f"[REGISTRY] security_keys_router not loaded: {_sk_e}")
+
+                # iter D-47 — Save-to-GitHub dialog backend (list repos,
+                # list branches, commit manifest + chat history).
+                try:
+                    from routers.github_save_router import (
+                        router as _ghs_router,
+                        set_db as _set_ghs_db,
+                    )
+                    app.include_router(_ghs_router)
+                    _set_ghs_db(db)
+                    logger.info("[REGISTRY] github_save_router wired")
+                except Exception as _ghs_e:
+                    logger.warning(f"[REGISTRY] github_save_router not loaded: {_ghs_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

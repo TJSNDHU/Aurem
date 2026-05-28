@@ -176,6 +176,24 @@ async def generate_security_keys(
     logger.info(f"[security-keys] generated triplet for user {user_id} "
                 f"(ip={ip or '?'}, live env applied)")
 
+    # iter D-47 — fire audit alert (Slack + email). Best-effort, never
+    # raises. We treat the FIRST generation as a non-rotation (no
+    # alert); subsequent generations are real rotations worth pinging.
+    try:
+        from services.security_alerts import notify_key_rotation
+        any_prior = await _db.customer_security_keys.find_one(
+            {"user_id": user_id, "status": "rotated"}, {"_id": 0},
+        )
+        if any_prior:
+            await notify_key_rotation(
+                event_type="self_rotated", user_id=user_id,
+                email=user.get("email", ""),
+                tenant_id=user.get("tenant_id", "default"),
+                ip_address=ip,
+            )
+    except Exception as _alert_e:
+        logger.warning(f"[security-keys] alert hook skipped: {_alert_e}")
+
     # Plaintext returned ONCE — UI must persuade the user to copy.
     return {
         "ok":              True,
@@ -291,4 +309,19 @@ async def admin_force_rotate(
     }
     await _db.customer_security_keys.insert_one(dict(row))
     logger.info(f"[security-keys] admin force-rotated user_id={user_id}")
+
+    # iter D-47 — audit alert.
+    try:
+        from services.security_alerts import notify_key_rotation
+        await notify_key_rotation(
+            event_type="admin_force_rotated",
+            user_id=user_id,
+            email=target.get("email", ""),
+            tenant_id=target.get("tenant_id", "default"),
+            ip_address=ip,
+            reason=body.reason or "",
+        )
+    except Exception as _alert_e:
+        logger.warning(f"[security-keys] admin alert hook skipped: {_alert_e}")
+
     return {"ok": True, "summary": _row_summary(row)}

@@ -18,6 +18,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Paperclip, Save, FileText, Image as ImageIcon,
          Copy, Check, Eye, Rocket, Undo2, X, Zap } from "lucide-react";
+import SaveToGithubDialog from "./SaveToGithubDialog"; // iter D-47
 import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -139,6 +140,8 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   // iter D-43 — planning bar dismiss + Maxx (frontier model) toggle.
   const [nextStepsDismissed, setNextStepsDismissed] = useState(false);
   const [maxx, setMaxx] = useState(isMaxxOn());
+  // iter D-47 — Save-to-GitHub dialog state.
+  const [showGithubSave, setShowGithubSave] = useState(false);
 
   // Load persisted history OR a saved project, depending on `?project=` query.
   useEffect(() => {
@@ -249,6 +252,21 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           if (evt.type === "meta") {
             setTier(evt.tier || "free");
             setProvider(evt.provider || "");
+            // iter D-47 — stamp provider/model onto the in-progress
+            // assistant message so we can render a per-turn badge.
+            const _meta = {
+              provider: evt.provider || "",
+              model:    evt.model    || "",
+              tier:     evt.tier     || "",
+            };
+            setMessages(m => {
+              const copy = m.slice();
+              const last = copy[copy.length - 1];
+              if (last && last.role === "assistant") {
+                copy[copy.length - 1] = { ...last, meta: _meta };
+              }
+              return copy;
+            });
           } else if (evt.type === "token") {
             receivedAny = true;
             setStreamChars(c => c + (evt.content?.length || 0));
@@ -603,6 +621,31 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                   {displayed || (busy && m.role === "assistant" ? "…" : "")}
                   {m.attachment && <Attachment att={m.attachment} />}
                   {m.paywall && <PaywallBlock info={m.paywall} />}
+                  {/* iter D-47 — per-turn model badge. Only on
+                      assistant bubbles that received a meta event. */}
+                  {m.role === "assistant" && m.meta && (m.meta.provider || m.meta.model) && (
+                    <span data-testid={`dev-cto-msg-model-badge-${i}`}
+                          title={m.meta.model
+                            ? `${m.meta.provider || ""} · ${m.meta.model}`
+                            : m.meta.provider}
+                          style={{ display: "inline-flex",
+                                   alignItems: "center", gap: 4,
+                                   marginTop: 8, padding: "2px 7px",
+                                   borderRadius: 999,
+                                   background: m.meta.tier === "byok"
+                                     ? "rgba(232,200,106,0.10)"
+                                     : "rgba(255,140,53,0.10)",
+                                   border: m.meta.tier === "byok"
+                                     ? "1px solid rgba(232,200,106,0.30)"
+                                     : "1px solid rgba(255,140,53,0.30)",
+                                   color: m.meta.tier === "byok"
+                                     ? "#E8C86A" : "#FF8C35",
+                                   fontFamily: "'JetBrains Mono', monospace",
+                                   fontSize: 9.5,
+                                   letterSpacing: 0.3 }}>
+                      {(m.meta.provider || m.meta.model || "").toLowerCase()}
+                    </span>
+                  )}
                   {m.role === "assistant" && displayed && !busy && (
                     <BubbleActionRow text={displayed}
                                       index={i}
@@ -710,6 +753,26 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                             transition: "all 160ms ease" }}>
             <Zap size={13} />
             {maxx ? "Maxx" : ""}
+          </button>
+          {/* iter D-47 — Save to GitHub button (next to Maxx). Disabled
+              until a project is loaded so the dialog has somewhere to
+              save to. */}
+          <button data-testid="dev-cto-chat-save-github"
+                   onClick={() => setShowGithubSave(true)}
+                   disabled={busy || !projectId}
+                   title={projectId
+                     ? "Commit manifest + chat history to a GitHub repo"
+                     : "Save the project first, then commit to GitHub"}
+                   style={{ background: "#24292F",
+                            border: "1px solid #1B1F23",
+                            color: "#fff", borderRadius: 4,
+                            padding: "0 12px",
+                            cursor: (busy || !projectId)
+                              ? "not-allowed" : "pointer",
+                            opacity: (busy || !projectId) ? 0.5 : 1,
+                            display: "flex", alignItems: "center", gap: 5,
+                            fontSize: 11, fontWeight: 500 }}>
+            <Save size={13} /> Github
           </button>
           <button data-testid="dev-cto-chat-send"
                    onClick={() => send()} disabled={busy || !input.trim()}
@@ -819,6 +882,11 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           </div>
         </div>
       )}
+
+      {/* iter D-47 — Save-to-GitHub dialog. */}
+      <SaveToGithubDialog open={showGithubSave}
+                            projectId={projectId}
+                            onClose={() => setShowGithubSave(false)} />
 
       {/* Token-low modal — unchanged */}
       {showLowModal && (
