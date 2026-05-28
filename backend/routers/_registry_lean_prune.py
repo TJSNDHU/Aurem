@@ -29,7 +29,10 @@ _PRUNE_PREFIXES: tuple[str, ...] = (
     "/api/admin/brands",       # brand mgmt (0 frontend refs)
     "/api/admin/products",     # product admin (0 frontend refs)
     "/api/admin/whatsapp",     # whatsapp admin (0 frontend refs)
-    "/api/admin/security",     # security admin (0 frontend refs)
+    # iter D-46 — narrowed from prefix "/api/admin/security" to the
+    # one specific subscription-admin endpoint, so D-46 routes
+    # /api/admin/security-keys + /api/admin/security-key-vault are
+    # NOT swept by lean prune.
     "/api/pipeline/rollout",   # pipeline rollout (0 frontend refs)
     "/api/pipeline/shadow",    # shadow pipeline (0 frontend refs)
     "/api/subscription/admin", # subscription admin (0 frontend refs)
@@ -56,6 +59,10 @@ _PRUNE_PREFIXES: tuple[str, ...] = (
 _PRUNE_EXACT: frozenset[str] = frozenset({
     "/.well-known/assetlinks.json",
     "/.well-known/ucp",
+    # iter D-46 — the single subscription-admin /api/admin/security
+    # endpoint, moved out of _PRUNE_PREFIXES so it doesn't sweep our
+    # new /api/admin/security-keys + /api/admin/security-key-vault.
+    "/api/admin/security",
 })
 
 

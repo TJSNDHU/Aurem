@@ -7,6 +7,7 @@ import DeveloperShell, { devAuthHeaders, setDevJwt } from "./DeveloperShell";
 import { PageHeader, SectionTitle } from "./DevDashboard";
 import ConsentToggleCard from "./ConsentToggleCard";
 import PlatformCredentialsBlock from "./PlatformCredentialsBlock"; // iter D-43
+import SecurityKeysBlock from "./SecurityKeysBlock";                 // iter D-46
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
@@ -67,6 +68,11 @@ export default function DevSettings() {
     <DeveloperShell requireAuth>
       <PageHeader eyebrow="SETTINGS" title="Account & security"
                   sub="Rotate keys, close sessions, toggle data sharing, or delete your account." />
+
+      {/* iter D-46 — one-click security-key generation (JWT_SECRET +
+          AUREM_ENCRYPTION_KEY + CORS_ORIGINS). Sits at the top of
+          settings because it's the highest-leverage action. */}
+      <SecurityKeysBlock />
 
       {/* iter D-43 — founder-controlled platform-wide secrets (AES-256
           encrypted, applied live to os.environ). Admin-gated by the

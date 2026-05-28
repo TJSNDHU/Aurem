@@ -985,6 +985,22 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] developer_database_router wired")
                 except Exception as _dbinfo_e:
                     logger.warning(f"[REGISTRY] developer_database_router not loaded: {_dbinfo_e}")
+
+                # iter D-46 — One-click security-key generation + admin
+                # panel. Backend mints JWT_SECRET + AUREM_ENCRYPTION_KEY
+                # + CORS_ORIGINS, AES-256 stores + applies live to env.
+                try:
+                    from routers.security_keys_router import (
+                        dev_router as _sk_dev_router,
+                        admin_router as _sk_admin_router,
+                        set_db as _set_sk_db,
+                    )
+                    app.include_router(_sk_dev_router)
+                    app.include_router(_sk_admin_router)
+                    _set_sk_db(db)
+                    logger.info("[REGISTRY] security_keys_router wired")
+                except Exception as _sk_e:
+                    logger.warning(f"[REGISTRY] security_keys_router not loaded: {_sk_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
