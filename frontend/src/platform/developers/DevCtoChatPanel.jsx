@@ -20,6 +20,7 @@ import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Copy, Check, Eye, Rocket, Undo2, X, Zap } from "lucide-react";
 import SaveToGithubDialog from "./SaveToGithubDialog"; // iter D-47
 import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
+import "./DevCtoChatPanel.mobile.css"; // iter D-50 — mobile composer fixes
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const LOW_THRESHOLD = 100;
@@ -680,7 +681,8 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
         )}
 
         {/* Input */}
-        <div style={{ display: "flex", gap: 10, padding: "12px 18px",
+        <div className="dev-cto-composer"
+             style={{ display: "flex", gap: 10, padding: "12px 18px",
                       borderTop: "1px solid var(--dash-divider)",
                       background: "rgba(0,0,0,0.20)" }}>
           {/* iter 332b D-20 — upload button. Hidden native input
@@ -690,20 +692,6 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                   data-testid="dev-cto-chat-file-input"
                   onChange={handleFileSelect}
                   style={{ display: "none" }} />
-          <button data-testid="dev-cto-chat-upload"
-                   onClick={() => fileInputRef.current?.click()}
-                   disabled={uploading || busy}
-                   title="Attach a file (max 25 MB)"
-                   style={{ background: "rgba(255,255,255,0.04)",
-                            border: "1px solid var(--dash-border)",
-                            color: uploading
-                              ? "var(--dash-orange)"
-                              : "var(--dash-text-muted)",
-                            borderRadius: 4, padding: "0 12px",
-                            cursor: uploading ? "not-allowed" : "pointer",
-                            display: "flex", alignItems: "center" }}>
-            <Paperclip size={14} />
-          </button>
           <textarea ref={textareaRef}
                      data-testid="dev-cto-chat-input"
                      value={input}
@@ -724,6 +712,25 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                               maxHeight: "40vh",
                               overflowY: "auto",
                               transition: "height 80ms ease" }} />
+          {/* iter D-50 — buttons grouped in a row that, on mobile, drops
+              below the textarea (CSS in DevCtoChatPanel.mobile.css). On
+              desktop the parent flex-row keeps them inline. */}
+          <div className="dev-cto-composer-actions"
+               style={{ display: "contents" }}>
+          <button data-testid="dev-cto-chat-upload"
+                   onClick={() => fileInputRef.current?.click()}
+                   disabled={uploading || busy}
+                   title="Attach a file (max 25 MB)"
+                   style={{ background: "rgba(255,255,255,0.04)",
+                            border: "1px solid var(--dash-border)",
+                            color: uploading
+                              ? "var(--dash-orange)"
+                              : "var(--dash-text-muted)",
+                            borderRadius: 4, padding: "0 12px",
+                            cursor: uploading ? "not-allowed" : "pointer",
+                            display: "flex", alignItems: "center" }}>
+            <Paperclip size={14} />
+          </button>
           {/* iter D-43 — Maxx toggle (frontier model, 5/turn). Mirrors
               the sidebar Maxx button so the dev can flip it without
               moving their hand off the composer. */}
@@ -773,7 +780,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                             opacity: (busy || !projectId) ? 0.5 : 1,
                             display: "flex", alignItems: "center", gap: 5,
                             fontSize: 11, fontWeight: 500 }}>
-            <Save size={13} /> Github
+            <Save size={13} /> <span>Github</span>
           </button>
           <button data-testid="dev-cto-chat-send"
                    onClick={() => send()} disabled={busy || !input.trim()}
@@ -785,6 +792,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                             display: "flex", alignItems: "center", gap: 6 }}>
             <Send size={14} /> Send
           </button>
+          </div>
         </div>
       </div>
 

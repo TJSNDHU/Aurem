@@ -1,0 +1,89 @@
+/* DevCtoChatPanel.mobile.css — iter D-50
+ * Mobile-only (≤768px) overrides for the AUREM CTO chat composer.
+ *
+ * Desktop layout is preserved exactly (inline styles win on desktop
+ * because no class selector here matches above 768px). On mobile we:
+ *
+ *   1. Stack the bottom composer so the textarea sits ABOVE the
+ *      button row, and the whole bar pins to the bottom of the
+ *      viewport with iPhone safe-area padding.
+ *   2. Force the planning chips row to scroll horizontally instead
+ *      of wrapping — so the row stays one-line on a 390 px iPhone.
+ *   3. Keep the textarea visible (min-height 44 px) so users always
+ *      see what they're typing while the keyboard is open.
+ *   4. Hide the global ORA help bubble (handled in ORAWidget.jsx —
+ *      pure JS hidden=true short-circuit, no CSS needed).
+ *
+ * Convention: every selector is scoped under `[data-testid="dev-cto-..."]`
+ * so this file CANNOT leak styles to other pages.
+ */
+
+@media (max-width: 768px) {
+  /* ── 1. Composer bar — stack textarea above buttons, fix to bottom ── */
+  .dev-cto-composer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 10px 12px
+             calc(10px + env(safe-area-inset-bottom, 0px))
+             12px !important;
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    background: rgba(15, 15, 26, 0.92);
+    backdrop-filter: blur(8px);
+  }
+
+  .dev-cto-composer textarea[data-testid="dev-cto-chat-input"] {
+    width: 100% !important;
+    min-height: 44px !important;
+    order: 0;
+  }
+
+  .dev-cto-composer-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    height: 52px !important;
+    order: 1;
+    width: 100%;
+  }
+
+  /* Send button takes the remaining space so the thumb has a fat target. */
+  .dev-cto-composer-actions [data-testid="dev-cto-chat-send"] {
+    margin-left: auto !important;
+    flex: 0 0 auto !important;
+    padding: 0 16px !important;
+    height: 44px !important;
+  }
+
+  .dev-cto-composer-actions [data-testid="dev-cto-chat-upload"],
+  .dev-cto-composer-actions [data-testid="dev-cto-chat-maxx"],
+  .dev-cto-composer-actions [data-testid="dev-cto-chat-save-github"] {
+    height: 44px !important;
+  }
+
+  /* Save-to-GitHub label text is too long for 390 px — hide the word,
+     keep the icon. */
+  .dev-cto-composer-actions
+  [data-testid="dev-cto-chat-save-github"] > span {
+    display: none !important;
+  }
+
+  /* ── 2. Planning chips — horizontal scroll, no wrap ── */
+  [data-testid="dev-cto-planning-bar"] {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;          /* Firefox */
+    padding: 8px 12px !important;
+  }
+  [data-testid="dev-cto-planning-bar"]::-webkit-scrollbar {
+    display: none;                  /* Chrome / Safari */
+  }
+  [data-testid="dev-cto-planning-bar"] > * {
+    flex-shrink: 0;
+  }
+}

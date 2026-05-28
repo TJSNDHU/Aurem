@@ -53,6 +53,23 @@ const saveState = (s) => {
 };
 
 export default function ORAWidget() {
+  // iter D-50 — fully hide on mobile (≤768px). Previously we only
+  // force-minimized; the founder reported the bubble was still visible
+  // and covering controls. Use a live media-query listener so a phone
+  // rotation immediately re-renders.
+  const [hidden, setHidden] = useState(isMobileViewport());
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const onChange = (e) => setHidden(e.matches);
+    try { mq.addEventListener('change', onChange); }
+    catch { mq.addListener(onChange); }   // Safari < 14 fallback
+    return () => {
+      try { mq.removeEventListener('change', onChange); }
+      catch { mq.removeListener(onChange); }
+    };
+  }, []);
+
   const [state, setState] = useState(loadState);
   const [messages, setMessages] = useState([
     { role: "ora", text: "Hi! I'm ORA. Stuck somewhere? Type or drop a screenshot — I'll help." }
@@ -283,6 +300,10 @@ export default function ORAWidget() {
     : { left: state.position.x, top: state.position.y };
 
   const heightStyle = state.minimized ? { height: 48 } : { height: clampedH };
+
+  // iter D-50 — short-circuit render on mobile so the widget DOM is
+  // never present below 768px. Hooks above still run unconditionally.
+  if (hidden) return null;
 
   return (
     <div
