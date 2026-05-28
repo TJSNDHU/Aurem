@@ -17,11 +17,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Paperclip, Save, FileText, Image as ImageIcon,
-         Copy, Check, Eye, Rocket, Undo2, X, Zap } from "lucide-react";
+         Copy, Check, Eye, Rocket, Undo2, X, Zap, FolderOpen } from "lucide-react";
 import SaveToGithubDialog from "./SaveToGithubDialog"; // iter D-47
 import DeployProgressDialog from "./DeployProgressDialog"; // iter D-51
 import VerificationBadge, { pushVerifyEvent } from "./VerificationBadge"; // iter D-52
 import ConfidenceBadge from "./ConfidenceBadge"; // iter D-53
+import CodebaseMap from "./CodebaseMap"; // iter D-55 — click-to-inject file tree
 import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
 import "./DevCtoChatPanel.mobile.css"; // iter D-50 — mobile composer fixes
 import "./DevCtoChatPanel.animations.css"; // iter D-51 — push/deploy animations
@@ -146,6 +147,9 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   const [nextStepsDismissed, setNextStepsDismissed] = useState(false);
   const [maxx, setMaxx] = useState(isMaxxOn());
   // iter D-47 — Save-to-GitHub dialog state.
+  // iter D-55 — Codebase Map drawer (right-side slide-out)
+  const [showCodebaseMap, setShowCodebaseMap] = useState(false);
+
   const [showGithubSave, setShowGithubSave] = useState(false);
   // iter D-51 — deploy dialog state + commit context handoff from
   // SaveToGithubDialog success path.
@@ -512,6 +516,22 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           </div>
           {historyLoaded && (
             <>
+              <button data-testid="dev-cto-chat-codebase-toggle"
+                       onClick={() => setShowCodebaseMap(s => !s)}
+                       title="Browse the codebase tree (click a file to /file it)"
+                       style={{ background: showCodebaseMap
+                                  ? "rgba(255,107,0,0.18)"
+                                  : "transparent",
+                                border: "1px solid var(--dash-border)",
+                                color: showCodebaseMap
+                                  ? "#FFB070"
+                                  : "var(--dash-text-muted)",
+                                borderRadius: 4, padding: "6px 10px",
+                                fontSize: 11, cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center", gap: 6 }}>
+                <FolderOpen size={12} /> Files
+              </button>
               <button data-testid="dev-cto-chat-save"
                        onClick={() => setShowSaveModal(true)}
                        title="Save this build as a project"
@@ -944,6 +964,60 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                               commitSha={deployContext.commitSha}
                               commitUrl={deployContext.commitUrl}
                               onClose={() => setShowDeploy(false)} />
+
+      {/* iter D-55 — Codebase Map drawer. Right-side slide-out so it
+          doesn't disturb the main chat layout. Clicking a file injects
+          `/file <path>` into the textarea so the next Send fires the
+          D-54 sandboxed read. */}
+      {showCodebaseMap && (
+        <div data-testid="dev-cto-codebase-drawer"
+             style={{ position: "fixed", right: 0, top: 0,
+                      width: "min(360px, 100vw)", height: "100vh",
+                      background: "#0F0F1A",
+                      borderLeft: "1px solid var(--dash-divider)",
+                      boxShadow: "-12px 0 36px rgba(0,0,0,0.45)",
+                      zIndex: 900, display: "flex",
+                      flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center",
+                         padding: "8px 10px",
+                         borderBottom: "1px solid var(--dash-divider)",
+                         background: "rgba(0,0,0,0.30)" }}>
+            <strong style={{ fontSize: 11, letterSpacing: "0.12em",
+                              textTransform: "uppercase",
+                              color: "#E8C86A",
+                              fontFamily: "'JetBrains Mono', monospace" }}>
+              File Browser
+            </strong>
+            <button data-testid="dev-cto-codebase-drawer-close"
+                    onClick={() => setShowCodebaseMap(false)}
+                    style={{ marginLeft: "auto",
+                             background: "transparent", border: "none",
+                             color: "#a1958a", cursor: "pointer",
+                             padding: 4 }}>
+              <X size={14} />
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <CodebaseMap basePath="backend"
+                          maxDepth={3}
+                          onPick={(path) => {
+                            // Prepend `/file <path>` to the input. If the
+                            // user already had text, we put the command
+                            // on a new line so nothing is lost.
+                            setInput((cur) => {
+                              const cmd = `/file ${path}`;
+                              if (!cur.trim()) return cmd + "\n";
+                              return cur + "\n" + cmd + "\n";
+                            });
+                            // Auto-focus the textarea so the founder can
+                            // type a follow-up question and hit Send.
+                            setTimeout(() => {
+                              textareaRef.current?.focus();
+                            }, 50);
+                          }} />
+          </div>
+        </div>
+      )}
 
       {/* Token-low modal — unchanged */}
       {showLowModal && (

@@ -158,6 +158,77 @@ async def read_file(path: str = Query(..., min_length=1, max_length=400),
 
 # ── 2. Codebase search (substring) ──────────────────────────────────
 
+# ── 2. Codebase search (substring) ──────────────────────────────────
+
+# Directory-tree listing — used by the Codebase Map sidebar widget so
+# the founder can click-to-inject any file into the chat without typing
+# the path.
+@router.get("/file/tree")
+async def file_tree(
+    path: str = Query("backend", min_length=0, max_length=200),
+    max_depth: int = Query(2, ge=1, le=6),
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    await _require_admin(authorization)
+    base = _resolve_safe(path) if path else _ROOT
+    if not base.exists() or not base.is_dir():
+        raise HTTPException(404, f"not_a_dir: {path}")
+
+    rel_base = base.relative_to(_ROOT).as_posix()
+    files: list[dict[str, Any]] = []
+    dirs:  list[dict[str, Any]] = []
+
+    def _walk(dir_path: Path, depth: int) -> None:
+        if depth > max_depth:
+            return
+        try:
+            entries = sorted(dir_path.iterdir(),
+                              key=lambda p: (p.is_file(), p.name.lower()))
+        except PermissionError:
+            return
+        for entry in entries:
+            rel = entry.relative_to(_ROOT).as_posix()
+            name = entry.name
+            # blocklist
+            if name in _BLOCKED_NAMES:
+                continue
+            if set(rel.split("/")) & {".git", "node_modules", "__pycache__"}:
+                continue
+            if any(fnmatch.fnmatch(name, b)
+                    for b in _BLOCKED_GLOBS):
+                continue
+            if entry.is_dir():
+                dirs.append({
+                    "path": rel, "name": name, "type": "dir",
+                    "depth": depth,
+                })
+                _walk(entry, depth + 1)
+            elif entry.is_file():
+                try:
+                    sz = entry.stat().st_size
+                except OSError:
+                    sz = 0
+                files.append({
+                    "path":  rel,
+                    "name":  name,
+                    "type":  "file",
+                    "size":  sz,
+                    "ext":   entry.suffix.lstrip("."),
+                    "depth": depth,
+                })
+
+    _walk(base, 1)
+
+    return {
+        "ok":    True,
+        "base":  rel_base,
+        "dirs":  dirs,
+        "files": files,
+        "count": {"dirs": len(dirs), "files": len(files)},
+        "ts":    _now(),
+    }
+
+
 @router.get("/file/search")
 async def search_codebase(
     q: str = Query(..., min_length=2, max_length=120),
