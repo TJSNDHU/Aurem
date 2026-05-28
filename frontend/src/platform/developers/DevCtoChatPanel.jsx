@@ -442,11 +442,12 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   }
 
   // Full-screen layout fills the page; embedded mode keeps the legacy card.
+  // iter D-49 — header bar above this was removed, so chat now claims
+  // the full viewport (minus av2-content padding ~32px).
   const wrapperStyle = fullScreen
     ? {
         display: "flex", flexDirection: "column",
-        // Page header sits above this — give it ~120px of breathing room.
-        height: "calc(100vh - 180px)",
+        height: "calc(100vh - 32px)",
         minHeight: 520,
         border: "1px solid rgba(255,107,0,0.18)",
         borderRadius: 6,

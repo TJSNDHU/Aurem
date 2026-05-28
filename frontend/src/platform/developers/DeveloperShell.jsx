@@ -805,7 +805,7 @@ function DashboardSidebar({ me, collapsed, onToggle }) {
 // which deploy the browser is serving. MUST match the iter in
 // `backend/routers/version_router.py::ITER` and the meta tag in
 // `frontend/public/index.html`. Bump all three on every release.
-const BUNDLE_ITER = "D-48";
+const BUNDLE_ITER = "D-49";
 
 function BuildVersionBadge() {
   const [serverIter, setServerIter] = useState(null);
