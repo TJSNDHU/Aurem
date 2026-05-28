@@ -1039,6 +1039,21 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] cto_tools_router wired")
                 except Exception as _ctot_e:
                     logger.warning(f"[REGISTRY] cto_tools_router not loaded: {_ctot_e}")
+
+                # iter D-52 — auto-verification (code syntax, GitHub commit,
+                # deploy /api/version polling). Replaces CTO's self-reported
+                # confirmations with system-level proof.
+                try:
+                    from routers.cto_verify_router import (
+                        router as _cto_verify_router,
+                        set_db as _set_cto_verify_db,
+                    )
+                    if db is not None:
+                        _set_cto_verify_db(db)
+                    app.include_router(_cto_verify_router)
+                    logger.info("[REGISTRY] cto_verify_router wired")
+                except Exception as _ctov_e:
+                    logger.warning(f"[REGISTRY] cto_verify_router not loaded: {_ctov_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

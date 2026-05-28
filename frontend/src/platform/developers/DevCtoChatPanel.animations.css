@@ -1,0 +1,80 @@
+/* DevCtoChatPanel.animations.css — iter D-51
+ *
+ * Push + deploy animations for AUREM CTO. Mobile-friendly (uses
+ * transform / opacity only — no layout thrash). Scoped under
+ * `.aurem-anim-*` so nothing else in the app is affected.
+ */
+
+@keyframes aurem-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes aurem-progress-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes aurem-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1.0);  opacity: 1; }
+}
+@keyframes aurem-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes aurem-confetti {
+  0%   { transform: translate(0, 0)         scale(0); opacity: 1; }
+  100% { transform: translate(var(--cx), var(--cy)) scale(1); opacity: 0; }
+}
+
+.aurem-anim-spin       { animation: aurem-spin 1.0s linear infinite; }
+.aurem-anim-pop        { animation: aurem-pop 0.45s cubic-bezier(.2,.9,.3,1.4) both; }
+.aurem-anim-fade-out   { animation: aurem-fade-out 0.4s ease-out both; }
+
+/* Progress bar — orange fill that scales from 0 → 1 over duration. */
+.aurem-anim-progress {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 107, 0, 0.10);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.aurem-anim-progress > .fill {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, #FF6B00, #FF8C35);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.35s cubic-bezier(.4, .1, .2, 1);
+}
+
+/* Confetti dot — used 8x with different --cx / --cy. */
+.aurem-anim-confetti-dot {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  pointer-events: none;
+  animation: aurem-confetti 0.9s ease-out both;
+}
+
+/* Deploy stepper — vertical list with check / spinner / dot markers. */
+.aurem-deploy-step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #a1958a;
+  font-family: "JetBrains Mono", monospace;
+  transition: color 0.3s ease;
+}
+.aurem-deploy-step .marker {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 18px;
+}
+.aurem-deploy-step.done    { color: #4ade80; }
+.aurem-deploy-step.active  { color: #FF8C35; }
+.aurem-deploy-step.failed  { color: #FF6060; }
+
+@media (max-width: 768px) {
+  .aurem-deploy-step { font-size: 12px; }
+}

@@ -21,7 +21,7 @@ router = APIRouter(tags=["version"])
 
 # Bump this every iter. The frontend `index.html` <meta> tag must
 # match. If they diverge, the deploy is mid-flight or stale.
-ITER     = "D-49"
+ITER     = "D-52"
 ITER_TS  = "2026-02-28"
 
 

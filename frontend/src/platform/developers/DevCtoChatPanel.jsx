@@ -19,8 +19,11 @@ import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Paperclip, Save, FileText, Image as ImageIcon,
          Copy, Check, Eye, Rocket, Undo2, X, Zap } from "lucide-react";
 import SaveToGithubDialog from "./SaveToGithubDialog"; // iter D-47
+import DeployProgressDialog from "./DeployProgressDialog"; // iter D-51
+import VerificationBadge, { pushVerifyEvent } from "./VerificationBadge"; // iter D-52
 import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
 import "./DevCtoChatPanel.mobile.css"; // iter D-50 — mobile composer fixes
+import "./DevCtoChatPanel.animations.css"; // iter D-51 — push/deploy animations
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const LOW_THRESHOLD = 100;
@@ -143,6 +146,20 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   const [maxx, setMaxx] = useState(isMaxxOn());
   // iter D-47 — Save-to-GitHub dialog state.
   const [showGithubSave, setShowGithubSave] = useState(false);
+  // iter D-51 — deploy dialog state + commit context handoff from
+  // SaveToGithubDialog success path.
+  const [showDeploy, setShowDeploy]   = useState(false);
+  const [deployContext, setDeployContext] = useState({ commitSha: "",
+                                                          commitUrl: "" });
+  // iter D-52 — current iter tag we expect on /api/version after a
+  // production deploy. Pulled live so this string never lies.
+  const [iterTag, setIterTag] = useState("D-52");
+  useEffect(() => {
+    fetch(`${process.env.REACT_APP_BACKEND_URL || ""}/api/version`)
+      .then(r => r.json())
+      .then(j => { if (j?.iter) setIterTag(j.iter); })
+      .catch(() => { /* keep default */ });
+  }, []);
 
   // Load persisted history OR a saved project, depending on `?project=` query.
   useEffect(() => {
@@ -527,6 +544,11 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           <ProgressBar progress={progress} chars={streamChars} />
         )}
 
+        {/* iter D-52 — 3-layer auto-verification badge (code / GitHub /
+            deploy). Hides itself when all three rows are idle so it
+            never clutters a fresh chat. */}
+        <VerificationBadge />
+
         {/* iter D-43 — Planning bar at the top of chat. Replaces the
             bottom-of-input next-step chips. Shows "Planning the next
             move…" with three "+ <suggestion>" pills and a ✕ to dismiss
@@ -892,10 +914,29 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
         </div>
       )}
 
-      {/* iter D-47 — Save-to-GitHub dialog. */}
+      {/* iter D-47 — Save-to-GitHub dialog.
+          iter D-51 — onDeployRequested opens the DeployProgressDialog
+                       after a successful push, gated by the verification
+                       badge (which the dialog feeds via pushVerifyEvent). */}
       <SaveToGithubDialog open={showGithubSave}
                             projectId={projectId}
-                            onClose={() => setShowGithubSave(false)} />
+                            onClose={() => setShowGithubSave(false)}
+                            onDeployRequested={(r) => {
+                              setShowGithubSave(false);
+                              setDeployContext({
+                                commitSha: r?.verified_sha || r?.commit_sha || "",
+                                commitUrl: r?.verified_url || r?.view_url || "",
+                              });
+                              setShowDeploy(true);
+                            }} />
+
+      {/* iter D-51 — Deploy progress dialog (rocket stepper). */}
+      <DeployProgressDialog open={showDeploy}
+                              expectedIter={iterTag}
+                              targetUrl="https://aurem.live"
+                              commitSha={deployContext.commitSha}
+                              commitUrl={deployContext.commitUrl}
+                              onClose={() => setShowDeploy(false)} />
 
       {/* Token-low modal — unchanged */}
       {showLowModal && (

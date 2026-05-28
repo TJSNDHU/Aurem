@@ -8,14 +8,17 @@
  */
 import React, { useEffect, useState } from "react";
 import { X, Github, CheckCircle2, ExternalLink, AlertCircle,
-         Loader2 } from "lucide-react";
+         Loader2, Rocket } from "lucide-react";
 import { devAuthHeaders } from "./DeveloperShell";
+import { pushVerifyEvent } from "./VerificationBadge"; // iter D-52
+import "./DevCtoChatPanel.animations.css";              // iter D-51
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
 
-export default function SaveToGithubDialog({ open, projectId, onClose }) {
-  // step: "pick" → "saving" → "success" | "error"
+export default function SaveToGithubDialog({ open, projectId, onClose,
+                                              onDeployRequested }) {
+  // step: "pick" → "saving" → "pushing" → "success" | "error"
   const [step, setStep]       = useState("pick");
   const [repos, setRepos]     = useState(null);
   const [branches, setBranches] = useState(null);
@@ -24,11 +27,15 @@ export default function SaveToGithubDialog({ open, projectId, onClose }) {
   const [message, setMessage] = useState("Save from AUREM CTO chat");
   const [result, setResult]   = useState(null);
   const [err, setErr]         = useState(null);
+  // iter D-51 — push animation drives progress 0→100 over ~1.5s as the
+  // GitHub commit POST resolves. Auto-dismiss timer fires 3s after success.
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     setStep("pick"); setResult(null); setErr(null);
     setRepos(null); setBranches(null); setRepo(""); setBranch("");
+    setProgress(0);
     fetch(`${API}/api/developers/github/repos`,
             { headers: devAuthHeaders() })
       .then(r => r.ok ? r.json() : r.json().then(j => Promise.reject(j)))
@@ -58,9 +65,15 @@ export default function SaveToGithubDialog({ open, projectId, onClose }) {
   }, [repo]);
 
   async function commit() {
-    setStep("saving"); setErr(null);
+    setStep("saving"); setErr(null); setProgress(0);
+    // iter D-51 — animated progress: jump to 35% on send, 75% on roundtrip
+    // start, 100% on success. Also fires the D-52 verification badge.
+    pushVerifyEvent("github", { status: "checking",
+                                  detail: `pushing to ${repo}` });
+    setTimeout(() => setProgress(35), 50);
     try {
       const [owner, name] = repo.split("/");
+      setProgress(60);
       const r = await fetch(`${API}/api/developers/github/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...devAuthHeaders() },
@@ -68,10 +81,52 @@ export default function SaveToGithubDialog({ open, projectId, onClose }) {
           owner, repo: name, branch, project_id: projectId, message,
         }),
       });
+      setProgress(85);
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || "commit_failed");
-      setResult(j); setStep("success");
-    } catch (e) { setErr(String(e.message || e)); setStep("error"); }
+
+      // iter D-52 — verify the commit ACTUALLY landed on GitHub before
+      // we paint green. We don't trust the commit endpoint's local
+      // response; we re-read from the GitHub API.
+      let verified = j;
+      try {
+        const vr = await fetch(`${API}/api/developers/cto/verify/github`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+          body: JSON.stringify({
+            owner, repo: name, branch,
+            expected_sha: j.commit_sha || "",
+          }),
+        });
+        const vj = await vr.json();
+        if (vj.found) {
+          verified = { ...j, verified_sha: vj.sha,
+                        verified_url: vj.url || j.view_url };
+          pushVerifyEvent("github", {
+            status: "green",
+            detail: `commit ${vj.short_sha}`,
+            url:    vj.url || j.view_url,
+          });
+        } else {
+          // Push endpoint claimed success but GitHub doesn't see it
+          // (token scope issue, branch protection, etc.) — show RED.
+          pushVerifyEvent("github", {
+            status: "red",
+            detail: vj.error || "commit not found on GitHub",
+          });
+        }
+      } catch {
+        pushVerifyEvent("github", { status: "red",
+                                      detail: "verify probe failed" });
+      }
+
+      setProgress(100);
+      setResult(verified); setStep("success");
+    } catch (e) {
+      pushVerifyEvent("github", { status: "red",
+                                    detail: String(e.message || e) });
+      setErr(String(e.message || e)); setStep("error");
+    }
   }
 
   if (!open) return null;
@@ -236,58 +291,23 @@ export default function SaveToGithubDialog({ open, projectId, onClose }) {
                                opacity: (!repo || !branch || step === "saving") ? 0.5 : 1,
                                display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {step === "saving"
-                  ? <><Loader2 size={13} className="aurem-spin" /> Saving…</>
+                  ? <><Loader2 size={13} className="aurem-anim-spin" /> Pushing…</>
                   : <><Github size={13} /> Save to Github</>}
               </button>
             </div>
-          </>
-        ) : step === "success" ? (
-          <div data-testid="save-github-success"
-                style={{ textAlign: "center", padding: "12px 4px" }}>
-            <Github size={48}
-                    style={{ color: "#FF8C35", marginBottom: 10 }} />
-            <h3 style={{ margin: "0 0 6px",
-                          fontFamily: "'Cinzel', serif",
-                          fontSize: 18, color: "#E8C86A" }}>
-              Successfully saved to GitHub!
-            </h3>
-            <p style={{ fontSize: 13, color: "#a1958a",
-                         margin: "0 0 14px" }}>
-              <code>{result?.owner}/{result?.repo}</code>
-              {" "}on branch{" "}
-              <code>{result?.branch}</code>
-            </p>
-            {result?.commit_sha && (
-              <div style={{ fontSize: 11, color: "#a1958a",
-                             fontFamily: "'JetBrains Mono', monospace",
-                             marginBottom: 14 }}>
-                commit {result.commit_sha.slice(0, 9)}
+            {step === "saving" && (
+              <div data-testid="save-github-progress"
+                   className="aurem-anim-progress"
+                   style={{ marginTop: 14 }}>
+                <span className="fill"
+                       style={{ transform: `scaleX(${progress / 100})` }} />
               </div>
             )}
-            <div style={{ display: "flex", gap: 8,
-                           justifyContent: "center" }}>
-              <a href={result?.view_url} target="_blank" rel="noreferrer"
-                  data-testid="save-github-view-link"
-                  style={{ padding: "8px 16px",
-                           background: "rgba(255,107,0,0.10)",
-                           border: "1px solid rgba(255,107,0,0.40)",
-                           color: "#FF8C35", borderRadius: 4,
-                           fontSize: 13, textDecoration: "none",
-                           display: "inline-flex", alignItems: "center", gap: 6 }}>
-                View on GitHub <ExternalLink size={11} />
-              </a>
-              <button onClick={onClose}
-                      data-testid="save-github-okay-got-it"
-                      style={{ padding: "8px 16px",
-                               background: "linear-gradient(135deg, #FF6B00, #FF8C35)",
-                               color: "#fff", border: "none", borderRadius: 4,
-                               fontSize: 13, fontWeight: 500,
-                               cursor: "pointer",
-                               display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <CheckCircle2 size={13} /> Okay got it
-              </button>
-            </div>
-          </div>
+          </>
+        ) : step === "success" ? (
+          <SuccessCelebration result={result}
+                               onClose={onClose}
+                               onDeployRequested={onDeployRequested} />
         ) : (
           <div data-testid="save-github-error-state"
                 style={{ textAlign: "center", padding: "12px 4px" }}>
@@ -310,6 +330,116 @@ export default function SaveToGithubDialog({ open, projectId, onClose }) {
               Try again
             </button>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+ * SuccessCelebration — iter D-51
+ *
+ * Animated "code pushed!" panel rendered inside the same modal. Shows:
+ *   • Big checkmark with pop animation
+ *   • Confetti burst (8 dots flying outward)
+ *   • Real commit SHA + view link
+ *   • Orange Deploy CTA button — when clicked, fires
+ *     `onDeployRequested(result)` so the parent can open the
+ *     DeployProgressDialog. The dialog auto-fades 3s if neither button
+ *     is clicked.
+ * ────────────────────────────────────────────────────────────────── */
+function SuccessCelebration({ result, onClose, onDeployRequested }) {
+  const [fadingOut, setFadingOut] = useState(false);
+
+  // 3-second auto-dismiss — disabled if user is hovering or has clicked
+  // the deploy button (we let the deploy dialog take over).
+  useEffect(() => {
+    const t = setTimeout(() => setFadingOut(true), 3000);
+    const t2 = setTimeout(() => { try { onClose && onClose(); } catch {} },
+                           3500);
+    return () => { clearTimeout(t); clearTimeout(t2); };
+  }, [onClose]);
+
+  const sha = (result?.verified_sha || result?.commit_sha || "").slice(0, 9);
+  const url = result?.verified_url || result?.view_url || "";
+
+  // 8 confetti dots scattered around — radial offsets in px.
+  const dots = [
+    { x:  -60, y: -50, c: "#FF8C35" },
+    { x:   60, y: -50, c: "#E8C86A" },
+    { x:  -80, y:  10, c: "#4ade80" },
+    { x:   80, y:  10, c: "#FF6B00" },
+    { x:  -40, y:  60, c: "#FFC857" },
+    { x:   40, y:  60, c: "#4ade80" },
+    { x:    0, y: -80, c: "#FF8C35" },
+    { x:    0, y:  80, c: "#E8C86A" },
+  ];
+
+  return (
+    <div data-testid="save-github-success"
+         className={fadingOut ? "aurem-anim-fade-out" : "aurem-anim-pop"}
+         style={{ textAlign: "center", padding: "16px 4px",
+                  position: "relative" }}>
+      {/* Confetti layer */}
+      <div style={{ position: "absolute", inset: 0,
+                     pointerEvents: "none", overflow: "visible" }}>
+        {dots.map((d, i) => (
+          <span key={i}
+                className="aurem-anim-confetti-dot"
+                style={{ background: d.c,
+                         ["--cx"]: `${d.x}px`,
+                         ["--cy"]: `${d.y}px` }} />
+        ))}
+      </div>
+
+      <CheckCircle2 size={56}
+                     className="aurem-anim-pop"
+                     style={{ color: "#4ade80", marginBottom: 10 }} />
+      <h3 style={{ margin: "0 0 6px",
+                    fontFamily: "'Cinzel', serif",
+                    fontSize: 19, color: "#E8C86A" }}>
+        Code pushed to GitHub!
+      </h3>
+      <p style={{ fontSize: 13, color: "#a1958a",
+                   margin: "0 0 6px" }}>
+        <code>{result?.owner}/{result?.repo}</code>
+        {" "}on branch <code>{result?.branch}</code>
+      </p>
+      {sha && (
+        <div data-testid="save-github-commit-sha"
+             style={{ fontSize: 11, color: "#a1958a",
+                       fontFamily: "'JetBrains Mono', monospace",
+                       marginBottom: 14 }}>
+          commit <strong style={{ color: "#FF8C35" }}>{sha}</strong>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8,
+                     justifyContent: "center", flexWrap: "wrap" }}>
+        {url && (
+          <a href={url} target="_blank" rel="noreferrer"
+              data-testid="save-github-view-link"
+              style={{ padding: "8px 16px",
+                       background: "rgba(255,107,0,0.10)",
+                       border: "1px solid rgba(255,107,0,0.40)",
+                       color: "#FF8C35", borderRadius: 4,
+                       fontSize: 13, textDecoration: "none",
+                       display: "inline-flex", alignItems: "center", gap: 6 }}>
+            View on GitHub <ExternalLink size={11} />
+          </a>
+        )}
+        {onDeployRequested && (
+          <button onClick={() => onDeployRequested(result)}
+                  data-testid="save-github-deploy-cta"
+                  style={{ padding: "8px 16px",
+                           background: "linear-gradient(135deg, #FF6B00, #FF8C35)",
+                           color: "#fff", border: "none", borderRadius: 4,
+                           fontSize: 13, fontWeight: 500,
+                           cursor: "pointer",
+                           display: "inline-flex", alignItems: "center",
+                           gap: 6 }}>
+            <Rocket size={14} /> Deploy to aurem.live
+          </button>
         )}
       </div>
     </div>
