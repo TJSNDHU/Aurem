@@ -791,11 +791,72 @@ function DashboardSidebar({ me, collapsed, onToggle }) {
               {me.email}
             </div>
           </div>
+          {/* iter D-48 — version badge. Reveals exactly which iter the
+              currently-served bundle came from. Click to GET /api/version
+              for the deployed backend's git sha. */}
+          <BuildVersionBadge />
         </div>
       )}
     </aside>
   );
 }
+
+// iter D-48 — bundle iter is hard-coded here so the running JS reveals
+// which deploy the browser is serving. MUST match the iter in
+// `backend/routers/version_router.py::ITER` and the meta tag in
+// `frontend/public/index.html`. Bump all three on every release.
+const BUNDLE_ITER = "D-48";
+
+function BuildVersionBadge() {
+  const [serverIter, setServerIter] = useState(null);
+  const [serverSha,  setServerSha]  = useState(null);
+  const [open, setOpen] = useState(false);
+
+  async function fetchVersion() {
+    try {
+      const r = await fetch(`${API}/api/version`, { cache: "no-store" });
+      if (!r.ok) return;
+      const j = await r.json();
+      setServerIter(j.iter || "?");
+      setServerSha(j.commit_sha || j.build_sha || "");
+    } catch { /* ignore */ }
+  }
+  React.useEffect(() => { fetchVersion(); }, []);
+
+  const mismatch = serverIter && serverIter !== BUNDLE_ITER;
+  return (
+    <div data-testid="dev-build-version-badge"
+         onClick={() => { setOpen(o => !o); if (!serverIter) fetchVersion(); }}
+         title="Click to refresh — bundle vs server version"
+         style={{ marginTop: 10, padding: "5px 8px",
+                  background: mismatch
+                    ? "rgba(255,96,96,0.10)"
+                    : "rgba(255,255,255,0.03)",
+                  border: mismatch
+                    ? "1px solid rgba(255,96,96,0.40)"
+                    : "1px solid var(--dash-divider)",
+                  borderRadius: 4,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 10, color: mismatch ? "#FF8C70"
+                                                : "var(--dash-text-faint)",
+                  cursor: "pointer",
+                  letterSpacing: 0.3 }}>
+      bundle {BUNDLE_ITER}
+      {serverIter && <span> · api {serverIter}</span>}
+      {open && serverSha && (
+        <div style={{ marginTop: 3, color: "var(--dash-text-faint)" }}>
+          sha {serverSha}
+        </div>
+      )}
+      {mismatch && (
+        <div style={{ marginTop: 3, color: "#FF8C70" }}>
+          mismatch — hard refresh
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function DashboardShell({ children, requireAuth }) {
   const { me, loading } = useDevMe();

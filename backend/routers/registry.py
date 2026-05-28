@@ -1014,6 +1014,16 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] github_save_router wired")
                 except Exception as _ghs_e:
                     logger.warning(f"[REGISTRY] github_save_router not loaded: {_ghs_e}")
+
+                # iter D-48 — cheap /api/version endpoint so the founder
+                # can confirm a production deploy actually picked up
+                # the latest code.
+                try:
+                    from routers.version_router import router as _ver_router
+                    app.include_router(_ver_router)
+                    logger.info("[REGISTRY] version_router wired")
+                except Exception as _ver_e:
+                    logger.warning(f"[REGISTRY] version_router not loaded: {_ver_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
