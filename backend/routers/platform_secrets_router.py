@@ -94,6 +94,9 @@ _ALLOWED_SECRETS = {
     "GITHUB_CLIENT_ID",
     "GITHUB_CLIENT_SECRET",
     "GITHUB_OAUTH_REDIRECT_URI",
+    # Security alert sinks (added D-49 per founder request)
+    "SECURITY_ALERT_SLACK_WEBHOOK",
+    "SECURITY_ALERT_EMAIL",
 }
 
 

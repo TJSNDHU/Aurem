@@ -1024,6 +1024,21 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] version_router wired")
                 except Exception as _ver_e:
                     logger.warning(f"[REGISTRY] version_router not loaded: {_ver_e}")
+
+                # iter D-49 — real-execution CTO tools (run-scout, import-leads,
+                # run-blast, db-stats). Lets the CTO chat actually DO things
+                # instead of only planning.
+                try:
+                    from routers.cto_tools_router import (
+                        router as _cto_tools_router,
+                        set_db as _set_cto_tools_db,
+                    )
+                    if db is not None:
+                        _set_cto_tools_db(db)
+                    app.include_router(_cto_tools_router)
+                    logger.info("[REGISTRY] cto_tools_router wired")
+                except Exception as _ctot_e:
+                    logger.warning(f"[REGISTRY] cto_tools_router not loaded: {_ctot_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

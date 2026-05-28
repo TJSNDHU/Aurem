@@ -26,6 +26,40 @@ compliant. Sovereign data residency, plain-English communication
 
 ## What's been implemented (chronological highlights)
 
+### iter D-49 (2026-05-28) — CTO real-execution tools + blast unstuck
+
+- **CTO Tools Router** (`routers/cto_tools_router.py`): 4 real-execution endpoints
+  the chat can invoke instead of only planning:
+  - `POST /api/developers/cto/tools/run-scout` → harvest_leads via OSM/Places
+  - `POST /api/developers/cto/tools/import-leads` → bulk insert with dedup + channel-gating
+  - `POST /api/developers/cto/tools/run-blast` → force auto_blast_engine cycle
+  - `GET  /api/developers/cto/tools/db-stats` → live counts for CTO context
+  - Every call audited to `cto_tool_runs` collection.
+- **Settings whitelist expanded** (`platform_secrets_router._ALLOWED_SECRETS`):
+  added `SECURITY_ALERT_SLACK_WEBHOOK` + `SECURITY_ALERT_EMAIL`.
+- **Channel-gating reclamation** (one-shot script): flipped 25 emails
+  + 151 SMS gating to True for fresh leads that had valid contact info
+  but were locked out by stale verification scores.
+- **Ghost Scout live harvest**: ran 30 queries across beauty / wellness
+  verticals in GTA — added 45 fresh leads to `campaign_leads`, broke
+  the "no-eligible-leads" stall.
+- **Blast verified live**: 12 emails sent via Resend (confirmed IDs in
+  `outreach_history`) within minutes of backend restart. First real
+  outbound since May 11.
+- pytest: 6/6 green (`test_cto_tools_d49.py`), 38/38 green for D-42..D-49 set.
+
+### Pending — requires user action on prod (preview cannot touch aurem.live)
+- Apply rotated secrets (`JWT_SECRET`, `AUREM_ENCRYPTION_KEY`,
+  `EMERGENCY_RESET_SECRET`) to `/etc/aurem/.env` on Hetzner and `sudo
+  systemctl restart aurem-backend`.
+- Set `CORS_ORIGINS=https://aurem.live,https://www.aurem.live` on prod
+  (preview default allowlist already covers both).
+- Reset prod admin password via prod MongoDB shell — see
+  `/app/memory/test_credentials.md` for the exact `db.users.updateOne`
+  command (bcrypt hash format).
+
+## What's been implemented (earlier history)
+
 See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
 
 - iter 331c: Sprint 6 — consent network, ora_session_metrics, Vanguard, portability audit.
