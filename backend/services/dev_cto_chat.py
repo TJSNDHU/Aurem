@@ -296,6 +296,114 @@ def _extract_search_query(user_msg: str) -> str | None:
     return None
 
 
+async def _maybe_inject_codebase(
+    full_messages: list[dict[str, str]],
+    original_messages: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """iter D-54 — Detect "line N of <path>", "show me <path>",
+    "/file <path>", or "what's in <path>" patterns on the user's
+    last turn, fetch the real file contents via the codebase router
+    (sandboxed under /app), and inject it as a system message before
+    the LLM sees the turn. Stops the "I imagined the code" failure
+    mode dead.
+
+    Silent no-op on any failure — never blocks the chat.
+    """
+    if not original_messages:
+        return full_messages
+    last = original_messages[-1]
+    if last.get("role") != "user":
+        return full_messages
+    text = str(last.get("content") or "")
+    if not text.strip():
+        return full_messages
+
+    import re as _re
+    path = None
+    start_line = 1
+    end_line   = 200
+
+    # /file <path>  — explicit slash command
+    m = _re.search(r"^/file\s+([^\s]+)(?:\s+(\d+))?(?:\s+(\d+))?", text)
+    if m:
+        path = m.group(1)
+        if m.group(2):
+            start_line = max(1, int(m.group(2)))
+            end_line   = int(m.group(3) or (start_line + 40))
+    else:
+        # "line N of <path>" / "line N from <path>"
+        m = _re.search(r"line\s+(\d+)\s+(?:of|from|in)\s+([A-Za-z0-9_./\-]+\.\w+)",
+                        text, _re.IGNORECASE)
+        if m:
+            ln   = int(m.group(1))
+            path = m.group(2)
+            start_line = max(1, ln - 5)
+            end_line   = ln + 15
+        else:
+            # "show me <path>" / "what's in <path>" / "open <path>"
+            m = _re.search(
+                r"(?:show\s+me|open|what'?s?\s+in|content\s+of)\s+"
+                r"([A-Za-z0-9_./\-]+\.\w+)",
+                text, _re.IGNORECASE,
+            )
+            if m:
+                path = m.group(1)
+
+    if not path:
+        return full_messages
+
+    # Tolerate "backend/foo.py" or "/app/backend/foo.py"
+    rel = path.lstrip("/")
+    if rel.startswith("app/"):
+        rel = rel[4:]
+
+    try:
+        from pathlib import Path as _P
+        candidate = _P("/app").joinpath(rel).resolve()
+        if not str(candidate).startswith("/app"):
+            return full_messages
+        # Reuse the safety blocklist from the router
+        from routers.cto_codebase_router import (
+            _BLOCKED_NAMES, _BLOCKED_GLOBS,
+        )
+        import fnmatch as _fn
+        if candidate.name in _BLOCKED_NAMES:
+            return full_messages
+        rel_name = candidate.relative_to("/app").as_posix()
+        for pat in _BLOCKED_GLOBS:
+            if _fn.fnmatch(rel_name, pat) or _fn.fnmatch(candidate.name, pat):
+                return full_messages
+        if not candidate.exists() or not candidate.is_file():
+            return full_messages
+        # Hard cap to keep context sane
+        raw = candidate.read_bytes()[:32_000]
+        body = raw.decode("utf-8", errors="replace")
+        all_lines = body.split("\n")
+        total = len(all_lines)
+        s = max(1, start_line)
+        e = min(total, end_line)
+        slice_lines = all_lines[s - 1: e]
+        joined = "\n".join(f"{s + i:4d} | {ln}"
+                            for i, ln in enumerate(slice_lines))
+        injection_lines = [
+            "[Real file contents from REPO — sandboxed read]",
+            f"path: {rel_name}",
+            f"lines {s}–{e} of {total} (sha1 truncated)",
+            "----",
+            joined[:8000],
+            "----",
+            "[Quote / refer to these EXACT lines. Do not invent code.]",
+        ]
+        injection = {"role": "system",
+                      "content": "\n".join(injection_lines)}
+        out = list(full_messages)
+        out.insert(-1, injection)
+        return out
+    except Exception as e:
+        logger.warning(f"[cto_chat] codebase injection skipped: {e}")
+        return full_messages
+
+
 async def _maybe_inject_web_search(
     full_messages: list[dict[str, str]],
     original_messages: list[dict[str, str]],
@@ -568,6 +676,7 @@ async def cto_chat(
     from services.aurem_design_prompt import inject_design_prompt
     full_messages = inject_design_prompt(full_messages)
     # iter 332b D-29 — inject web-search context (see helper docstring).
+    full_messages = await _maybe_inject_codebase(full_messages, messages)
     full_messages = await _maybe_inject_web_search(full_messages, messages)
     try:
         if tier == "byok":
@@ -771,6 +880,7 @@ async def cto_chat_stream(
     # "search" / "look up" / "latest" / "/search ..." prefix etc.) and
     # inject the top Tavily hits as an extra system message so the LLM
     # has fresh facts to ground its reply.
+    full_messages = await _maybe_inject_codebase(full_messages, messages)
     full_messages = await _maybe_inject_web_search(full_messages, messages)
 
     tokens_remaining = deduct.get("tokens_remaining", 0)

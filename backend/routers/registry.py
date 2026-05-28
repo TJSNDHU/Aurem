@@ -1069,6 +1069,17 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] cto_learning_router wired")
                 except Exception as _ctol_e:
                     logger.warning(f"[REGISTRY] cto_learning_router not loaded: {_ctol_e}")
+
+                # iter D-54 — real codebase + GitHub access so the CTO
+                # chat reads files/commits instead of hallucinating.
+                try:
+                    from routers.cto_codebase_router import (
+                        router as _cto_codebase_router,
+                    )
+                    app.include_router(_cto_codebase_router)
+                    logger.info("[REGISTRY] cto_codebase_router wired")
+                except Exception as _ctoc_e:
+                    logger.warning(f"[REGISTRY] cto_codebase_router not loaded: {_ctoc_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
