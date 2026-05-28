@@ -23,6 +23,8 @@ import DeployProgressDialog from "./DeployProgressDialog"; // iter D-51
 import VerificationBadge, { pushVerifyEvent } from "./VerificationBadge"; // iter D-52
 import ConfidenceBadge from "./ConfidenceBadge"; // iter D-53
 import CodebaseMap from "./CodebaseMap"; // iter D-55 — click-to-inject file tree
+import TemperatureBadge from "./TemperatureBadge"; // iter D-57
+import HotLeadsBar from "./HotLeadsBar"; // iter D-57 — hot lead surfacing
 import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
 import "./DevCtoChatPanel.mobile.css"; // iter D-50 — mobile composer fixes
 import "./DevCtoChatPanel.animations.css"; // iter D-51 — push/deploy animations
@@ -281,6 +283,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
               provider: evt.provider || "",
               model:    evt.model    || "",
               tier:     evt.tier     || "",
+              intent:   evt.intent   || "",  // iter D-57 — temperature badge
             };
             setMessages(m => {
               const copy = m.slice();
@@ -565,6 +568,17 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           <ProgressBar progress={progress} chars={streamChars} />
         )}
 
+        {/* iter D-57 — Hot leads bar (Resend webhook surfacing). Polls
+            /api/leads/hot every 60s; auto-hides if empty. Clicking a
+            pill prefills a "draft reply to X" message. */}
+        <HotLeadsBar onReply={(lead) => {
+          setInput(`Draft a reply to ${lead.business_name} `
+                    + `(${lead.email || lead.phone}) — they just `
+                    + `${lead.hot_lead_reason === "email_clicked"
+                         ? "clicked" : "opened"} our email ${lead.ago}.`);
+          setTimeout(() => textareaRef.current?.focus(), 50);
+        }} />
+
         {/* iter D-52 — 3-layer auto-verification badge (code / GitHub /
             deploy). Hides itself when all three rows are idle so it
             never clutters a fresh chat. */}
@@ -695,6 +709,12 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                                    fontSize: 9.5,
                                    letterSpacing: 0.3 }}>
                       {(m.meta.provider || m.meta.model || "").toLowerCase()}
+                    </span>
+                  )}
+                  {/* iter D-57 — temperature badge per assistant turn. */}
+                  {m.role === "assistant" && m.meta && m.meta.intent && (
+                    <span style={{ marginLeft: 4 }}>
+                      <TemperatureBadge intent={m.meta.intent} />
                     </span>
                   )}
                   {m.role === "assistant" && displayed && !busy && (

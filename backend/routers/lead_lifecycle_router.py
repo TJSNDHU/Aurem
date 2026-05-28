@@ -322,11 +322,41 @@ async def resend_webhook(request: Request):
         # Move contacted → engaged
         if current_stage in ("new", "contacted"):
             await transition(db, lead_id, "engaged", reason="email_opened", by="resend_webhook", force=True)
+        # iter D-57 — surface to CTO as a HOT-LEAD signal. The chat
+        # surfaces these via /api/leads/hot — the founder sees a
+        # "🔥 Lead opened email N min ago" pill.
+        from datetime import datetime, timezone
+        try:
+            await db.campaign_leads.update_one(
+                {"lead_id": lead_id},
+                {"$set": {
+                    "hot_lead_flag":        True,
+                    "hot_lead_reason":      "email_opened",
+                    "hot_lead_signal_at":   datetime.now(timezone.utc).isoformat(),
+                    "last_hot_email_id":    data.get("email_id", ""),
+                }},
+            )
+        except Exception:
+            pass
 
     elif event_type == "email.clicked":
         click = data.get("click", {}) or {}
         await record_touchpoint(db, lead_id, "email", "resend_clicked", "clicked",
                                 details={"email_id": data.get("email_id"), "url": click.get("link")})
+        # iter D-57 — clicked = even hotter; force-mark + record link.
+        from datetime import datetime, timezone
+        try:
+            await db.campaign_leads.update_one(
+                {"lead_id": lead_id},
+                {"$set": {
+                    "hot_lead_flag":      True,
+                    "hot_lead_reason":    "email_clicked",
+                    "hot_lead_signal_at": datetime.now(timezone.utc).isoformat(),
+                    "last_clicked_url":   click.get("link", ""),
+                }},
+            )
+        except Exception:
+            pass
         # HIGH intent — engage + boost flame score by +20
         if current_stage in ("new", "contacted", "called_no_response", "following_up", "cold"):
             await transition(db, lead_id, "engaged", reason="email_clicked_link", by="resend_webhook", force=True)

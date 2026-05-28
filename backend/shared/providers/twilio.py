@@ -192,7 +192,19 @@ async def send_whatsapp_message(phone: str, message: str) -> dict:
                     )
                 except Exception:
                     pass
-            return wresult
+                return wresult
+            # iter D-57 — WHAPI returned success=False. Fall through to
+            # Twilio WABA instead of returning the failure to the caller.
+            # The earlier code unconditionally `return wresult`, which
+            # killed the legitimate Twilio fallback whenever WHAPI was
+            # disabled or rate-limited. The founder hit exactly this
+            # in D-56 ("WHAPI disabled (use Twilio WABA)" but Twilio
+            # never tried).
+            logger.info(
+                "[twilio.send_whatsapp_message] WHAPI declined "
+                f"(err={wresult.get('error') if isinstance(wresult, dict) else 'unknown'}) "
+                "— falling back to Twilio WABA"
+            )
     except Exception as e:
         logger.warning(f"WHAPI send failed, falling back to Twilio: {e}")
 

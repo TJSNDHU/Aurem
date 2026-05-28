@@ -1080,6 +1080,21 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] cto_codebase_router wired")
                 except Exception as _ctoc_e:
                     logger.warning(f"[REGISTRY] cto_codebase_router not loaded: {_ctoc_e}")
+
+                # iter D-57 — clean /api/webhooks/resend alias + /api/leads/hot
+                # CTO-surfacing endpoint. Reuses lead_lifecycle_router's
+                # signature verification (single source of truth).
+                try:
+                    from routers.resend_webhook_router import (
+                        router as _resend_wh_router,
+                        set_db as _set_resend_db,
+                    )
+                    if db is not None:
+                        _set_resend_db(db)
+                    app.include_router(_resend_wh_router)
+                    logger.info("[REGISTRY] resend_webhook_router wired")
+                except Exception as _rwh_e:
+                    logger.warning(f"[REGISTRY] resend_webhook_router not loaded: {_rwh_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

@@ -478,9 +478,10 @@ def _pick_byok_provider(byok: dict[str, str]) -> tuple[str, str] | None:
 
 async def _call_openrouter(
     api_key: str, model: str, messages: list[dict[str, str]],
+    temperature: float = 0.1,
 ) -> str:
     payload = {"model": model, "messages": messages,
-               "max_tokens": 1024, "temperature": 0.4}
+               "max_tokens": 1024, "temperature": temperature}
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type":  "application/json",
@@ -500,9 +501,10 @@ async def _call_openrouter(
 async def _call_openai_compatible(
     url: str, api_key: str, model: str,
     messages: list[dict[str, str]],
+    temperature: float = 0.1,
 ) -> str:
     payload = {"model": model, "messages": messages,
-               "max_tokens": 1024, "temperature": 0.4}
+               "max_tokens": 1024, "temperature": temperature}
     async with httpx.AsyncClient(timeout=45.0) as c:
         r = await c.post(
             url,
@@ -516,12 +518,14 @@ async def _call_openai_compatible(
     return (j.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
 
 
-async def _call_anthropic(api_key: str, messages: list[dict[str, str]]) -> str:
+async def _call_anthropic(api_key: str, messages: list[dict[str, str]],
+                            temperature: float = 0.1) -> str:
     from services.aurem_design_prompt import design_prompt_for_native_provider
     url = "https://api.anthropic.com/v1/messages"
     body = {
         "model": "claude-3-5-sonnet-20241022",
         "max_tokens": 1024,
+        "temperature": temperature,
         "system": SYSTEM_PROMPT + design_prompt_for_native_provider(),
         "messages": [m for m in messages if m["role"] != "system"],
     }
@@ -538,7 +542,8 @@ async def _call_anthropic(api_key: str, messages: list[dict[str, str]]) -> str:
     return "".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
 
 
-async def _call_gemini(api_key: str, messages: list[dict[str, str]]) -> str:
+async def _call_gemini(api_key: str, messages: list[dict[str, str]],
+                        temperature: float = 0.1) -> str:
     from services.aurem_design_prompt import design_prompt_for_native_provider
     user_text = "\n\n".join(m["content"] for m in messages if m["role"] != "system")
     url = (
@@ -548,7 +553,7 @@ async def _call_gemini(api_key: str, messages: list[dict[str, str]]) -> str:
     body = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT + design_prompt_for_native_provider()}]},
         "contents": [{"role": "user", "parts": [{"text": user_text}]}],
-        "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.4},
+        "generationConfig": {"maxOutputTokens": 1024, "temperature": temperature},
     }
     async with httpx.AsyncClient(timeout=45.0) as c:
         r = await c.post(url, json=body, headers={"Content-Type": "application/json"})
@@ -561,33 +566,94 @@ async def _call_gemini(api_key: str, messages: list[dict[str, str]]) -> str:
 
 
 async def _dispatch_byok(provider: str, api_key: str,
-                          messages: list[dict[str, str]]) -> str:
+                          messages: list[dict[str, str]],
+                          temperature: float = 0.1) -> str:
     if provider == "anthropic":
-        return await _call_anthropic(api_key, messages)
+        return await _call_anthropic(api_key, messages, temperature=temperature)
     if provider == "gemini":
-        return await _call_gemini(api_key, messages)
+        return await _call_gemini(api_key, messages, temperature=temperature)
     if provider not in PROVIDER_ROUTES:
         raise RuntimeError(f"unknown provider {provider!r}")
     route = PROVIDER_ROUTES[provider]
     return await _call_openai_compatible(
         route["url"], api_key, route["model"], messages,
+        temperature=temperature,
     )
 
 
 async def _dispatch_free_tier(api_key: str,
-                               messages: list[dict[str, str]]) -> tuple[str, str]:
+                               messages: list[dict[str, str]],
+                               temperature: float = 0.1
+                               ) -> tuple[str, str]:
     """Walk the FREE_TIER_MODELS ladder, return (reply, label_used).
     Raises if every model fails."""
     last_err: Exception | None = None
     for model, label in FREE_TIER_MODELS:
         try:
-            reply = await _call_openrouter(api_key, model, messages)
+            reply = await _call_openrouter(
+                api_key, model, messages, temperature=temperature,
+            )
             return reply, label
         except Exception as e:
             logger.warning(f"[cto_chat] free-tier {model} failed: {e}")
             last_err = e
             continue
     raise RuntimeError(f"all free-tier models failed; last error: {last_err}")
+
+
+# ── iter D-57 — Temperature-by-intent helper ──────────────────────────
+# The founder asked for deterministic code generation but slightly
+# wiggly planning output. Map the intent classifier's labels to a
+# temperature so we don't hallucinate dates / SHAs / API endpoints
+# on the LLM's whim.
+#
+# Code-leaning intents → 0.0  (deterministic, repeatable)
+# Plan-leaning intents → 0.2  (a hair of variation for structure)
+# Everything else      → 0.1  (the new house default — was 0.4)
+_CODE_INTENTS  = {"build", "fix_code", "diagnostic", "refactor",
+                   "code_review"}
+_PLAN_INTENTS  = {"strategic", "planning", "architecture", "design"}
+
+
+def _temperature_for_intent(intent: str) -> float:
+    if not intent:
+        return 0.1
+    lc = intent.lower()
+    if lc in _CODE_INTENTS:
+        return 0.0
+    if lc in _PLAN_INTENTS:
+        return 0.2
+    return 0.1
+
+
+# Guardrail system message — appended on EVERY chat turn so the model
+# is reminded that it cannot invent dates / SHAs / endpoint URLs even
+# when running at temperature > 0. D-54's codebase injector + D-52's
+# verification badge make this enforceable downstream.
+_GUARDRAIL_MSG = (
+    "GUARDRAIL — Do NOT invent or guess:\n"
+    "  • commit SHAs (use the actual /api/developers/cto/github/commits result)\n"
+    "  • file line numbers (use /api/developers/cto/file?path=... result)\n"
+    "  • dates / timestamps (only quote ones that appear in injected context)\n"
+    "  • iter tags like 'D-57' (only quote /api/version response)\n"
+    "  • API endpoints (only quote ones that appear in injected context)\n"
+    "If you do not have the real value, say 'I need to look that up' "
+    "and stop. Never fabricate."
+)
+
+
+def _inject_guardrail(full_messages: list[dict[str, str]]
+                       ) -> list[dict[str, str]]:
+    """Append the guardrail as a final system message right before the
+    last user turn. Idempotent — bails out if the marker is already
+    present (prevents accumulation across multi-turn conversations)."""
+    marker = "GUARDRAIL — Do NOT invent"
+    for m in full_messages:
+        if m.get("role") == "system" and marker in (m.get("content") or ""):
+            return full_messages
+    out = list(full_messages)
+    out.insert(-1, {"role": "system", "content": _GUARDRAIL_MSG})
+    return out
 
 
 async def cto_chat(
@@ -678,13 +744,18 @@ async def cto_chat(
     # iter 332b D-29 — inject web-search context (see helper docstring).
     full_messages = await _maybe_inject_codebase(full_messages, messages)
     full_messages = await _maybe_inject_web_search(full_messages, messages)
+    # iter D-57 — anti-hallucination guardrail + intent-aware temperature.
+    full_messages = _inject_guardrail(full_messages)
+    _temp = _temperature_for_intent(_intent)
     try:
         if tier == "byok":
             provider, api_key = picked_byok  # type: ignore[misc]
-            reply = await _dispatch_byok(provider, api_key, full_messages)
+            reply = await _dispatch_byok(provider, api_key, full_messages,
+                                           temperature=_temp)
         else:
             api_key = _free_tier_key() or ""
-            reply, provider = await _dispatch_free_tier(api_key, full_messages)
+            reply, provider = await _dispatch_free_tier(api_key, full_messages,
+                                                          temperature=_temp)
     except Exception as e:
         return {
             "ok": False, "error": "llm_failed", "tier": tier,
@@ -745,12 +816,13 @@ import json as _json
 
 
 async def _stream_openrouter(api_key: str, model: str,
-                              messages: list[dict[str, str]]):
+                              messages: list[dict[str, str]],
+                              temperature: float = 0.1):
     """Async-iter over OpenRouter SSE chunks for one model. Yields
     plain text deltas. Raises on HTTP error so the caller can fall
     through to the next rung on the free-tier ladder."""
     payload = {"model": model, "messages": messages,
-               "max_tokens": 1024, "temperature": 0.4, "stream": True}
+               "max_tokens": 1024, "temperature": temperature, "stream": True}
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type":  "application/json",
@@ -883,6 +955,10 @@ async def cto_chat_stream(
     full_messages = await _maybe_inject_codebase(full_messages, messages)
     full_messages = await _maybe_inject_web_search(full_messages, messages)
 
+    # iter D-57 — anti-hallucination guardrail + intent-aware temperature.
+    full_messages = _inject_guardrail(full_messages)
+    _temp = _temperature_for_intent(_intent)
+
     tokens_remaining = deduct.get("tokens_remaining", 0)
 
     # iter D-40b + D-41 — when the turn is NOT a build/fix (or the
@@ -902,9 +978,11 @@ async def cto_chat_stream(
     if tier == "byok":
         provider, api_key = picked_byok  # type: ignore[misc]
         yield _evt({"type": "meta", "tier": tier, "provider": provider,
+                     "intent": _intent, "temperature": _temp,
                      "tokens_remaining": int(tokens_remaining or 0)})
         try:
-            reply = await _dispatch_byok(provider, api_key, full_messages)
+            reply = await _dispatch_byok(provider, api_key, full_messages,
+                                           temperature=_temp)
         except Exception as e:
             yield _evt({"type": "error", "tier": tier,
                          "error": "llm_failed", "message": str(e)})
@@ -938,10 +1016,12 @@ async def cto_chat_stream(
             # Emit meta as soon as we know which model we're trying.
             yield _evt({"type": "meta", "tier": tier, "provider": label,
                          "model": model,
+                         "intent": _intent, "temperature": _temp,
                          "tokens_remaining": int(tokens_remaining or 0)})
             got_any = False
             buffered: list[str] = []
-            async for delta in _stream_openrouter(api_key, model, full_messages):
+            async for delta in _stream_openrouter(api_key, model, full_messages,
+                                                     temperature=_temp):
                 got_any = True
                 # Always buffer so we can run guards at end. For build
                 # turns we ALSO yield each delta live (typing UX); for
