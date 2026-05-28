@@ -60,6 +60,11 @@ _BLOCKED_EMAIL_HINTS = (
     "noreply", "no-reply", "donotreply", "do-not-reply",
     "abuse@", "postmaster@", "wordpress@", "sentry-",
     "support@yelp.com", "@gmail.com",  # generic personal addresses lower priority
+    # iter D-56 — placeholder/template emails harvested from junk pages
+    "@domain.com", "@example.com", "@example.org", "@yourdomain",
+    "@your-domain", "@youremail", "@email.com", "yourpaypal",
+    "yourname@", "yourcompany@", "name@", "test@", "info@info",
+    "placeholder", "@sentry.io", "user@user",
 )
 # Junk file-name patterns that LOOK like emails (image filenames with @ in CDN URLs)
 _JUNK_EMAIL_PATTERNS = (
@@ -68,6 +73,32 @@ _JUNK_EMAIL_PATTERNS = (
     "sentry", "googleusercontent", "amazonaws", "cloudfront",
 )
 ALLOWED_COUNTRIES = ("us", "ca")
+
+# iter D-56 — Canadian area codes (NANP). Used to STRICTLY reject phones
+# from the wrong country when scout is called with country="ca". This
+# stops Burlington VT (+1802) bleeding into Burlington ON results.
+_CA_AREA_CODES = frozenset({
+    # Ontario
+    "226", "249", "289", "343", "365", "382", "416", "437", "519",
+    "548", "613", "647", "683", "705", "742", "807", "905", "942",
+    # Quebec
+    "367", "418", "438", "450", "468", "514", "579", "581", "819", "873",
+    # BC
+    "236", "250", "257", "604", "672", "778",
+    # Alberta
+    "368", "403", "587", "780", "825",
+    # Prairies (SK/MB)
+    "204", "306", "431", "474", "584", "639",
+    # Maritimes (NS/NB/PE/NL)
+    "354", "428", "506", "709", "782", "879", "902",
+    # Territories
+    "367", "639", "742", "867",
+})
+_US_ONLY_BLOCKLIST = frozenset({
+    # High-confidence US-only area codes that have collided with our
+    # CA queries in the wild. Vermont (+1802) is the main offender.
+    "802",  # Vermont
+})
 
 
 def _proxy_kwargs() -> dict[str, Any]:
@@ -108,6 +139,30 @@ def _normalize_phone(p: str) -> str:
     if len(digits) == 11 and digits.startswith("1"):
         return f"+{digits}"
     return f"+{digits}"
+
+
+def _phone_matches_country(phone: str, country: str) -> bool:
+    """iter D-56 — strict country check on the normalized phone. When
+    country='ca', the area code MUST be in the Canadian NANP set.
+    Rejects e.g. +18028626762 (Burlington, Vermont) when the founder
+    asked for Burlington, Ontario.
+
+    For non-CA/US countries we return True (no whitelist yet).
+    """
+    if not phone or not country:
+        return True
+    country = country.lower()
+    if country == "ca":
+        # Strip "+1" prefix, take first 3 digits as area code.
+        if not phone.startswith("+1") or len(phone) < 5:
+            return False
+        area = phone[2:5]
+        if area in _US_ONLY_BLOCKLIST:
+            return False
+        return area in _CA_AREA_CODES
+    # US: allow anything that looks like NANP and isn't blocklisted as
+    # CA-only. (Out of scope today — we leave it permissive.)
+    return True
 
 
 # ── Email/phone harvest from business website ────────────────────────
@@ -442,6 +497,21 @@ async def harvest_leads(
                     errors.append(f"site harvest {website}: {type(e).__name__}")
 
             if not (email or phone):
+                continue
+
+            # iter D-56 — strict country enforcement on the phone. When
+            # the founder asks country='ca', we reject Vermont (+1802)
+            # and any other non-NANP-CA prefix. If both the phone AND
+            # the email are missing/invalid after this filter, skip the
+            # lead entirely (can't reach them anyway).
+            if phone and not _phone_matches_country(phone, country):
+                logger.info(
+                    f"[ghost-scout] dropped non-{country} phone "
+                    f"{phone} for {name}"
+                )
+                phone = ""
+            if not (email or phone):
+                # CA-filter dropped the only contact path — skip.
                 continue
             with_contact += 1
 
