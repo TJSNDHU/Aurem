@@ -142,3 +142,48 @@ export function allVerifyGreen(rows) {
          rows.github?.status === "green" &&
          rows.deploy?.status === "green";
 }
+
+/**
+ * Helper: returns true iff the Deploy button should be SHOWN.
+ * Logic:
+ *   - if any row is "red" → BLOCK (something failed; no deploy)
+ *   - github MUST be "green" (push was confirmed by GitHub API)
+ *   - code may be "green" OR "idle" (idle = no code verify ran yet,
+ *     which is the normal case for a config-only commit)
+ *   - deploy itself can stay "idle" or "checking" — the button is what
+ *     triggers the deploy verification, so gating on it would be a
+ *     chicken-and-egg.
+ *
+ * iter D-52a — replaces the unconditional CTA introduced in D-51.
+ */
+export function canShowDeploy(rows) {
+  if (!rows) return false;
+  for (const r of Object.values(rows)) {
+    if (r?.status === "red") return false;
+  }
+  return rows.github?.status === "green";
+}
+
+/**
+ * React hook — subscribes to the verify-event bus and returns the
+ * current rows object. Lets any component reactively gate UI on the
+ * verification state without re-implementing the listener.
+ */
+export function useVerifyRows() {
+  const [rows, setRows] = React.useState(DEFAULTS);
+  React.useEffect(() => {
+    const onEvt = (e) => {
+      const { kind, payload } = e.detail || {};
+      if (!kind || !DEFAULTS[kind]) return;
+      setRows((cur) => ({
+        ...cur,
+        [kind]: { ...cur[kind],
+                   status: payload.status || cur[kind].status,
+                   detail: payload.detail || "" },
+      }));
+    };
+    window.addEventListener(EVENT, onEvt);
+    return () => window.removeEventListener(EVENT, onEvt);
+  }, []);
+  return rows;
+}

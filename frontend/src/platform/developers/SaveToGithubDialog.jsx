@@ -10,7 +10,7 @@ import React, { useEffect, useState } from "react";
 import { X, Github, CheckCircle2, ExternalLink, AlertCircle,
          Loader2, Rocket } from "lucide-react";
 import { devAuthHeaders } from "./DeveloperShell";
-import { pushVerifyEvent } from "./VerificationBadge"; // iter D-52
+import { pushVerifyEvent, useVerifyRows, canShowDeploy } from "./VerificationBadge"; // iter D-52
 import "./DevCtoChatPanel.animations.css";              // iter D-51
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -351,6 +351,12 @@ export default function SaveToGithubDialog({ open, projectId, onClose,
  * ────────────────────────────────────────────────────────────────── */
 function SuccessCelebration({ result, onClose, onDeployRequested }) {
   const [fadingOut, setFadingOut] = useState(false);
+  // iter D-52a — Deploy CTA is GATED on the verification rows. Until
+  // GitHub verify flips to GREEN (real commit confirmed by GitHub API),
+  // the button stays hidden. If any row goes RED, the button never
+  // appears. Founder mandate: no fake deploys.
+  const verifyRows = useVerifyRows();
+  const deployAllowed = canShowDeploy(verifyRows);
 
   // 3-second auto-dismiss — disabled if user is hovering or has clicked
   // the deploy button (we let the deploy dialog take over).
@@ -428,7 +434,7 @@ function SuccessCelebration({ result, onClose, onDeployRequested }) {
             View on GitHub <ExternalLink size={11} />
           </a>
         )}
-        {onDeployRequested && (
+        {onDeployRequested && deployAllowed && (
           <button onClick={() => onDeployRequested(result)}
                   data-testid="save-github-deploy-cta"
                   style={{ padding: "8px 16px",
@@ -440,6 +446,16 @@ function SuccessCelebration({ result, onClose, onDeployRequested }) {
                            gap: 6 }}>
             <Rocket size={14} /> Deploy to aurem.live
           </button>
+        )}
+        {onDeployRequested && !deployAllowed && (
+          <div data-testid="save-github-deploy-blocked"
+               style={{ padding: "8px 14px", fontSize: 12,
+                        color: "#a1958a",
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 4 }}>
+            Deploy unlocks once GitHub verification turns ✅ GREEN
+          </div>
         )}
       </div>
     </div>
