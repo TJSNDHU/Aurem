@@ -5,7 +5,7 @@
  * /api/developers/deploy/config and /api/developers/deploy/history.
  * "Redeploy" button POSTs to /api/developers/deploy/run with mode=deploy.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Rocket, ExternalLink, RefreshCw, CheckCircle2, Circle,
          Loader2, AlertCircle } from "lucide-react";
 import DeveloperShell, { devAuthHeaders } from "./DeveloperShell";
@@ -13,14 +13,30 @@ import { PageHeader, SectionTitle } from "./DevDashboard";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
+// iter D-45 — map deploy-log line patterns to step indexes. The backend
+// streams stdout/stderr from `git fetch && git pull && docker compose
+// pull && docker compose up -d --build`. We watch for substrings that
+// only appear when each phase finishes, so each tick of the poller can
+// only ever advance the step counter forward.
 const STEPS = [
-  "Environment Ready",
-  "Building",
-  "Migrate DB",
-  "Export Secrets",
-  "Deploy",
-  "Health Check",
+  "Environment Ready",   // 0  initial $ <command> echo
+  "Building",            // 1  git fetch / pull / checkout
+  "Migrate DB",          // 2  docker compose pull
+  "Export Secrets",      // 3  Recreating / Creating service
+  "Deploy",              // 4  Started / Running
+  "Health Check",        // 5  DEPLOY_HEAD=... at the very end
 ];
+
+export function classifyStep(line) {
+  const l = (line || "").toLowerCase();
+  if (l.includes("deploy_head="))                          return 5;
+  if (l.includes("started ")     || l.includes("running")) return 4;
+  if (l.includes("creating ")    || l.includes("recreating"))   return 3;
+  if (l.includes("compose pull") || l.includes("pulling "))    return 2;
+  if (l.includes("git ")         || l.includes("from origin")) return 1;
+  if (l.startsWith("$ "))                                  return 0;
+  return -1;
+}
 
 function DeployStep({ label, done, current }) {
   const Icon = done ? CheckCircle2 : current ? Loader2 : Circle;
@@ -47,6 +63,10 @@ export default function DevDeploy() {
   const [err, setErr]       = useState(null);
   const [activeRun, setActive] = useState(null); // currently running run_id
   const [stepIdx, setStepIdx] = useState(-1);
+  // iter D-45 — keep a tail of log lines for the console preview
+  const [logLines, setLogLines] = useState([]);
+  const pollRef = useRef(null);
+  const cursorRef = useRef(0);
 
   async function loadAll() {
     setErr(null);
@@ -63,8 +83,57 @@ export default function DevDeploy() {
   }
   useEffect(() => { loadAll(); }, []);
 
+  // iter D-45 — log poller. Runs only while a deploy is in flight,
+  // walks the /log/{run_id} cursor, classifies each new line into a
+  // step index, monotonically advances `stepIdx` (never goes back).
+  function startPolling(runId) {
+    cursorRef.current = 0;
+    setLogLines([]);
+    setStepIdx(0);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(
+          `${API}/api/developers/deploy/log/${runId}?since=${cursorRef.current}`,
+          { headers: devAuthHeaders() },
+        );
+        if (!r.ok) return;
+        const j = await r.json();
+        cursorRef.current = j.next_cursor || cursorRef.current;
+        const newLines = j.lines || [];
+        if (newLines.length) {
+          setLogLines(prev => [...prev, ...newLines].slice(-60));
+          setStepIdx(prev => {
+            let next = prev;
+            for (const ln of newLines) {
+              const idx = classifyStep(ln);
+              if (idx > next) next = idx;
+            }
+            return next;
+          });
+        }
+        if (j.status && j.status !== "running") {
+          // Final state — mark all steps complete on success.
+          if (j.status === "ok") setStepIdx(STEPS.length);
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setBusy(false);
+          if (j.status !== "ok") {
+            setErr(`Deploy ${j.status}${j.exit_code != null ? ` (exit ${j.exit_code})` : ""}`);
+          }
+          setTimeout(loadAll, 400);
+        }
+      } catch { /* transient network — retry on next tick */ }
+    }, 900);
+  }
+
+  // Stop polling on unmount.
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+  }, []);
+
   async function redeploy() {
-    setBusy(true); setErr(null); setStepIdx(0);
+    setBusy(true); setErr(null); setStepIdx(0); setLogLines([]);
     try {
       const r = await fetch(`${API}/api/developers/deploy/run`, {
         method: "POST",
@@ -73,19 +142,18 @@ export default function DevDeploy() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || "deploy_failed");
-      setActive(j.run_id || null);
-      // Naive progress animation while the run finishes server-side.
-      let i = 0;
-      const t = setInterval(() => {
-        i++; setStepIdx(i);
-        if (i >= STEPS.length - 1) clearInterval(t);
-      }, 1200);
+      const runId = j.run_id;
+      setActive(runId);
+      if (runId) {
+        startPolling(runId);
+      } else {
+        setBusy(false);
+        setErr("Backend did not return a run_id.");
+      }
     } catch (e) {
       setErr(String(e.message || e));
       setStepIdx(-1);
-    } finally {
       setBusy(false);
-      setTimeout(loadAll, 800);
     }
   }
 
@@ -145,8 +213,31 @@ export default function DevDeploy() {
           {STEPS.map((s, i) => (
             <DeployStep key={s} label={s}
                          done={stepIdx > i}
-                         current={stepIdx === i} />
+                         current={stepIdx === i && busy} />
           ))}
+          {/* iter D-45 — real log tail. Mirrors what /deploy/log/{id}
+              streams, scrolled to bottom, scrubbed by the backend. */}
+          {logLines.length > 0 && (
+            <pre data-testid="deploy-log-tail"
+                 style={{ marginTop: 12,
+                           background: "#0e0c0a",
+                           color: "#E8C86A",
+                           padding: 10, borderRadius: 4,
+                           fontSize: 10.5,
+                           lineHeight: 1.55,
+                           maxHeight: 200,
+                           overflow: "auto",
+                           fontFamily: "'JetBrains Mono', monospace" }}>
+{logLines.join("\n")}
+            </pre>
+          )}
+          {activeRun && (
+            <div style={{ marginTop: 8, fontSize: 10,
+                           color: "var(--dash-text-faint)",
+                           fontFamily: "'JetBrains Mono', monospace" }}>
+              run #{activeRun.slice(-8)}
+            </div>
+          )}
         </div>
       )}
 
