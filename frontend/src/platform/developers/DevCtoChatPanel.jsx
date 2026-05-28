@@ -21,6 +21,7 @@ import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
 import SaveToGithubDialog from "./SaveToGithubDialog"; // iter D-47
 import DeployProgressDialog from "./DeployProgressDialog"; // iter D-51
 import VerificationBadge, { pushVerifyEvent } from "./VerificationBadge"; // iter D-52
+import ConfidenceBadge from "./ConfidenceBadge"; // iter D-53
 import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
 import "./DevCtoChatPanel.mobile.css"; // iter D-50 — mobile composer fixes
 import "./DevCtoChatPanel.animations.css"; // iter D-51 — push/deploy animations
@@ -548,6 +549,12 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
             deploy). Hides itself when all three rows are idle so it
             never clutters a fresh chat. */}
         <VerificationBadge />
+
+        {/* iter D-53 — confidence badge for the github_push pattern.
+            Renders nothing until learnings exist for that task type. */}
+        <div style={{ padding: "4px 12px" }}>
+          <ConfidenceBadge taskType="github_push" compact={true} />
+        </div>
 
         {/* iter D-43 — Planning bar at the top of chat. Replaces the
             bottom-of-input next-step chips. Shows "Planning the next

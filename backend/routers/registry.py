@@ -1054,6 +1054,21 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] cto_verify_router wired")
                 except Exception as _ctov_e:
                     logger.warning(f"[REGISTRY] cto_verify_router not loaded: {_ctov_e}")
+
+                # iter D-53 — self-learning system. Records only verified
+                # outcomes (D-52 gates), surfaces confidence badges, runs
+                # a weekly self-review every Sunday 02:00 UTC.
+                try:
+                    from routers.cto_learning_router import (
+                        router as _cto_learning_router,
+                        set_db as _set_cto_learning_db,
+                    )
+                    if db is not None:
+                        _set_cto_learning_db(db)
+                    app.include_router(_cto_learning_router)
+                    logger.info("[REGISTRY] cto_learning_router wired")
+                except Exception as _ctol_e:
+                    logger.warning(f"[REGISTRY] cto_learning_router not loaded: {_ctol_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
@@ -3193,6 +3208,28 @@ def register_all_routers(app, db):
 
         aurem_scheduler.start()
         logger.info("[REGISTRY] AUREM Bug Engine scheduler started (every 10 min)")
+
+        # iter D-53 — weekly self-review for CTO learning system.
+        # Runs every Sunday 02:00 UTC. Aggregates the prior 7 days of
+        # verified outcomes, writes a row to `cto_weekly_reports`.
+        try:
+            from services.cto_learning import (
+                set_db as _set_learn_db,
+                weekly_self_review as _weekly_review,
+            )
+            _set_learn_db(db)
+            aurem_scheduler.add_job(
+                _weekly_review,
+                CronTrigger(day_of_week="sun", hour=2, minute=0,
+                             timezone="UTC"),
+                id="cto_learning_weekly_review",
+                name="CTO Learning: weekly self-review",
+                replace_existing=True,
+            )
+            logger.info("[REGISTRY] cto_learning weekly review scheduled "
+                         "(Sun 02:00 UTC)")
+        except Exception as _le:
+            logger.warning(f"[REGISTRY] cto_learning weekly job not scheduled: {_le}")
 
         # iter 326pp — silent-failure alerts: any scheduled job that
         # raises now fires a single Telegram ping (dedup 5 min per

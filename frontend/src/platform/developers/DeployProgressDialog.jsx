@@ -23,6 +23,22 @@ import { pushVerifyEvent } from "./VerificationBadge";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
+/**
+ * iter D-53 — fire-and-forget learning recorder. Never blocks the UI;
+ * silent on failure. Backend gates this on `verified_by` so we cannot
+ * accidentally log a self-reported success.
+ */
+function recordLearning(task_type, approach, result, verified_by, metadata) {
+  try {
+    fetch(`${API}/api/developers/cto/learning/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+      body: JSON.stringify({ task_type, approach, result,
+                              verified_by, metadata: metadata || {} }),
+    }).catch(() => { /* silent */ });
+  } catch { /* silent */ }
+}
+
 const STEPS = [
   { id: "pushed",    label: "Code pushed to GitHub" },
   { id: "building",  label: "Building production bundle…" },
@@ -81,6 +97,12 @@ export default function DeployProgressDialog({
             detail: `${j.iter} live in ${j.elapsed_s}s`,
             url:    targetUrl,
           });
+          // iter D-53 — auto-record a verified success learning row.
+          // Only system-verified outcomes feed the learning DB.
+          recordLearning("deploy_to_prod", "github_push + version_poll",
+                          "success", "deploy_green",
+                          { iter: j.iter, elapsed_s: j.elapsed_s,
+                            commit_sha: commitSha });
         } else {
           setState("failed");
           setVersion(j.iter || "");
@@ -88,6 +110,13 @@ export default function DeployProgressDialog({
             status: "red",
             detail: `stuck on ${j.iter || "unknown"}`,
           });
+          // iter D-53 — record the failure so future attempts learn
+          // from what didn't work.
+          recordLearning("deploy_to_prod", "github_push + version_poll",
+                          "failure", "deploy_green",
+                          { stuck_on: j.iter || "unknown",
+                            expected:  expectedIter,
+                            elapsed_s: j.elapsed_s });
         }
       })
       .catch(() => {

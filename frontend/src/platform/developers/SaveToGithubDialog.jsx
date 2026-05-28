@@ -15,6 +15,24 @@ import "./DevCtoChatPanel.animations.css";              // iter D-51
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 
+/**
+ * iter D-53 — fire-and-forget GitHub-push learning recorder. Backend
+ * rejects non-system-verified rows (verified_by must be one of the
+ * D-52 verify layers), so we cannot accidentally log a self-claim.
+ */
+function recordGithubLearning(result, verified_by, metadata) {
+  try {
+    fetch(`${API}/api/developers/cto/learning/record`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...devAuthHeaders() },
+      body: JSON.stringify({
+        task_type:   "github_push", approach: "save_to_github_dialog",
+        result, verified_by, metadata: metadata || {},
+      }),
+    }).catch(() => { /* silent */ });
+  } catch { /* silent */ }
+}
+
 
 export default function SaveToGithubDialog({ open, projectId, onClose,
                                               onDeployRequested }) {
@@ -107,6 +125,11 @@ export default function SaveToGithubDialog({ open, projectId, onClose,
             detail: `commit ${vj.short_sha}`,
             url:    vj.url || j.view_url,
           });
+          // iter D-53 — system-verified GitHub push → learning row.
+          recordGithubLearning("success", "github_green",
+                                { commit_sha: vj.sha,
+                                  short_sha:  vj.short_sha,
+                                  repo:       repo });
         } else {
           // Push endpoint claimed success but GitHub doesn't see it
           // (token scope issue, branch protection, etc.) — show RED.
@@ -114,6 +137,9 @@ export default function SaveToGithubDialog({ open, projectId, onClose,
             status: "red",
             detail: vj.error || "commit not found on GitHub",
           });
+          recordGithubLearning("failure", "github_green",
+                                { reason: vj.error || "not_found",
+                                  repo:   repo });
         }
       } catch {
         pushVerifyEvent("github", { status: "red",
