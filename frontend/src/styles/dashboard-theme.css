@@ -187,6 +187,12 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.6; transform: scale(0.9); }
 }
+/* iter D-43 — Planning bar dot uses a softer breathe (no scale shift,
+   keeps the surrounding text from jittering). */
+@keyframes aurem-pulse {
+  0%, 100% { opacity: 1;   box-shadow: 0 0 0 0 rgba(255,140,53,0.55); }
+  50%      { opacity: 0.5; box-shadow: 0 0 0 4px rgba(255,140,53,0); }
+}
 .av2-pulse-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--dash-green);

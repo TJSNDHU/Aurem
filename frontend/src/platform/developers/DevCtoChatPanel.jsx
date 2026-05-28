@@ -17,8 +17,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Send, Sparkles, AlertTriangle, Trash2, ArrowRight,
          Paperclip, Save, FileText, Image as ImageIcon,
-         Copy, Check, Eye, Rocket, Undo2 } from "lucide-react";
-import { devAuthHeaders } from "./DeveloperShell";
+         Copy, Check, Eye, Rocket, Undo2, X, Zap } from "lucide-react";
+import { devAuthHeaders, isMaxxOn } from "./DeveloperShell";
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
 const LOW_THRESHOLD = 100;
@@ -136,6 +136,9 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   const [saveDomain, setSaveDomain] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveOk, setSaveOk] = useState(null);
+  // iter D-43 — planning bar dismiss + Maxx (frontier model) toggle.
+  const [nextStepsDismissed, setNextStepsDismissed] = useState(false);
+  const [maxx, setMaxx] = useState(isMaxxOn());
 
   // Load persisted history OR a saved project, depending on `?project=` query.
   useEffect(() => {
@@ -180,6 +183,19 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
     ? parseProgress(messages[messages.length - 1]?.content || "")
     : null;
 
+  // iter D-43 — reset planning-bar dismiss + listen for sidebar Maxx
+  // toggle so the chat composer + the button highlight stay in sync.
+  useEffect(() => {
+    setNextStepsDismissed(false);
+  }, [lastAssistant?.id, lastAssistant?.content]);
+  useEffect(() => {
+    function onExt(e) {
+      if (typeof e.detail?.on === "boolean") setMaxx(e.detail.on);
+    }
+    window.addEventListener("aurem-maxx-toggle", onExt);
+    return () => window.removeEventListener("aurem-maxx-toggle", onExt);
+  }, []);
+
   async function send(textOverride) {
     const text = (textOverride ?? input).trim();
     if (!text || busy) return;
@@ -200,7 +216,9 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
         body: JSON.stringify({
           messages: history,
           project_id: projectId || "",   // iter D-32 — debit wallet + patch progress
-          model_tier: modelTier || "cheap",
+          // iter D-43 — Maxx toggle overrides incoming modelTier; flips
+          // to frontier (5 tokens/turn) when on, else cheap (1/turn).
+          model_tier: maxx ? "frontier" : (modelTier || "cheap"),
         }),
       });
       if (!r.ok) {
@@ -489,6 +507,68 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           <ProgressBar progress={progress} chars={streamChars} />
         )}
 
+        {/* iter D-43 — Planning bar at the top of chat. Replaces the
+            bottom-of-input next-step chips. Shows "Planning the next
+            move…" with three "+ <suggestion>" pills and a ✕ to dismiss
+            the whole bar. */}
+        {nextSteps.length > 0 && !nextStepsDismissed && (
+          <div data-testid="dev-cto-planning-bar"
+               style={{ display: "flex", alignItems: "center", gap: 8,
+                        flexWrap: "wrap",
+                        padding: "10px 18px",
+                        borderBottom: "1px solid var(--dash-divider)",
+                        background: "rgba(255,107,0,0.03)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8,
+                           fontSize: 10, letterSpacing: "0.18em",
+                           textTransform: "uppercase",
+                           color: "var(--dash-text-muted)",
+                           fontFamily: "'JetBrains Mono', monospace",
+                           marginRight: 4 }}>
+              <span data-testid="planning-dot"
+                    style={{ width: 6, height: 6, borderRadius: 999,
+                             background: busy ? "#FF8C35"
+                                              : "var(--dash-text-faint)",
+                             animation: busy
+                               ? "aurem-pulse 1.2s ease-in-out infinite"
+                               : "none" }} />
+              Planning the next move…
+            </div>
+            {nextSteps.map((s, i) => (
+              <button key={i}
+                       data-testid={`dev-cto-planning-step-${i}`}
+                       onClick={() => send(s)}
+                       disabled={busy}
+                       style={{ background: "rgba(255,107,0,0.08)",
+                                border: "1px solid rgba(255,107,0,0.30)",
+                                color: "#FFB070",
+                                padding: "5px 10px 5px 8px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                cursor: busy ? "not-allowed" : "pointer",
+                                display: "inline-flex",
+                                alignItems: "center", gap: 5 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 999,
+                                background: "rgba(255,107,0,0.20)",
+                                display: "inline-flex",
+                                alignItems: "center", justifyContent: "center",
+                                fontWeight: 700, fontSize: 11 }}>+</span>
+                {s}
+              </button>
+            ))}
+            <button data-testid="dev-cto-planning-dismiss"
+                     onClick={() => setNextStepsDismissed(true)}
+                     title="Dismiss"
+                     style={{ marginLeft: "auto",
+                              background: "transparent",
+                              border: "none",
+                              color: "var(--dash-text-faint)",
+                              cursor: "pointer", padding: 4,
+                              display: "inline-flex", alignItems: "center" }}>
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Message list */}
         <div ref={scrollRef}
              data-testid="dev-cto-chat-messages"
@@ -545,37 +625,8 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           )}
         </div>
 
-        {/* Next-step chips — render before the input so they sit just
-            above where the dev's hands are. */}
-        {nextSteps.length > 0 && (
-          <div data-testid="dev-cto-chat-next-steps"
-               style={{ display: "flex", gap: 6, flexWrap: "wrap",
-                        padding: "10px 18px 0",
-                        borderTop: "1px solid var(--dash-divider)" }}>
-            <span style={{ fontSize: 9, letterSpacing: "0.18em",
-                            textTransform: "uppercase",
-                            color: "var(--dash-text-muted)",
-                            fontFamily: "'JetBrains Mono', monospace",
-                            padding: "6px 4px" }}>
-              Next:
-            </span>
-            {nextSteps.map((s, i) => (
-              <button key={i}
-                       data-testid={`dev-cto-next-step-${i}`}
-                       onClick={() => send(s)}
-                       disabled={busy}
-                       style={{ background: "rgba(255,107,0,0.06)",
-                                border: "1px solid rgba(255,107,0,0.30)",
-                                color: "#FFB070",
-                                padding: "6px 12px",
-                                borderRadius: 999,
-                                fontSize: 12, cursor: busy ? "not-allowed" : "pointer",
-                                display: "inline-flex", alignItems: "center", gap: 4 }}>
-                {s} <ArrowRight size={11} />
-              </button>
-            ))}
-          </div>
-        )}
+        {/* iter D-43 — bottom NEXT_STEPS chips removed; they're rendered
+            as the Planning bar at the top of the chat panel above. */}
 
         {/* iter D-38 — chat footer actions bar (Preview + Deploy moved
             here so they no longer cover the in-bubble Copy/Rollback
@@ -629,6 +680,37 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                               maxHeight: "40vh",
                               overflowY: "auto",
                               transition: "height 80ms ease" }} />
+          {/* iter D-43 — Maxx toggle (frontier model, 5/turn). Mirrors
+              the sidebar Maxx button so the dev can flip it without
+              moving their hand off the composer. */}
+          <button data-testid="dev-cto-chat-maxx"
+                   onClick={() => {
+                     const next = !maxx;
+                     try { localStorage.setItem("aurem.maxx_mode",
+                                                  next ? "1" : "0"); }
+                     catch { /* ignore */ }
+                     setMaxx(next);
+                     window.dispatchEvent(new CustomEvent(
+                       "aurem-maxx-toggle", { detail: { on: next } }));
+                   }}
+                   title={maxx ? "Maxx ON — frontier model, 5 tokens/turn"
+                               : "Maxx OFF — cheap model, 1 token/turn"}
+                   style={{ background: maxx
+                              ? "linear-gradient(135deg, rgba(255,107,0,0.22), rgba(255,140,53,0.14))"
+                              : "rgba(255,255,255,0.04)",
+                            border: maxx
+                              ? "1px solid rgba(255,107,0,0.45)"
+                              : "1px solid var(--dash-border)",
+                            color: maxx ? "#FF8C35"
+                                        : "var(--dash-text-muted)",
+                            borderRadius: 4, padding: "0 12px",
+                            cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: 4,
+                            fontSize: 11, fontWeight: 500,
+                            transition: "all 160ms ease" }}>
+            <Zap size={13} />
+            {maxx ? "Maxx" : ""}
+          </button>
           <button data-testid="dev-cto-chat-send"
                    onClick={() => send()} disabled={busy || !input.trim()}
                    style={{ background: "linear-gradient(135deg, #FF6B00, #FF8C35)",

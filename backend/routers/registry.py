@@ -958,6 +958,23 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] admin_integrations_router wired")
                 except Exception as _int_e:
                     logger.warning(f"[REGISTRY] admin_integrations_router not loaded: {_int_e}")
+
+                # iter D-43 — Founder-controlled platform secrets UI
+                # (paste API keys in AUREM, AES-256 stored, applied live
+                # to os.environ so existing code paths pick them up).
+                try:
+                    from routers.platform_secrets_router import (
+                        router as _secrets_router,
+                        set_db as _set_secrets_db,
+                        apply_platform_secrets_to_env,
+                    )
+                    app.include_router(_secrets_router)
+                    _set_secrets_db(db)
+                    import asyncio as _aio_secrets
+                    _aio_secrets.create_task(apply_platform_secrets_to_env())
+                    logger.info("[REGISTRY] platform_secrets_router wired")
+                except Exception as _sec_e:
+                    logger.warning(f"[REGISTRY] platform_secrets_router not loaded: {_sec_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

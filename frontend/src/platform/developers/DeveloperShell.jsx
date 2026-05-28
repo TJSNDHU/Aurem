@@ -16,7 +16,7 @@ import {
   Home as HomeIcon, Github, Activity, BarChart3, Coins,
   ScrollText, Settings as SettingsIcon, Briefcase, ShieldCheck,
   LogOut, Sun, Moon, BookOpen,
-  ChevronLeft, ChevronRight, Menu, X,
+  ChevronLeft, ChevronRight, Menu, X, Zap,
 } from "lucide-react";
 
 import "../../styles/dashboard-theme.css";
@@ -377,6 +377,178 @@ function DashboardTopbar({ me, theme, toggleTheme, onMobileMenu, mobileOpen }) {
   );
 }
 
+// iter D-43 — Sidebar widgets: GitHub status pill, Maxx toggle, Token
+// progress bar. All read from existing endpoints; Maxx persists to
+// localStorage and emits a `aurem-maxx-toggle` event the chat panel
+// listens for to flip `model_tier` on the next request.
+
+const MAXX_STORAGE_KEY = "aurem.maxx_mode";
+
+export function isMaxxOn() {
+  try { return localStorage.getItem(MAXX_STORAGE_KEY) === "1"; }
+  catch { return false; }
+}
+
+function SidebarWidgets({ me, collapsed }) {
+  const [gh, setGh]     = useState(null);   // {login, repos_count} or null
+  const [maxx, setMaxx] = useState(isMaxxOn());
+  const balance = Number(me?.tokens_remaining || 0);
+  const cap     = Math.max(balance, 1000);  // assume signup grant = 1000
+  const pct     = Math.min(100, Math.round((balance / cap) * 100));
+  const low     = balance < 200;
+
+  useEffect(() => {
+    let cancel = false;
+    fetch(`${API}/api/developers/github/me`, { headers: devAuthHeaders() })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (!cancel && j?.login) setGh(j); })
+      .catch(() => {});
+    return () => { cancel = true; };
+  }, []);
+
+  function toggleMaxx() {
+    const next = !maxx;
+    if (next && balance < 5) {
+      window.dispatchEvent(new CustomEvent("aurem-low-tokens-for-maxx",
+        { detail: { balance } }));
+      // Don't activate; bubble a hint instead.
+      return;
+    }
+    try { localStorage.setItem(MAXX_STORAGE_KEY, next ? "1" : "0"); }
+    catch { /* ignore */ }
+    setMaxx(next);
+    window.dispatchEvent(new CustomEvent("aurem-maxx-toggle",
+      { detail: { on: next } }));
+  }
+
+  // Listen for external maxx state changes (chat panel may flip it
+  // back to OFF after a token wall).
+  useEffect(() => {
+    function onExt(e) {
+      if (typeof e.detail?.on === "boolean") setMaxx(e.detail.on);
+    }
+    window.addEventListener("aurem-maxx-toggle", onExt);
+    return () => window.removeEventListener("aurem-maxx-toggle", onExt);
+  }, []);
+
+  if (collapsed) {
+    return (
+      <div data-testid="dev-sidebar-widgets-collapsed"
+           style={{ display: "flex", flexDirection: "column", gap: 10,
+                    alignItems: "center", marginTop: 14, marginBottom: 14 }}>
+        {gh && (
+          <div title={`GitHub: @${gh.login}`}
+               data-testid="dev-sidebar-gh-dot"
+               style={{ width: 8, height: 8, borderRadius: 999,
+                        background: "var(--dash-green, #4ade80)" }} />
+        )}
+        <button data-testid="dev-sidebar-maxx-toggle"
+                onClick={toggleMaxx}
+                title={maxx ? "Maxx ON (frontier model, 5/turn)"
+                            : "Maxx OFF (cheap model, 1/turn)"}
+                style={{ background: maxx
+                          ? "linear-gradient(135deg, #FF6B00, #FF8C35)"
+                          : "rgba(255,255,255,0.04)",
+                         border: "1px solid var(--dash-border)",
+                         color: maxx ? "#fff" : "var(--dash-text-muted)",
+                         width: 28, height: 28, borderRadius: 6,
+                         display: "inline-flex", alignItems: "center",
+                         justifyContent: "center", cursor: "pointer" }}>
+          <Zap size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="dev-sidebar-widgets"
+         style={{ marginTop: 14, marginBottom: 6,
+                  display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* GitHub status pill */}
+      <div data-testid="dev-sidebar-gh-status"
+           style={{ display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 10px", borderRadius: 6,
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid var(--dash-divider)" }}>
+        <Github size={13}
+                style={{ color: gh ? "var(--dash-green, #4ade80)"
+                                   : "var(--dash-text-faint)" }} />
+        <span style={{ fontSize: 12, color: "var(--dash-text)",
+                        flex: 1, overflow: "hidden",
+                        textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {gh ? `@${gh.login}` : "Not connected"}
+        </span>
+        {gh && (
+          <span style={{ width: 6, height: 6, borderRadius: 999,
+                          background: "var(--dash-green, #4ade80)" }} />
+        )}
+      </div>
+
+      {/* Maxx toggle */}
+      <button data-testid="dev-sidebar-maxx-toggle"
+              onClick={toggleMaxx}
+              style={{ display: "flex", alignItems: "center", gap: 8,
+                       padding: "8px 10px", borderRadius: 6,
+                       background: maxx
+                         ? "linear-gradient(135deg, rgba(255,107,0,0.20), rgba(255,140,53,0.12))"
+                         : "rgba(255,255,255,0.03)",
+                       border: maxx
+                         ? "1px solid rgba(255,107,0,0.45)"
+                         : "1px solid var(--dash-divider)",
+                       color: maxx ? "#FFB070" : "var(--dash-text)",
+                       cursor: "pointer", textAlign: "left",
+                       fontFamily: "inherit",
+                       transition: "all 160ms ease" }}>
+        <Zap size={13} style={{ color: maxx ? "#FF8C35"
+                                            : "var(--dash-text-faint)" }} />
+        <span style={{ fontSize: 12, flex: 1 }}>Maxx mode</span>
+        <span style={{ fontSize: 10, letterSpacing: 0.5,
+                        color: maxx ? "#FF8C35"
+                                    : "var(--dash-text-faint)",
+                        fontFamily: "'JetBrains Mono', monospace" }}>
+          {maxx ? "ON • 5/turn" : "OFF"}
+        </span>
+      </button>
+
+      {/* Token progress bar */}
+      <div data-testid="dev-sidebar-token-bar"
+           style={{ padding: "8px 10px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid var(--dash-divider)",
+                    borderRadius: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between",
+                       fontSize: 10, color: "var(--dash-text-muted)",
+                       letterSpacing: 0.4, marginBottom: 5,
+                       textTransform: "uppercase",
+                       fontFamily: "'JetBrains Mono', monospace" }}>
+          <span>Tokens</span>
+          <span style={{ color: low ? "#FF8C35"
+                                    : "var(--dash-text)" }}>
+            {balance.toLocaleString()} / {cap.toLocaleString()}
+          </span>
+        </div>
+        <div style={{ width: "100%", height: 5, borderRadius: 999,
+                       background: "rgba(255,255,255,0.06)",
+                       overflow: "hidden" }}>
+          <div data-testid="dev-sidebar-token-fill"
+               style={{ width: `${pct}%`, height: "100%",
+                        background: low
+                          ? "linear-gradient(90deg, #FF6B00, #FFB070)"
+                          : "linear-gradient(90deg, #FF6B00, #FF8C35)",
+                        transition: "width 240ms ease" }} />
+        </div>
+        {low && (
+          <div style={{ marginTop: 5, fontSize: 10, color: "#FF8C35",
+                         letterSpacing: 0.3 }}>
+            Low — top up on Tokens page.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function DashboardSidebar({ me, collapsed, onToggle }) {
   const loc = useLocation();
   const navigate = useNavigate();
@@ -493,6 +665,11 @@ function DashboardSidebar({ me, collapsed, onToggle }) {
           );
         })}
       </nav>
+
+      {/* iter D-43 — GitHub status, Maxx toggle, token progress bar.
+          Visible in both expanded and collapsed states (compact icons
+          when collapsed). */}
+      <SidebarWidgets me={me} collapsed={collapsed} />
 
       {/* iter 332b D-20 — Saved projects strip. Only renders when the
           sidebar is expanded; otherwise we'd waste vertical space. */}
