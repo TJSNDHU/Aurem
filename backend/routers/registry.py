@@ -975,6 +975,16 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] platform_secrets_router wired")
                 except Exception as _sec_e:
                     logger.warning(f"[REGISTRY] platform_secrets_router not loaded: {_sec_e}")
+
+                # iter D-44 — Database info page (masked Mongo URL)
+                try:
+                    from routers.developer_database_router import (
+                        router as _dbinfo_router,
+                    )
+                    app.include_router(_dbinfo_router)
+                    logger.info("[REGISTRY] developer_database_router wired")
+                except Exception as _dbinfo_e:
+                    logger.warning(f"[REGISTRY] developer_database_router not loaded: {_dbinfo_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

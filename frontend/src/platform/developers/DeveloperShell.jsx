@@ -15,7 +15,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Home as HomeIcon, Github, Activity, BarChart3, Coins,
   ScrollText, Settings as SettingsIcon, Briefcase, ShieldCheck,
-  LogOut, Sun, Moon, BookOpen,
+  LogOut, Sun, Moon, BookOpen, Plug, Folder, Rocket, Globe, Database,
   ChevronLeft, ChevronRight, Menu, X, Zap,
 } from "lucide-react";
 
@@ -304,14 +304,28 @@ function LandingShell({ children }) {
 // ────────────────────────────────────────────────────────────────
 // Dashboard mode (LuxeDashboardV2 style)
 // ────────────────────────────────────────────────────────────────
+// iter D-44 — grouped sidebar (MAIN / BUILD / DEVELOPER / ACCOUNT).
+// Each entry: {to, label, icon, testid}. A null entry inserts a
+// section divider with the next entry's `section` label.
 const DASH_NAV = [
+  { section: "Main" },
   { to: "/developers/dashboard", label: "Home",       icon: HomeIcon,    testid: "dev-nav-dashboard" },
-  { to: "/developers/connect",   label: "Connect",    icon: Github,      testid: "dev-nav-connect" },
+
+  { section: "Build" },
+  { to: "/developers/connect",   label: "Connect",    icon: Plug,        testid: "dev-nav-connect" },
+  { to: "/developers/projects",  label: "Projects",   icon: Folder,      testid: "dev-nav-projects" },
+  { to: "/developers/deploy",    label: "Deploy",     icon: Rocket,      testid: "dev-nav-deploy" },
+  { to: "/developers/domain",    label: "Domain",     icon: Globe,       testid: "dev-nav-domain" },
+  { to: "/developers/database",  label: "Database",   icon: Database,    testid: "dev-nav-database" },
+
+  { section: "Developer" },
   { to: "/developers/analytics", label: "Analytics",  icon: BarChart3,   testid: "dev-nav-analytics" },
   { to: "/developers/examples",  label: "Examples",   icon: Briefcase,   testid: "dev-nav-examples" },
   { to: "/developers/tokens",    label: "Tokens",     icon: Coins,       testid: "dev-nav-tokens" },
   { to: "/developers/docs",      label: "API Docs",   icon: BookOpen,    testid: "dev-nav-docs" },
   { to: "/developers/status",    label: "Status",     icon: Activity,    testid: "dev-nav-status" },
+
+  { section: "Account" },
   { to: "/developers/settings",  label: "Settings",   icon: SettingsIcon,testid: "dev-nav-settings" },
   { to: "/developers/terms",     label: "Terms",      icon: ScrollText,  testid: "dev-nav-terms" },
 ];
@@ -630,8 +644,33 @@ function DashboardSidebar({ me, collapsed, onToggle }) {
         </button>
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {DASH_NAV.map(n => {
-          const active = loc.pathname === n.to;
+        {DASH_NAV.map((n, idx) => {
+          // iter D-44 — render section divider rows.
+          if (n.section) {
+            if (collapsed) {
+              return idx === 0 ? null : (
+                <div key={`sec-${idx}`}
+                     style={{ height: 1, margin: "8px 6px",
+                              background: "var(--dash-divider)" }} />
+              );
+            }
+            return (
+              <div key={`sec-${idx}`}
+                   data-testid={`dev-nav-section-${n.section.toLowerCase()}`}
+                   style={{ fontSize: 9, letterSpacing: "0.20em",
+                            color: "var(--dash-text-faint)",
+                            textTransform: "uppercase",
+                            padding: idx === 0 ? "2px 10px 6px"
+                                               : "12px 10px 4px",
+                            fontFamily: "'JetBrains Mono', monospace" }}>
+                {n.section}
+              </div>
+            );
+          }
+          const active = loc.pathname === n.to
+            || (n.to === "/developers/projects"
+                && loc.pathname === "/developers/dashboard"
+                && loc.search.includes("project="));
           const Icon = n.icon;
           return (
             <Link key={n.to} to={n.to}

@@ -191,6 +191,9 @@ import DevSettings  from './platform/developers/DevSettings';
 import DevExamples  from './platform/developers/DevExamples';
 import DevStatus    from './platform/developers/DevStatus';
 import DevApiDocs   from './platform/developers/DevApiDocs';
+import DevDeploy    from './platform/developers/DevDeploy';     // iter D-44
+import DevDomain    from './platform/developers/DevDomain';     // iter D-44
+import DevDatabase  from './platform/developers/DevDatabase';   // iter D-44
 import NewProjectFlow   from './platform/developers/NewProjectFlow';     // iter D-32
 import ProjectWorkspace from './platform/developers/ProjectWorkspace';   // iter D-32
 import PublicProjectPreview from './platform/PublicProjectPreview';      // iter D-32
@@ -344,6 +347,11 @@ function AppRouter() {
       <Route path="/developers/examples"  element={<DevExamples />} />
       <Route path="/developers/status"    element={<DevStatus />} />
       <Route path="/developers/docs"      element={<DevApiDocs />} />
+      {/* iter D-44 — new build-section pages + Projects alias */}
+      <Route path="/developers/projects"  element={<DevDashboard />} />
+      <Route path="/developers/deploy"    element={<DevDeploy />} />
+      <Route path="/developers/domain"    element={<DevDomain />} />
+      <Route path="/developers/database"  element={<DevDatabase />} />
 
       {/* iter D-32 — Watchdog-approved onboarding: build-first, deploy-last */}
       <Route path="/my/projects/new"        element={<NewProjectFlow />} />

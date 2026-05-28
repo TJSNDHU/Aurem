@@ -73,52 +73,9 @@ export default function DevSettings() {
           backend; non-admin devs will just see an empty card. */}
       <PlatformCredentialsBlock />
 
-      <div className="av2-card">
-        <SectionTitle title="Rotate BYOK keys" />
-        <p style={{ fontSize: 13, color: "var(--dash-text-muted)",
-                     marginBottom: 16 }}>
-          Paste a new key for any provider to replace the existing one.
-          Empty fields are ignored.
-        </p>
-        {["anthropic", "deepseek", "gemini"].map(p => (
-          <label key={p} style={{ display: "block", marginBottom: 10 }}>
-            <span style={{
-              display: "block",
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10, letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--dash-text-muted)", marginBottom: 4,
-            }}>{p}</span>
-            <input data-testid={`settings-byok-${p}-input`}
-                    type="password" value={byok[p]} placeholder="sk-…"
-                    onChange={e => setByok({ ...byok, [p]: e.target.value })}
-                    className="dev-input"
-                    style={{ width: "100%", maxWidth: 420, fontSize: 12 }} />
-          </label>
-        ))}
-        <button data-testid="settings-byok-rotate-btn"
-                 onClick={rotateByok} disabled={busy}
-                 style={{
-                   marginTop: 8, padding: "9px 20px",
-                   background: "linear-gradient(135deg, #FF6B00, #FF8C35)",
-                   color: "#fff", border: "none", borderRadius: 6,
-                   fontSize: 13, fontWeight: 500,
-                   display: "inline-flex", alignItems: "center", gap: 8,
-                   cursor: "pointer", opacity: busy ? 0.5 : 1,
-                 }}>
-          <RotateCcw size={13} /> Rotate keys
-        </button>
-        {msg && (
-          <p data-testid="settings-byok-success"
-              style={{ marginTop: 12, fontSize: 12,
-                        color: "var(--dash-green)" }}>{msg}</p>
-        )}
-        {err && (
-          <p data-testid="settings-byok-error"
-              style={{ marginTop: 12, fontSize: 12,
-                        color: "var(--dash-red)" }}>{err}</p>
-        )}
-      </div>
+      {/* iter D-44 — Rotate BYOK keys moved to /developers/connect
+          (lives next to the BYOK paste form so all key-management is
+          on one page). */}
 
       <div data-testid="settings-sessions-list" className="av2-card">
         <SectionTitle title="Active sessions" />
