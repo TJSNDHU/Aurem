@@ -1095,6 +1095,20 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] resend_webhook_router wired")
                 except Exception as _rwh_e:
                     logger.warning(f"[REGISTRY] resend_webhook_router not loaded: {_rwh_e}")
+
+                # iter D-58 — Daily Brief + Template Performance + Proactive ORA
+                # admin endpoints. Schedulers wired separately further down.
+                try:
+                    from routers.cto_brief_router import (
+                        router as _cto_brief_router,
+                        set_db as _set_cto_brief_db,
+                    )
+                    if db is not None:
+                        _set_cto_brief_db(db)
+                    app.include_router(_cto_brief_router)
+                    logger.info("[REGISTRY] cto_brief_router wired")
+                except Exception as _ctob_e:
+                    logger.warning(f"[REGISTRY] cto_brief_router not loaded: {_ctob_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")
@@ -3256,6 +3270,56 @@ def register_all_routers(app, db):
                          "(Sun 02:00 UTC)")
         except Exception as _le:
             logger.warning(f"[REGISTRY] cto_learning weekly job not scheduled: {_le}")
+
+        # iter D-58 — Daily Brief, Template Performance Rotation,
+        # Proactive ORA sweep. Times are scoped to America/Toronto so
+        # the founder sees them at their wall-clock 09:00 / 21:00 EST/EDT.
+        try:
+            from services.daily_brief import (
+                set_db as _set_db_brief,
+                send_morning_brief, send_evening_brief,
+            )
+            from services.template_performance import (
+                set_db as _set_db_tp, weekly_rotate as _tp_rotate,
+            )
+            from services.proactive_ora import (
+                set_db as _set_db_pa, run_all as _pa_run,
+            )
+            _set_db_brief(db); _set_db_tp(db); _set_db_pa(db)
+
+            aurem_scheduler.add_job(
+                send_morning_brief,
+                CronTrigger(hour=9, minute=0, timezone="America/Toronto"),
+                id="daily_brief_morning",
+                name="Daily Brief: morning",
+                replace_existing=True,
+            )
+            aurem_scheduler.add_job(
+                send_evening_brief,
+                CronTrigger(hour=21, minute=0, timezone="America/Toronto"),
+                id="daily_brief_evening",
+                name="Daily Brief: evening",
+                replace_existing=True,
+            )
+            aurem_scheduler.add_job(
+                _tp_rotate,
+                CronTrigger(day_of_week="sun", hour=3, minute=0,
+                             timezone="UTC"),
+                id="template_perf_weekly_rotate",
+                name="Template Performance: weekly rotation",
+                replace_existing=True,
+            )
+            aurem_scheduler.add_job(
+                _pa_run,
+                CronTrigger(minute="*/30", timezone="UTC"),
+                id="proactive_ora_sweep",
+                name="Proactive ORA: 30-min sweep",
+                replace_existing=True,
+            )
+            logger.info("[REGISTRY] D-58 schedulers wired "
+                         "(brief 9/21 ET, perf Sun 03 UTC, proactive 30m)")
+        except Exception as _d58e:
+            logger.warning(f"[REGISTRY] D-58 schedulers not wired: {_d58e}")
 
         # iter 326pp — silent-failure alerts: any scheduled job that
         # raises now fires a single Telegram ping (dedup 5 min per

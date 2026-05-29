@@ -301,6 +301,30 @@ async def resend_webhook(request: Request):
     to_list = data.get("to") or []
     email_to = to_list[0] if to_list else data.get("email_to") or ""
 
+    # iter D-58 — capture per-template performance metrics. The
+    # tags / headers Resend sends back include the template_id we
+    # passed in `send_email(...)`. Best-effort, never blocks the
+    # webhook.
+    try:
+        from services.template_performance import record_event as _tp_evt
+        tags = data.get("tags") or []
+        template_id = ""
+        for t in tags:
+            if isinstance(t, dict) and t.get("name") == "template_id":
+                template_id = t.get("value") or ""
+                break
+        if template_id and event_type in (
+            "email.sent", "email.opened", "email.clicked",
+        ):
+            tp_kind = {"email.sent": "sent",
+                        "email.opened": "opened",
+                        "email.clicked": "clicked"}[event_type]
+            await _tp_evt(template_id, tp_kind,
+                          email=email_to,
+                          message_id=data.get("email_id", ""))
+    except Exception as _tp_e:
+        logger.warning(f"[lead-lifecycle] tpl-perf event drop: {_tp_e}")
+
     lead = await _find_lead_by_email(db, email_to)
     if not lead:
         return {"received": True, "matched_lead": False, "type": event_type}
