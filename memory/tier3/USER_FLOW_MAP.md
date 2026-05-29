@@ -1,4 +1,15 @@
-# AUREM — Complete User Flow Map
+# AUREM — Complete User Flow Map (CUSTOMER + ADMIN surfaces)
+
+> ⚠️ **REFERENCE / HISTORICAL DOC** — generated 2026-04-27 (iter 315e+).
+> Covers customer-facing flows: homepage, /platform/signup, /my/*
+> portal, repair funnel, edit portal, admin sub-routes (35+ pages).
+>
+> For the FOUNDER + DEVELOPER (AUREM CTO chat) flow as of iter D-57,
+> read **`SPEC_03_APP_FLOW.md`** first. The two files are complementary:
+>   - SPEC_03 = AUREM CTO chat + dev portal + admin CTO surfaces.
+>   - This file = SMB customer journey, repair funnel, edit portal,
+>                  admin mission-control sub-routes.
+
 **Generated 2026-04-27 (iter 315e+)** · Live URL: `https://aurem.live`
 
 > Verified live HTTP 200 on every page route except API endpoints that

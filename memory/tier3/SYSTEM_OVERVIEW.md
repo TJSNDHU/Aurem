@@ -1,7 +1,15 @@
 # AUREM Platform — System Overview
 
-> **Status: 🟢 GREEN · Last scan: 2026-05-12 · Latest iter: 322fa (Legion Bridge)**
-> Single-page truth document. Auto-regenerated on each major scan.
+> ⚠️ **REFERENCE / HISTORICAL DOC** — last scan 2026-05-12 (iter 322fa).
+> For the CURRENT, AUTHORITATIVE PRD + stack + flow + schema + plan,
+> read the 6 SPEC docs first (`SPEC_INDEX.md` → `SPEC_01..06`).
+>
+> This file is kept for the Legion Bridge / aurem-cto sovereign
+> sidekick context (iter 322a → 322fa), which is NOT yet covered in
+> the SPEC set. When that work resumes, fold the relevant bits into
+> SPEC_02 + SPEC_06.
+>
+> **Status snapshot (when last scanned)**: 🟢 GREEN · 322fa Legion Bridge.
 
 ---
 

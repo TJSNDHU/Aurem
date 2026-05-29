@@ -1,7 +1,11 @@
 # AUREM ORA — System Architecture
 
-> **Last refreshed header**: 2026-04-24 (iter 287.7)
-> Detailed diagram below is from 2026-04-05 iter baseline — still topologically accurate.
+> ⚠️ **REFERENCE / HISTORICAL DOC** — last refreshed iter 287.7 (Apr 2026).
+> The mermaid diagram + 26-service integration table below remain
+> topologically accurate, but for the CURRENT, AUTHORITATIVE source on
+> tech stack + integrations + env vars, read **`SPEC_02_TRD.md`** first.
+>
+> Diagram is from 2026-04-05 iter baseline.
 > Recent additions since baseline (2026-04 iters 285-287) documented in **`CHANGELOG.md`**:
 > ORA Command Center (any-language + founder-gated), Master Autopilot (daily Scout→Hunt→Blast→Report),
 > Apollo DIY Proxy (website scraper + email guesser), Twilio WABA migration (WHAPI banned),
