@@ -1,5 +1,10 @@
 # AUREM Specification Index
 
+> 🛑 **MANDATORY READ for every agent.** Before responding or writing
+> code, also process `/app/memory/AGENT_CONTEXT.md` and
+> `/app/memory/_README_FIRST.md`. These three files are the
+> non-negotiable entry points for any session on this codebase.
+>
 > **READ THIS FIRST.** Every Emergent / coding agent that touches this
 > codebase must read the 6 SPEC documents below before writing or
 > changing any code. Order matters — PRD first, Implementation Plan

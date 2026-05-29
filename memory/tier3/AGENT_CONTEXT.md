@@ -1,5 +1,12 @@
 # Agent Context — STICKY RULES (do not violate)
 
+> 🛑 **MANDATORY FIRST READ** — every agent / Emergent fork / coding
+> assistant opening this repo MUST process this file before any
+> other action. Skipping it has historically cost the founder hours
+> of rework and broken trust. Do not skip. ⚠️
+>
+> Cross-references: `/app/memory/_README_FIRST.md` + `/app/memory/SPEC_INDEX.md`.
+
 **Last updated:** 2026-05-28 (iter D-57)
 
 ## 0. READ THE SPECS FIRST
