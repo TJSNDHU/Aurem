@@ -1109,6 +1109,19 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] cto_brief_router wired")
                 except Exception as _ctob_e:
                     logger.warning(f"[REGISTRY] cto_brief_router not loaded: {_ctob_e}")
+
+                # iter D-59 — Campaign Health + Autonomous Autofix admin page
+                try:
+                    from routers.campaign_health_router import (
+                        router as _camp_health_router,
+                        set_db as _set_camp_db,
+                    )
+                    if db is not None:
+                        _set_camp_db(db)
+                    app.include_router(_camp_health_router)
+                    logger.info("[REGISTRY] campaign_health_router wired")
+                except Exception as _cpe:
+                    logger.warning(f"[REGISTRY] campaign_health_router not loaded: {_cpe}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

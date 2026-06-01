@@ -44,6 +44,7 @@ import AdminAntigravitySkills from './platform/AdminAntigravitySkills';
 import AdminMemoir from './platform/AdminMemoir';
 import AdminIntegrations from './platform/AdminIntegrations';
 import AdminSecurityKeys from './platform/AdminSecurityKeys';  // iter D-46
+import CampaignHealthPage from './platform/CampaignHealthPage';  // iter D-59
 import AWBCockpit from './platform/AWBCockpit';
 import AdminDiagnostics from './platform/AdminDiagnostics';
 import LeadsDashboard from './platform/LeadsDashboard';
@@ -405,6 +406,7 @@ function AppRouter() {
         <Route path="/admin/memoir" element={<AdminMemoir />} />
         <Route path="/admin/integrations" element={<AdminIntegrations />} />
         <Route path="/admin/security-keys" element={<AdminSecurityKeys />} />
+        <Route path="/admin/campaign-health" element={<CampaignHealthPage />} />
         <Route path="/admin/awb-cockpit" element={<AWBCockpit />} />
         <Route path="/admin/boardroom" element={<BoardroomPage />} />
         <Route path="/admin/mission-control" element={<AdminMissionControl />} />

@@ -58,6 +58,7 @@ const SECTIONS = [
     blurb: 'Orient — leads, clients, outreach',
     items: [
       { to: '/admin/mission-control',    label: 'Mission Control',     icon: Radar,   hint: 'g m' },
+      { to: '/admin/campaign-health',    label: 'Campaign Health',     icon: Activity,hint: 'g H' },  // iter D-59
       { to: '/admin/openfang',           label: 'OpenFang · Lead Hand',icon: Phone,   hint: 'g o' },
       { to: '/admin/site-monitor',       label: 'Site Monitor',        icon: Globe,   hint: '' },
       { to: '/admin/hunter-test',        label: 'Hunter · Live Test',  icon: FlaskConical, hint: 'g h' },
