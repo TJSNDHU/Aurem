@@ -111,6 +111,7 @@ const SECTIONS = [
       { to: '/admin/2fa',                label: '2FA Enrolment',       icon: Lock,       hint: '' },
       { to: '/admin/ssot',               label: 'SSOT Console',        icon: DollarSign, hint: 'g s' },
       { to: '/admin/plans',              label: 'Plans · Pricing',     icon: DollarSign, hint: '' },
+      { to: '/admin/api-keys',           label: 'Public API Keys',     icon: KeyRound,   hint: 'g k' },  // iter D-59 Part B
       { to: '/admin/business-ids',       label: 'Business IDs',        icon: Hash,       hint: 'g i' },
       { to: '/admin/impersonation-log',  label: 'Impersonation Log',   icon: Eye,        hint: 'g l' },
     ],

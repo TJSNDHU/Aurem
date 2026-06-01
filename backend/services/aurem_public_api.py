@@ -92,7 +92,8 @@ async def issue_key(*, name: str, owner_email: str,
     }
     await _db.aurem_api_keys.insert_one(row)
     logger.info(f"[public-api] issued key id={key_id} owner={owner_email}")
-    public_row = {k: v for k, v in row.items() if k != "key_hash"}
+    public_row = {k: v for k, v in row.items()
+                    if k not in ("key_hash", "_id")}
     return {"ok": True, "secret": secret, "key": public_row}
 
 

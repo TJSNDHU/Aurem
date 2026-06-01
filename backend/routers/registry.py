@@ -1122,6 +1122,25 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] campaign_health_router wired")
                 except Exception as _cpe:
                     logger.warning(f"[REGISTRY] campaign_health_router not loaded: {_cpe}")
+
+                # iter D-59 Part B — Public AUREM API + admin key manager
+                try:
+                    from routers.public_api_router import (
+                        router as _pub_api_router,
+                        set_db as _set_pub_api_db,
+                    )
+                    from routers.admin_api_keys_router import (
+                        router as _admin_keys_router,
+                        set_db as _set_admin_keys_db,
+                    )
+                    if db is not None:
+                        _set_pub_api_db(db)
+                        _set_admin_keys_db(db)
+                    app.include_router(_pub_api_router)
+                    app.include_router(_admin_keys_router)
+                    logger.info("[REGISTRY] public_api_router + admin_api_keys_router wired")
+                except Exception as _papi_e:
+                    logger.warning(f"[REGISTRY] public_api / admin_api_keys not loaded: {_papi_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

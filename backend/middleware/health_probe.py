@@ -89,8 +89,12 @@ _INTERNAL_PROBE_PREFIXES = (
 # iter D-38 — paths that must NEVER be short-circuited by the boot
 # grace window. The admin Integration Health tracker reads live data
 # and any 204 confuses the UI into thinking the endpoint is empty.
+# iter D-59 — Campaign Health + Public API Keys admin pages need
+# real responses (founder hits them from the UI during boot grace too).
 _BOOT_GRACE_EXCLUDE = (
     "/api/admin/integrations/",
+    "/api/admin/campaign/",
+    "/api/admin/public-api-keys",
 )
 
 

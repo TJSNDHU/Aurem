@@ -26,6 +26,43 @@ compliant. Sovereign data residency, plain-English communication
 
 ## What's been implemented (chronological highlights)
 
+### iter D-59 (2026-06-01) — Campaign Health + Public AUREM API (commercialization)
+
+**Part A — Campaign Health + Autonomous Autofix loop**
+- New admin page at `/admin/api-keys` → `/admin/campaign-health` tracks
+  11 outreach components (Ghost Scout, Auto-Blast, Resend, Twilio, WHAPI,
+  Proactive ORA, Template Perf, Daily Brief, Lead Pool, Emergent LLM,
+  Resend Webhook) with 🟢/🟡/🔴 status + root cause + autofix button.
+- Per-component autofixes wired: `trigger_scout_run`,
+  `trigger_blast_cycle`, `topup_via_scout`, `send_morning_brief`.
+- "Fix All" walks the report. 30s timeout per fix. Every attempt logged
+  to `campaign_autofix_log`. Honest results — never claims fixed when
+  it isn't.
+- 15 pytests (`backend/tests/test_campaign_health_d59.py`).
+
+**Part B — Public AUREM API for commercialization**
+- New router `/api/v1/public/*` with three scoped endpoints:
+  - `POST /ora/chat`        — scope `ora_chat`
+  - `POST /cto/chat`        — scope `cto_chat`
+  - `GET  /leads/lookup`    — scope `leads_read`
+  - `GET  /health`          — anonymous sanity ping
+- Bearer-key auth (`aurem_sk_live_<43-urlsafe>`). Server stores only
+  the **sha256 hash** — raw secret returned ONCE on issue.
+- Per-key daily rate limit, counter resets at UTC midnight, all calls
+  logged to `aurem_api_usage`.
+- Admin manager router `/api/admin/public-api-keys` (issue / list /
+  revoke / 7-day usage) gated by admin JWT.
+- Admin UI at `/admin/api-keys` (Settings sidebar) with one-time secret
+  reveal card, scope checkboxes, daily-limit input, revoke confirm,
+  usage panel.
+- Boot-grace middleware excluded for new admin prefixes so the UI gets
+  real data instead of `204 No Content` during pod warmup.
+- Founder primary key issued live (preview Mongo) — credentials in
+  `test_credentials.md`.
+- 15 pytests (`backend/tests/test_public_api_d59.py`).
+- Full usage guide at `/app/memory/PUBLIC_API_USAGE.md` (cURL +
+  Python examples for founder's other projects).
+
 ### iter D-49 (2026-05-28) — CTO real-execution tools + blast unstuck
 
 - **CTO Tools Router** (`routers/cto_tools_router.py`): 4 real-execution endpoints
