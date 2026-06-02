@@ -34,6 +34,7 @@ import { BACKEND_URL } from '../lib/api';
 import { PillarProvider, usePillarHealth } from './PillarHealthContext';
 import PillarGate, { PillarDot } from './PillarGate';
 import OrgSwitcher from './OrgSwitcher';
+import BugCatchWidget from './BugCatchWidget';   // iter D-60
 
 const API = BACKEND_URL;
 
