@@ -1141,6 +1141,19 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] public_api_router + admin_api_keys_router wired")
                 except Exception as _papi_e:
                     logger.warning(f"[REGISTRY] public_api / admin_api_keys not loaded: {_papi_e}")
+
+                # iter D-60 — BugCatch admin bug-report capture
+                try:
+                    from routers.bug_catch_router import (
+                        router as _bug_catch_router,
+                        set_db as _set_bug_catch_db,
+                    )
+                    if db is not None:
+                        _set_bug_catch_db(db)
+                    app.include_router(_bug_catch_router)
+                    logger.info("[REGISTRY] bug_catch_router wired")
+                except Exception as _bc_e:
+                    logger.warning(f"[REGISTRY] bug_catch_router not loaded: {_bc_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

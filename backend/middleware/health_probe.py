@@ -95,6 +95,7 @@ _BOOT_GRACE_EXCLUDE = (
     "/api/admin/integrations/",
     "/api/admin/campaign/",
     "/api/admin/public-api-keys",
+    "/api/admin/bug-reports",
 )
 
 

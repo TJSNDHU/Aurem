@@ -26,6 +26,36 @@ compliant. Sovereign data residency, plain-English communication
 
 ## What's been implemented (chronological highlights)
 
+### iter D-60 (2026-06-02) — BugCatch · internal QA bug capture
+
+**Floating bug-report widget (admin only)** mounted inside `AdminShell`:
+- Bottom-right 🐛 button on every `/admin/*` page
+- Click opens modal that captures: DOM screenshot via `html2canvas`,
+  annotation overlay (pen / arrow / text in 4 colors), last 200 console
+  logs, last 50 network calls (fetch interceptor), URL + viewport + UA
+- POSTs to `/api/admin/bug-reports`
+- Annotations baked into the screenshot before send
+
+**Admin reports inbox** at `/admin/bug-reports` (Settings sidebar):
+- List with severity dot + status filter (open / investigating / resolved / won't_fix)
+- Stats counters at top
+- Detail drawer with screenshot, AI root cause, console logs, network calls
+- Status flipper
+
+**Backend** (`backend/services/bug_catch.py`, `backend/routers/bug_catch_router.py`):
+- Admin-JWT gated CRUD: POST submit, GET list/stats/detail, PATCH status
+- Screenshot >2 MB dropped honestly (note kept)
+- Logs/network capped at 200/50
+- Per-report **AI root cause** via existing free-tier OpenRouter ladder
+  (`_dispatch_free_tier`) — DeepSeek primary, no extra cost
+- Per-report **email alert** to founder via existing Resend wrapper
+- Mongo collection `bug_reports`, boot-grace middleware excluded
+
+**Tests:** 15/15 in `test_bug_catch_d60.py` + 71/71 across the recent ring.
+Live verified: AI tagged a test bug correctly — *"The API key issuance
+likely failed due to an undefined response array being accessed in
+the AdminApiKeysPage component."*
+
 ### iter D-59 (2026-06-01) — Campaign Health + Public AUREM API (commercialization)
 
 **Part A — Campaign Health + Autonomous Autofix loop**
