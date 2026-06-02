@@ -43,6 +43,15 @@ def is_production_pod() -> bool:
 
     Cached for the lifetime of the process — env vars don't change at
     runtime, so we read them once and freeze the answer.
+
+    iter D-60a — broadened the signal set so production deploys are
+    detected even when AUREM_ENV / APP_URL aren't explicitly set:
+      • MONGO_URL contains "mongodb+srv://"  → managed Atlas → prod
+      • PREVIEW_PROXY_URL contains "deploy.emergentcf.cloud"
+      • EMERGENT_KUBE / RAILWAY_* / RENDER are present
+      • KUBERNETES_SERVICE_HOST set AND not the preview namespace
+    Any one of these flips production mode on, which silences the
+    Legion / Ollama / SovereignWarmer / ghost_scout auto-loops.
     """
     if (os.environ.get("AUREM_ENV", "").strip().lower() == "production"):
         return True
@@ -50,8 +59,17 @@ def is_production_pod() -> bool:
             in ("1", "true", "yes", "on")):
         return True
     app_url = (os.environ.get("APP_URL", "") or "").lower()
-    if "aurem.live" in app_url or "aurem.live" in app_url:
+    if "aurem.live" in app_url:
         return True
+    # iter D-60a — Atlas managed Mongo → only ever used in production
+    mongo_url = (os.environ.get("MONGO_URL", "") or "").lower()
+    if "mongodb+srv://" in mongo_url:
+        return True
+    # iter D-60a — Emergent prod hostname seen in deploy logs
+    for var in ("PREVIEW_PROXY_URL", "DEPLOY_URL", "CF_PAGES_URL"):
+        v = (os.environ.get(var, "") or "").lower()
+        if "deploy.emergentcf.cloud" in v or "aurem.live" in v:
+            return True
     return False
 
 

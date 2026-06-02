@@ -710,6 +710,20 @@ async def ghost_scout_loop() -> None:
     if not PROXY_URL:
         print("[ghost-scout] disabled — IPROYAL_PROXY_URL not set", flush=True)
         return
+    # iter D-60a — skip the auto-loop in production unless the founder
+    # explicitly opts in. The Google Places API key on prod has billing
+    # disabled, so every cycle returns REQUEST_DENIED and wastes the
+    # event loop. Production blasting will be triggered from the admin
+    # UI's "Autofix · topup_via_scout" button instead.
+    try:
+        from services.prod_guard import is_production_pod
+        if is_production_pod() and os.environ.get(
+                "GHOST_SCOUT_PROD_LOOP", "").lower() not in ("1", "true", "yes"):
+            print("[ghost-scout] disabled in production "
+                   "(set GHOST_SCOUT_PROD_LOOP=true to enable)", flush=True)
+            return
+    except Exception:
+        pass
     print(
         f"[ghost-scout] alive — interval={HARVEST_INTERVAL_S}s "
         f"queue_len={len(HARVEST_QUEUE)} park_threshold={_PARK_AFTER_ZERO_CYCLES}",

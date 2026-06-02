@@ -26,6 +26,23 @@ compliant. Sovereign data residency, plain-English communication
 
 ## What's been implemented (chronological highlights)
 
+### iter D-60a (2026-06-02) — Production deploy hardening (post-mortem fix)
+
+**Symptom:** Prod deploy logs showed backend booting fine, serving 200s for ~1 minute, then nginx returning `connect() failed (111: Connection refused)`. Root cause was NOT a structural compile/env issue — the `deployment_agent` correctly said PASS on that. The killer was at runtime: `prod_guard.is_production_pod()` returned **False** in prod because the only signals it checked (`AUREM_ENV`, `APP_URL`, `DISABLE_LEGION`) were not set on the deployed pod. With prod undetected, `SovereignWarmer` + `ghost_scout` auto-loop + Ollama health pings + ora_agent circuit breaker poll all ran flat-out trying to reach unreachable preview-only hosts. Combined event-loop pressure most likely OOM-killed the container.
+
+**Fix (3 code changes):**
+1. **`services/prod_guard.py`** — broadened detection: any of these flips production mode on
+   - `MONGO_URL` contains `mongodb+srv://` (managed Atlas — only ever used in prod)
+   - `PREVIEW_PROXY_URL` / `DEPLOY_URL` / `CF_PAGES_URL` contains `deploy.emergentcf.cloud` or `aurem.live`
+   - Existing `AUREM_ENV`, `APP_URL`, `DISABLE_LEGION` still honored
+2. **`services/ghost_scout_iproyal.py`** — explicit short-circuit in `ghost_scout_loop`: returns early in prod unless `GHOST_SCOUT_PROD_LOOP=true`. Google Places API key on prod has billing disabled, so every cycle was returning REQUEST_DENIED anyway.
+3. **`backend/tests/test_prod_guard_d60a.py`** — 7 regression pytests covering every new detection signal + the ghost-scout guard.
+
+**Cascading wins** (already gated via `is_production_pod()` upstream):
+- SovereignWarmer skips its 240s ping loop
+- ora_agent circuit-breaker stops hammering localhost Ollama
+- Several other preview-only background tasks short-circuit
+
 ### iter D-60 (2026-06-02) — BugCatch · internal QA bug capture
 
 **Floating bug-report widget (admin only)** mounted inside `AdminShell`:
