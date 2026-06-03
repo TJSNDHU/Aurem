@@ -46,6 +46,7 @@ import AdminIntegrations from './platform/AdminIntegrations';
 import AdminSecurityKeys from './platform/AdminSecurityKeys';  // iter D-46
 import CampaignHealthPage from './platform/CampaignHealthPage';  // iter D-59
 import AdminApiKeysPage from './platform/AdminApiKeysPage';  // iter D-59 Part B
+import AdminApolloCostPage from './platform/AdminApolloCostPage';
 import AdminBugReportsPage from './platform/AdminBugReportsPage';  // iter D-60 BugCatch
 import AWBCockpit from './platform/AWBCockpit';
 import AdminDiagnostics from './platform/AdminDiagnostics';
@@ -411,6 +412,7 @@ function AppRouter() {
         <Route path="/admin/campaign-health" element={<CampaignHealthPage />} />
         <Route path="/admin/api-keys" element={<AdminApiKeysPage />} />
         <Route path="/admin/bug-reports" element={<AdminBugReportsPage />} />
+        <Route path="/admin/apollo-cost" element={<AdminApolloCostPage />} />
         <Route path="/admin/awb-cockpit" element={<AWBCockpit />} />
         <Route path="/admin/boardroom" element={<BoardroomPage />} />
         <Route path="/admin/mission-control" element={<AdminMissionControl />} />

@@ -1123,7 +1123,7 @@ def register_all_routers(app, db):
                 except Exception as _cpe:
                     logger.warning(f"[REGISTRY] campaign_health_router not loaded: {_cpe}")
 
-                # iter D-59 Part B — Public AUREM API + admin key manager
+                # iter D-60 Part B — Public AUREM API + admin key manager
                 try:
                     from routers.public_api_router import (
                         router as _pub_api_router,
@@ -1154,6 +1154,19 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] bug_catch_router wired")
                 except Exception as _bc_e:
                     logger.warning(f"[REGISTRY] bug_catch_router not loaded: {_bc_e}")
+
+                # iter D-60d — Apollo cost dashboard
+                try:
+                    from routers.apollo_cost_router import (
+                        router as _apollo_cost_router,
+                        set_db as _set_apollo_cost_db,
+                    )
+                    if db is not None:
+                        _set_apollo_cost_db(db)
+                    app.include_router(_apollo_cost_router)
+                    logger.info("[REGISTRY] apollo_cost_router wired")
+                except Exception as _ac_e:
+                    logger.warning(f"[REGISTRY] apollo_cost_router not loaded: {_ac_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

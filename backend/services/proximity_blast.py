@@ -103,6 +103,24 @@ def _check_apollo_rate_limit() -> None:
         )
         raise RuntimeError("apollo_rate_limit_pause")
     _apollo_call_log.append(now.timestamp())
+    # Best-effort Mongo logging for the admin cost dashboard. Never
+    # let a logging failure block the actual Apollo call.
+    db = _get_db()
+    if db is not None:
+        async def _log():
+            try:
+                await db.apollo_call_log.insert_one({
+                    "ts":          now.isoformat(),
+                    "day":         now.strftime("%Y-%m-%d"),
+                    "estimated_usd": 0.03,
+                })
+            except Exception as e:
+                logger.debug(f"[proximity-blast] apollo log insert failed: {e}")
+        try:
+            asyncio.create_task(_log())
+        except RuntimeError:
+            # No running loop (sync caller) — skip persistence
+            pass
 
 
 # ─── Real lead discovery ───────────────────────────────────────────

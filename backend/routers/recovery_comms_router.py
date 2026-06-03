@@ -78,11 +78,9 @@ def _generate_tracking_link(user_id: str, customer_email: str, channel: str, cam
 # ═══════════════════════════════════════════════════════════════
 
 
-async def _mock_send(channel: str, recipient: str, message: dict) -> dict:
-    """Stub: simulate message delivery. Replace with real Twilio/Resend/WhatsApp integration."""
-    import secrets as _s
-    logging.warning(f"_mock_send not implemented — skipping ({channel} to {recipient})")
-    return {"message_id": f"mock_{_s.token_urlsafe(8)}", "status": "simulated", "channel": channel}
+async def _real_send_recovery_message(channel: str, recipient: str, message: dict, tenant_id: str) -> dict:
+    """Stub kept for backward-compat — actual implementation defined later in this file as `_real_send`."""
+    return await _real_send(channel, recipient, message, tenant_id)
 
 
 def _compose_message(channel: str, customer: dict, tracking_url: str, campaign_type: str) -> dict:
@@ -210,22 +208,18 @@ async def _real_send(channel: str, recipient: str, message: dict, tenant_id: str
                 logger.warning(f"[CommsEngine] WhatsApp send failed: {error}")
                 return {"status": "failed", "channel": "whatsapp", "recipient": recipient, "message_id": msg_id, "error": error}
 
-        elif channel == "sms":
-            # SMS: Log for manual follow-up via click-to-chat URL
-            wa_link = f"https://wa.me/{recipient.replace('+', '')}?text={message.get('body', '')[:200]}"
-            logger.info(f"[CommsEngine] SMS fallback → WhatsApp click-to-chat: {wa_link}")
-            return {
-                "status": "logged",
-                "channel": "sms",
-                "recipient": recipient,
-                "message_id": msg_id,
-                "delivered_at": now,
-                "provider": "click_to_chat_fallback",
-                "wa_link": wa_link,
-            }
-
         else:
-            return {"status": "failed", "channel": channel, "recipient": recipient, "message_id": msg_id, "error": f"Unknown channel: {channel}"}
+            # SMS removed in this build — no Twilio from-number provisioned.
+            # Email and WhatsApp are the supported channels. Fail loudly
+            # rather than logging a fake click-to-chat fallback.
+            return {
+                "status":     "failed",
+                "channel":    channel,
+                "recipient":  recipient,
+                "message_id": msg_id,
+                "error":      (f"Channel '{channel}' not supported. "
+                                "Email and WhatsApp only in this build."),
+            }
 
     except Exception as e:
         logger.error(f"[CommsEngine] Send error ({channel}): {e}")
@@ -400,7 +394,7 @@ async def send_bulk_recovery(body: BulkRecoveryRequest, authorization: str = Hea
         })
 
         message = _compose_message(body.channel, customer, link_data["tracking_url"], body.campaign_type)
-        delivery = await _mock_send(body.channel, recipient, message)
+        delivery = await _real_send(body.channel, recipient, message, ctx["tenant_id"])
 
         await db.sent_messages.insert_one({
             "message_id": delivery["message_id"],

@@ -98,6 +98,7 @@ _BOOT_GRACE_EXCLUDE = (
     "/api/admin/bug-reports",
     "/api/admin/pillars-map",
     "/api/pillars/",
+    "/api/admin/apollo-cost",
 )
 
 

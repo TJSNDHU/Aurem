@@ -115,16 +115,11 @@ async def create_subscription(body: SubscribeRequest, request: Request):
     )
 
     if not install or not install.get("access_token") or install["access_token"] == "mock_token":
-        # Scaffold mode — return mock confirmation URL
-        logger.info(f"[SHOPIFY-BILLING] Scaffold mode — no real access token for {shop}")
-        return {
-            "mode": "scaffold",
-            "message": "Shopify billing requires a real access token. Connect your Shopify Partner app first.",
-            "plan": body.plan_id,
-            "shop": shop,
-            "confirmation_url": None,
-            "setup_required": ["SHOPIFY_API_KEY", "SHOPIFY_API_SECRET", "Complete OAuth install flow"],
-        }
+        raise HTTPException(
+            503,
+            f"Shopify OAuth not completed for shop '{shop}'. "
+            "Complete app installation first.",
+        )
 
     access_token = install["access_token"]
     return_url = body.return_url or f"https://{shop}/admin/apps"
@@ -283,17 +278,25 @@ async def charge_recovery_commission(shop: str, order_id: str, order_total: floa
         {"shop_domain": shop, "status": "active"}, {"_id": 0}
     )
     if not install or not install.get("access_token") or install["access_token"] == "mock_token":
-        logger.info(f"[SHOPIFY-BILLING] Scaffold mode — skipping charge for {shop}")
-        # Log the charge even in scaffold mode
+        # Log the missed charge for visibility — but never fake-record
+        # commission as collected.
+        logger.warning(
+            f"[SHOPIFY-BILLING] No OAuth token for {shop} — "
+            f"cannot charge commission for order {order_id}"
+        )
         await _db.shopify_usage_charges.insert_one({
-            "shop": shop,
-            "order_id": order_id,
-            "order_total": order_total,
-            "commission": RECOVERY_COMMISSION,
-            "status": "scaffold",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "shop":         shop,
+            "order_id":     order_id,
+            "order_total":  order_total,
+            "commission":   RECOVERY_COMMISSION,
+            "status":       "skipped_no_oauth",
+            "created_at":   datetime.now(timezone.utc).isoformat(),
         })
-        return {"success": True, "mode": "scaffold", "commission": RECOVERY_COMMISSION}
+        return {
+            "success": False,
+            "mode":    "skipped_no_oauth",
+            "error":   "Shopify OAuth not completed — commission not charged",
+        }
 
     access_token = install["access_token"]
 
