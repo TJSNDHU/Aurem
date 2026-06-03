@@ -33,7 +33,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _db = None
-_TIMEOUT_S = 30
+_TIMEOUT_S = 90    # iter D-60b — Apollo + ghost_scout site-scrape needs >30s
 
 
 def set_db(database) -> None:
@@ -153,37 +153,48 @@ async def _fix_trigger_blast_cycle() -> dict[str, Any]:
 
 
 async def _fix_topup_via_scout() -> dict[str, Any]:
-    """Pool empty → run a 3-query scout burst (Toronto + Mississauga
-    salons / spas)."""
+    """Pool empty → run a 6-query Apollo-powered scout burst across
+    Toronto + Mississauga + Brampton SMB niches. iter D-60b."""
     try:
         from services.ghost_scout_iproyal import harvest_leads
         queries = [
-            ("beauty clinic", "Toronto", "ca"),
-            ("med spa",       "Mississauga", "ca"),
-            ("nail salon",    "Toronto", "ca"),
+            ("dental clinic",     "Toronto",     "ca"),
+            ("dental clinic",     "Mississauga", "ca"),
+            ("med spa",           "Mississauga", "ca"),
+            ("roofing contractor", "Brampton",   "ca"),
+            ("auto repair",       "Toronto",     "ca"),
+            ("law firm",          "Mississauga", "ca"),
         ]
         total = 0
+        per_query: list[str] = []
         for q, loc, ctry in queries:
             try:
                 r = await asyncio.wait_for(
-                    harvest_leads(q, loc, country=ctry, limit=8),
-                    timeout=10,
+                    harvest_leads(q, loc, country=ctry, limit=10),
+                    timeout=20,    # Apollo ~2-4s + site scrape can be slow
                 )
-                total += r.get("inserted", 0)
-            except Exception:
-                continue
+                got = int(r.get("inserted", 0))
+                total += got
+                per_query.append(f"{q}/{loc}={got}")
+            except asyncio.TimeoutError:
+                per_query.append(f"{q}/{loc}=timeout")
+            except Exception as e:
+                per_query.append(f"{q}/{loc}=err:{type(e).__name__}")
         if total > 0:
             return {"ok": True, "fixed": True,
-                     "result": f"+{total} fresh leads inserted",
+                     "result": f"+{total} fresh leads inserted "
+                               f"({', '.join(per_query)})",
                      "residual_issue": None,
                      "requires_human": False}
         return {"ok": True, "fixed": False,
-                 "result": "scout completed but 0 inserted "
-                          "(all duplicates or proxy slow)",
-                 "residual_issue": "all_duplicates_or_slow",
+                 "result": f"scout completed but 0 inserted "
+                          f"({', '.join(per_query)})",
+                 "residual_issue": "all_duplicates_or_filtered",
                  "requires_human": True,
-                 "human_hint": ("Try a new query niche or upload a CSV. "
-                                 "Or check iProyal quota.")}
+                 "human_hint": ("All hits were duplicates or filtered "
+                                 "(bad email / not-CA phone). Add a new "
+                                 "industry to the query list, or upload "
+                                 "a CSV via /api/admin/leads/upload-csv.")}
     except Exception as e:
         return {"ok": False, "fixed": False,
                  "result": f"topup failed: {e}",

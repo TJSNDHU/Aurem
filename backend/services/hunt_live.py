@@ -317,10 +317,47 @@ async def _discover_businesses(query: str, limit: int) -> List[Dict[str, Any]]:
     industry_for_lookup = industry_for_lookup.strip()
     city_for_lookup = (city_for_lookup or "").strip() or "Mississauga, ON"
 
-    # ── 1. Google Places (PRIMARY — iter 324e) ─────────────────
-    # Highest quality: official SMB API. Returns real business names,
-    # not HTML page titles. Phone is canonical. Website is the actual
-    # company site, never a SERP fragment.
+    # ── 1. Apollo.io (PRIMARY — iter D-60b) ─────────────────────
+    # Founder paid for Apollo $65/mo plan specifically for SMB
+    # discovery. Returns real Canadian SMBs with verified
+    # phone/website/city. Hits before Google Places because GP key
+    # often has billing disabled on prod.
+    apollo_key = (os.environ.get("APOLLO_API_KEY") or "").strip()
+    if apollo_key:
+        try:
+            from services.apollo_discovery import discover_organizations
+            apollo_leads = await discover_organizations(
+                industry_keyword=industry_for_lookup,
+                city=city_for_lookup.split(",")[0].strip() or "Mississauga",
+                province="Ontario",
+                country="Canada",
+                per_page=min(limit, 25),
+            )
+            for lead in apollo_leads[:limit]:
+                results.append({
+                    "business_name": lead.get("business_name", ""),
+                    "phone":         lead.get("phone", ""),
+                    "address":       f"{lead.get('city','')}, {lead.get('province','')}".strip(", "),
+                    "website":       lead.get("website", ""),
+                    "rating":        4.0,
+                    "review_count":  0,
+                    "source":        "apollo_discovery",
+                    "domain":        lead.get("domain", ""),
+                    "industry":      lead.get("industry", ""),
+                    "employees":     lead.get("employees", 0),
+                    "linkedin_url":  lead.get("linkedin_url", ""),
+                })
+            if results:
+                logger.info(f"[hunt_live] Apollo → {len(results)} businesses (primary, real SMBs)")
+                return results
+            else:
+                logger.warning(f"[hunt_live] Apollo returned 0 for '{query}' — falling through to Google Places")
+        except Exception as e:
+            logger.warning(f"[hunt_live] Apollo discovery failed: {e}")
+
+    # ── 2. Google Places (secondary fallback — iter 324e, demoted by D-60b)
+    # Highest quality fallback when Apollo returns 0. Returns real business
+    # names, not HTML page titles. Phone is canonical.
     gp_key = os.environ.get("GOOGLE_PLACES_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY")
     if gp_key:
         try:

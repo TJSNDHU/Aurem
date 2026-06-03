@@ -430,18 +430,40 @@ async def harvest_leads(
         follow_redirects=True,
         **proxies,
     ) as client:
-        # 1) Try OSM Overpass FIRST (free, no API key, works everywhere).
-        #    Falls back to Google Places only if OSM returns empty.
-        osm_hits = await _osm_overpass_search(client, query, location, limit)
+        # iter D-60b — Apollo.io FIRST (founder pays for $65/mo plan,
+        # returns verified SMB orgs with phone+website+city).
+        # Falls through to OSM if Apollo returns 0 or APOLLO_API_KEY missing.
         search_results: list[dict] = []
-        if osm_hits:
-            # OSM already returns name+phone+website — wrap as place-shaped dicts
-            for h in osm_hits:
-                search_results.append({"_osm_pre": h})
-            logger.info(f"[ghost-scout] OSM gave {len(osm_hits)} hits, skipping Places")
-        else:
-            places_hits = await _places_text_search(client, query, location, limit)
-            search_results = places_hits
+        apollo_hits = []
+        if os.environ.get("APOLLO_API_KEY"):
+            try:
+                from services.apollo_discovery import discover_organizations
+                apollo_hits = await discover_organizations(
+                    industry_keyword=query,
+                    city=location.split(",")[0].strip() or "Mississauga",
+                    province="Ontario",
+                    country="Canada",
+                    per_page=min(limit, 25),
+                )
+                # Convert apollo lead → place-shaped dict with _apollo_pre
+                for a in apollo_hits:
+                    search_results.append({"_apollo_pre": a})
+                if apollo_hits:
+                    logger.info(f"[ghost-scout] Apollo gave {len(apollo_hits)} SMBs (primary)")
+            except Exception as e:
+                logger.warning(f"[ghost-scout] Apollo discovery failed: {e}")
+        # 1) Try OSM Overpass next (free, no API key, works everywhere).
+        #    Falls back to Google Places only if OSM returns empty.
+        if not search_results:
+            osm_hits = await _osm_overpass_search(client, query, location, limit)
+            if osm_hits:
+                # OSM already returns name+phone+website — wrap as place-shaped dicts
+                for h in osm_hits:
+                    search_results.append({"_osm_pre": h})
+                logger.info(f"[ghost-scout] OSM gave {len(osm_hits)} hits, skipping Places")
+            else:
+                places_hits = await _places_text_search(client, query, location, limit)
+                search_results = places_hits
 
         fetched = len(search_results)
         if not search_results:
@@ -455,7 +477,15 @@ async def harvest_leads(
         for place in search_results:
             # OSM path: contact data already in place
             osm_pre = place.get("_osm_pre")
-            if osm_pre:
+            apollo_pre = place.get("_apollo_pre")
+            if apollo_pre:
+                # iter D-60b — Apollo path: already enriched at source
+                name = apollo_pre.get("business_name", "")
+                phone = _normalize_phone(apollo_pre.get("phone", ""))
+                website = apollo_pre.get("website", "")
+                address = f"{apollo_pre.get('city','')}, {apollo_pre.get('province','')}".strip(", ")
+                email_pre = apollo_pre.get("email", "") if _is_valid_email(apollo_pre.get("email", "")) else ""
+            elif osm_pre:
                 name = osm_pre.get("name", "")
                 phone = _normalize_phone(osm_pre.get("phone", ""))
                 website = osm_pre.get("website", "")
