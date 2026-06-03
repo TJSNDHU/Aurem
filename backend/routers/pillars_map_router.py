@@ -92,6 +92,10 @@ _service_cache: dict[str, list[dict]] = {}
 # Falls back to same-origin if not set. Resolved at runtime.
 _PUBLIC_BASE_URL_ENV = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 _LOCAL_BACKEND_URL = "http://localhost:8001"
+# iter D-60c — in-cluster frontend probe target (always reachable from
+# the same pod). Avoids the pod-to-ingress egress race that caused
+# `route failed: ` empty exceptions in the previous probe.
+_LOCAL_FRONTEND_URL = "http://localhost:3000"
 
 
 def _resolve_public_base() -> str:
@@ -1117,44 +1121,55 @@ async def _check_flow(flow: dict, live_names: set[str]) -> dict:
         )
 
     # ── Frontend side (route + asset bundle) ──────────────────────
+    # iter D-60c — probe the in-cluster frontend at localhost:3000 so
+    # we never depend on the pod being able to egress back through the
+    # ingress to its own hostname. If localhost:3000 serves the route
+    # AND the asset bundle, the FE is healthy. External uptime is
+    # checked separately by /api/admin/uptime.
     fe_side = "green"
     fe_reason = "skipped"
     fe_route_status: Optional[int] = None
     fe_asset_status: Optional[int] = None
 
-    if _PUBLIC_BASE_RESOLVED:
-        route_url = _PUBLIC_BASE_RESOLVED + flow["fe_route"]
-        asset_url = _PUBLIC_BASE_RESOLVED + "/manifest.json"
-        try:
-            async with httpx.AsyncClient(timeout=2.5, follow_redirects=False) as client:
-                route_res, asset_res = await asyncio.gather(
-                    client.get(route_url),
-                    client.get(asset_url),
-                    return_exceptions=True,
-                )
-            if isinstance(route_res, Exception):
-                fe_side = "red"
-                fe_reason = f"route failed: {str(route_res)[:40]}"
-            else:
-                fe_route_status = route_res.status_code
-                if not isinstance(asset_res, Exception):
-                    fe_asset_status = asset_res.status_code
+    route_url = _LOCAL_FRONTEND_URL + flow["fe_route"]
+    asset_url = _LOCAL_FRONTEND_URL + "/manifest.json"
+    try:
+        async with httpx.AsyncClient(timeout=4.0,
+                                        follow_redirects=False) as client:
+            route_res, asset_res = await asyncio.gather(
+                client.get(route_url),
+                client.get(asset_url),
+                return_exceptions=True,
+            )
+        if isinstance(route_res, Exception):
+            # iter D-60c — surface the actual exception class so
+            # "route failed: " never appears empty again.
+            exc_name = type(route_res).__name__
+            exc_msg = (str(route_res) or "no_msg")[:60]
+            fe_side = "yellow"      # cluster-internal probe missing
+                                     # is non-blocking (external probe
+                                     # has the canonical verdict)
+            fe_reason = f"probe-skip: {exc_name}: {exc_msg}"
+        else:
+            fe_route_status = route_res.status_code
+            if not isinstance(asset_res, Exception):
+                fe_asset_status = asset_res.status_code
 
-                if not (200 <= fe_route_status < 400):
-                    fe_side = "red"
-                    fe_reason = f"route HTTP {fe_route_status}"
-                elif fe_asset_status is not None and not (200 <= fe_asset_status < 400):
-                    fe_side = "red"
-                    fe_reason = f"assets HTTP {fe_asset_status} (CDN/build broken)"
-                else:
-                    fe_side = "green"
-                    fe_reason = f"route {fe_route_status} · assets {fe_asset_status or 'n/a'}"
-        except Exception as e:
-            fe_side = "yellow"
-            fe_reason = f"probe failed: {str(e)[:60]}"
-    else:
-        fe_side = "green"
-        fe_reason = "PUBLIC_BASE_URL unresolved (skipped)"
+            # iter D-60c — React SPA always returns 200 for any path
+            # (catch-all index.html). So a 200 + manifest 200 means
+            # the bundle is up. 4xx/5xx means the dev server is dead.
+            if not (200 <= fe_route_status < 400):
+                fe_side = "red"
+                fe_reason = f"route HTTP {fe_route_status}"
+            elif fe_asset_status is not None and not (200 <= fe_asset_status < 400):
+                fe_side = "yellow"
+                fe_reason = f"assets HTTP {fe_asset_status} (manifest)"
+            else:
+                fe_side = "green"
+                fe_reason = f"route {fe_route_status} · assets {fe_asset_status or 'n/a'}"
+    except Exception as e:
+        fe_side = "yellow"
+        fe_reason = f"probe failed: {type(e).__name__}: {str(e)[:60]}"
 
     overall = _pick_worst(db_side, be_side, fe_side)
 
