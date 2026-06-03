@@ -152,7 +152,6 @@ async def create_checkout_session(request: CheckoutRequest):
             "session_id": result["session_id"],
             "plan_id": result["plan_id"],
             "billing_cycle": result["billing_cycle"],
-            "mock_mode": result.get("mock_mode", False)
         }
     
     except HTTPException:

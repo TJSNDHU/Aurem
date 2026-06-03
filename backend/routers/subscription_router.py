@@ -132,31 +132,12 @@ async def create_checkout(req: UpgradeRequest, request: Request):
     if plan not in PLAN_TIERS or plan == "trial":
         raise HTTPException(400, "Invalid plan")
 
-    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
-    is_mock = not stripe_key or stripe_key == "sk_test_emergent"
-
-    if is_mock:
-        await db["aurem_billing"].update_one(
-            {"business_id": tenant_id},
-            {"$set": {
-                "plan": plan,
-                "status": "active",
-                "updated_at": datetime.now(timezone.utc),
-                "mock_mode": True,
-            }},
-            upsert=True,
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+    if not stripe_key or stripe_key == "sk_test_emergent":
+        raise HTTPException(
+            503,
+            "Stripe not configured. Add STRIPE_SECRET_KEY to env.",
         )
-        await db["aurem_workspaces"].update_one(
-            {"business_id": tenant_id},
-            {"$set": {"plan": plan, "updated_at": datetime.now(timezone.utc)}},
-            upsert=True,
-        )
-        return {
-            "success": True,
-            "mock": True,
-            "plan": plan,
-            "message": f"Upgraded to {PLAN_TIERS[plan]['label']} (Stripe not configured — mock mode)",
-        }
 
     try:
         import stripe

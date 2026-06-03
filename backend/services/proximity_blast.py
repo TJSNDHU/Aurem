@@ -4,19 +4,37 @@ Copyright (c) 2026 Polaris Built Inc.
 
 Proximity Blast Service
 =======================
-Geofenced local lead discovery and promotion engine.
-Simulated data layer with admin toggle for Live Google Maps API.
+Geofenced local lead discovery via Apollo.io.
+
+Given (lat, lng, radius_km), this service:
+  1. Reverse-geocodes the coordinate to a city/country via the
+     existing OpenWeatherMap free geo helper.
+  2. Queries Apollo for SMBs matching `industry_hint` in that city.
+  3. Returns a list of real leads (verified phone/website/city) in
+     the same dict shape used by all downstream consumers.
+
+NO simulated leads are generated. If Apollo is unreachable or returns
+empty, this service returns `[]` and the caller is responsible for
+handling the empty case (e.g. log + skip, never fabricate).
+
+Rate-limit safeguard: a module-level deque tracks Apollo call
+timestamps. If we exceed 100 calls in a rolling 60-minute window, the
+function raises RuntimeError("apollo_rate_limit_pause") so the campaign
+loop can back off instead of burning budget.
 
 Add-on: $49/month for Starter/Growth tiers.
 """
+import asyncio
 import logging
-import random
 import math
+from collections import deque
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
 _db = None
+_apollo_call_log: deque = deque(maxlen=500)
+_APOLLO_RATE_LIMIT_PER_HOUR = 100
 
 
 def set_db(database):
@@ -38,98 +56,179 @@ def _get_db():
     return None
 
 
-# ═══════════════════════════════════════════════════════════════
-# SIMULATED LOCAL LEADS (Demo / Development)
-# ═══════════════════════════════════════════════════════════════
+# ─── Geo helpers ───────────────────────────────────────────────────
 
-BUSINESS_TYPES = [
-    "MedSpa", "Dental Clinic", "Hair Salon", "Fitness Studio", "Yoga Studio",
-    "Pet Grooming", "Coffee Shop", "Restaurant", "Auto Repair", "Real Estate Agency",
-    "Accounting Firm", "Law Office", "Physiotherapy", "Chiropractic", "Florist",
-    "Bakery", "Nail Salon", "Barbershop", "Dry Cleaner", "Insurance Agency",
-    "Optometrist", "Pharmacy", "Tattoo Parlor", "Photography Studio", "Print Shop",
-]
-
-FIRST_NAMES = ["Sarah", "James", "Maria", "David", "Lisa", "Michael", "Jennifer",
-               "Robert", "Emily", "Daniel", "Ashley", "Christopher", "Amanda", "Matthew",
-               "Stephanie", "Andrew", "Nicole", "Joshua", "Jessica", "Ryan"]
-
-LAST_NAMES = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller",
-              "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez",
-              "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"]
-
-STREET_NAMES = ["Oak St", "Maple Ave", "Cedar Ln", "Pine Rd", "Elm Blvd",
-                "Birch Dr", "Walnut Cr", "Spruce Way", "Willow Pl", "Cherry St"]
+def _haversine_km(lat1, lon1, lat2, lon2) -> float:
+    """Great-circle distance in km."""
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = (math.sin(dp / 2) ** 2 +
+          math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _random_point_in_radius(lat: float, lng: float, radius_km: float):
-    """Generate a random lat/lng within a radius (simple approximation)."""
-    r = radius_km / 111.0  # rough degrees per km
-    u = random.random()
-    v = random.random()
-    w = r * math.sqrt(u)
-    t = 2 * math.pi * v
-    x = w * math.cos(t)
-    y = w * math.sin(t)
-    return round(lat + x, 6), round(lng + y / math.cos(math.radians(lat)), 6)
+async def _city_from_latlng(lat: float, lng: float) -> tuple[str, str]:
+    """Reverse-geocode (lat,lng) → (city, country_iso2).
+
+    Uses the existing OpenWeatherMap geo helper in
+    `services.location_service`. Returns ("", "") on failure — the
+    caller decides whether to skip or fall back to a default city.
+    """
+    try:
+        from services.location_service import _reverse_geocode
+        out = await _reverse_geocode(lat, lng)
+        city = (out or {}).get("city", "") or ""
+        country = (out or {}).get("country", "") or ""
+        return city, country
+    except Exception as e:
+        logger.warning(f"[proximity-blast] reverse-geocode failed: {e}")
+        return "", ""
 
 
-def generate_simulated_leads(lat: float, lng: float, radius_km: float, count: int = 20) -> list:
-    """Generate simulated local business leads within a radius."""
+# ─── Rate limit ────────────────────────────────────────────────────
+
+def _check_apollo_rate_limit() -> None:
+    """Raise RuntimeError if we've already burned 100 Apollo calls in
+    the last 60 minutes. Otherwise record this call's timestamp."""
+    now = datetime.now(timezone.utc)
+    cutoff = now.timestamp() - 3600
+    while _apollo_call_log and _apollo_call_log[0] < cutoff:
+        _apollo_call_log.popleft()
+    if len(_apollo_call_log) >= _APOLLO_RATE_LIMIT_PER_HOUR:
+        logger.error(
+            f"[proximity-blast] Apollo rate limit hit "
+            f"({_APOLLO_RATE_LIMIT_PER_HOUR}/hr) — pausing"
+        )
+        raise RuntimeError("apollo_rate_limit_pause")
+    _apollo_call_log.append(now.timestamp())
+
+
+# ─── Real lead discovery ───────────────────────────────────────────
+
+async def discover_real_leads_via_apollo(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    count: int = 20,
+    industry_hint: str = "",
+) -> list:
+    """Find real local SMBs around (lat,lng) via Apollo.
+
+    Returns leads in the same shape used by all downstream consumers:
+        lead_id, business_name, owner_name, business_type, address,
+        lat, lng, distance_km, phone, email, rating, review_count,
+        match_score, status
+
+    Empty list if Apollo unavailable / 0 results. Never simulates.
+    Raises RuntimeError("apollo_rate_limit_pause") when the per-hour
+    budget is exhausted.
+    """
+    import os
+    if not os.environ.get("APOLLO_API_KEY"):
+        logger.warning("[proximity-blast] APOLLO_API_KEY missing — returning []")
+        return []
+
+    _check_apollo_rate_limit()
+
+    city, country = await _city_from_latlng(lat, lng)
+    if not city:
+        # Reverse-geocode failed. Don't fabricate a city — return empty.
+        logger.warning(
+            f"[proximity-blast] reverse-geocode produced no city for "
+            f"({lat:.4f},{lng:.4f}) — returning []"
+        )
+        return []
+
+    industry = industry_hint.strip() or "local business"
+    country_name = "Canada" if country.upper() == "CA" else (country or "Canada")
+
+    try:
+        from services.apollo_discovery import discover_organizations
+        orgs = await discover_organizations(
+            industry_keyword=industry,
+            city=city,
+            country=country_name,
+            per_page=max(1, min(count, 50)),
+        )
+    except Exception as e:
+        logger.error(f"[proximity-blast] Apollo call failed: {e}")
+        return []
+
     leads = []
-    for i in range(count):
-        lead_lat, lead_lng = _random_point_in_radius(lat, lng, radius_km)
-        distance = round(random.uniform(0.5, radius_km), 1)
-        first = random.choice(FIRST_NAMES)
-        last = random.choice(LAST_NAMES)
-        btype = random.choice(BUSINESS_TYPES)
-        street_num = random.randint(10, 9999)
-        street = random.choice(STREET_NAMES)
-
+    for i, org in enumerate(orgs[:count]):
+        # Apollo organizations don't expose a per-location lat/lng,
+        # so we use the search-anchor coordinate and tag distance as
+        # None — UI shows "in {city}" rather than a fake decimal.
         leads.append({
-            "lead_id": f"prox_{i+1:04d}",
-            "business_name": f"{first}'s {btype}",
-            "owner_name": f"{first} {last}",
-            "business_type": btype,
-            "address": f"{street_num} {street}",
-            "lat": lead_lat,
-            "lng": lead_lng,
-            "distance_km": distance,
-            "phone": f"+1{random.randint(200,999)}{random.randint(100,999)}{random.randint(1000,9999)}",
-            "email": f"{first.lower()}.{last.lower()}@{btype.lower().replace(' ', '')}.com",
-            "rating": round(random.uniform(3.5, 5.0), 1),
-            "review_count": random.randint(5, 300),
-            "match_score": random.randint(60, 98),
-            "status": random.choice(["new", "new", "new", "contacted", "interested"]),
+            "lead_id":       org.get("lead_id") or f"prox_{i + 1:04d}",
+            "business_name": org.get("business_name", ""),
+            "owner_name":    "",        # not in Apollo org payload
+            "business_type": org.get("industry") or industry,
+            "address":       f"{org.get('city','')}, {org.get('province','')}".strip(", "),
+            "lat":           None,
+            "lng":           None,
+            "distance_km":   None,
+            "phone":         org.get("phone", ""),
+            "email":         "",        # enriched downstream
+            "website":       org.get("website", ""),
+            "domain":        org.get("domain", ""),
+            "linkedin_url":  org.get("linkedin_url", ""),
+            "employees":     org.get("employees", 0),
+            "rating":        None,
+            "review_count":  None,
+            "match_score":   None,
+            "status":        "new",
+            "source":        "apollo_discovery",
         })
 
-    leads.sort(key=lambda x: x["distance_km"])
+    logger.info(
+        f"[proximity-blast] Apollo returned {len(leads)} real SMBs "
+        f"for {industry} near {city} (radius hint={radius_km}km, "
+        f"requested={count})"
+    )
     return leads
 
 
-# ═══════════════════════════════════════════════════════════════
-# BLAST CAMPAIGN MANAGEMENT
-# ═══════════════════════════════════════════════════════════════
+# Backwards-compatibility alias. `oracle_proactive.py` (and any other
+# legacy caller) still imports `generate_simulated_leads` by name. This
+# alias forwards to the real Apollo discovery. The old synchronous-fake
+# implementation has been deleted entirely (Rule 1).
+#
+# This wrapper will be removed in the next step once oracle_proactive
+# is updated to call `discover_real_leads_via_apollo` directly.
+async def generate_simulated_leads(lat: float, lng: float,
+                                     radius_km: float,
+                                     count: int = 20) -> list:
+    """DEPRECATED — calls the real Apollo discovery. Kept only so the
+    `oracle_proactive` import doesn't break before its own update."""
+    return await discover_real_leads_via_apollo(
+        lat, lng, radius_km, count=count,
+    )
+
+
+# ─── Config CRUD ───────────────────────────────────────────────────
 
 async def get_proximity_config(tenant_id: str) -> dict:
     """Get the proximity blast config for a tenant."""
     db = _get_db()
     defaults = {
-        "tenant_id": tenant_id,
-        "enabled": False,
-        "data_source": "simulated",
-        "default_radius_km": 10,
-        "business_lat": 43.6532,
-        "business_lng": -79.3832,
-        "addon_active": False,
-        "addon_price_monthly": 49,
-        "campaigns_run": 0,
+        "tenant_id":            tenant_id,
+        "enabled":              False,
+        "data_source":          "apollo",
+        "default_radius_km":    10,
+        "business_lat":         43.6532,
+        "business_lng":         -79.3832,
+        "addon_active":         False,
+        "addon_price_monthly":  49,
+        "campaigns_run":        0,
     }
     if db is None:
         return defaults
 
     config = await db.proximity_config.find_one(
-        {"tenant_id": tenant_id}, {"_id": 0}
+        {"tenant_id": tenant_id}, {"_id": 0},
     )
     if not config:
         return defaults
@@ -154,7 +253,7 @@ async def save_proximity_config(tenant_id: str, update: dict) -> dict:
         {
             "$set": safe_fields,
             "$setOnInsert": {
-                "tenant_id": tenant_id,
+                "tenant_id":  tenant_id,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             },
         },
@@ -163,29 +262,45 @@ async def save_proximity_config(tenant_id: str, update: dict) -> dict:
     return await get_proximity_config(tenant_id)
 
 
-async def run_blast(tenant_id: str, lat: float, lng: float, radius_km: float, count: int = 20) -> dict:
-    """Execute a proximity blast — discover leads in radius."""
+# ─── Campaign runner ───────────────────────────────────────────────
+
+async def run_blast(tenant_id: str, lat: float, lng: float,
+                      radius_km: float, count: int = 20,
+                      industry_hint: str = "") -> dict:
+    """Execute a proximity blast — discover real leads in radius.
+
+    Tenant config is honoured for radius defaults but `data_source` is
+    no longer a switch: there is exactly ONE source (Apollo). Legacy
+    configs still listing `"simulated"` are accepted but the call
+    silently uses Apollo.
+    """
     db = _get_db()
     config = await get_proximity_config(tenant_id)
-    source = config.get("data_source", "simulated")
+    _ = config.get("data_source", "apollo")   # honoured by db update only
 
-    if source == "live":
-        # Placeholder for Google Maps API integration
-        leads = generate_simulated_leads(lat, lng, radius_km, count)
-        source_label = "live_google_maps"
-    else:
-        leads = generate_simulated_leads(lat, lng, radius_km, count)
-        source_label = "simulated"
+    try:
+        leads = await discover_real_leads_via_apollo(
+            lat, lng, radius_km, count, industry_hint=industry_hint,
+        )
+    except RuntimeError as e:
+        # Rate-limit pause — surface to the caller rather than silently
+        # emit zero leads.
+        return {
+            "campaign":   None,
+            "leads":      [],
+            "total":      0,
+            "source":     "apollo",
+            "error":      str(e),
+        }
 
-    # Store campaign record
     campaign = {
-        "tenant_id": tenant_id,
-        "lat": lat,
-        "lng": lng,
-        "radius_km": radius_km,
+        "tenant_id":   tenant_id,
+        "lat":         lat,
+        "lng":         lng,
+        "radius_km":   radius_km,
         "leads_found": len(leads),
-        "data_source": source_label,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "data_source": "apollo",
+        "created_at":  datetime.now(timezone.utc).isoformat(),
     }
 
     if db is not None:
@@ -197,7 +312,7 @@ async def run_blast(tenant_id: str, lat: float, lng: float, radius_km: float, co
 
     return {
         "campaign": {k: v for k, v in campaign.items() if k != "_id"},
-        "leads": leads,
-        "total": len(leads),
-        "source": source_label,
+        "leads":    leads,
+        "total":    len(leads),
+        "source":   "apollo",
     }

@@ -24,17 +24,19 @@ class TOONStripeService:
     
     def __init__(self, db):
         self.db = db
-        
-        stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
-        
-        # Check if key is valid (not the placeholder test key)
-        if not stripe_key or stripe_key == "" or stripe_key == "sk_test_emergent":
-            logger.warning("[TOONStripe] STRIPE_API_KEY not set or invalid - running in mock mode")
-            self.mock_mode = True
-        else:
-            stripe.api_key = stripe_key
-            self.mock_mode = False
-            logger.info("[TOONStripe] Stripe initialized")
+
+        stripe_key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+
+        # Fail fast if the live key is missing or still the placeholder.
+        # No mock fallback — Rule 1: NO MOCKS IN PRODUCTION.
+        if not stripe_key or stripe_key == "sk_test_emergent":
+            raise RuntimeError(
+                "STRIPE_SECRET_KEY missing or invalid — "
+                "TOON billing requires a live Stripe secret key in env."
+            )
+
+        stripe.api_key = stripe_key
+        logger.info("[TOONStripe] Stripe initialized")
     
     async def get_or_create_stripe_product(
         self,
@@ -48,9 +50,6 @@ class TOONStripeService:
         Returns:
             Stripe product ID
         """
-        if self.mock_mode:
-            return f"mock_prod_{plan_id}"
-        
         try:
             # Check if product already exists
             plan_doc = await self.db.subscription_plans.find_one(
@@ -115,9 +114,6 @@ class TOONStripeService:
         Returns:
             Stripe price ID
         """
-        if self.mock_mode:
-            return f"mock_price_{plan_id}_{interval}"
-        
         try:
             # Check if price already exists
             price_field = f"stripe_price_id_{interval}ly"
@@ -241,7 +237,6 @@ class TOONStripeService:
                 "stripe_product_id": product_id,
                 "stripe_price_monthly": monthly_price_id,
                 "stripe_price_annual": annual_price_id,
-                "mock_mode": self.mock_mode
             }
         
         except Exception as e:
@@ -280,7 +275,6 @@ class TOONStripeService:
                 "total_plans": len(plans),
                 "synced": success_count,
                 "results": results,
-                "mock_mode": self.mock_mode
             }
         
         except Exception as e:
@@ -337,18 +331,7 @@ class TOONStripeService:
                     return sync_result
                 
                 price_id = sync_result.get(f"stripe_price_{billing_cycle}")
-            
-            if self.mock_mode:
-                # Mock checkout session
-                return {
-                    "success": True,
-                    "checkout_url": f"{success_url}?mock_session=true",
-                    "session_id": f"mock_cs_{plan_id}_{billing_cycle}",
-                    "mock_mode": True,
-                    "plan_id": plan_id,
-                    "billing_cycle": billing_cycle
-                }
-            
+
             # Create Stripe Checkout Session
             session_params = {
                 "mode": "subscription",
@@ -383,7 +366,6 @@ class TOONStripeService:
                 "session_id": session.id,
                 "plan_id": plan_id,
                 "billing_cycle": billing_cycle,
-                "mock_mode": False
             }
         
         except Exception as e:
