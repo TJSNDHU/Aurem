@@ -158,14 +158,9 @@ def test_run_blast_uses_apollo_path(monkeypatch):
     assert out["leads"] == [{"business_name": "X", "lead_id": "X1"}]
 
 
-def test_legacy_alias_forwards_to_real_function(monkeypatch):
-    """Backwards-compat alias for oracle_proactive must NOT fabricate."""
-    monkeypatch.setenv("APOLLO_API_KEY", "fake_for_test")
-    pb = _reload()
-    async def _fake_disc(lat, lng, radius_km, count, industry_hint=""):
-        return [{"src": "apollo", "real": True}]
-    monkeypatch.setattr(pb, "discover_real_leads_via_apollo", _fake_disc)
-    out = asyncio.run(pb.generate_simulated_leads(
-        43.6532, -79.3832, 10, count=1,
-    ))
-    assert out == [{"src": "apollo", "real": True}]
+def test_legacy_alias_removed():
+    """After Step 3, the temporary alias must be deleted — callers
+    must use `discover_real_leads_via_apollo` directly."""
+    src = _read(os.path.join(ROOT, "services", "proximity_blast.py"))
+    assert "async def generate_simulated_leads" not in src
+    assert "DEPRECATED" not in src

@@ -191,23 +191,6 @@ async def discover_real_leads_via_apollo(
     return leads
 
 
-# Backwards-compatibility alias. `oracle_proactive.py` (and any other
-# legacy caller) still imports `generate_simulated_leads` by name. This
-# alias forwards to the real Apollo discovery. The old synchronous-fake
-# implementation has been deleted entirely (Rule 1).
-#
-# This wrapper will be removed in the next step once oracle_proactive
-# is updated to call `discover_real_leads_via_apollo` directly.
-async def generate_simulated_leads(lat: float, lng: float,
-                                     radius_km: float,
-                                     count: int = 20) -> list:
-    """DEPRECATED — calls the real Apollo discovery. Kept only so the
-    `oracle_proactive` import doesn't break before its own update."""
-    return await discover_real_leads_via_apollo(
-        lat, lng, radius_km, count=count,
-    )
-
-
 # ─── Config CRUD ───────────────────────────────────────────────────
 
 async def get_proximity_config(tenant_id: str) -> dict:

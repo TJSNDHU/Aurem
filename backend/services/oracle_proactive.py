@@ -220,7 +220,7 @@ async def _trigger_background_scout(tenant_id: str) -> bool:
         return False  # Already ran recently
 
     try:
-        from services.proximity_blast import generate_simulated_leads
+        from services.proximity_blast import discover_real_leads_via_apollo
 
         # Get tenant location (default Toronto)
         config = await db.proximity_config.find_one(
@@ -229,25 +229,46 @@ async def _trigger_background_scout(tenant_id: str) -> bool:
         lat = config.get("business_lat", 43.6532) if config else 43.6532
         lng = config.get("business_lng", -79.3832) if config else -79.3832
 
-        leads = generate_simulated_leads(lat, lng, 15, count=10)
+        try:
+            leads = await discover_real_leads_via_apollo(
+                lat, lng, 15, count=10,
+                industry_hint="local business",
+            )
+        except RuntimeError as e:
+            logger.warning(
+                f"[ProactiveORA] Apollo paused for tenant {tenant_id}: {e}"
+            )
+            return False
+
+        if not leads:
+            return False
 
         # Queue in envoy_outreach
         now_iso = datetime.now(timezone.utc).isoformat()
         outreach_tasks = []
         for lead in leads:
+            biz_name = lead.get("business_name") or "your business"
+            biz_type = lead.get("business_type") or "business"
             outreach_tasks.append({
-                "tenant_id": tenant_id,
-                "lead_id": lead["lead_id"],
-                "business_name": lead["business_name"],
-                "owner_name": lead["owner_name"],
-                "email": lead["email"],
-                "phone": lead["phone"],
-                "business_type": lead["business_type"],
-                "distance_km": lead["distance_km"],
-                "outreach_type": "auto_scout_fill",
-                "status": "queued",
-                "script": f"Hi {lead['owner_name']}, I noticed your {lead['business_type']} is nearby. We help local businesses automate lead generation. Would a quick 10-minute call work this week?",
-                "created_at": now_iso,
+                "tenant_id":      tenant_id,
+                "lead_id":        lead.get("lead_id"),
+                "business_name":  biz_name,
+                "owner_name":     lead.get("owner_name") or "",
+                "email":          lead.get("email") or "",
+                "phone":          lead.get("phone") or "",
+                "website":        lead.get("website") or "",
+                "business_type":  biz_type,
+                "distance_km":    lead.get("distance_km"),
+                "outreach_type":  "auto_scout_fill",
+                "status":         "queued",
+                "script": (
+                    f"Hi there at {biz_name}, I noticed your {biz_type} "
+                    f"is nearby. We help local businesses automate lead "
+                    f"generation. Would a quick 10-minute call work "
+                    f"this week?"
+                ),
+                "created_at":     now_iso,
+                "source":         "apollo_discovery",
             })
 
         if outreach_tasks:
@@ -258,7 +279,7 @@ async def _trigger_background_scout(tenant_id: str) -> bool:
             "tenant_id": tenant_id,
             "lat": lat, "lng": lng, "radius_km": 15,
             "leads_found": len(leads),
-            "data_source": "simulated",
+            "data_source": "apollo",
             "source": "auto_scout",
             "created_at": now_iso,
         })
