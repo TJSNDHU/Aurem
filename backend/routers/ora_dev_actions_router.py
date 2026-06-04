@@ -64,9 +64,15 @@ async def list_pending(authorization: Optional[str] = Header(None)):
     db = _get_db()
     if db is None:
         raise HTTPException(503, "Database not wired")
+    # iter D-62 — exclude legacy/orphan docs that don't have a valid
+    # `proposal_id`. They render as #?? cards in the UI and can't be
+    # approved/rejected (the route would become /api/.../undefined/...).
     cursor = (
         db.ora_dev_actions
-        .find({"status": "pending"})
+        .find({
+            "status": "pending",
+            "proposal_id": {"$exists": True, "$ne": None, "$type": "string"},
+        })
         .sort("created_at", -1)
         .limit(50)
     )
@@ -84,7 +90,12 @@ async def list_actions(
     db = _get_db()
     if db is None:
         raise HTTPException(503, "Database not wired")
-    q: Dict[str, Any] = {}
+    # iter D-62 — every served row MUST have a real proposal_id, or the
+    # frontend renders #?? cards whose buttons 404. Orphans live in DB
+    # but are invisible to the UI — clean them via /cleanup endpoint.
+    q: Dict[str, Any] = {
+        "proposal_id": {"$exists": True, "$ne": None, "$type": "string"},
+    }
     if status:
         if status not in _VALID_STATUSES:
             raise HTTPException(400, f"Invalid status (allowed: {sorted(_VALID_STATUSES)})")
@@ -100,13 +111,51 @@ async def stats(authorization: Optional[str] = Header(None)):
     db = _get_db()
     if db is None:
         raise HTTPException(503, "Database not wired")
+    # iter D-62 — counts must mirror the list endpoint above: only proposals
+    # that have a real proposal_id are countable. Orphans get reported
+    # separately under `orphans` so the founder can see + clean them.
     counts = {s: 0 for s in _VALID_STATUSES}
-    pipeline = [{"$group": {"_id": "$status", "n": {"$sum": 1}}}]
+    pipeline = [
+        {"$match": {
+            "proposal_id": {"$exists": True, "$ne": None, "$type": "string"}
+        }},
+        {"$group": {"_id": "$status", "n": {"$sum": 1}}},
+    ]
     async for row in db.ora_dev_actions.aggregate(pipeline):
         s = row.get("_id") or "pending"
-        counts[s] = int(row.get("n", 0))
+        if s in counts:
+            counts[s] = int(row.get("n", 0))
     counts["total"] = sum(counts.values())
+    counts["orphans"] = await db.ora_dev_actions.count_documents({
+        "$or": [
+            {"proposal_id": {"$exists": False}},
+            {"proposal_id": None},
+            {"proposal_id": ""},
+        ],
+    })
     return {"ok": True, **counts}
+
+
+@router.post("/cleanup-orphans")
+async def cleanup_orphans(authorization: Optional[str] = Header(None)):
+    """iter D-62 — purge legacy proposals with no usable proposal_id.
+
+    These are old records from previous schema migrations. They render
+    as #?? cards in the UI and approve/reject 404s. Safe to delete:
+    the operator never had a way to act on them.
+    """
+    verify_admin(authorization)
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database not wired")
+    res = await db.ora_dev_actions.delete_many({
+        "$or": [
+            {"proposal_id": {"$exists": False}},
+            {"proposal_id": None},
+            {"proposal_id": ""},
+        ],
+    })
+    return {"ok": True, "deleted": int(res.deleted_count)}
 
 
 async def _transition(

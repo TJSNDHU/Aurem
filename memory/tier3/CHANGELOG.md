@@ -1,3 +1,25 @@
+## 2026-06-04 — iter D-62 — ORA Dev Console orphan-proposal purge
+
+**Bug:** Approve/Reject failing with "proposal undefined not found"; cards rendering as `#??`.
+
+**Root cause:** Legacy/orphan documents in `db.ora_dev_actions` had no `proposal_id` field (or null/empty). Frontend rendered them anyway → action buttons POST'd to `/api/admin/ora-dev/undefined/approve` → 404.
+
+**Fixes:**
+- `routers/ora_dev_actions_router.py`:
+  - `GET /pending` + `GET /list` now filter `proposal_id: {$exists, $ne null, $type "string"}`.
+  - `GET /stats` aggregates only valid rows; reports `orphans` count separately.
+  - `POST /cleanup-orphans` (new) — purges orphan docs in one shot.
+- `frontend/src/platform/OraDevConsole.jsx`:
+  - `onAct` guards undefined `id` with a friendly toast (never fires bad URL).
+  - "Clean N orphans" button appears in header when `counts.orphans > 0`.
+  - Stable React `key` even when `proposal_id` missing.
+  - `AlertTriangle` icon import added.
+
+**Verified live:** 13 orphan docs purged from preview DB. Stats now clean (3 pending / 2 approved / 1 applied / 1 rolled back). Approve flow returns `{ok: true, status: "approved"}` end-to-end.
+
+**Regression tests:** `backend/tests/test_d62_ora_dev_orphan_filter.py` — 4 tests covering pending-filter, list-filter, stats-orphans-separate, cleanup-deletes-orphans. **16/16 D-61+D-62 tests pass.**
+
+
 ## 2026-06-04 — iter D-61.b — Full mock purge + dead-code sweep
 
 **Mock removals (P0/P1):**

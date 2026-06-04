@@ -18,6 +18,7 @@ import {
   Code2,
   RefreshCw,
   GitBranch,
+  AlertTriangle,
 } from "lucide-react";
 import { safeFetchJson } from "../lib/safeFetchJson";
 
@@ -421,6 +422,13 @@ const OraDevConsole = () => {
 
   const onAct = useCallback(
     async (id, action) => {
+      // iter D-62 — frontend guard: never POST /undefined/approve.
+      // Orphan docs without proposal_id render as #?? cards and the
+      // backend now filters them out, but defensively block here too.
+      if (!id || typeof id !== "string") {
+        showToast(`✗ ${action}: proposal id missing — refresh or run Clean Orphans`, "bad");
+        return;
+      }
       setBusyId(id);
       try {
         const res = await safeFetchJson(`${API}/api/admin/ora-dev/${id}/${action}`, {
@@ -482,8 +490,38 @@ const OraDevConsole = () => {
       rejected: c.rejected || 0,
       rolled_back: c.rolled_back || 0,
       total: c.total || 0,
+      orphans: c.orphans || 0,
     };
   }, [stats]);
+
+  // iter D-62 — One-click purge for legacy proposals without proposal_id.
+  // These rendered as #?? cards whose approve/reject 404'd. Backend now
+  // filters them from /list, but the count in /stats lets the founder
+  // see them and remove for good with one click.
+  const onCleanOrphans = useCallback(async () => {
+    if (counts.orphans === 0) {
+      showToast("No orphans to clean — list is healthy", "info");
+      return;
+    }
+    const ok = window.confirm(
+      `Permanently delete ${counts.orphans} legacy proposals with no proposal_id?\n\nThese are unreachable from the UI and cannot be approved/rejected. This action cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      const res = await safeFetchJson(`${API}/api/admin/ora-dev/cleanup-orphans`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+      });
+      if (!res.ok) {
+        showToast(`✗ cleanup: ${res.error}`, "bad");
+        return;
+      }
+      showToast(`✓ purged ${res.data?.deleted ?? 0} orphan proposals`, "good");
+      fetchAll();
+    } catch (e) {
+      showToast(`✗ cleanup: ${e.message || e}`, "bad");
+    }
+  }, [counts.orphans, fetchAll]);
 
   return (
     <div
@@ -506,19 +544,32 @@ const OraDevConsole = () => {
             human approval required.
           </p>
         </div>
-        <button
-          onClick={fetchAll}
-          disabled={loading}
-          data-testid="ora-dev-refresh-btn"
-          className="text-[12px] px-3 py-1.5 rounded bg-zinc-900 border border-zinc-700 hover:border-zinc-500 text-zinc-200 flex items-center gap-1 disabled:opacity-40"
-        >
-          {loading ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-3.5" />
+        <div className="flex items-center gap-2">
+          {counts.orphans > 0 && (
+            <button
+              onClick={onCleanOrphans}
+              data-testid="ora-dev-clean-orphans-btn"
+              className="text-[12px] px-3 py-1.5 rounded bg-rose-950 border border-rose-700 hover:border-rose-500 text-rose-200 flex items-center gap-1.5"
+              title={`Delete ${counts.orphans} legacy proposals with no usable proposal_id`}
+            >
+              <AlertTriangle className="size-3.5" />
+              Clean {counts.orphans} orphan{counts.orphans === 1 ? "" : "s"}
+            </button>
           )}
-          Refresh
-        </button>
+          <button
+            onClick={fetchAll}
+            disabled={loading}
+            data-testid="ora-dev-refresh-btn"
+            className="text-[12px] px-3 py-1.5 rounded bg-zinc-900 border border-zinc-700 hover:border-zinc-500 text-zinc-200 flex items-center gap-1 disabled:opacity-40"
+          >
+            {loading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-3.5" />
+            )}
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats strip */}
@@ -560,8 +611,8 @@ const OraDevConsole = () => {
           </div>
         )}
 
-        {items.map((p) => (
-          <ProposalCard key={p.proposal_id} p={p} onAct={onAct} busyId={busyId} onTranslate={onTranslate} />
+        {items.map((p, idx) => (
+          <ProposalCard key={p.proposal_id || `orphan-${idx}`} p={p} onAct={onAct} busyId={busyId} onTranslate={onTranslate} />
         ))}
       </div>
 
