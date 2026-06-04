@@ -134,7 +134,7 @@ from fastapi import (
 )
 print("[STARTUP] FastAPI imported", flush=True)
 
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 print("[STARTUP] FastAPI extras imported", flush=True)
 
@@ -746,6 +746,71 @@ async def _liveness_api_health():
     import time as _t
     return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
             "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# iter D-63 — Smart readiness probe (zero-downtime deploy guarantee)
+#
+# K8s readinessProbe targets /api/ready. While Mongo is unreachable
+# (boot, network blip, Atlas failover), this endpoint returns 503 and
+# K8s holds traffic off the pod. As soon as Mongo responds to ping,
+# the pod becomes ready and ingress starts sending traffic.
+#
+# Cached for 5s so we don't hammer Mongo on every probe tick (K8s
+# probes every 2-10s). 1s timeout per ping so a slow Mongo can't
+# block the event loop and starve liveness.
+# ─────────────────────────────────────────────────────────────────────
+import asyncio as _ready_asyncio  # noqa: E402
+import time as _ready_time        # noqa: E402
+
+_READY_CACHE = {"ok": False, "checked_at": 0.0, "error": None}
+_READY_CACHE_TTL = 5.0
+_READY_PING_TIMEOUT = 1.0
+
+
+async def _check_db_ready() -> tuple[bool, str | None]:
+    """Cached Mongo ping with 1s timeout."""
+    now = _ready_time.monotonic()
+    if (now - _READY_CACHE["checked_at"]) < _READY_CACHE_TTL:
+        return _READY_CACHE["ok"], _READY_CACHE["error"]
+
+    ok, err = False, None
+    try:
+        if client is None:
+            err = "mongo_client_not_initialized"
+        else:
+            await _ready_asyncio.wait_for(
+                client.admin.command("ping"),
+                timeout=_READY_PING_TIMEOUT,
+            )
+            ok = True
+    except _ready_asyncio.TimeoutError:
+        err = f"mongo_ping_timeout_{int(_READY_PING_TIMEOUT*1000)}ms"
+    except Exception as e:
+        err = f"mongo_error:{type(e).__name__}"
+
+    _READY_CACHE["ok"] = ok
+    _READY_CACHE["checked_at"] = now
+    _READY_CACHE["error"] = err
+    return ok, err
+
+
+@app.get("/api/ready", include_in_schema=False)
+async def _readiness_api():
+    """Deep readiness check — Mongo must be reachable to return 200."""
+    ok, err = await _check_db_ready()
+    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
+    import time as _t
+    payload = {
+        "status": "ready" if ok else "not_ready",
+        "platform": "aurem",
+        "v": _BUILD_SHA,
+        "uptime_seconds": int(_t.monotonic() - _BOOT_TS),
+        "db": "ok" if ok else "unreachable",
+    }
+    if err:
+        payload["error"] = err
+    return JSONResponse(status_code=200 if ok else 503, content=payload)
 
 
 @app.get("/live", include_in_schema=False)
@@ -2804,6 +2869,23 @@ from bootstrap.image_cleanup import cleanup_broken_images, DEFAULT_IMAGES  # noq
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    # iter D-63 — Graceful APScheduler drain BEFORE other cleanup.
+    # `wait=True` lets currently-executing jobs finish (max ~misfire_grace).
+    # Critical for zero-downtime: prevents duplicate auto-blast sends and
+    # half-applied stem-fixes when K8s SIGTERMs the pod mid-cycle.
+    try:
+        sched = getattr(app.state, "scheduler", None)
+        if sched and getattr(sched, "running", False):
+            logging.info("[shutdown] Draining APScheduler (wait=True)...")
+            # Run in thread because APScheduler.shutdown is sync.
+            import asyncio as _async_mod
+            await _async_mod.get_event_loop().run_in_executor(
+                None, lambda: sched.shutdown(wait=True)
+            )
+            logging.info("✓ APScheduler drained")
+    except Exception as e:
+        logging.warning(f"Scheduler drain error: {e}")
+
     # Cancel pillar orchestrator first (clean shutdown of supervised tasks)
     try:
         if hasattr(app.state, "orchestrator"):

@@ -718,6 +718,7 @@ def register_all_routers(app, db):
         ("routers.uptime_webhook_router",      "External uptime webhook (iter 328c)"),
         ("routers.ora_feedback_router",        "ORA chat feedback (iter 329d)"),
         ("routers.outreach_admin_router",      "Outreach health + manual triggers (iter 330)"),
+        ("routers.feature_flags_router",       "Feature Flags admin (iter D-63 zero-downtime)"),
     ]
 
     for module_path, label in _aurem_with_db:
@@ -3311,6 +3312,15 @@ def register_all_routers(app, db):
             logger.warning(f"[REGISTRY] Agent system init failed: {ae}")
 
         aurem_scheduler.start()
+        # iter D-63 — expose scheduler so the shutdown handler in server.py
+        # can drain in-flight jobs (wait=True) on SIGTERM. Without this,
+        # rolling deploys can kill jobs mid-cycle → duplicate auto-blasts,
+        # half-applied stem-fixes, etc. Zero-downtime requires graceful drain.
+        try:
+            app.state.scheduler = aurem_scheduler
+            logger.info("[REGISTRY] scheduler exposed on app.state for graceful shutdown")
+        except Exception as _se:
+            logger.warning(f"[REGISTRY] could not attach scheduler to app.state: {_se}")
         logger.info("[REGISTRY] AUREM Bug Engine scheduler started (every 10 min)")
 
         # iter D-53 — weekly self-review for CTO learning system.

@@ -1,3 +1,50 @@
+## 2026-06-04 — iter D-63 — Zero-Downtime Deployment iteration (5 fixes)
+
+**Goal:** push AUREM from 80% → 100% zero-downtime deploys. Five focused fixes,
+all real (no mocks), all tested.
+
+### P0-1 · Smart Readiness Probe (Mongo-aware)
+- `middleware/health_probe.py`: split `_LIVENESS_PATHS` (instant) from readiness.
+  `/api/ready` no longer short-circuits in middleware → falls through to FastAPI handler.
+- `server.py`: new `/api/ready` endpoint does cached Mongo `ping` (1s timeout, 5s cache).
+  Returns 200 `{status: ready, db: ok}` or 503 `{status: not_ready, db: unreachable, error: …}`.
+- K8s readinessProbe should target `/api/ready` going forward. Pod won't receive
+  traffic until Mongo is reachable.
+
+### P0-2 · Graceful APScheduler Shutdown
+- `routers/registry.py`: scheduler now attached to `app.state.scheduler` after start.
+- `server.py` shutdown handler: drains scheduler with `shutdown(wait=True)` BEFORE
+  closing Mongo. Prevents duplicate auto-blast sends and half-applied stem-fixes when
+  K8s SIGTERMs the pod mid-cycle.
+
+### P1-1 · MIGRATION_RULES doc
+- New `memory/MIGRATION_RULES.md`: codifies the 3-deploy rule (Additive → Dual-Read → Cleanup),
+  allowed/forbidden single-deploy changes table, PR checklist to paste into every PR,
+  reference incidents (rename + scheduler kill).
+
+### P1-2 · SSE Reconnect Wrapper
+- New `frontend/src/lib/useReliableSSE.js`: React hook with exponential backoff (1s→30s with jitter),
+  reconnect on `visibilitychange` (tab refocus) + `online` event (net recovery),
+  Last-Event-ID resume, max-retries safety net. Drop-in replacement for `new EventSource(url)`.
+- 6 SSE consumers identified (`AgentCommandCenter`, `FrameworkMap`, `AuremDashboard`,
+  `ORACommandConsole`, `CampaignDashboard`, `CustomerScanner`); progressive migration as
+  per the additive rule.
+
+### P2 · Feature Flag System
+- New `services/feature_flags.py`: Mongo-backed flag store with deterministic per-tenant
+  bucketing (sha256(tenant+flag) % 100), 30s in-process cache.
+- New `routers/feature_flags_router.py`: admin CRUD at `/api/admin/feature-flags`
+  (list / get / upsert / delete / check?tenant=…).
+- Verified live: tenant-1 and tenant-2 both land in 75-99 bucket at 25% rollout
+  (deterministic).
+
+**Tests:** `backend/tests/test_d63_zero_downtime.py` — 12 new tests covering all 5 pieces.
+Combined D-61+D-62+D-63 + chip: **29/29 pass**.
+
+**Snapshot of today's (2026-06-04) campaign health** archived to
+`memory/CAMPAIGN_HEALTH_2026-06-04.md` for posterity.
+
+
 ## 2026-06-04 — iter D-62 — ORA Dev Console orphan-proposal purge
 
 **Bug:** Approve/Reject failing with "proposal undefined not found"; cards rendering as `#??`.

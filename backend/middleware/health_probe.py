@@ -81,12 +81,19 @@ _OK_HEADERS = [
 # pod gets killed when scheduler ticks (Sentinel/Bridge/A2A) saturate the
 # event loop with 60s Claude calls. Production observed 15+ consecutive
 # upstream timeouts on this path → this short-circuit prevents that.
-_PROBE_PATHS = frozenset({
-    "/health", "/ready", "/live",
+#
+# iter D-63 split — LIVENESS stays instant (just "process alive").
+# READINESS is handled by FastAPI handlers in server.py that do a
+# cached Mongo ping with a 1s timeout. K8s readinessProbe targets
+# /api/ready and traffic is held off the pod until Mongo is reachable.
+_LIVENESS_PATHS = frozenset({
+    "/health", "/live",
     "/api/health",            # alt mount used by some routers
-    "/api/platform/health",   # K8s liveness/readiness target (nginx rewrite)
-    "/api/ready",             # alt readiness mount
+    "/api/platform/health",   # K8s liveness target (nginx rewrite)
 })
+# Kept as legacy alias for callers still using /ready — points to liveness
+# fast path. The deep readiness check lives at /api/ready (FastAPI handler).
+_PROBE_PATHS = _LIVENESS_PATHS | frozenset({"/ready"})
 
 # ─────────────────────────────────────────────────────────────────────
 # Startup self-flood gate — during the first 90s of pod life the
