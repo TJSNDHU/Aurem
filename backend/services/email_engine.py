@@ -55,9 +55,13 @@ except Exception as _resend_err:
         # endpoint is a stable JSON API; we don't need their Python SDK
         # at all. This keeps prod sending mail even when the wheel is
         # missing submodules or otherwise unloadable.
-        _engine_logger.warning(
-            f"[email_engine] resend SDK completely unavailable ({_inner}); "
-            f"switching to direct HTTP fallback to api.resend.com/emails"
+        #
+        # iter D-63 — demoted to INFO. The HTTP fallback is a fully
+        # supported path (not a degraded mode); spamming a WARNING on
+        # every boot wrongly suggests something is broken.
+        _engine_logger.info(
+            f"[email_engine] resend SDK submodule unavailable ({_inner}); "
+            f"using direct HTTP path to api.resend.com/emails (intended)"
         )
 
         class _HttpEmails:
