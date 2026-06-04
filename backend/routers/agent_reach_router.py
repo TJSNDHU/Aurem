@@ -347,7 +347,7 @@ async def health():
         "philosophy": "zero-api-social-intelligence",
         "tools": {
             "twitter_search": {
-                "status": "available" if available.get("twitter_search") else "mock_mode",
+                "status": "available" if available.get("twitter_search") else "disabled",
                 "requires": "bird CLI + browser cookies"
             },
             "reddit_search": {
@@ -355,7 +355,7 @@ async def health():
                 "requires": "Exa API (free tier) or mock"
             },
             "youtube_transcript": {
-                "status": "available" if available.get("youtube_transcript") else "mock_mode",
+                "status": "available" if available.get("youtube_transcript") else "disabled",
                 "requires": "yt-dlp"
             },
             "web_reader": {

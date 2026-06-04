@@ -1155,18 +1155,24 @@ def register_all_routers(app, db):
                 except Exception as _bc_e:
                     logger.warning(f"[REGISTRY] bug_catch_router not loaded: {_bc_e}")
 
-                # iter D-60d — Apollo cost dashboard
+                # iter D-60d — Apollo cost dashboard + budget alert
                 try:
                     from routers.apollo_cost_router import (
                         router as _apollo_cost_router,
                         set_db as _set_apollo_cost_db,
                     )
+                    from routers.apollo_budget_router import (
+                        router as _apollo_budget_router,
+                        set_db as _set_apollo_budget_db,
+                    )
                     if db is not None:
                         _set_apollo_cost_db(db)
+                        _set_apollo_budget_db(db)
                     app.include_router(_apollo_cost_router)
-                    logger.info("[REGISTRY] apollo_cost_router wired")
+                    app.include_router(_apollo_budget_router)
+                    logger.info("[REGISTRY] apollo_cost + apollo_budget routers wired")
                 except Exception as _ac_e:
-                    logger.warning(f"[REGISTRY] apollo_cost_router not loaded: {_ac_e}")
+                    logger.warning(f"[REGISTRY] apollo cost/budget not loaded: {_ac_e}")
             logger.info("[REGISTRY] developer_portal_router loaded")
         except Exception as e:
             logger.warning(f"[REGISTRY] developer_portal_router not loaded: {e}")

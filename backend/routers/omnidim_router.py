@@ -89,7 +89,7 @@ def require_omnidim_enabled():
             detail={
                 "error": "OmniDimension not configured",
                 "message": "OMNIDIM_API_KEY or OMNIDIM_AGENT_ID environment variables are not set",
-                "mode": "scaffold",
+                "status": "disabled",
                 "action": "Set OMNIDIM_API_KEY and OMNIDIM_AGENT_ID in backend/.env"
             }
         )
@@ -565,10 +565,10 @@ async def get_integration_status():
         "description": "The Muscle - Voice AI Sales Rep reporting to AUREM Manager",
         "configuration": config_status,
         "connectivity": connectivity,
-        "mode": "live" if config_status.get("configured") else "scaffold",
-        "scaffold_note": None if config_status.get("configured") else (
-            "OmniDim not configured - operating in scaffold mode. "
-            "Set OMNIDIM_API_KEY and OMNIDIM_AGENT_ID to enable live calls."
+        "mode": "live" if config_status.get("configured") else "disabled",
+        "status_note": None if config_status.get("configured") else (
+            "OmniDim not configured. Set OMNIDIM_API_KEY and "
+            "OMNIDIM_AGENT_ID to enable live calls."
         ),
         "endpoints": {
             "post_call_webhook": "/api/brain/omnidim-callback",

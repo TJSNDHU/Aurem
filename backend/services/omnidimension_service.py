@@ -454,10 +454,17 @@ class OmniDimensionService:
     # ═══════════════════════════════════════════════════════════════════════════
     
     async def get_channel_analytics(self, business_id: str) -> Dict[str, Any]:
-        """Get analytics across all channels"""
+        """Get analytics across all channels. Returns zero-counts honestly
+        when the database isn't available — no fabricated traffic numbers."""
         if self.db is None:
-            return self._get_mock_analytics()
-        
+            return {
+                "business_id": business_id,
+                "channels":    {},
+                "totals":      {"inbound": 0, "outbound": 0, "total": 0},
+                "error":       "database_unavailable",
+                "timestamp":   datetime.now(timezone.utc).isoformat(),
+            }
+
         analytics = {}
         
         for channel in Channel:
@@ -494,22 +501,8 @@ class OmniDimensionService:
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
-    def _get_mock_analytics(self) -> Dict[str, Any]:
-        """Return mock analytics data"""
-        return {
-            "channels": {
-                "email": {"inbound": 1247, "outbound": 892, "total": 2139},
-                "whatsapp": {"inbound": 3456, "outbound": 2834, "total": 6290},
-                "voice": {"inbound": 234, "outbound": 567, "total": 801},
-                "web_chat": {"inbound": 1823, "outbound": 1654, "total": 3477},
-                "sms": {"inbound": 456, "outbound": 234, "total": 690}
-            },
-            "totals": {
-                "inbound": 7216,
-                "outbound": 6181,
-                "total": 13397
-            }
-        }
+    # _get_mock_analytics removed — get_channel_analytics now returns
+    # honest zero-counts when the database is unavailable.
 
 
 # Singleton
