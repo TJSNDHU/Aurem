@@ -329,6 +329,20 @@ async def _check_lead_pool() -> dict[str, Any]:
         "status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]},
     })
     if elig == 0:
+        # Distinguish "campaign caught up" (good problem) from "pool empty".
+        already_blasted = await _db.campaign_leads.count_documents({
+            "last_blast_at": {"$exists": True},
+        })
+        total = await _db.campaign_leads.count_documents({})
+        if total > 100 and already_blasted >= int(total * 0.80):
+            return {
+                "component": "lead_pool",
+                "status":   "yellow",
+                "headline": f"campaign caught up · {already_blasted} blasted / {total} total",
+                "detail":   "all current leads already contacted — top up to keep firing",
+                "issue":    "all_contacted",
+                "autofix":  "topup_via_scout",
+            }
         return {
             "component": "lead_pool",
             "status":   "red",
