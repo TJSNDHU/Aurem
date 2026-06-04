@@ -656,6 +656,69 @@ def _inject_guardrail(full_messages: list[dict[str, str]]
     return out
 
 
+def _build_skills_block(manifest_items: list) -> str:
+    """Render the skill manifest into a system-prompt section. The LLM
+    is told to emit `[[SKILL: <name> <json-args>]]` to invoke."""
+    if not manifest_items:
+        return ""
+    import json as _json
+    lines = [
+        "AVAILABLE SKILLS (real, not mock — invoke by emitting on its own line:",
+        "  [[SKILL: <name> <json-args>]]",
+        "Only ONE skill per reply. Only invoke when the user explicitly asks.",
+        "",
+    ]
+    for s in manifest_items:
+        params = ", ".join(p["name"] for p in s.get("params", []))
+        keys = ", ".join(s.get("requires_keys") or []) or "—"
+        lines.append(f"• {s['name']}({params}) — {s['description']} "
+                       f"[keys: {keys}]")
+    lines.append("\nExample: [[SKILL: apollo_lead_search "
+                  + _json.dumps({"industry": "dental clinic",
+                                  "city": "Mississauga", "count": 5})
+                  + "]]")
+    return "\n".join(lines)
+
+
+_SKILL_RE = None
+
+
+async def _maybe_invoke_skill(reply: str) -> dict | None:
+    """Detect `[[SKILL: name {json}]]` markers in LLM reply, invoke
+    the first one, return the result dict (or None if no marker)."""
+    global _SKILL_RE
+    if _SKILL_RE is None:
+        import re
+        _SKILL_RE = re.compile(
+            r"\[\[SKILL:\s*([a-z_]+)\s*(\{[^}]*\})?\s*\]\]", re.IGNORECASE,
+        )
+    m = _SKILL_RE.search(reply or "")
+    if not m:
+        return None
+    import json as _json
+    name = m.group(1)
+    raw_args = (m.group(2) or "{}").strip()
+    try:
+        args = _json.loads(raw_args)
+    except Exception:
+        return {"ok": False, "skill": name,
+                 "error": f"bad_json_args: {raw_args[:80]}"}
+    try:
+        from cto_skills import invoke
+        # Pass db only if skill declares it requires_db — registry
+        # handles the missing-db branch itself.
+        db = None
+        try:
+            from services.developer_portal_core import _get_db
+            db = _get_db()
+        except Exception:
+            pass
+        return await invoke(name, db=db, **args)
+    except Exception as e:
+        return {"ok": False, "skill": name,
+                 "error": f"{type(e).__name__}: {e}"}
+
+
 async def cto_chat(
     *,
     account: dict[str, Any],
@@ -708,13 +771,22 @@ async def cto_chat(
         }
 
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+
+    # Skill manifest injection. Gives the LLM the list of executable
+    # tools. LLM emits `[[SKILL: <name> <json-args>]]` on its own line;
+    # we parse it after the LLM call and run the real action.
+    try:
+        from cto_skills import manifest as _skill_manifest
+        _sblock = _build_skills_block(_skill_manifest())
+        if _sblock:
+            full_messages.insert(
+                1, {"role": "system", "content": _sblock},
+            )
+    except Exception as _se:
+        logger.warning(f"[cto_chat] skill manifest skipped: {_se}")
+
     # iter D-37 — intent-aware system prompt. Pick the conversation
-    # branch (build / question / conversational / diagnostic / strategic
-    # / unknown) from the LATEST user message and append the matching
-    # output contract so greetings, simple lookups, and casual turns no
-    # longer get the rigid build-scaffold treatment.
-    # iter D-40 — also check if the customer is non-technical; if yes
-    # append the NON-TECH MODE suffix (strips code/jargon/Plan format).
+    # branch from the latest user message.
     try:
         from services.aurem_cto_intent import (
             classify_intent, system_prompt_for, is_non_technical,
@@ -773,6 +845,24 @@ async def cto_chat(
         )
     except Exception as _guard_e:
         logger.warning(f"[cto_chat] output guard skipped: {_guard_e}")
+
+    # Skill-call detection. If the LLM emitted a [[SKILL: ...]] marker,
+    # execute the skill and append the JSON result to the reply so the
+    # founder + frontend see both the LLM thinking AND the real action.
+    skill_result = None
+    try:
+        skill_result = await _maybe_invoke_skill(reply)
+        if skill_result is not None:
+            import json as _json
+            reply = (
+                reply + "\n\n---\n**Skill executed:** "
+                + skill_result.get("skill", "?")
+                + "\n```json\n"
+                + _json.dumps(skill_result, indent=2)[:1500]
+                + "\n```"
+            )
+    except Exception as _ske:
+        logger.warning(f"[cto_chat] skill invocation failed: {_ske}")
 
     tokens_remaining = deduct.get("tokens_remaining")
     if tokens_remaining is None:
