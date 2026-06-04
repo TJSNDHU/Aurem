@@ -716,7 +716,10 @@ app = FastAPI(
 # ─────────────────────────────────────────────────────────────────────
 @app.get("/health", include_in_schema=False)
 async def _liveness_health():
-    return {"status": "healthy"}
+    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
+    import time as _t
+    return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
+            "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
 
 
 @app.get("/ready", include_in_schema=False)
@@ -731,12 +734,18 @@ async def _liveness_ready():
 # readiness/liveness probes during production cold-start.
 @app.get("/api/platform/health", include_in_schema=False)
 async def _liveness_platform_health():
-    return {"status": "healthy", "platform": "aurem"}
+    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
+    import time as _t
+    return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
+            "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
 
 
 @app.get("/api/health", include_in_schema=False)
 async def _liveness_api_health():
-    return {"status": "healthy"}
+    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
+    import time as _t
+    return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
+            "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
 
 
 @app.get("/live", include_in_schema=False)

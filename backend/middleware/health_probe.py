@@ -34,16 +34,45 @@ must be the LAST call made on the FastAPI app.
 
 from __future__ import annotations
 
+import os
+import subprocess
 import time
 from collections import OrderedDict
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-_OK_BODY = b'{"status":"ok","platform":"aurem"}'
+
+def _resolve_build_sha() -> str:
+    """Resolve a short build SHA once at import time.
+
+    Tries (in order): env BUILD_SHA → env GIT_SHA → `git rev-parse --short HEAD`.
+    Falls back to 'dev' so the chip never sticks on 'loading'.
+    """
+    for env_key in ("BUILD_SHA", "GIT_SHA", "VERSION_SHA"):
+        v = os.environ.get(env_key)
+        if v:
+            return v.strip()[:12]
+    try:
+        # Repo lives at /app — safe one-shot read at boot, not per-request.
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd="/app",
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        sha = (out.stdout or "").strip()
+        if sha:
+            return f"git-{sha}"
+    except Exception:
+        pass
+    return "dev"
+
+
+_BUILD_SHA = _resolve_build_sha()
 _OK_HEADERS = [
     (b"content-type", b"application/json"),
     (b"cache-control", b"no-store"),
-    (b"content-length", str(len(_OK_BODY)).encode()),
 ]
 
 # iter 322aa — K8s probe paths that MUST always reply <50ms.
@@ -207,15 +236,23 @@ class HealthProbeMiddleware:
 
         # 1. Liveness / readiness probe — always-instant 200
         if method in ("GET", "HEAD") and path in _PROBE_PATHS:
+            uptime_s = int(time.monotonic() - _BOOT_TS)
+            body = (
+                b'{"status":"ok","platform":"aurem","v":"'
+                + _BUILD_SHA.encode("ascii", errors="ignore")
+                + b'","uptime_seconds":' + str(uptime_s).encode() + b"}"
+            )
+            headers = _OK_HEADERS + [
+                (b"content-length", str(len(body)).encode()),
+            ]
             await send({
                 "type": "http.response.start",
                 "status": 200,
-                "headers": _OK_HEADERS,
+                "headers": headers,
             })
-            body = b"" if method == "HEAD" else _OK_BODY
             await send({
                 "type": "http.response.body",
-                "body": body,
+                "body": b"" if method == "HEAD" else body,
                 "more_body": False,
             })
             return

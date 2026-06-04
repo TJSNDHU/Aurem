@@ -1,3 +1,27 @@
+## 2026-06-04 — iter D-61 — SystemStatusChip "loading · 0m" red-state + Campaign Health blank + Stem-Fix display
+
+**Three production-feeling bugs spotted by founder on /admin/stem-fix:**
+
+1. **Top-right chip stuck on "loading · 0m" with red glow.**
+   Root cause: `HealthProbeMiddleware._OK_BODY` and the `server.py` fallback `/api/health` routes returned a static `{"status":"healthy"}` blob. `SystemStatusChip` + `BuildBadge` poll `/api/health` and expect `v` (build SHA) + `uptime_seconds`. Both fields were missing → chip rendered the placeholder string forever.
+   Fix: middleware now computes `_BUILD_SHA` once at import (env `BUILD_SHA` → `git rev-parse --short HEAD` → `dev`) and serialises `uptime_seconds` per request. All four probe paths (`/health`, `/api/health`, `/api/platform/health`, `/ready`) carry the same contract. Server-level fallbacks updated to match.
+
+2. **Campaign Health page blank, no rows shown.**
+   Root cause: `frontend/src/platform/CampaignHealthPage.jsx::adminHeaders()` was reading the wrong storage keys (`aurem.admin_jwt`, `aurem.dev_jwt`) which **don't exist** anywhere on the platform. Every request flew anonymous → 401 → silent failure → blank page.
+   Fix: rebuilt `adminHeaders()` to match the canonical fallback chain (`sessionStorage:platform_token` → `localStorage:platform_token` → `aurem_admin_token` → `token`). Page now shows the real 11-row report (5 green / 6 yellow / 0 red).
+
+3. **Stem-Fix Queue showed "No stem-fixes yet" despite Mongo having entries.**
+   Backend was already healthy — the queue's two real Claude-generated refactors (`cleanup_broken_images` + `usage_metering_middleware`, both `rejected`) now render correctly once `/pending` is reachable from the chip-tied auth state. Verified via Playwright screenshot.
+
+**Regression guard:** `backend/tests/test_health_chip_signal.py` pins the chip contract — any future drop of `v` or `uptime_seconds` from a health route fails the suite.
+
+**Files touched:**
+- `backend/middleware/health_probe.py` — `_BUILD_SHA` resolver + dynamic body.
+- `backend/server.py` — fallback liveness routes now mirror the chip contract.
+- `frontend/src/platform/CampaignHealthPage.jsx` — token-key fix.
+- `backend/tests/test_health_chip_signal.py` — new 3-test guard.
+
+
 ## 2026-05-21 — iter 325h — Retell voice call bug fix (silent TypeError)
 
 **Confirmation query proved the bug**: `db.auto_call_log.count_documents({"result.error": {"$regex": "TypeError"}})` returned **141/141 rows** — every single historical closer_ora attempt failed with:

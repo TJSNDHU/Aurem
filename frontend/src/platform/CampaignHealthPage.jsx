@@ -20,8 +20,12 @@ const API = process.env.REACT_APP_BACKEND_URL || "";
 function adminHeaders() {
   let token = "";
   try {
-    token = localStorage.getItem("aurem.admin_jwt") ||
-            localStorage.getItem("aurem.dev_jwt")   || "";
+    token = sessionStorage.getItem("platform_token") ||
+            localStorage.getItem("platform_token") ||
+            localStorage.getItem("aurem_admin_token") ||
+            sessionStorage.getItem("aurem_admin_token") ||
+            localStorage.getItem("token") ||
+            "";
   } catch { /* ignore */ }
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
