@@ -364,12 +364,13 @@ def _backend_pulse(coll_name: str, pillar_live_count: int, live_names: set[str])
     if _in_boot_grace():
         elapsed = int((datetime.now(timezone.utc) - _PROCESS_STARTED_AT).total_seconds())
         return "yellow", f"booting · orchestrator grace ({elapsed}s / {int(_ORCH_GRACE_SECONDS)}s)"
-    # iter D-34 — LITE-mode demote. If EVERY writer is a `p4:*` scheduler
+    # iter D-60d — LITE-mode demote. If EVERY writer is a `p4:*` scheduler
     # and the pod is in LITE mode, the writer is intentionally paused on
-    # prod to save RAM (D-13 work). Surface as yellow `lite_mode` instead
-    # of an outage-style red.
+    # prod to save RAM (D-13 work). This is BY DESIGN, not an outage —
+    # report green with explanatory reason so the founder sees the
+    # truth: "system is healthy, scheduler paused on purpose".
     if writers and all(w.startswith("p4:") for w in writers) and _is_lite_mode():
-        return "yellow", "lite_mode — writer paused on prod (saves RAM)"
+        return "green", "lite_mode — writer intentionally paused on prod (saves RAM)"
     return "red", f"0/{len(writers)} writers live"
 
 
@@ -411,9 +412,17 @@ _LITE_MODE_CACHE: Optional[bool] = None
 
 
 def _is_lite_mode() -> bool:
-    """Returns True when AUREM_LITE_MODE=1 OR the pod hostname looks like
-    Emergent production (so we never alarm the founder over schedulers
-    that prod intentionally disables to save RAM)."""
+    """Returns True when AUREM_LITE_MODE=1 OR the pod is production.
+
+    Production pods intentionally pause `p4:*` schedulers to save RAM.
+    Without this flag, the pillar-map BE side flashes red because the
+    expected writer task isn't registered in the asyncio loop.
+
+    We reuse `services.prod_guard.is_production_pod()` so the detection
+    matches the same 4 signals (Atlas URL, AUREM_ENV, APP_URL,
+    PREVIEW_PROXY_URL) used elsewhere — no second hostname heuristic
+    drift.
+    """
     global _LITE_MODE_CACHE
     if _LITE_MODE_CACHE is not None:
         return _LITE_MODE_CACHE
@@ -422,9 +431,19 @@ def _is_lite_mode() -> bool:
         if env_flag in ("1", "true", "yes", "on"):
             _LITE_MODE_CACHE = True
             return True
+        # Delegate to the canonical production detector.
+        try:
+            from services.prod_guard import is_production_pod
+            if is_production_pod():
+                _LITE_MODE_CACHE = True
+                return True
+        except Exception:
+            pass
+        # Hostname fallback for legacy preview pods.
         host = (os.environ.get("HOSTNAME") or "").lower()
         is_prod_pod = (
-            ("live-support" in host or "emergent.host" in host)
+            ("live-support" in host or "emergent.host" in host
+              or "cluster-" in host)
             and not host.startswith("agent-env-")
         )
         _LITE_MODE_CACHE = bool(is_prod_pod)
