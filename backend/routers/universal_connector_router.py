@@ -78,7 +78,7 @@ async def list_supported_platforms():
             {"type": "magento", "name": "Magento/Adobe Commerce", "status": "coming_soon", "icon": "server"},
             {"type": "square", "name": "Square POS", "status": "coming_soon", "icon": "credit-card"},
             {"type": "clover", "name": "Clover POS", "status": "coming_soon", "icon": "monitor"},
-            {"type": "stripe", "name": "Stripe", "status": "scaffold", "icon": "zap"},
+            {"type": "stripe", "name": "Stripe", "status": "not_configured", "icon": "zap"},
             {"type": "csv_manual", "name": "CSV Import", "status": "supported", "icon": "file-text"},
             {"type": "standalone", "name": "Standalone (Manual)", "status": "supported", "icon": "briefcase"},
         ],

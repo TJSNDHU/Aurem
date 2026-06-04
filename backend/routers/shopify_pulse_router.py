@@ -142,8 +142,16 @@ async def run_pulse_scan(body: ScanRequest, request: Request):
     token = await _get_shop_token(db, shop)
 
     if not token:
-        # Scaffold mode — return simulated scan
-        return _scaffold_scan(shop)
+        # Mock-purged: no fake scan when store not connected.
+        # Force the operator through OAuth at /settings/shopify so we
+        # only ever return real GraphQL-sourced data.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Shopify token not connected. "
+                "Complete OAuth at /settings/shopify"
+            ),
+        )
 
     issues = []
     total_products = 0
@@ -264,24 +272,12 @@ async def run_pulse_scan(body: ScanRequest, request: Request):
 
 
 def _scaffold_scan(shop: str) -> dict:
-    """Return simulated scan for shops without API access."""
-    return {
-        "shop": shop,
-        "health_score": 67,
-        "revenue_at_risk_monthly": 1240,
-        "total_products": 0,
-        "mode": "scaffold",
-        "issues": [
-            {"type": "missing_alt_text", "count": 47, "severity": "medium", "fix_available": True,
-             "description": "47 product images missing alt-text (estimated — connect store for exact count)"},
-            {"type": "abandoned_cart_rate", "value": "34%", "severity": "high", "fix_available": True,
-             "description": "34% cart abandonment rate (industry average — connect store for real data)"},
-            {"type": "slow_images", "count": 12, "severity": "medium", "fix_available": False,
-             "description": "12 images over 2MB (estimated — connect store for analysis)"},
-        ],
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
-        "note": "Connect your Shopify store for real-time scanning. This is a simulated report.",
-    }
+    """REMOVED iter D-61. Kept as a loud raiser so any forgotten caller
+    crashes loudly instead of silently faking data."""
+    raise RuntimeError(
+        "_scaffold_scan is removed (iter D-61 mock-purge). "
+        "Connect the store via OAuth and use real GraphQL data."
+    )
 
 
 # ═══════════════════════════════════════════════════
@@ -312,12 +308,8 @@ async def fix_alt_text(body: FixAltTextRequest, request: Request):
         errors = 0
 
         if not token:
-            yield f"data: {_sse_json({'type': 'info', 'message': 'Scaffold mode — generating simulated fixes'})}\n\n"
-            for i in range(5):
-                await asyncio.sleep(0.5)
-                yield f"data: {_sse_json({'type': 'fix', 'product': f'Product {i+1}', 'image': f'image_{i+1}.jpg', 'alt_text': f'Professional product photo for Product {i+1}', 'status': 'simulated'})}\n\n"
-                fixed += 1
-            yield f"data: {_sse_json({'type': 'complete', 'fixed': fixed, 'errors': 0, 'mode': 'scaffold'})}\n\n"
+            yield f"data: {_sse_json({'type': 'error', 'code': 'NOT_CONNECTED', 'message': 'Shopify token not connected. Complete OAuth at /settings/shopify'})}\n\n"
+            yield f"data: {_sse_json({'type': 'complete', 'fixed': 0, 'errors': 1, 'mode': 'not_connected'})}\n\n"
             return
 
         yield f"data: {_sse_json({'type': 'start', 'message': f'Scanning {shop} for missing alt-text...'})}\n\n"
@@ -468,11 +460,8 @@ async def fix_meta_descriptions(body: FixAltTextRequest, request: Request):
     async def stream():
         fixed, errors = 0, 0
         if not token:
-            for i in range(3):
-                await asyncio.sleep(0.4)
-                yield f"data: {_sse_json({'type': 'fix', 'product': f'Product {i+1}', 'meta_description': f'Shop Product {i+1} — premium quality, fast shipping.', 'status': 'simulated'})}\n\n"
-                fixed += 1
-            yield f"data: {_sse_json({'type': 'complete', 'fixed': fixed, 'errors': 0, 'fix_type': 'meta_descriptions', 'mode': 'scaffold'})}\n\n"
+            yield f"data: {_sse_json({'type': 'error', 'code': 'NOT_CONNECTED', 'message': 'Shopify token not connected. Complete OAuth at /settings/shopify'})}\n\n"
+            yield f"data: {_sse_json({'type': 'complete', 'fixed': 0, 'errors': 1, 'fix_type': 'meta_descriptions', 'mode': 'not_connected'})}\n\n"
             return
 
         yield f"data: {_sse_json({'type': 'start', 'message': f'Scanning {shop} for missing meta descriptions...'})}\n\n"
@@ -540,11 +529,8 @@ async def fix_page_titles(body: FixAltTextRequest, request: Request):
     async def stream():
         fixed, errors = 0, 0
         if not token:
-            for i in range(3):
-                await asyncio.sleep(0.4)
-                yield f"data: {_sse_json({'type': 'fix', 'product': f'Product {i+1}', 'seo_title': f'Product {i+1} | Shop', 'status': 'simulated'})}\n\n"
-                fixed += 1
-            yield f"data: {_sse_json({'type': 'complete', 'fixed': fixed, 'errors': 0, 'fix_type': 'page_titles', 'mode': 'scaffold'})}\n\n"
+            yield f"data: {_sse_json({'type': 'error', 'code': 'NOT_CONNECTED', 'message': 'Shopify token not connected. Complete OAuth at /settings/shopify'})}\n\n"
+            yield f"data: {_sse_json({'type': 'complete', 'fixed': 0, 'errors': 1, 'fix_type': 'page_titles', 'mode': 'not_connected'})}\n\n"
             return
 
         yield f"data: {_sse_json({'type': 'start', 'message': f'Scanning {shop} for missing/weak SEO titles...'})}\n\n"
@@ -605,11 +591,8 @@ async def fix_schema_markup(body: FixAltTextRequest, request: Request):
     async def stream():
         fixed, errors = 0, 0
         if not token:
-            for i in range(3):
-                await asyncio.sleep(0.4)
-                yield f"data: {_sse_json({'type': 'fix', 'product': f'Product {i+1}', 'schema_type': 'Product', 'status': 'simulated'})}\n\n"
-                fixed += 1
-            yield f"data: {_sse_json({'type': 'complete', 'fixed': fixed, 'errors': 0, 'fix_type': 'schema_markup', 'mode': 'scaffold'})}\n\n"
+            yield f"data: {_sse_json({'type': 'error', 'code': 'NOT_CONNECTED', 'message': 'Shopify token not connected. Complete OAuth at /settings/shopify'})}\n\n"
+            yield f"data: {_sse_json({'type': 'complete', 'fixed': 0, 'errors': 1, 'fix_type': 'schema_markup', 'mode': 'not_connected'})}\n\n"
             return
 
         yield f"data: {_sse_json({'type': 'start', 'message': f'Generating JSON-LD schema for {shop} products...'})}\n\n"
@@ -734,6 +717,14 @@ async def auto_fix_all(body: AutoFixAllRequest, request: Request):
     if not db:
         raise HTTPException(503, "DB not available")
     shop, token = body.shop, await _get_shop_token(db, body.shop)
+    if not token:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Shopify token not connected. "
+                "Complete OAuth at /settings/shopify"
+            ),
+        )
 
     async def stream():
         import json as _json
@@ -789,7 +780,11 @@ async def auto_fix_all(body: AutoFixAllRequest, request: Request):
 async def _run_fix_phase_alt(shop: str, token: str) -> dict:
     """Internal: fix alt-text, return counts."""
     if not token:
-        return {"fixed": 5, "errors": 0, "mode": "scaffold"}
+        # Master-autofix already 503s before reaching this. Defensive raise
+        # ensures no scaffolded counts ever leak into shopify_autofix_reports.
+        raise RuntimeError(
+            "Shopify token required for alt-text auto-fix (iter D-61 mock-purge)"
+        )
     fixed, errors = 0, 0
     q = """query ($cursor: String) { products(first: 20, after: $cursor) {
         edges { node { id title description images(first: 10) { edges { node { id altText } } } } }
@@ -823,7 +818,9 @@ async def _run_fix_phase_alt(shop: str, token: str) -> dict:
 
 async def _run_fix_phase_meta(shop: str, token: str) -> dict:
     if not token:
-        return {"fixed": 3, "errors": 0, "mode": "scaffold"}
+        raise RuntimeError(
+            "Shopify token required for meta-description auto-fix (iter D-61 mock-purge)"
+        )
     fixed, errors = 0, 0
     q = """query ($cursor: String) { products(first: 20, after: $cursor) {
         edges { node { id title description seo { description } } }
@@ -854,7 +851,9 @@ async def _run_fix_phase_meta(shop: str, token: str) -> dict:
 
 async def _run_fix_phase_titles(shop: str, token: str) -> dict:
     if not token:
-        return {"fixed": 3, "errors": 0, "mode": "scaffold"}
+        raise RuntimeError(
+            "Shopify token required for page-title auto-fix (iter D-61 mock-purge)"
+        )
     fixed, errors = 0, 0
     store_name = shop.split(".")[0].replace("-", " ").title()
     q = """query ($cursor: String) { products(first: 20, after: $cursor) {
@@ -886,7 +885,9 @@ async def _run_fix_phase_titles(shop: str, token: str) -> dict:
 
 async def _run_fix_phase_schema(shop: str, token: str) -> dict:
     if not token:
-        return {"fixed": 3, "errors": 0, "mode": "scaffold"}
+        raise RuntimeError(
+            "Shopify token required for schema-markup auto-fix (iter D-61 mock-purge)"
+        )
     fixed, errors = 0, 0
     q = """query ($cursor: String) { products(first: 20, after: $cursor) {
         edges { node { id title description

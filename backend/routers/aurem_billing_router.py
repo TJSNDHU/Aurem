@@ -88,10 +88,10 @@ async def get_stripe_status():
     if not s["configured"]:
         return {"mode": "not_configured", "message": s["reason"]}
     if s["mode"] == "test":
-        return {"mode": "mock", "message": "Stripe running in test mode"}
+        return {"mode": "test", "message": "Stripe running in test mode"}
     if s["mode"] == "live":
         return {"mode": "live", "message": "Stripe connected with live keys"}
-    return {"mode": "mock", "message": "Stripe key present but mode unknown"}
+    return {"mode": "unknown", "message": "Stripe key present but mode unknown"}
 
 
 

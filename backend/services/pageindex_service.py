@@ -146,13 +146,15 @@ async def query_document(tenant_id: str, doc_id: str, query: str) -> dict:
                 "reasoning": False,
             }
     else:
-        return {
-            "doc_id": doc_id,
-            "query": query,
-            "answer": "PageIndex not configured. Add PAGEINDEX_API_KEY to .env to enable document reasoning.",
-            "source": "mock",
-            "reasoning": False,
-        }
+        # Mock-purged iter D-61. Loud 503 instead of fake answer.
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "PAGEINDEX_API_KEY not set. "
+                "Add key to env to enable page indexing."
+            ),
+        )
 
 
 async def search_document(tenant_id: str, doc_id: str, query: str) -> dict:
@@ -186,7 +188,15 @@ async def search_document(tenant_id: str, doc_id: str, query: str) -> dict:
         except Exception as e:
             return {"doc_id": doc_id, "query": query, "sections": [], "source": "error", "error": str(e)}
     else:
-        return {"doc_id": doc_id, "query": query, "sections": [], "source": "mock"}
+        # Mock-purged iter D-61. Caller already handles HTTPException upstream.
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "PAGEINDEX_API_KEY not set. "
+                "Add key to env to enable page indexing."
+            ),
+        )
 
 
 async def get_tenant_documents(tenant_id: str) -> list:

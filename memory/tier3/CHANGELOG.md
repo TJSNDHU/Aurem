@@ -1,3 +1,23 @@
+## 2026-06-04 — iter D-61.b — Full mock purge + dead-code sweep
+
+**Mock removals (P0/P1):**
+- `routers/shopify_pulse_router.py` — `_scaffold_scan` now raises RuntimeError; all 9 scaffold-mode fallbacks (1 main + 4 SSE + 4 helpers + 1 master-autofix guard) replaced with HTTP 503 (`"Shopify token not connected. Complete OAuth at /settings/shopify"`) or RuntimeError. NOTE: this router is **LEAN-skipped in production** (`routers/_registry_config.py` line 68 → SKIP_IN_LEAN), so the mocks were never user-reachable — purged on principle.
+- `services/pageindex_service.py::search_document` + `query_document` — `{"source":"mock"}` returns replaced with HTTPException 503 (`"PAGEINDEX_API_KEY not set. Add key to env to enable page indexing."`).
+
+**Label fixes (cosmetic, no behavioural change):**
+- `routers/aurem_billing_router.py` `/stripe-status` — `"mode":"mock"` → `"mode":"test"` (Stripe test keys) / `"mode":"unknown"` (key present but mode indeterminate). Live keys already returned `"mode":"live"`.
+- `routers/universal_connector_router.py` `/platforms` — Stripe catalog entry `"status":"scaffold"` → `"status":"not_configured"`.
+
+**Dead-code purge:**
+- Deleted `backend/routers/public_api_admin_router.py` — duplicate of `admin_api_keys_router.py`; frontend never called it.
+- Deleted 7 unwired frontend pages (~5k lines): `AutonomousClock.jsx`, `ClientDashboard.jsx`, `Day7UpsellModal.jsx`, `FirstLoginWizard.jsx`, `OraDesktopSidebar.jsx`, `OraNotificationPanel.jsx`, `PlatformDashboard.jsx`.
+- Deleted `frontend/src/platform/index.js` — orphan barrel re-export; only re-exported `PlatformDashboard` which is also now gone; `PlatformLanding` and `PlatformAuth` are imported directly from their source files.
+
+**Regression tests added:** `backend/tests/test_d61_mock_purge.py` — 9 tests covering all 6 surface areas above. `40/40 tests pass` across D-61, chip, Stripe-purge, CTO-skills, and BugCatch suites.
+
+**Architecture map archived:** `memory/SYSTEM_AUDIT_2026-06-04.md` — covers 145 routers, 212 frontend pages, all 8 live integrations, pillar telemetry.
+
+
 ## 2026-06-04 — iter D-61 — SystemStatusChip "loading · 0m" red-state + Campaign Health blank + Stem-Fix display
 
 **Three production-feeling bugs spotted by founder on /admin/stem-fix:**
