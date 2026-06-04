@@ -1117,17 +1117,32 @@ async def _check_flow(flow: dict, live_names: set[str]) -> dict:
         be_side = "green"
         be_reason = f"auth-gated endpoint reachable (HTTP {be_status_code})"
         if sched_missing:
-            be_side = "red"
-            be_reason = (
-                f"scheduler(s) dead: {','.join(sched_missing)} "
-                f"(endpoint itself is auth-gated reachable)"
-            )
+            # LITE mode demote — all-p4 missing writers are intentionally
+            # paused on prod, NOT an outage.
+            if all(s.startswith("p4:") for s in sched_missing) and _is_lite_mode():
+                be_side = "green"
+                be_reason = (
+                    f"auth-gated endpoint reachable · "
+                    f"lite_mode: {','.join(sched_missing)} paused by design"
+                )
+            else:
+                be_side = "red"
+                be_reason = (
+                    f"scheduler(s) dead: {','.join(sched_missing)} "
+                    f"(endpoint itself is auth-gated reachable)"
+                )
     elif be_status_code >= 400:
         be_side = "yellow"
         be_reason = f"HTTP {be_status_code}"
     elif sched_missing:
-        be_side = "red"
-        be_reason = f"scheduler(s) dead: {','.join(sched_missing)}"
+        if all(s.startswith("p4:") for s in sched_missing) and _is_lite_mode():
+            be_side = "green"
+            be_reason = (
+                f"lite_mode — {','.join(sched_missing)} paused by design"
+            )
+        else:
+            be_side = "red"
+            be_reason = f"scheduler(s) dead: {','.join(sched_missing)}"
     elif be_body_status:
         # iter 280.14 — endpoint reported its own roll-up status
         be_side = be_body_status
