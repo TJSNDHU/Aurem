@@ -1,3 +1,48 @@
+## 2026-06-05 — iter D-67 — Voice channel visibility + engagement summary
+
+**Founder's question:** "Yeh dashboard se pata chalta hai kya chal raha hai
+kya nahi?" — pointed out that Retell AI is wired and used (closer-day-5
+auto-calls, hot-lead voice escalation), but Campaign Health was **blind to
+it**. WhatsApp showed yellow as if no high-touch channel existed.
+
+### Two new rows in Campaign Health
+1. **`voice_retell`** — checks `RETELL_API_KEY` + `RETELL_FROM_NUMBER` +
+   `RETELL_AGENT_ID` configuration, plus real Retell activity from
+   `voice_call_log` and `agent_ledger` (sub_type=`voice_retell`).
+   - 🟢 wired + idle 24h → "Retell wired · ready for closer triggers"
+   - 🟢 wired + active   → "N AI calls last 24h"
+   - 🟡 misconfigured    → exact missing env var named
+2. **`engagement_24h`** — the "kya chal raha hai" panel. Real Mongo counts
+   for the last 24h across all 4 outbound channels (email/sms/whatsapp/calls)
+   PLUS inbound signals (opens via `hot_lead_signal_at`, replies via
+   `outreach_history.type =~ ^reply_`). Auto-computed reply-rate and open-rate.
+
+### WhatsApp row re-graded to acknowledge voice fallback
+The `whapi` check now considers Retell as the high-touch fallback. If WHAPI
+is disabled (account restriction April-24) AND Retell is wired, the row
+shows green with the explicit message "WHAPI off · voice AI handles
+high-intent" rather than misleadingly yellow.
+
+### Live snapshot after D-67
+- 🟢 **10 green** (was 7): ghost_scout, resend, twilio, whapi (re-graded
+  with voice context), **voice_retell** (new), proactive_ora, template_perf,
+  daily_brief, emergent_llm, **engagement_24h** (new)
+- 🟡 **3 yellow** (was 4): auto_blast pool empty, lead_pool 1967/2010
+  saturated, resend_webhook URL not configured
+- 🔴 0 red
+
+### Why this matters
+The dashboard now answers the founder's question end-to-end: every outbound
+channel is visible (email, SMS, WhatsApp, voice), and engagement (opens +
+replies) is computed from real Mongo data — not implied from one source.
+The 3 remaining yellows are honest external-config items, not channel gaps.
+
+### Tests
+`backend/tests/test_d67_voice_retell_and_engagement.py` — 7 new tests
+covering shape, env-var coverage, per-channel counts, and the WhatsApp
+re-grade logic. Combined D-61 → D-67 = **70/70 PASS**.
+
+
 ## 2026-06-05 — iter D-66 — Campaign Health 6-yellow purge (real code fixes only)
 
 **Goal:** founder reported 6 yellows in Campaign Health. Fixed everything that's

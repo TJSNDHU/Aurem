@@ -207,11 +207,11 @@ async def _check_whapi() -> dict[str, Any]:
     dis = (os.environ.get("WHAPI_BLAST_DISABLED", "false").lower()
             in ("1", "true", "yes"))
     twilio_wa = os.environ.get("TWILIO_WA_FROM_NUMBER", "")
+    # iter D-67 — Retell voice is the high-touch fallback. If voice is
+    # wired AND active, WhatsApp gap stops being a blocker — it becomes
+    # an "additional channel" gap, not a "no outreach" gap.
+    retell_ok = bool(os.environ.get("RETELL_API_KEY", "").strip())
     if not tok:
-        # No WHAPI token. Honest state depends on whether Twilio WA is
-        # wired as the fallback. iter D-66 — make this green when an
-        # alternate channel exists; we're a campaign tool, not a single-
-        # vendor monitor.
         if twilio_wa:
             return {
                 "component": "whapi",
@@ -221,18 +221,24 @@ async def _check_whapi() -> dict[str, Any]:
                 "issue":    None,
                 "autofix":  None,
             }
+        if retell_ok:
+            return {
+                "component": "whapi",
+                "status":   "green",
+                "headline": "no WhatsApp · voice AI is the closer fallback",
+                "detail":   "high-intent leads → Retell AI calls (see voice_retell)",
+                "issue":    None,
+                "autofix":  None,
+            }
         return {
             "component": "whapi",
             "status":   "yellow",
-            "headline": "no WhatsApp channel wired",
-            "detail":   "neither WHAPI_API_TOKEN nor TWILIO_WA_FROM_NUMBER set",
-            "issue":    "no_wa_channel",
+            "headline": "no WhatsApp channel AND no voice fallback",
+            "detail":   "wire either WHAPI_API_TOKEN or RETELL_API_KEY",
+            "issue":    "no_high_touch_channel",
             "autofix":  None,
         }
     if dis:
-        # iter D-66 — explicit env disable IS the intended state when
-        # using Twilio WABA. Green if Twilio path exists; yellow only
-        # when no WA channel at all.
         if twilio_wa:
             return {
                 "component": "whapi",
@@ -242,11 +248,21 @@ async def _check_whapi() -> dict[str, Any]:
                 "issue":    None,
                 "autofix":  None,
             }
+        if retell_ok:
+            return {
+                "component": "whapi",
+                "status":   "green",
+                "headline": "WHAPI off · voice AI handles high-intent",
+                "detail":   ("WHAPI disabled (account restriction April-24) · "
+                              "Retell AI active for closers · see voice_retell"),
+                "issue":    None,
+                "autofix":  None,
+            }
         return {
             "component": "whapi",
             "status":   "yellow",
-            "headline": "WHAPI disabled and Twilio WA missing",
-            "detail":   "set TWILIO_WA_FROM_NUMBER or re-enable WHAPI",
+            "headline": "WHAPI disabled and no fallback channel",
+            "detail":   "set TWILIO_WA_FROM_NUMBER or RETELL_API_KEY",
             "issue":    "wa_fully_offline",
             "autofix":  None,
         }
@@ -508,6 +524,127 @@ async def _check_resend_webhook() -> dict[str, Any]:
     }
 
 
+async def _retell_active_24h() -> int:
+    """True voice-channel signal: how many AI calls happened in last 24h."""
+    if _db is None:
+        return 0
+    # Calls are logged in `voice_call_log` or `agent_ledger` with sub_type
+    # voice_retell. Try both for resilience.
+    try:
+        c1 = await _db.voice_call_log.count_documents({
+            "ts": {"$gte": _iso_minus(24)},
+        })
+    except Exception:
+        c1 = 0
+    try:
+        c2 = await _db.agent_ledger.count_documents({
+            "ts":       {"$gte": _iso_minus(24)},
+            "sub_type": "voice_retell",
+        })
+    except Exception:
+        c2 = 0
+    return max(c1, c2)
+
+
+async def _check_voice_retell() -> dict[str, Any]:
+    """iter D-67 — Retell AI voice channel health. Configured + recent
+    activity → green. Configured + idle → green (waiting for triggers).
+    Misconfigured → yellow."""
+    api_key  = os.environ.get("RETELL_API_KEY", "").strip()
+    from_no  = os.environ.get("RETELL_FROM_NUMBER", "").strip()
+    agent_id = os.environ.get("RETELL_AGENT_ID", "").strip()
+    if not api_key:
+        return {
+            "component": "voice_retell",
+            "status":   "yellow",
+            "headline": "RETELL_API_KEY missing",
+            "detail":   "no voice channel — closer-day-5 + high-intent calls disabled",
+            "issue":    "no_voice_channel",
+            "autofix":  None,
+        }
+    if not (from_no and agent_id):
+        return {
+            "component": "voice_retell",
+            "status":   "yellow",
+            "headline": "Retell partially configured",
+            "detail":   "RETELL_FROM_NUMBER or RETELL_AGENT_ID missing",
+            "issue":    "voice_partial_config",
+            "autofix":  None,
+        }
+    calls_24h = await _retell_active_24h()
+    if calls_24h == 0:
+        return {
+            "component": "voice_retell",
+            "status":   "green",
+            "headline": "Retell wired · idle 24h",
+            "detail":   "AI voice ready · fires on closer-day-5 + hot-lead triggers",
+            "issue":    None,
+            "autofix":  None,
+        }
+    return {
+        "component": "voice_retell",
+        "status":   "green",
+        "headline": f"{calls_24h} AI calls last 24h",
+        "detail":   f"voice channel active · agent={agent_id[:8]}…",
+        "issue":    None,
+        "autofix":  None,
+    }
+
+
+async def _check_engagement_summary() -> dict[str, Any]:
+    """iter D-67 — "Kya chal raha hai" snapshot. Real activity numbers
+    across every outreach channel in the last 24h. This is what the
+    founder actually wants to see: are we doing things, are leads
+    responding."""
+    if _db is None:
+        return {"component": "engagement_24h", "status": "red",
+                 "headline": "db unreachable", "detail": "",
+                 "issue": "db", "autofix": None}
+    cutoff = _iso_minus(24)
+    # Outbound — every kind of message we sent in last 24h
+    emails  = await _db.outreach_history.count_documents({
+        "ts": {"$gte": cutoff}, "channel": "email",
+    })
+    sms     = await _db.outreach_history.count_documents({
+        "ts": {"$gte": cutoff}, "channel": "sms",
+    })
+    wa      = await _db.outreach_history.count_documents({
+        "ts": {"$gte": cutoff}, "channel": "whatsapp",
+    })
+    calls   = await _retell_active_24h()
+    # Inbound — leads that engaged back
+    opens   = await _db.campaign_leads.count_documents({
+        "hot_lead_signal_at": {"$gte": cutoff},
+    })
+    replies = await _db.outreach_history.count_documents({
+        "ts": {"$gte": cutoff},
+        "type": {"$regex": "^reply_", "$options": "i"},
+    })
+    total_out = emails + sms + wa + calls
+    if total_out == 0:
+        return {
+            "component": "engagement_24h",
+            "status":   "yellow",
+            "headline": "no outbound activity last 24h",
+            "detail":   "pool may be empty or all channels off",
+            "issue":    "engine_idle",
+            "autofix":  "topup_via_scout",
+        }
+    reply_rate = (replies / total_out * 100) if total_out else 0
+    open_rate  = (opens / max(emails, 1) * 100) if emails else 0
+    return {
+        "component": "engagement_24h",
+        "status":   "green",
+        "headline": (
+            f"{total_out} touches · {opens} opens · {replies} replies "
+            f"({reply_rate:.1f}% reply, {open_rate:.1f}% open)"
+        ),
+        "detail":   f"email={emails} sms={sms} wa={wa} calls={calls}",
+        "issue":    None,
+        "autofix":  None,
+    }
+
+
 # ── Master report ────────────────────────────────────────────────────
 
 async def full_report() -> dict[str, Any]:
@@ -517,12 +654,14 @@ async def full_report() -> dict[str, Any]:
         _check_resend(),
         _check_twilio(),
         _check_whapi(),
+        _check_voice_retell(),       # iter D-67
         _check_proactive_ora(),
         _check_template_perf(),
         _check_daily_brief(),
         _check_lead_pool(),
         _check_emergent_llm(),
         _check_resend_webhook(),
+        _check_engagement_summary(), # iter D-67
     )
     by_status = {"green": 0, "yellow": 0, "red": 0}
     for r in rows:
