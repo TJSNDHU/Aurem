@@ -1,3 +1,50 @@
+## 2026-06-05 — iter D-68 — Admin sidebar dedupe (3 duplicates removed)
+
+**Founder feedback:** "Admin sidebar mein bahut options double show kar rahe
+hain — same window kisi or main bhi aa rahi hai, jaise Pillars Map. Like
+Founders Console is in ORA Unified."
+
+**Confirmed duplicates removed from sidebar (routes still mounted for
+direct-URL bookmarks):**
+
+1. **Founders Console** (`/admin/console`)
+   - The `AdminConsole` page is mounted as the "Console" tab inside
+     `/admin/ora` (ORA · Unified). Source comment in `OraAdminUnified.jsx`
+     literally references it as "the legacy /admin/console — chat with
+     ORA Brain".
+   - Sidebar entry under COCKPIT section removed.
+
+2. **Stem-Fix · Refactor** (`/admin/stem-fix`)
+   - Identical functionality rendered by `PendingCodeFixesPanel` embedded
+     inside `AdminPillarsMap.jsx`.
+   - Sidebar entry under HEALTH section removed.
+
+3. **Self-Repair** (`/admin/self-repair`)
+   - Identical functionality rendered by `AutonomousRepairPanel` embedded
+     inside `AdminPillarsMap.jsx`.
+   - Sidebar entry under HEALTH section removed.
+
+**What stayed (intentionally not duplicates):**
+- `AdminMemoir` (Git-versioned KV store) vs `LessonSources` tab in ORA
+  Unified (Tier-1/Tier-2 lesson files at boot) — different data.
+- `System Pulse Live` (live endpoint sweep + QA) vs `System Overview`
+  (investor demo) — different purpose.
+- `Sentinel` / Diagnostics vs the sentinel overlay inside Pillars Map
+  (overlay is summary; standalone page is deep dive).
+- `Git Commit Gate` (approve / reject commits) vs `DeployStatusPanel`
+  inside Pillars Map (read-only drift) — different concern.
+- `AdminOpenFang` (Lead-Hand webhook) vs `AdminLeadsMining` (in-house
+  discovery) — different upstream.
+
+**Sidebar item count:** 36 → 33 (six sections retained, navigation
+density reduced).
+
+**Tests:** `backend/tests/test_d68_sidebar_dedupe.py` — 10 new tests
+covering: removals from sidebar, route mounts still alive in App.js,
+embedded panels still present at the new home, source breadcrumb. Combined
+D-61 → D-68 = **80/80 PASS**.
+
+
 ## 2026-06-05 — iter D-67 — Voice channel visibility + engagement summary
 
 **Founder's question:** "Yeh dashboard se pata chalta hai kya chal raha hai

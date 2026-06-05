@@ -39,14 +39,20 @@ import BugCatchWidget from './BugCatchWidget';   // iter D-60
 const API = BACKEND_URL;
 
 // ─────────────────────────────────────────────────────────────
-// SIDEBAR TREE — 22 items, 6 sections
+// SIDEBAR TREE — 33 items, 6 sections (iter D-68: -3 sidebar duplicates)
+// Removed (still accessible via direct URL):
+//   /admin/console      → Console tab inside /admin/ora
+//   /admin/stem-fix     → PendingCodeFixesPanel inside /admin/pillars-map
+//   /admin/self-repair  → AutonomousRepairPanel inside /admin/pillars-map
 // ─────────────────────────────────────────────────────────────
 const SECTIONS = [
   {
     id: 'cockpit', label: 'COCKPIT', icon: Crown, accent: '#4A8FD4', pillar: 'P1',
     blurb: 'Observe — P&L, burn, system pulse',
     items: [
-      { to: '/admin/console',            label: 'Founders Console',    icon: Brain,   hint: 'g c' },
+      // iter D-68 — `/admin/console` removed from sidebar. Lives as the
+      // `Console` tab inside ORA · Unified (/admin/ora?tab=console).
+      // Direct route still works for bookmarks.
       { to: '/admin/awb-cockpit',        label: 'Auto Site Cockpit',   icon: Globe,   hint: 'g w' },
       { to: '/admin/boardroom',          label: 'Boardroom · P&L',     icon: Trophy,  hint: 'g b' },
       { to: '/admin/system-pulse-live',  label: 'System Pulse · Live', icon: Zap,     hint: 'g p' },
@@ -89,8 +95,10 @@ const SECTIONS = [
       { to: '/admin/pillars-map',        label: 'Pillars Map',         icon: Map,        hint: '' },
       { to: '/admin/sentinel',           label: 'Diagnostics',         icon: Shield,     hint: 'g x' },
       { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity,   hint: 'g h' },
-      { to: '/admin/stem-fix',           label: 'Stem-Fix · Refactor', icon: GitBranch,  hint: '' },
-      { to: '/admin/self-repair',        label: 'Self-Repair',         icon: RotateCcw,  hint: '' },
+      // iter D-68 — `/admin/stem-fix` and `/admin/self-repair` removed
+      // from sidebar. Both surface inside Pillars Map as embedded panels
+      // (PendingCodeFixesPanel + AutonomousRepairPanel). Direct routes
+      // still work for bookmarks.
       { to: '/admin/integrations',       label: 'Integrations',        icon: KeyRound,   hint: 'g i' },
       { to: '/admin/git-gate',           label: 'Git Commit Gate',     icon: GitBranch,  hint: '' },
     ],
