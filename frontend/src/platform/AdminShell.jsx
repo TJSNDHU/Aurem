@@ -39,11 +39,13 @@ import BugCatchWidget from './BugCatchWidget';   // iter D-60
 const API = BACKEND_URL;
 
 // ─────────────────────────────────────────────────────────────
-// SIDEBAR TREE — 33 items, 6 sections (iter D-68: -3 sidebar duplicates)
+// SIDEBAR TREE — 31 items, 6 sections (iter D-69: -2 more per founder request)
 // Removed (still accessible via direct URL):
 //   /admin/console      → Console tab inside /admin/ora
 //   /admin/stem-fix     → PendingCodeFixesPanel inside /admin/pillars-map
 //   /admin/self-repair  → AutonomousRepairPanel inside /admin/pillars-map
+//   /admin/blocks       → Pillar Blocks (iter D-69)
+//   /admin/root-command → Root Command (iter D-69)
 // ─────────────────────────────────────────────────────────────
 const SECTIONS = [
   {
@@ -57,7 +59,8 @@ const SECTIONS = [
       { to: '/admin/boardroom',          label: 'Boardroom · P&L',     icon: Trophy,  hint: 'g b' },
       { to: '/admin/system-pulse-live',  label: 'System Pulse · Live', icon: Zap,     hint: 'g p' },
       { to: '/admin/system-overview',    label: 'System Overview',     icon: Layers,  hint: 'g s' },
-      { to: '/admin/blocks',             label: 'Pillar Blocks',       icon: Grid3x3, hint: 'g B' },
+      // iter D-69 — `/admin/blocks` (Pillar Blocks) removed from sidebar
+      // per founder request. Route still mounted for bookmarks.
     ],
   },
   {
@@ -83,7 +86,8 @@ const SECTIONS = [
       { to: '/admin/avatar-manager',     label: 'Avatar Manager',      icon: Sparkles,hint: '' },
       { to: '/admin/leads-mining',       label: 'Leads Mining',        icon: Pickaxe, hint: '' },
       { to: '/admin/vanguard',           label: 'Vanguard',            icon: Sword,   hint: '' },
-      { to: '/admin/root-command',       label: 'Root Command',        icon: Terminal,hint: 'g r' },
+      // iter D-69 — `/admin/root-command` removed from sidebar per
+      // founder request. Route still mounted for bookmarks.
       { to: '/admin/skills-library',     label: 'Skills Library · 1.4k',icon: Sparkles,hint: 'g l' },
       { to: '/admin/memoir',             label: 'Memoir · Memory',     icon: GitBranch,hint: 'g M' },
     ],
