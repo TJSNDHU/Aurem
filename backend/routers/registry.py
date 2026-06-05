@@ -719,6 +719,7 @@ def register_all_routers(app, db):
         ("routers.ora_feedback_router",        "ORA chat feedback (iter 329d)"),
         ("routers.outreach_admin_router",      "Outreach health + manual triggers (iter 330)"),
         ("routers.feature_flags_router",       "Feature Flags admin (iter D-63 zero-downtime)"),
+        ("routers.web_search_router",          "Web Search + URL Fetch (iter D-64 Tavily skills)"),
     ]
 
     for module_path, label in _aurem_with_db:

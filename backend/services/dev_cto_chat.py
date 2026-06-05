@@ -270,11 +270,43 @@ import re as _re
 
 _SEARCH_PREFIX_RE = _re.compile(r"^\s*/(search|web)\s+(.+)$", _re.I)
 _SEARCH_INTENT_RE = _re.compile(
-    r"\b(search for|look\s*up|google|find me|fetch|latest|today's|today|"
-    r"current|recent|right now|this (?:week|month|year)|in (?:202[4-9]|203\d))\b",
+    r"\b(search for|search karo|look\s*up|google|find me|fetch|latest|today's|today|"
+    r"current|recent|right now|this (?:week|month|year)|in (?:202[4-9]|203\d)|"
+    # iter D-64 — Hinglish triggers
+    r"kya hai|kya hota|btao to|kaha milega|kaha hai|news|khabar)\b",
     _re.I,
 )
 _URL_RE = _re.compile(r"https?://[^\s)<>\"']+", _re.I)
+
+# iter D-64 — internal/dev URLs that should NEVER trigger a Tavily fetch.
+# Users debugging often paste their own admin routes; following them would
+# waste API credit AND risk pulling auth-protected internals into the LLM
+# context.
+_INTERNAL_URL_HOSTS = (
+    "localhost", "127.0.0.1", "0.0.0.0",
+    "aurem.live", "www.aurem.live",
+    ".preview.emergentagent.com",
+    ".emergent.app",
+    ".emergent.sh",
+    ".cluster-",                  # K8s internal DNS
+)
+
+
+def _is_internal_url(url: str) -> bool:
+    """True when the URL points to AUREM itself or local/dev infra."""
+    if not url:
+        return False
+    low = url.lower()
+    # Strip scheme
+    rest = low.split("://", 1)[-1]
+    host = rest.split("/", 1)[0].split("?", 1)[0].split(":", 1)[0]
+    for needle in _INTERNAL_URL_HOSTS:
+        if needle.startswith("."):
+            if host.endswith(needle) or needle[1:] in host:
+                return True
+        elif host == needle or host.endswith("." + needle):
+            return True
+    return False
 
 
 def _extract_search_query(user_msg: str) -> str | None:
@@ -286,10 +318,11 @@ def _extract_search_query(user_msg: str) -> str | None:
     m = _SEARCH_PREFIX_RE.match(user_msg)
     if m:
         return m.group(2).strip()[:200]
-    # URL anywhere → research the URL.
+    # URL anywhere → research the URL — but skip internal/dev URLs.
     urls = _URL_RE.findall(user_msg)
-    if urls:
-        return urls[0]
+    for u in urls:
+        if not _is_internal_url(u):
+            return u
     if _SEARCH_INTENT_RE.search(user_msg):
         # Use the whole question as the query (Tavily handles natural language).
         return user_msg.strip()[:200]

@@ -1,3 +1,34 @@
+## 2026-06-04 — iter D-64 — Web Search + URL Fetch (Tavily skills)
+
+**Goal:** ORA can search the internet AND read pasted URLs — no mocks, real Tavily API.
+
+**3 new CTO skills** added to `/app/backend/cto_skills/tavily_search.py`:
+- `web_search(query, max_results, search_depth, include_domains?, exclude_domains?)` — live Tavily search, returns title/url/snippet/score per result.
+- `fetch_url(url, extract_depth)` — Tavily Extract API, cleaned content (up to 8k chars).
+- `web_search_and_summarize(query, max_results)` — combined search + Tavily's one-line answer + citations.
+
+All raise `RuntimeError` with the exact env-var name when `TAVILY_API_KEY` is missing. Zero mock paths.
+
+**Auto-detect (Q2 ✅ option a):**
+- `services/dev_cto_chat.py::_extract_search_query` extended with Hinglish triggers (`kya hai`, `btao`, `search karo`, `kaha milega`, `news`, `khabar`).
+- New `_is_internal_url()` blocklist refuses `aurem.live`, `localhost`, `127.0.0.1`, `.preview.emergentagent.com`, `.emergent.app|.sh`, `.cluster-*`. ORA never wastes Tavily credit on internal admin routes.
+
+**3 new admin REST endpoints** (`routers/web_search_router.py`):
+- `POST /api/admin/web/search`  — direct skill access for the founder + future public API.
+- `POST /api/admin/web/fetch`   — same blocklist applied defense-in-depth.
+- `POST /api/admin/web/answer`  — search + summary in one shot.
+- `GET  /api/admin/web/health`  — checks if TAVILY_API_KEY is set.
+
+**Live verified (preview):**
+- `web_search` "Anthropic Claude Sonnet 4.5 pricing 2026" → 3 real ranked results (pricepertoken.com, silicondata.com, openrouter.ai).
+- `fetch_url` https://example.com → 834 chars of cleaned RFC 2606 text.
+- `POST /fetch` with `aurem.live` URL → 400 "internal URL refused" (security).
+
+**Tests:** `backend/tests/test_d64_web_search_skills.py` — 17 tests, ALL PASS including 3 LIVE Tavily API hits (real network round-trip). Combined D-61+D-62+D-63+D-64+chip = **46/46 pass**.
+
+**Cost note:** Tavily basic ≈ $0.008/query. Auto-detect heuristics keep this from firing on every chat turn — only on URL paste / explicit search keyword / recency words.
+
+
 ## 2026-06-04 — iter D-63 — Zero-Downtime Deployment iteration (5 fixes)
 
 **Goal:** push AUREM from 80% → 100% zero-downtime deploys. Five focused fixes,

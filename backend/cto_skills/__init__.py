@@ -21,5 +21,6 @@ from . import apollo_lead_search  # noqa: F401
 from . import send_email_via_resend  # noqa: F401
 from . import remember        # noqa: F401
 from . import recall          # noqa: F401
+from . import tavily_search   # noqa: F401  # iter D-64 — web_search + fetch_url + summarize
 
 __all__ = ["skill", "invoke", "list_skills", "manifest"]
