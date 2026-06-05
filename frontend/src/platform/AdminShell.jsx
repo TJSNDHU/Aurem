@@ -27,7 +27,7 @@ import {
   // Settings
   Lock, DollarSign, Hash, Eye,
   // HUD
-  Flame, Dot, LogOut, MessageSquare,
+  Flame, Dot, LogOut, MessageSquare, FileCode,
 } from 'lucide-react';
 import { getPlatformToken, clearAdminAuth, forceLogoutAdminEverywhere } from '../utils/secureTokenStore';
 import { BACKEND_URL } from '../lib/api';
@@ -39,7 +39,7 @@ import BugCatchWidget from './BugCatchWidget';   // iter D-60
 const API = BACKEND_URL;
 
 // ─────────────────────────────────────────────────────────────
-// SIDEBAR TREE — 31 items, 6 sections (iter D-69: -2 more per founder request)
+// SIDEBAR TREE — 32 items, 6 sections (iter D-69: -2 dupes, iter D-70: +1 Codebase Health)
 // Removed (still accessible via direct URL):
 //   /admin/console      → Console tab inside /admin/ora
 //   /admin/stem-fix     → PendingCodeFixesPanel inside /admin/pillars-map
@@ -97,6 +97,7 @@ const SECTIONS = [
     blurb: 'System integrity · diagnostics',
     items: [
       { to: '/admin/pillars-map',        label: 'Pillars Map',         icon: Map,        hint: '' },
+      { to: '/admin/codebase-health',    label: 'Codebase Health',     icon: FileCode,   hint: '' },
       { to: '/admin/sentinel',           label: 'Diagnostics',         icon: Shield,     hint: 'g x' },
       { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity,   hint: 'g h' },
       // iter D-68 — `/admin/stem-fix` and `/admin/self-repair` removed

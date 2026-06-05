@@ -88,6 +88,7 @@ import AdminRootCommand from './platform/AdminRootCommand';
 import AuditLiveDashboard from './platform/admin/AuditLiveDashboard';
 import AdminStemFix from './platform/AdminStemFix';
 import AdminPillarsMap from './platform/AdminPillarsMap';
+import AdminCodebaseHealth from './platform/AdminCodebaseHealth';
 import AdminSidebarBlocks from './platform/AdminSidebarBlocks';
 import AdminVanguard from './platform/AdminVanguard';
 import SystemOverview from './platform/SystemOverview';
@@ -424,6 +425,7 @@ function AppRouter() {
         <Route path="/admin/audit-live" element={<AuditLiveDashboard />} />
         <Route path="/admin/stem-fix" element={<AdminStemFix />} />
         <Route path="/admin/pillars-map" element={<AdminPillarsMap />} />
+        <Route path="/admin/codebase-health" element={<AdminCodebaseHealth />} />
         <Route path="/admin/blocks" element={<AdminSidebarBlocks />} />
         <Route path="/admin/vanguard" element={<AdminVanguard />} />
         <Route path="/admin/case-study" element={<AdminCaseStudy />} />

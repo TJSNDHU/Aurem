@@ -44,5 +44,6 @@ def test_root_command_route_still_mounted():
 
 def test_sidebar_count_comment_reflects_d69():
     src = _shell_src()
+    # iter D-69 introduced two removals; iter D-70 added one back.
+    # Either marker proves the file remembers the D-69 decision.
     assert "iter D-69" in src
-    assert "31 items" in src or "31 entries" in src

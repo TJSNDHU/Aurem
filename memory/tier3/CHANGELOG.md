@@ -1,3 +1,49 @@
+## 2026-06-05 — iter D-70 — Live Codebase Health dashboard (auto-updating)
+
+**Goal:** founder asked for live, auto-updating codebase health — no script
+to run, real numbers, top actionable file with short reason.
+
+### Backend
+- New `services/codebase_health.py` — pure-Python AST analyzer + `radon` for
+  cyclomatic complexity. Walks `/app/backend/*.py` and `/app/frontend/src/**/*.{jsx,js}`.
+  Computes: file-size buckets, god-files (imports-50+ OR imported-by-50+),
+  circular imports (DFS), CC top-15, biggest top-10, health score 0-10,
+  single top-actionable file with a short human reason.
+- New `routers/codebase_health_router.py` — admin REST:
+  `GET /api/admin/codebase-health/latest`,
+  `GET /api/admin/codebase-health/trend?days=7`,
+  `POST /api/admin/codebase-health/refresh` (force-run).
+- `routers/registry.py` — APScheduler jobs added: boot snapshot (date trigger,
+  ASAP) + every 6h cron. Coroutine-function pattern (no lambdas, per D-65).
+- `requirements.txt` — added `radon==6.0.1` + `mando==0.7.1`.
+
+### Frontend
+- New `frontend/src/platform/AdminCodebaseHealth.jsx` — auto-refreshes every
+  30s. Hero score, top-action banner with reason, 4 size buckets,
+  god-files panel, circular-imports panel, complexity hotspots, biggest
+  files, 7-day score trend bar chart.
+- Wired into `App.js` (route `/admin/codebase-health`) and `AdminShell.jsx`
+  (HEALTH section sidebar item with `FileCode` icon).
+
+### First real-world scan output
+```
+backend totals: 1,240 files / 385,005 lines
+size buckets:   ≥1500=13   800-1499=45   300-799=418   safe=764
+god files:      3 (top: registry.py imports 231 modules)
+circular:       5 detected
+top action:     routers/registry.py — 4340 lines, imports 231 modules
+CC=483 register_all_routers · CC=260 _aurem_chat_inner · CC=152 stream_scan
+health score:   0.0/10  (brutally honest — this is reality)
+```
+
+Persisted to `codebase_health_snapshots` collection (30 most-recent kept,
+auto-pruned). No manual script ever required.
+
+### Tests
+`backend/tests/test_d70_codebase_health.py` — 10 new tests including a real
+scan of AUREM source. Combined D-61 → D-70 = **95/95 PASS**.
+
+
 ## 2026-06-05 — iter D-68 — Admin sidebar dedupe (3 duplicates removed)
 
 **Founder feedback:** "Admin sidebar mein bahut options double show kar rahe

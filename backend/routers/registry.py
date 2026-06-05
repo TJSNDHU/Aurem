@@ -720,6 +720,7 @@ def register_all_routers(app, db):
         ("routers.outreach_admin_router",      "Outreach health + manual triggers (iter 330)"),
         ("routers.feature_flags_router",       "Feature Flags admin (iter D-63 zero-downtime)"),
         ("routers.web_search_router",          "Web Search + URL Fetch (iter D-64 Tavily skills)"),
+        ("routers.codebase_health_router",     "Codebase Health (iter D-70 live analyzer)"),
     ]
 
     for module_path, label in _aurem_with_db:
@@ -2947,6 +2948,32 @@ def register_all_routers(app, db):
                 logger.info("[REGISTRY] Self-Audit cron scheduled (every hour at :05 EDT)")
             except Exception as sae:
                 logger.warning(f"[REGISTRY] Self-Audit cron failed: {sae}")
+
+            # ── iter D-70 — Codebase Health analyzer (every 6h + boot) ──
+            try:
+                from services.codebase_health import run_snapshot as _ch_run_snapshot
+                from services.codebase_health import set_db as _ch_set_db
+                _ch_set_db(db)
+                aurem_scheduler.add_job(
+                    _ch_run_snapshot,
+                    CronTrigger(hour='*/6', minute=10, timezone='UTC'),
+                    id='codebase_health_6h',
+                    name='Codebase Health snapshot every 6h',
+                    replace_existing=True,
+                    max_instances=1,
+                )
+                # Boot snapshot: ASAP so the dashboard has data right after boot.
+                aurem_scheduler.add_job(
+                    _ch_run_snapshot,
+                    'date',
+                    id='codebase_health_boot',
+                    name='Codebase Health: boot snapshot',
+                    replace_existing=True,
+                    misfire_grace_time=120,
+                )
+                logger.info("[REGISTRY] Codebase Health scheduler armed (boot + 6h)")
+            except Exception as _che:
+                logger.warning(f"[REGISTRY] Codebase Health setup failed: {_che}")
 
             # ── iter 282r — Trial SMS Reminders (A2P 10DLC live) ──
             # 10:00 AM America/Toronto daily — fires welcome (Day 1),
