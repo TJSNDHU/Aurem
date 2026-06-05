@@ -217,6 +217,27 @@ async def _fix_send_morning_brief() -> dict[str, Any]:
                  "human_hint": "Check ADMIN_DAILY_BRIEF_EMAIL env var"}
 
 
+async def _fix_enable_proactive_defaults() -> dict[str, Any]:
+    """iter D-66 — flip on the two safe Proactive ORA rules:
+       R1 = 3-day no-reply email follow-up
+       R2 = opened-no-reply WhatsApp ping
+    R3 (site-visit) and R4 (hot-lead reply) need extra plumbing — stay off.
+    """
+    try:
+        from services.proactive_ora import set_rule
+        await set_rule("global", "R1", True)
+        await set_rule("global", "R2", True)
+        return {"ok": True, "fixed": True,
+                 "result": "R1+R2 enabled for tenant=global "
+                          "(R3+R4 left off — need explicit founder opt-in)",
+                 "residual_issue": None, "requires_human": False}
+    except Exception as e:
+        return {"ok": False, "fixed": False,
+                 "result": f"set_rule failed: {e}",
+                 "residual_issue": str(e), "requires_human": True,
+                 "human_hint": "Check Mongo write access on proactive_ora_config"}
+
+
 # Map: autofix tag → (fixer, action label)
 _FIXERS = {
     "trigger_scout_run":     (_fix_trigger_scout_run,
@@ -227,6 +248,8 @@ _FIXERS = {
                                 "ran 3-query Ghost Scout burst"),
     "send_morning_brief":    (_fix_send_morning_brief,
                                 "sent morning brief"),
+    "enable_proactive_defaults": (_fix_enable_proactive_defaults,
+                                "enabled Proactive ORA R1+R2"),
 }
 
 

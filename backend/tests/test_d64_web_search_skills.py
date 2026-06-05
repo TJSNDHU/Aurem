@@ -159,48 +159,32 @@ async def test_live_search_and_summarize_has_citations():
 
 # ─── 5 · Admin REST endpoints ────────────────────────────────
 @_skip_if_no_key
-def test_admin_web_search_endpoint_returns_results():
-    from fastapi.testclient import TestClient
-    from server import app
-    import jwt as _jwt
-    from config import JWT_SECRET, JWT_ALGORITHM
-    tok = _jwt.encode(
-        {"email": "teji.ss1986@gmail.com", "is_admin": True,
-         "is_super_admin": True, "role": "super_admin"},
-        JWT_SECRET, algorithm=JWT_ALGORITHM,
-    )
-    with TestClient(app) as client:
-        r = client.post(
-            "/api/admin/web/search",
-            json={"query": "FastAPI tutorial", "max_results": 3},
-            headers={"Authorization": f"Bearer {tok}"},
-        )
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["count"] >= 1
-        assert body["results"][0]["url"].startswith("http")
+@pytest.mark.asyncio
+async def test_admin_web_search_endpoint_returns_results(monkeypatch):
+    """Direct-call the handler. TestClient lifespan creates Mongo locks
+    bound to a per-test event loop that conflict with other async tests
+    in the same module; direct call avoids that and still exercises the
+    body validator + skill invoke path."""
+    from routers import web_search_router as wsr
+    monkeypatch.setattr(wsr, "verify_admin", lambda *a, **k: {"email": "x@y"})
+    body = wsr._SearchBody(query="FastAPI tutorial", max_results=3)
+    out = await wsr.web_search(body, authorization="bypass")
+    assert out.get("count", 0) >= 1
+    assert out["results"][0]["url"].startswith("http")
 
 
-def test_admin_web_fetch_blocks_internal_url():
-    """The REST /fetch endpoint must refuse internal AUREM URLs even
-    when posted by a valid admin — defense in depth."""
-    from fastapi.testclient import TestClient
-    from server import app
-    import jwt as _jwt
-    from config import JWT_SECRET, JWT_ALGORITHM
-    tok = _jwt.encode(
-        {"email": "teji.ss1986@gmail.com", "is_admin": True,
-         "is_super_admin": True, "role": "super_admin"},
-        JWT_SECRET, algorithm=JWT_ALGORITHM,
-    )
-    with TestClient(app) as client:
-        r = client.post(
-            "/api/admin/web/fetch",
-            json={"url": "https://aurem.live/admin/dashboard"},
-            headers={"Authorization": f"Bearer {tok}"},
-        )
-        assert r.status_code == 400
-        assert "internal" in r.text.lower()
+@pytest.mark.asyncio
+async def test_admin_web_fetch_blocks_internal_url(monkeypatch):
+    """Defense-in-depth: REST /fetch endpoint must refuse internal
+    AUREM URLs even when posted by a valid admin."""
+    from fastapi import HTTPException
+    from routers import web_search_router as wsr
+    monkeypatch.setattr(wsr, "verify_admin", lambda *a, **k: {"email": "x@y"})
+    body = wsr._FetchBody(url="https://aurem.live/admin/dashboard")
+    with pytest.raises(HTTPException) as exc:
+        await wsr.fetch_url(body, authorization="bypass")
+    assert exc.value.status_code == 400
+    assert "internal" in str(exc.value.detail).lower()
 
 
 @pytest.mark.asyncio

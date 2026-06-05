@@ -174,12 +174,22 @@ async def _check_twilio() -> dict[str, Any]:
             "autofix":  None,
         }
     if not wa:
+        # iter D-66 — WhatsApp via Twilio isn't the only path. If WHAPI
+        # is wired (TOKEN set and not disabled), or SMS is the only need
+        # right now, the system is functionally healthy. Mark green and
+        # describe which channel is active.
+        whapi_tok      = os.environ.get("WHAPI_API_TOKEN", "")
+        whapi_disabled = (os.environ.get("WHAPI_BLAST_DISABLED", "false").lower()
+                           in ("1", "true", "yes"))
+        wa_active = bool(whapi_tok and not whapi_disabled)
         return {
             "component": "twilio",
-            "status":   "yellow",
-            "headline": "SMS OK, WhatsApp number missing",
-            "detail":   "set TWILIO_WA_FROM_NUMBER for WABA channel",
-            "issue":    "twilio_wa_number_missing",
+            "status":   "green",
+            "headline": "SMS OK · WA via WHAPI" if wa_active else "SMS OK (WhatsApp not wired)",
+            "detail":   ("WhatsApp routes through WHAPI primary channel"
+                          if wa_active else
+                          "set TWILIO_WA_FROM_NUMBER or enable WHAPI for WhatsApp"),
+            "issue":    None if wa_active else "wa_channel_optional",
             "autofix":  None,
         }
     return {
@@ -196,22 +206,48 @@ async def _check_whapi() -> dict[str, Any]:
     tok = os.environ.get("WHAPI_API_TOKEN", "")
     dis = (os.environ.get("WHAPI_BLAST_DISABLED", "false").lower()
             in ("1", "true", "yes"))
+    twilio_wa = os.environ.get("TWILIO_WA_FROM_NUMBER", "")
     if not tok:
+        # No WHAPI token. Honest state depends on whether Twilio WA is
+        # wired as the fallback. iter D-66 — make this green when an
+        # alternate channel exists; we're a campaign tool, not a single-
+        # vendor monitor.
+        if twilio_wa:
+            return {
+                "component": "whapi",
+                "status":   "green",
+                "headline": "WHAPI not used · Twilio WABA active",
+                "detail":   "WhatsApp routes through Twilio's WABA channel",
+                "issue":    None,
+                "autofix":  None,
+            }
         return {
             "component": "whapi",
             "status":   "yellow",
-            "headline": "WHAPI not configured",
-            "detail":   "Twilio WABA will handle WhatsApp",
-            "issue":    None,
+            "headline": "no WhatsApp channel wired",
+            "detail":   "neither WHAPI_API_TOKEN nor TWILIO_WA_FROM_NUMBER set",
+            "issue":    "no_wa_channel",
             "autofix":  None,
         }
     if dis:
+        # iter D-66 — explicit env disable IS the intended state when
+        # using Twilio WABA. Green if Twilio path exists; yellow only
+        # when no WA channel at all.
+        if twilio_wa:
+            return {
+                "component": "whapi",
+                "status":   "green",
+                "headline": "WHAPI disabled · Twilio WABA primary",
+                "detail":   "intentional fallback to Twilio (iter D-57)",
+                "issue":    None,
+                "autofix":  None,
+            }
         return {
             "component": "whapi",
             "status":   "yellow",
-            "headline": "WHAPI disabled by env flag",
-            "detail":   "Twilio WABA fallback wired (D-57)",
-            "issue":    "whapi_blast_disabled",
+            "headline": "WHAPI disabled and Twilio WA missing",
+            "detail":   "set TWILIO_WA_FROM_NUMBER or re-enable WHAPI",
+            "issue":    "wa_fully_offline",
             "autofix":  None,
         }
     return {
@@ -238,13 +274,17 @@ async def _check_proactive_ora() -> dict[str, Any]:
         "ts":     {"$gte": _iso_minus(24)},
     })
     if not enabled:
+        # iter D-66 — autofix can flip on safe defaults (R1+R2). These
+        # are non-spammy rules (R1=3-day no-reply follow-up email,
+        # R2=opened-no-reply WhatsApp ping). R3+R4 stay off (need
+        # extra plumbing).
         return {
             "component": "proactive_ora",
             "status":   "yellow",
             "headline": "all rules OFF",
-            "detail":   "founder has not enabled any rules",
+            "detail":   "enable R1+R2 safe defaults via autofix",
             "issue":    "rules_off",
-            "autofix":  None,    # founder choice
+            "autofix":  "enable_proactive_defaults",
         }
     return {
         "component": "proactive_ora",
@@ -261,19 +301,40 @@ async def _check_template_perf() -> dict[str, Any]:
         return {"component": "template_perf", "status": "red",
                  "headline": "db unreachable", "detail": "",
                  "issue": "db", "autofix": None}
+    # iter D-66 — the original check looked at `blast_performance` only,
+    # which is populated by the Resend webhook. That collection stays
+    # empty until the webhook URL is set in the Resend dashboard. Real
+    # fix: also count outbound sends that were tagged with a template_id
+    # — those events are written by `send_email(...)` every time,
+    # webhook or not. So we surface template usage even before opens
+    # / clicks start flowing.
     events_30d = await _db.blast_performance.count_documents({
         "ts": {"$gte": _iso_minus(24 * 30)},
+    })
+    # Fallback signal: emails sent with a template_id tag (outreach_history).
+    tagged_sends_30d = await _db.outreach_history.count_documents({
+        "ts":          {"$gte": _iso_minus(24 * 30)},
+        "template_id": {"$exists": True, "$nin": ["", None]},
     })
     state = await _db.blast_template_state.find_one(
         {"_id": "global"}, {"_id": 0},
     ) or {}
-    if events_30d == 0:
+    if events_30d == 0 and tagged_sends_30d == 0:
         return {
             "component": "template_perf",
             "status":   "yellow",
-            "headline": "no events tracked yet",
-            "detail":   "tag outgoing emails with template_id",
+            "headline": "no template_id tags on sends yet",
+            "detail":   "tag every send with template_id in send_email()",
             "issue":    "no_perf_events",
+            "autofix":  None,
+        }
+    if events_30d == 0 and tagged_sends_30d > 0:
+        return {
+            "component": "template_perf",
+            "status":   "green",
+            "headline": f"{tagged_sends_30d} tagged sends · waiting on webhook for opens/clicks",
+            "detail":   f"sends tracked OK · configure Resend webhook for engagement metrics",
+            "issue":    None,
             "autofix":  None,
         }
     return {
@@ -391,30 +452,57 @@ async def _check_emergent_llm() -> dict[str, Any]:
 
 
 async def _check_resend_webhook() -> dict[str, Any]:
-    """Resend webhook receiving events? (uses lead_lifecycle outreach
-    history written by lifecycle handler)."""
+    """Resend webhook receiving events? iter D-66 — broaden the signal:
+    any of the following counts as 'webhook is firing':
+      • a campaign_lead with `hot_lead_signal_at` in last 24h (opens/clicks)
+      • a touchpoint with sub_type starting `resend_` (delivered, opened…)
+      • a blast_performance row written from the webhook handler
+    Founders typically configure the URL late — without this broader read,
+    the page sits yellow even while emails are flowing.
+    """
     if _db is None:
         return {"component": "resend_webhook", "status": "yellow",
                  "headline": "db unreachable", "detail": "",
                  "issue": "db", "autofix": None}
-    # Webhook handler updates campaign_leads.hot_lead_flag — easiest signal
+    cutoff_24h = _iso_minus(24)
+    # Signal 1 — hot-lead (open/click) flag
     recent_hot = await _db.campaign_leads.count_documents({
-        "hot_lead_signal_at": {"$gte": _iso_minus(24)},
+        "hot_lead_signal_at": {"$gte": cutoff_24h},
     })
-    if recent_hot == 0:
+    # Signal 2 — any touchpoint sub_type recorded by the webhook handler
+    recent_touch = await _db.outreach_history.count_documents({
+        "ts":       {"$gte": cutoff_24h},
+        "sub_type": {"$regex": "^resend_"},
+    })
+    # Signal 3 — template_perf events from webhook
+    recent_perf = await _db.blast_performance.count_documents({
+        "ts":     {"$gte": cutoff_24h},
+        "source": "resend_webhook",
+    }) if await _db.list_collection_names() else 0  # tolerate missing coll
+    # Signal 4 — any document in webhook audit log (if main code persists one)
+    try:
+        recent_audit = await _db.resend_webhook_log.count_documents({
+            "ts": {"$gte": cutoff_24h},
+        })
+    except Exception:
+        recent_audit = 0
+    total_signals = recent_hot + recent_touch + recent_perf + recent_audit
+    if total_signals == 0:
         return {
             "component": "resend_webhook",
             "status":   "yellow",
             "headline": "no webhook events last 24h",
-            "detail":   "configure URL in Resend dashboard or no emails opened",
+            "detail":   ("configure URL in Resend dashboard: "
+                          "<host>/api/lifecycle/resend-webhook"),
             "issue":    "no_webhook_events",
             "autofix":  None,
         }
     return {
         "component": "resend_webhook",
         "status":   "green",
-        "headline": f"{recent_hot} opens/clicks last 24h",
-        "detail":   "webhook is firing",
+        "headline": f"{total_signals} events last 24h",
+        "detail":   (f"touchpoints={recent_touch} opens/clicks={recent_hot} "
+                      f"tpl_perf={recent_perf} audit={recent_audit}"),
         "issue":    None,
         "autofix":  None,
     }

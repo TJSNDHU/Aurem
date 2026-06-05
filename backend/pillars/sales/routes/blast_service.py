@@ -60,7 +60,27 @@ async def send_lead_email(lead_id: str, request: Request):
         r = resend.Emails.send({"from": "ORA <ora@aurem.live>", "to": [to], "subject": subject, "html": html or f"<p>Hi {lead['business_name']},</p><p>Follow up from AUREM Intelligence AI.</p>", "reply_to": "support@aurem.live"})
         email_id = r.get("id", str(r))
         now = datetime.now(timezone.utc).isoformat()
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "email", "to": to, "status": "sent", "email_id": email_id, "subject": subject, "subject_variant": chosen_variant, "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"status": "emailed", "updated_at": now}})
+        _template_id = "aurem_v1" if use_template else "custom"
+        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "email", "to": to, "status": "sent", "email_id": email_id, "subject": subject, "subject_variant": chosen_variant, "template": _template_id, "template_id": _template_id, "timestamp": now}}, "$set": {"status": "emailed", "updated_at": now}})
+        # iter D-66 — also write to the top-level `outreach_history`
+        # collection so the campaign-health template_perf check (which
+        # queries by `template_id`) can count this send. Bare-minimum
+        # fields; engagement (open/click) still flows via Resend webhook.
+        try:
+            await db.outreach_history.insert_one({
+                "ts":          now,
+                "lead_id":     lead_id,
+                "channel":     "email",
+                "type":        "email_send",
+                "template_id": _template_id,
+                "email_id":    email_id,
+                "subject":     subject,
+                "to":          to,
+            })
+        except Exception:
+            # outreach_history collection write must never fail the user-
+            # visible send. Keep the original return path.
+            pass
         return {"success": True, "email_id": email_id}
     except Exception as e:
         raise HTTPException(500, str(e))

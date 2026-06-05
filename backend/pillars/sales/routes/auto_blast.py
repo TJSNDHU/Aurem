@@ -776,9 +776,23 @@ async def run_email_sequence():
                             "$set": {"status": "emailed",
                                       "last_email_at": now_iso,
                                       "updated_at": now_iso},
-                            "$push": {"outreach_history": {"type": "email", "template": "outbound_1", "sent_at": now_iso, "engine": result.get("engine", "resend")}},
+                            "$push": {"outreach_history": {"type": "email", "template": "outbound_1", "template_id": "outbound_1", "sent_at": now_iso, "engine": result.get("engine", "resend")}},
                         },
                     )
+                # iter D-66 — mirror into top-level outreach_history so
+                # template_perf health check (queries by template_id)
+                # can count this send.
+                try:
+                    await db.outreach_history.insert_one({
+                        "ts":          now_iso,
+                        "lead_id":     lead.get("lead_id"),
+                        "channel":     "email",
+                        "type":        "email_send",
+                        "template_id": "outbound_1",
+                        "engine":      result.get("engine", "resend"),
+                    })
+                except Exception:
+                    pass
             # iter 282al-11 — throttle to 4 req/s to stay under Resend's
             # 5/s rate limit. Without this the loop burns ~90% of attempts
             # on 429s.

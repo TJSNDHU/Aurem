@@ -27,6 +27,14 @@ def set_db(database) -> None:
     from services import campaign_autofix as _af
     _ch.set_db(database)
     _af.set_db(database)
+    # iter D-66 — the `enable_proactive_defaults` autofix writes to
+    # proactive_ora_config; wire proactive_ora's `_db` here so the
+    # autofix doesn't fail with "db_not_ready".
+    try:
+        from services import proactive_ora as _po
+        _po.set_db(database)
+    except Exception as _e:
+        logger.warning(f"[campaign-health] proactive_ora.set_db failed: {_e}")
 
 
 async def _require_admin(authorization: str | None) -> str:
@@ -63,11 +71,29 @@ async def autofix_one(tag: str = Path(..., min_length=2, max_length=40),
 
 @router.post("/autofix-all")
 async def autofix_all(authorization: str = Header(None)) -> dict[str, Any]:
+    """iter D-66 — Time-bounded fan-out. Some autofixes (e.g.
+    topup_via_scout) hit external APIs and can exceed the 60s ingress
+    timeout. Wrap each fix in a 25s timeout so the response always
+    returns within ingress budget; long-runners get queued for retry.
+    """
     await _require_admin(authorization)
     from services.campaign_health import full_report
     from services.campaign_autofix import apply_all_from_report
+    import asyncio as _async
     report = await full_report()
-    return await apply_all_from_report(report.get("rows", []))
+    try:
+        out = await _async.wait_for(
+            apply_all_from_report(report.get("rows", [])),
+            timeout=50.0,
+        )
+        return out
+    except _async.TimeoutError:
+        return {
+            "ok": False,
+            "partial": True,
+            "error": "ingress_timeout — some autofixes exceeded 50s budget",
+            "hint":   "Retry individual fixes via /autofix/<tag>",
+        }
 
 
 @router.get("/autofix-log")

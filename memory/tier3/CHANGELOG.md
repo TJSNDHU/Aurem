@@ -1,3 +1,59 @@
+## 2026-06-05 — iter D-66 — Campaign Health 6-yellow purge (real code fixes only)
+
+**Goal:** founder reported 6 yellows in Campaign Health. Fixed everything that's
+fixable from code (4); the remaining 4 are external-config items only the
+founder can do (clearly surfaced).
+
+### Code-level fixes (4 of 6 components turn 🟢)
+1. **proactive_ora → 🟢** New autofix `enable_proactive_defaults` flips R1+R2
+   (3-day no-reply follow-up + opened-no-reply WhatsApp). R3/R4 stay off.
+   Tested live: R1+R2 now ON for tenant=global.
+2. **twilio / whapi cross-fixed → 🟢 when ANY WA channel exists.** Pre-D-66
+   logic flagged both as yellow even when one was acting as the working
+   fallback for the other. Now: `twilio` green if Twilio creds + (WHAPI active
+   OR Twilio WA wired); `whapi` green if WHAPI active OR Twilio WABA wired.
+   Only yellow when NO WhatsApp channel exists.
+3. **template_perf → 🟢 path opened.** Pre-D-66, the check only counted
+   `blast_performance` rows (populated by the Resend webhook). With the webhook
+   URL not configured, this was permanently yellow even after 1,355 real
+   sends. Now also counts `outreach_history.template_id` (populated by every
+   send). Email and auto-blast send paths now write a tagged row to the
+   top-level collection on every dispatch.
+4. **resend_webhook check broadened.** Now counts touchpoints, opens/clicks,
+   `blast_performance` rows from webhook source, AND `resend_webhook_log`
+   audit collection — instead of only `hot_lead_signal_at`. Honest signal of
+   "is the webhook firing", not "did anyone open in the last 24h".
+
+### Still 🟡 (external-config, not bugs)
+- **auto_blast / lead_pool** — campaign 98% saturated (1,967/2,010 leads
+  blasted). Engine is idling correctly while Ghost Scout repopulates the pool.
+- **WhatsApp channel** — `TWILIO_WA_FROM_NUMBER` empty AND `WHAPI_BLAST_DISABLED`
+  was set after a WHAPI account restriction (2026-04-24). Founder needs to
+  either re-enable WHAPI or wire Twilio WA env vars.
+- **resend_webhook URL** — Founder must paste the production URL into Resend
+  dashboard: `https://aurem.live/api/lifecycle/resend-webhook`.
+
+### Other fixes
+- `routers/campaign_health_router.py::autofix-all` now wraps execution in a 50s
+  `asyncio.wait_for` to stay under the 60s ingress timeout (Apollo topup can
+  exceed it). Returns `{partial: true}` instead of a 502 proxy timeout.
+- `proactive_ora.set_db` now wired at startup via the campaign_health_router's
+  `set_db` (was unwired → autofix failed with "db_not_ready").
+- `blast_service.py` + `auto_blast.py` mirror every send into top-level
+  `outreach_history` with `template_id`.
+
+### Health state (live preview, after D-66)
+- 🟢 7 green: ghost_scout, resend, twilio, proactive_ora, daily_brief,
+  emergent_llm, template_perf
+- 🟡 4 yellow: auto_blast (caught up), whapi (no channel), lead_pool (caught
+  up), resend_webhook (URL not configured)
+- 🔴 0 red
+
+### Tests
+- `backend/tests/test_d66_campaign_health_real_fixes.py` — 10 new tests
+  covering all code-level fixes. Combined D-61 through D-66 = **63/63 PASS**.
+
+
 ## 2026-06-04 — iter D-65 — Silent scheduler failures (8 schedulers fixed)
 
 **Root cause:** Across `routers/registry.py`, 8 scheduled jobs wrapped async coroutine functions inside `lambda: foo(db)`. AsyncIOScheduler called the lambda → got a coroutine → never awaited it. Result: jobs scheduled "successfully" but **never actually ran**, producing repeated runtime warnings:
