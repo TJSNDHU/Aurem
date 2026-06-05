@@ -2926,9 +2926,15 @@ def register_all_routers(app, db):
                 from services.self_audit import (
                     ensure_self_audit_indexes, run_self_audit,
                 )
+                # iter D-65 — AsyncIOScheduler MUST receive a coroutine
+                # function + args, not a lambda that returns the
+                # coroutine. A returned coroutine is never awaited →
+                # `RuntimeWarning: coroutine 'run_self_audit' was never
+                # awaited` and the audit never runs.
                 aurem_scheduler.add_job(
-                    lambda: run_self_audit(db),
+                    run_self_audit,
                     CronTrigger(minute=5, timezone="America/Toronto"),
+                    args=[db],
                     id='self_audit_hourly',
                     name='Self-Audit: aurem.live every hour @ :05',
                     replace_existing=True,
@@ -2948,8 +2954,9 @@ def register_all_routers(app, db):
             try:
                 from services.trial_sms_reminders import run_trial_sms_reminders
                 aurem_scheduler.add_job(
-                    lambda: run_trial_sms_reminders(db),
+                    run_trial_sms_reminders,
                     CronTrigger(hour=10, minute=0, timezone="America/Toronto"),
+                    args=[db],
                     id='trial_sms_reminders',
                     name='Trial SMS Reminders: Day 1 / Ending Soon / Last Day',
                     replace_existing=True,
@@ -2964,8 +2971,9 @@ def register_all_routers(app, db):
             try:
                 from services.campaign_daily_brief import send_campaign_daily_brief
                 aurem_scheduler.add_job(
-                    lambda: send_campaign_daily_brief(db),
+                    send_campaign_daily_brief,
                     CronTrigger(hour=21, minute=0, timezone="America/Toronto"),
+                    args=[db],
                     id='campaign_daily_brief',
                     name='Campaign Daily Brief (9 PM EDT email)',
                     replace_existing=True,
@@ -2979,8 +2987,9 @@ def register_all_routers(app, db):
             try:
                 from services.webclaw_usage_rollup import run_daily_rollup
                 aurem_scheduler.add_job(
-                    lambda: run_daily_rollup(db),
+                    run_daily_rollup,
                     CronTrigger(hour=2, minute=0, timezone="UTC"),
+                    args=[db],
                     id='webclaw_usage_rollup',
                     name='webclaw_usage → webclaw_usage_daily (2 AM UTC)',
                     replace_existing=True,
@@ -2994,8 +3003,9 @@ def register_all_routers(app, db):
             try:
                 from services.site_change_watcher import run_weekly_site_watch
                 aurem_scheduler.add_job(
-                    lambda: run_weekly_site_watch(db),
+                    run_weekly_site_watch,
                     CronTrigger(day_of_week='sat', hour=7, minute=0, timezone="UTC"),
+                    args=[db],
                     id='site_change_watcher',
                     name='Active Site Watcher (Saturday 7 AM UTC)',
                     replace_existing=True,
@@ -3009,9 +3019,10 @@ def register_all_routers(app, db):
             try:
                 from services.site_change_watcher import run_daily_priority_watch
                 aurem_scheduler.add_job(
-                    lambda: run_daily_priority_watch(db),
+                    run_daily_priority_watch,
                     CronTrigger(day_of_week='mon-fri', hour=6, minute=0,
                                  timezone="UTC"),
+                    args=[db],
                     id='site_change_priority_daily',
                     name='Daily Priority Site Watcher (Mon-Fri 6 AM UTC)',
                     replace_existing=True,
@@ -3120,8 +3131,9 @@ def register_all_routers(app, db):
             try:
                 from services.linkedin_publisher import weekly_linkedin_tip
                 aurem_scheduler.add_job(
-                    lambda: weekly_linkedin_tip(db),
+                    weekly_linkedin_tip,
                     CronTrigger(day_of_week='mon', hour=9, minute=0, timezone="UTC"),
+                    args=[db],
                     id='linkedin_weekly_tip',
                     name='LinkedIn Weekly Tip (Monday 9 AM UTC)',
                     replace_existing=True,
@@ -3134,9 +3146,13 @@ def register_all_routers(app, db):
             # ── iter 282ak — ORA Skill Learner (2 AM UTC) ──
             try:
                 from services.skill_learner import run_learning_cycle
+                # iter D-65 — same fix as Self-Audit: pass coroutine
+                # function + args, not a lambda. Lambda returned the
+                # coroutine without awaiting → cycle never ran.
                 aurem_scheduler.add_job(
-                    lambda: run_learning_cycle(db),
+                    run_learning_cycle,
                     CronTrigger(hour=2, minute=15, timezone="UTC"),
+                    args=[db],
                     id='skill_learning_cycle',
                     name='ORA Skill Learner (2:15 AM UTC, 15min after Learning Bus)',
                     replace_existing=True,
@@ -3205,7 +3221,7 @@ def register_all_routers(app, db):
                 # lock to the configured TZ so DST transitions don't drift
                 # the fire time.
                 aurem_scheduler.add_job(
-                    lambda: run_morning_brief(),
+                    run_morning_brief,
                     CronTrigger(hour=7, minute=0, timezone="America/Toronto"),
                     id='founder_morning_brief',
                     name='Founder Morning Brief (7:00 AM America/Toronto)',

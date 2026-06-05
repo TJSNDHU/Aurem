@@ -1,3 +1,34 @@
+## 2026-06-04 — iter D-65 — Silent scheduler failures (8 schedulers fixed)
+
+**Root cause:** Across `routers/registry.py`, 8 scheduled jobs wrapped async coroutine functions inside `lambda: foo(db)`. AsyncIOScheduler called the lambda → got a coroutine → never awaited it. Result: jobs scheduled "successfully" but **never actually ran**, producing repeated runtime warnings:
+
+```
+RuntimeWarning: coroutine 'run_learning_cycle' was never awaited
+RuntimeWarning: coroutine 'run_self_audit' was never awaited
+```
+
+**Schedulers silently broken (now fixed):**
+- `self_audit_hourly` (`run_self_audit`)
+- `trial_sms_reminders` (`run_trial_sms_reminders`)
+- `campaign_daily_brief` (`send_campaign_daily_brief`)
+- `webclaw_usage_rollup` (`run_daily_rollup`)
+- `site_change_watcher` (`run_weekly_site_watch`)
+- `site_change_priority_daily` (`run_daily_priority_watch`)
+- `linkedin_weekly_tip` (`weekly_linkedin_tip`)
+- `skill_learning_cycle` (`run_learning_cycle`)
+
+**Fix:** Pass coroutine function + `args=[db]` directly to `add_job`, never via lambda. AsyncIOScheduler natively awaits coroutine functions.
+
+**Bonus fix:** `services/ora_nightly_self_test.py` was calling `silent_failure_alerts._send(message, fingerprint=...)` — but signature is `(message, alert_type, fingerprint)`. TypeError every night → no telegram alert. Added explicit `alert_type="ora_nightly_self_test"`.
+
+**Regression tests:** `backend/tests/test_d65_scheduler_coroutine_fix.py` — 7 new tests guarantee:
+- No `add_job(lambda: ...)` patterns ever again
+- Signatures of `run_self_audit`, `run_learning_cycle`, `_send` are pinned
+- Specific Self-Audit + Skill Learner blocks use coroutine-function pattern
+
+**All tests:** 7 D-65 + 17 D-64 + 13 D-63 + 4 D-62 + 9 D-61 + 3 chip = **53/53 PASS**.
+
+
 ## 2026-06-04 — iter D-64 — Web Search + URL Fetch (Tavily skills)
 
 **Goal:** ORA can search the internet AND read pasted URLs — no mocks, real Tavily API.

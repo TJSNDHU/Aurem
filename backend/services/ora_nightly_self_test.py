@@ -136,10 +136,13 @@ async def run_nightly_self_test(db) -> dict:
             from services.silent_failure_alerts import _send as _tg_send
             failed_names = [c["name"] for c in checks if not c.get("ok")]
             day = ts.strftime("%Y-%m-%d")
+            # iter D-65 — _send signature is (message, alert_type, fingerprint).
+            # The previous call dropped `alert_type` → TypeError every night.
             await _tg_send(
                 f"🌙 ORA Nightly Self-Test FAILED ({summary}) "
                 f"— failed: {', '.join(failed_names)} — see "
                 f"ora_nightly_self_tests collection for detail.",
+                alert_type="ora_nightly_self_test",
                 fingerprint=f"ora_nightly_self_test_fail_{day}",
             )
         except Exception as e:
