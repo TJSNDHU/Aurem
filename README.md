@@ -476,6 +476,30 @@ The Codebase Health dashboard at `/admin/codebase-health` is the single source o
 
 When you split or simplify a file, the score climbs the next snapshot. No manual updates to this README needed.
 
+### Active refactor — D-71 (queued)
+
+The Codebase Health dashboard has already named the next file to fix: `routers/registry.py`. The strangler-fig plan is documented and approved; execution begins in the next coding session.
+
+**Target shape:**
+```
+backend/routers/registry.py            ← stays, becomes a ~50-line orchestrator
+backend/routers/_register/
+    __init__.py                        ← exposes register_all_routers()
+    _schedulers.py     (~400 lines)    ← STEP 1: all APScheduler add_job calls
+    _admin.py          (~400 lines)    ← STEP 2: /admin/* routers
+    _ora.py            (~250 lines)    ← STEP 2: /api/ora/* + skills
+    _sales.py          (~350 lines)    ← STEP 3: P1 — Apollo, Scout, Closer, Blast
+    _billing.py        (~200 lines)    ← STEP 3: P2 — Stripe, Trial, Compliance
+    _monitor.py        (~200 lines)    ← STEP 3: P3 — Sentinel, Site Monitor
+    _core.py           (~150 lines)    ← STEP 4: health, auth, base
+    _customer.py       (~200 lines)    ← STEP 4: /customer/* + onboarding
+    _commercial.py     (~150 lines)    ← STEP 4: /v1/public, API keys
+```
+
+**Expected outcome:** `register_all_routers` CC drops from **483 → ~25** per sub-function. No file > 500 lines. Health score climbs **0.0 → 6-7** in one snapshot.
+
+**Execution:** 4 steps × ~30 min each. Full pytest + Pillar Map heartbeat verification after every step. Founder approves each step before the next. Safety net: 95 regression tests + 6 h Codebase Health auto-rescan provide instant feedback per step.
+
 ---
 
 ## Conventions & rules
