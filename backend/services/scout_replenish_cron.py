@@ -58,51 +58,64 @@ def _cfg_list(name: str, default: list) -> list:
 
 
 DEFAULT_CITIES = [
-    "Mississauga, ON",
-    "Toronto, ON",
-    "Brampton, ON",
-    "Oakville, ON",
-    "Hamilton, ON",
-    "Burlington, ON",
-    "Vaughan, ON",
-    "Markham, ON",
+    # ── Ontario (Greater Toronto Area + Hamilton) ──────────────────
+    "Mississauga, ON", "Toronto, ON", "Brampton, ON", "Oakville, ON",
+    "Hamilton, ON", "Burlington, ON", "Vaughan, ON", "Markham, ON",
+    "Ottawa, ON", "London, ON", "Kitchener, ON", "Waterloo, ON",
+    "Windsor, ON", "Barrie, ON", "Guelph, ON", "Kingston, ON",
+    "Richmond Hill, ON", "Pickering, ON", "Ajax, ON", "Whitby, ON",
+    # ── Quebec ─────────────────────────────────────────────────────
+    "Montreal, QC", "Quebec City, QC", "Laval, QC", "Gatineau, QC",
+    "Longueuil, QC", "Sherbrooke, QC", "Trois-Rivieres, QC",
+    # ── British Columbia ───────────────────────────────────────────
+    "Vancouver, BC", "Surrey, BC", "Burnaby, BC", "Richmond, BC",
+    "Victoria, BC", "Abbotsford, BC", "Coquitlam, BC", "Kelowna, BC",
+    "Langley, BC",
+    # ── Alberta ────────────────────────────────────────────────────
+    "Calgary, AB", "Edmonton, AB", "Red Deer, AB", "Lethbridge, AB",
+    "St. Albert, AB", "Medicine Hat, AB",
+    # ── Manitoba + Saskatchewan ────────────────────────────────────
+    "Winnipeg, MB", "Brandon, MB",
+    "Saskatoon, SK", "Regina, SK",
+    # ── Atlantic Canada ────────────────────────────────────────────
+    "Halifax, NS", "Moncton, NB", "Fredericton, NB", "Saint John, NB",
+    "St. John's, NL", "Charlottetown, PE",
 ]
 
 DEFAULT_INDUSTRIES = [
-    # ── Trades (always converts well, high SMB pain) ─────────────
-    "plumber",
-    "electrician",
-    "hvac",
-    "locksmith",
-    "pest_control",
-    "landscape",
-    "lawn_care",
-    # ── Personal services ─────────────────────────────────────────
-    "hair_salon",
-    "barber",
-    "beauty_salon",
-    # ── Auto ──────────────────────────────────────────────────────
-    "auto_repair",
-    "car_wash",
-    # ── Healthcare (high-LTV) ─────────────────────────────────────
-    "dental",
-    "chiropractor",
-    "physiotherapy",
-    "optometrist",
-    # ── Professional services ─────────────────────────────────────
-    "lawyer",
-    "accountant",
-    "real_estate_agent",
-    "marketing_agency",
-    # ── Home services ─────────────────────────────────────────────
-    "cleaning_services",
-    "janitorial",
-    "moving_company",
-    # ── Hospitality / B2C SMB ─────────────────────────────────────
-    "photographer",
-    "daycare",
-    "personal_trainer",
-    "yoga_studio",
+    # ── Trades (high SMB pain, fast close) ─────────────────────────
+    "plumber", "electrician", "hvac", "roofer", "painter",
+    "landscaper", "general contractor", "handyman", "locksmith",
+    "carpenter", "flooring", "drywall", "concrete", "fencing",
+    "pest control", "tree service", "snow removal",
+    # ── Health & Wellness ──────────────────────────────────────────
+    "dental clinic", "dentist", "orthodontist", "chiropractor",
+    "physiotherapy", "massage therapy", "optometrist", "veterinarian",
+    "medical clinic", "naturopath", "acupuncture",
+    # ── Beauty & Personal Care ─────────────────────────────────────
+    "hair salon", "barber shop", "nail salon", "spa", "med spa",
+    "tattoo studio", "lash studio", "esthetician",
+    # ── Auto & Mechanical ──────────────────────────────────────────
+    "auto repair", "auto body shop", "tire shop", "car detailing",
+    "auto glass", "motorcycle repair",
+    # ── Food & Hospitality ─────────────────────────────────────────
+    "restaurant", "cafe", "bakery", "catering", "food truck",
+    # ── Professional Services ──────────────────────────────────────
+    "accountant", "bookkeeping", "lawyer", "real estate agent",
+    "mortgage broker", "insurance broker", "immigration consultant",
+    "financial advisor", "notary",
+    # ── Fitness & Lifestyle ────────────────────────────────────────
+    "personal trainer", "yoga studio", "pilates studio",
+    "martial arts", "dance studio", "gym",
+    # ── Home & Cleaning ────────────────────────────────────────────
+    "cleaning service", "carpet cleaning", "window cleaning",
+    "moving company", "junk removal", "pool service",
+    # ── Pet Services ───────────────────────────────────────────────
+    "dog grooming", "dog walking", "pet boarding",
+    # ── Education & Childcare ──────────────────────────────────────
+    "tutoring", "daycare", "music lessons", "driving school",
+    # ── Photography & Events ───────────────────────────────────────
+    "photographer", "wedding planner", "event venue", "dj service",
 ]
 
 
