@@ -25,8 +25,9 @@ Live: **[https://aurem.live](https://aurem.live)** · Preview: internal Emergent
 13. [Founder-facing features](#founder-facing-features)
 14. [Public API (commercialised)](#public-api-commercialised)
 15. [Test coverage](#test-coverage)
-16. [Conventions & rules](#conventions--rules)
-17. [License](#license)
+16. [Known debt](#known-debt)
+17. [Conventions & rules](#conventions--rules)
+18. [License](#license)
 
 ---
 
@@ -427,6 +428,53 @@ Docs: `memory/PUBLIC_API_USAGE.md`.
 | D-70 | live codebase health analyzer | 10 |
 | Misc | health chip signal | 3 |
 | | **Combined** | **95/95 PASS** |
+
+---
+
+## Known debt
+
+The Codebase Health analyzer (§7) is brutally honest. Current snapshot scores **0.0 / 10**. Here is what's outstanding, sorted by priority:
+
+### 🔴 P0 — God-files (refactor candidates)
+
+| File | Lines | Concern |
+|---|---:|---|
+| `routers/registry.py` | 4,340 | imports 231 modules, CC=483 on `register_all_routers` |
+| `services/ora_tools.py` | 4,242 | needs split by tool category |
+| `services/ora_agent.py` | 3,932 | merge with `ora_council.py` discussion |
+| `routers/aurem_chat.py` | ~3,500 | CC=260 on `_aurem_chat_inner` |
+| `server.py` | 2,849 | lifespan + middleware + lifecycle all in one |
+| `routers/pillars_map_router.py` | 2,300 | telemetry generator |
+| `routers/cto_projects.py` | 1,952 | discovered manually pre-D-70 |
+
+Total: **13 backend files ≥ 1,500 lines.**
+
+### 🟠 P1 — Circular imports (5 detected)
+
+Listed in the live `/admin/codebase-health` page → "Circular Imports" panel. Each one is a refactor that introduces a third module to break the cycle.
+
+### 🟡 P1 — High complexity hotspots
+
+| Function | CC | Why it matters |
+|---|---:|---|
+| `register_all_routers` | 483 | every router boots through it; new integrations slow boot |
+| `_aurem_chat_inner` | 260 | ORA chat reasoning loop |
+| `stream_scan` | 152 | live SSE scanner |
+| Others (CC ≥ 30) | varies | see Codebase Health dashboard |
+
+### ⚪ P2 — Operational debt
+
+- **Resend webhook URL not configured** in dashboard → `template_perf` engagement signals partial.
+- **WHAPI account restriction (April 2026)** → WhatsApp via Twilio fallback only; Meta WhatsApp Cloud API migration planned.
+- **Hetzner Cloud API token not provided** → CTO Agent can propose deploys but can't SSH-execute on customer servers yet.
+- **K8s readinessProbe path** still points to `/api/health` instead of D-63's smarter `/api/ready` (needs Emergent Support 1-line change).
+- **6 SSE consumers** still use raw `EventSource` instead of D-63's `useReliableSSE` reconnect hook (progressive migration).
+
+### How to track
+
+The Codebase Health dashboard at `/admin/codebase-health` is the single source of truth. It auto-refreshes every 30 s on the page and the analyzer re-runs every 6 h. The "Top Action" banner names the next file to fix, with a one-line reason.
+
+When you split or simplify a file, the score climbs the next snapshot. No manual updates to this README needed.
 
 ---
 
