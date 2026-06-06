@@ -470,6 +470,15 @@ Listed in the live `/admin/codebase-health` page → "Circular Imports" panel. E
 - **K8s readinessProbe path** still points to `/api/health` instead of D-63's smarter `/api/ready` (needs Emergent Support 1-line change).
 - **6 SSE consumers** still use raw `EventSource` instead of D-63's `useReliableSSE` reconnect hook (progressive migration).
 
+### 🔴 P0 — Enterprise readiness gaps
+
+These are production debt that an enterprise audit will flag. Not optional for B2B sales.
+
+- **APScheduler is in-process, not Redis-backed.** `legion/docker-compose.yml` already runs Redis, but `routers/registry.py` uses `AsyncIOScheduler` with a Mongo jobstore. **Risk:** when AUREM runs 2+ pods, every scheduled job will fire on every pod → duplicate auto-blasts, double Stripe charges, repeated voice calls. **Fix:** migrate to `RedisJobStore` + Redis-backed lock. ~2 hrs.
+- **Row-Level Security is app-layer only.** Every router manually applies `{"tenant_id": tenant}` filters. **Risk:** one missed filter in a future PR → cross-tenant data leak. SOC 2 auditors will fail this. **Fix:** Mongo Atlas database-level access rules + a tenant-scope middleware that injects the filter automatically. ~4 hrs.
+- **74 of 77 SuperSkills are dormant.** `skills_manager.py` registers only 3 (`tdd-workflow`, `security-review`, `connector-pattern`) out of 77 JSON manifests. **Risk:** dead weight inflates the surface area without delivering value; founders/customers think they have powers they don't. **Fix:** either wire the remaining 74 or delete the JSON files. ~3 hrs to audit + decide.
+- **MCP server marked `# SLEEPING`.** Wired in code but never activated in production. **Risk:** if anyone calls the MCP endpoint expecting model-context-protocol behavior, they get silence or a 500. **Fix:** either activate (with proper auth + rate limit) or remove the route. ~1 hr.
+
 ### How to track
 
 The Codebase Health dashboard at `/admin/codebase-health` is the single source of truth. It auto-refreshes every 30 s on the page and the analyzer re-runs every 6 h. The "Top Action" banner names the next file to fix, with a one-line reason.
