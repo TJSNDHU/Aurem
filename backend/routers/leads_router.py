@@ -85,7 +85,7 @@ async def get_leads(
 
 @router.get("/stats")
 async def get_lead_stats(
-    period: str = "today",  # today, week, month, all
+    period: str = "all",  # iter D-71 — default "all" so CRM matches Dashboard total
     tenant_id: str = Depends(current_tenant)
 ):
     """

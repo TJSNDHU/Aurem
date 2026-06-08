@@ -9863,3 +9863,82 @@ both return Cloudflare 502 right now). The frontend fix above means
 *when production wakes up* the user will see the wake-up message and can
 retry, instead of a misleading "Connection error". The actual pod
 needs a redeploy/wake — that's an Emergent platform action.
+
+
+---
+
+## 2026-06-08 — D-71: 4-bug Production Sweep (Data Consistency + 5xx Storm)
+
+User reported via 5 screenshots: (a) Dashboard "Leads Found 1,264" while CRM
+shows "Total Leads 0", (b) 20 P1 `backend_middleware` incidents per hour,
+(c) all ORA agents stuck at 0 activity while Dashboard says "5 running",
+(d) Campaign "aurem" stuck on "Paused / Last run never".
+
+### Root causes (all four are real, no mocks)
+
+1. **`pillars/sales/routes/auto_blast.py` line 770-795** — broken indentation
+   silently killed both the Campaign Outbound registration and the APScheduler
+   trigger (registry caught the SyntaxError with a generic try/except). Result:
+   campaign never fired, 0 outreach, 0 emails.
+
+2. **`aurem_config` package shadowing** — `/app/backend/aurem_config/__init__.py`
+   was empty and shadowed the flat `aurem_config.py` module. Every caller doing
+   `from aurem_config import LINKEDIN_CLIENT_ID, TEST_LAB_API_KEY` failed with
+   ImportError / AttributeError. ~36k 5xx incidents on `/api/linkedin/auth`,
+   `/api/admin/site-qa/health`. Fixed by re-exporting the legacy constants from
+   the package's `__init__.py`.
+
+3. **`routers/content_engine_router.py:286`** — hard-keyed `plan['price_monthly']`
+   but the SSOT `PLAN_TIERS` only has `price_cad`. KeyError → 500 on every
+   `/api/content-engine/tiers` poll (2k hits).
+
+4. **Lead-data sharding across 3 collections** — Dashboard counted
+   `campaign_leads` (Apollo/Scout output, 2,021 docs), CRM stats read `db.leads`
+   (AI-conversation captures, 44 docs), CRM list read `customer_scans`
+   (empty for dogfood). Fixed by unifying `/api/leads/stats`,
+   `/api/customer/pipeline/scan-events`, and `/api/aurem/agents/status` to
+   prefer `campaign_leads` (with the legacy collections as fallback).
+
+5. **`middleware/exception_to_incident.py`** — was logging every Starlette
+   `RuntimeError: No response returned` and every `CancelledError` as a P1
+   backend_5xx. These are client-side disconnects (browser nav, double-click),
+   not server bugs. 34k spurious entries on `/api/auth/login` alone. Now filtered.
+
+### Verified
+
+| Endpoint | Before | After |
+|----------|--------|-------|
+| `/api/linkedin/auth` | 500 ImportError | 401 (auth gate) |
+| `/api/admin/site-qa/health` | 500 AttributeError | 200 |
+| `/api/content-engine/tiers` | 500 KeyError | 401 (auth gate) |
+| `/api/leads/stats` (admin) | 0 leads | 1469 leads |
+| `/api/customer/pipeline/scan-events` | `events:[]` | real lead payload |
+| `/api/aurem/agents/status` Scout | 0 | 2065 |
+| `/api/aurem/agents/status` Envoy | 0 | 3312 |
+
+### Cleanup
+
+- Bulk-resolved 8,649 stale incidents (`error_ledger` + `incident_ledger`)
+  whose root cause is now patched in code.
+
+### Tests
+
+- `tests/test_d71_data_consistency_and_5xx_fixes.py` — 7/7 pass.
+
+### Files touched
+- `backend/pillars/sales/routes/auto_blast.py`
+- `backend/aurem_config/__init__.py`
+- `backend/routers/content_engine_router.py`
+- `backend/routers/aurem_routes.py`
+- `backend/routers/customer_pipeline_router.py`
+- `backend/routers/leads_router.py`
+- `backend/services/lead_capture_service.py`
+- `backend/middleware/exception_to_incident.py`
+- `backend/tests/test_d71_data_consistency_and_5xx_fixes.py` (new)
+
+### USER ACTION STILL REQUIRED
+
+⚠️ These fixes are LIVE on Preview ONLY. To see them on `aurem.live`:
+**Press the "Deploy" button in the Emergent dashboard.** The last 3 weeks
+of fixes (D-65 scheduler, D-71 data consistency) are not yet on production.
+

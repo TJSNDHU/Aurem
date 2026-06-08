@@ -80,4 +80,30 @@ async def scan_events(
         if events:
             break
 
+    # iter D-71 — Customer CRM consistency. If no scan-events exist (which
+    # is the normal case for fresh dogfood accounts), fall back to the
+    # `campaign_leads` collection that the Dashboard counts. Otherwise the
+    # CRM page shows "0 leads" while the Dashboard says "1,264 leads" —
+    # the exact data-mismatch the customer hit on aurem.live.
+    if not events:
+        tenant_id = (
+            claims.get("tenant_id") or claims.get("business_id")
+            or claims.get("user_id") or user_id
+        )
+        is_admin = bool(claims.get("is_admin") or claims.get("is_super_admin"))
+        scope = {} if is_admin else {"tenant_id": tenant_id}
+        try:
+            cursor = _db.campaign_leads.find(scope, {"_id": 0}).sort("created_at", -1).limit(limit)
+            async for doc in cursor:
+                ts = doc.get("created_at") or doc.get("scanned_at") or doc.get("updated_at")
+                if isinstance(ts, datetime):
+                    doc["created_at"] = ts.astimezone(timezone.utc).isoformat()
+                # Normalise to fields the CRM frontend expects
+                doc.setdefault("name", doc.get("contact_name") or doc.get("business_name") or "—")
+                doc.setdefault("domain", doc.get("website_url") or doc.get("website") or "")
+                doc.setdefault("status", doc.get("status") or "new")
+                events.append(doc)
+        except Exception as exc:
+            logger.warning(f"[scan-events] campaign_leads fallback failed: {exc}")
+
     return {"events": events, "total": len(events)}

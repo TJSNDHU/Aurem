@@ -35,6 +35,17 @@ class ExceptionToIncidentMiddleware(BaseHTTPMiddleware):
         try:
             response: Response = await call_next(request)
         except Exception as exc:
+            # iter D-71 — client disconnects (CancelledError) and the
+            # Starlette "No response returned" RuntimeError that follows
+            # are NOT server bugs. They are the client closing the socket
+            # mid-flight (browser nav, double-click, network blip). Logging
+            # ~35k of these per day drowns out real 5xx incidents and turns
+            # the Live Health panel into noise.
+            exc_name = type(exc).__name__
+            if exc_name in ("CancelledError",) or (
+                isinstance(exc, RuntimeError) and "No response returned" in str(exc)
+            ):
+                raise
             await self._report_exception(request, exc)
             raise
         else:

@@ -768,17 +768,17 @@ async def run_email_sequence():
 
             result = await email_engine.send_message("polaris-built-001", lead["email"], subject, html)
             if result.get("success"):
-                    sent += 1
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    await db.campaign_leads.update_one(
-                        {"lead_id": lead["lead_id"]},
-                        {
-                            "$set": {"status": "emailed",
-                                      "last_email_at": now_iso,
-                                      "updated_at": now_iso},
-                            "$push": {"outreach_history": {"type": "email", "template": "outbound_1", "template_id": "outbound_1", "sent_at": now_iso, "engine": result.get("engine", "resend")}},
-                        },
-                    )
+                sent += 1
+                now_iso = datetime.now(timezone.utc).isoformat()
+                await db.campaign_leads.update_one(
+                    {"lead_id": lead["lead_id"]},
+                    {
+                        "$set": {"status": "emailed",
+                                  "last_email_at": now_iso,
+                                  "updated_at": now_iso},
+                        "$push": {"outreach_history": {"type": "email", "template": "outbound_1", "template_id": "outbound_1", "sent_at": now_iso, "engine": result.get("engine", "resend")}},
+                    },
+                )
                 # iter D-66 — mirror into top-level outreach_history so
                 # template_perf health check (queries by template_id)
                 # can count this send.

@@ -356,55 +356,70 @@ class LeadCaptureService:
     
     async def get_lead_stats(self, tenant_id: str, period: str = "today") -> Dict[str, Any]:
         """
-        Get lead statistics for a tenant
-        
-        Args:
-            tenant_id: Tenant ID
-            period: Time period ("today", "week", "month", "all")
-        
-        Returns:
-            {
-                "total_leads": int,
-                "new_leads": int,
-                "converted": int,
-                "total_value": float,
-                "conversion_rate": float
-            }
+        Get lead statistics for a tenant.
+
+        iter D-71 — UNIFY data source. Dashboard reads `campaign_leads`
+        (where Scout/Apollo/Tavily writes). CRM was reading `db.leads`
+        (AI-conversation captures only) so customer always saw "0 leads"
+        even with 2,021 leads on the Dashboard. Merge both collections,
+        with `campaign_leads` as primary.
         """
         try:
             # Determine date filter based on period
             now = datetime.now(timezone.utc)
             date_filter = {}
-            
+
             if period == "today":
                 from datetime import timedelta
                 start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                date_filter = {"captured_at": {"$gte": start_of_day}}
-            
-            query = {"tenant_id": tenant_id, **date_filter}
-            
-            # Get all leads
-            all_leads = await self.db.leads.find(query, {"_id": 0}).to_list(1000)
-            
-            # Calculate stats
+                # campaign_leads uses `created_at` (ISO string), `leads` uses `captured_at` (datetime)
+                date_filter_legacy = {"captured_at": {"$gte": start_of_day}}
+                date_filter_campaign = {"$or": [
+                    {"created_at": {"$gte": start_of_day}},
+                    {"created_at": {"$gte": start_of_day.isoformat()}},
+                ]}
+            else:
+                date_filter_legacy = {}
+                date_filter_campaign = {}
+
+            # ── Primary source: campaign_leads (Scout / Apollo output) ──
+            scope_campaign = {} if not tenant_id else {"tenant_id": tenant_id}
+            campaign_leads = await self.db.campaign_leads.find(
+                {**scope_campaign, **date_filter_campaign}, {"_id": 0}
+            ).to_list(5000)
+
+            # ── Legacy source: leads (AI-conversation captures) ──
+            scope_legacy = {} if not tenant_id else {"tenant_id": tenant_id}
+            legacy_leads = await self.db.leads.find(
+                {**scope_legacy, **date_filter_legacy}, {"_id": 0}
+            ).to_list(2000)
+
+            all_leads = (campaign_leads or []) + (legacy_leads or [])
+
+            # Calculate stats — accept multiple status field names
             total_leads = len(all_leads)
-            new_leads = len([l for l in all_leads if l.get("status") == "new"])
-            converted = len([l for l in all_leads if l.get("status") == "converted"])
-            total_value = sum(l.get("value_estimate", 0) for l in all_leads)
+            qualified = len([l for l in all_leads
+                             if l.get("status") in ("qualified", "interested", "scored")
+                             or (isinstance(l.get("score"), (int, float)) and l.get("score", 0) >= 70)])
+            new_leads = len([l for l in all_leads if l.get("status") in (None, "", "new", "discovered", "scored")])
+            converted = len([l for l in all_leads if l.get("status") in ("converted", "closed", "won")])
+            total_value = sum(l.get("value_estimate", 0) or l.get("revenue_estimate", 0) for l in all_leads)
             conversion_rate = (converted / total_leads * 100) if total_leads > 0 else 0
-            
+
             return {
                 "total_leads": total_leads,
+                "qualified": qualified,
                 "new_leads": new_leads,
                 "converted": converted,
                 "total_value": round(total_value, 2),
                 "conversion_rate": round(conversion_rate, 1)
             }
-        
+
         except Exception as e:
             logger.error(f"[LeadCapture] Error getting stats: {e}")
             return {
                 "total_leads": 0,
+                "qualified": 0,
                 "new_leads": 0,
                 "converted": 0,
                 "total_value": 0.0,

@@ -482,28 +482,40 @@ async def get_agents_status(user = Depends(get_current_user)):
     _db = _get_db()
     if _db is not None:
         try:
-            # Count real activities to update agent stats
+            # iter D-71 — Count REAL activity. Scout writes to `campaign_leads`
+            # (where Apollo/Tavily put their finds), NOT to `db.leads` (which
+            # is the AI-conversation lead capture). The agent status was
+            # showing 0 even when 2,021 campaign_leads existed because we
+            # were reading the wrong collection.
             voice_calls = await _db.voice_calls.count_documents({})
-            leads = await _db.leads.count_documents({})
+            campaign_leads = await _db.campaign_leads.count_documents({})
+            captured_leads = await _db.leads.count_documents({})
+            scout_leads = campaign_leads + captured_leads
             conversations = await _db.aurem_conversations.count_documents({})
             api_keys = await _db.api_keys.count_documents({})
-            
-            # Scout: lead scraping tasks
-            agents[0]["tasks_completed"] = leads
-            agents[0]["status"] = "SCANNING" if leads > 0 else "STANDBY"
-            
+            outreach = 0
+            try:
+                outreach = await _db.outreach_history.count_documents({})
+            except Exception:
+                pass
+
+            # Scout: lead scraping tasks (campaign_leads is the truth)
+            agents[0]["tasks_completed"] = scout_leads
+            agents[0]["status"] = "SCANNING" if scout_leads > 0 else "STANDBY"
+
             # Architect: automation building
             agents[1]["tasks_completed"] = api_keys + 3
             agents[1]["status"] = "BUILDING" if api_keys > 0 else "STANDBY"
-            
-            # Envoy: conversations + voice calls handled
-            agents[2]["tasks_completed"] = conversations + voice_calls
-            agents[2]["status"] = "ACTIVE" if (conversations + voice_calls) > 0 else "STANDBY"
-            
+
+            # Envoy: conversations + outreach touches
+            envoy_tasks = conversations + outreach
+            agents[2]["tasks_completed"] = envoy_tasks
+            agents[2]["status"] = "ACTIVE" if envoy_tasks > 0 else "STANDBY"
+
             # Closer: voice calls
             agents[3]["tasks_completed"] = voice_calls
             agents[3]["status"] = "ENGAGING" if voice_calls > 0 else "STANDBY"
-            
+
             # Orchestrator: always active if other agents are working
             total_tasks = sum(a["tasks_completed"] for a in agents[:4])
             agents[4]["tasks_completed"] = total_tasks

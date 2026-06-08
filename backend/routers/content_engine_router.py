@@ -283,7 +283,7 @@ async def tiers(authorization: str = Header(None)):
     return {
         tier: {
             "name": plan["name"],
-            "price": f"${plan['price_monthly']}/mo",
+            "price": f"${plan.get('price_monthly', plan.get('price_cad', 0))}/mo",
             "content_posts": plan["limits"].get("content_posts_per_month", 0),
             "images": plan["limits"].get("images_per_month", 0),
             "social_channels": plan["limits"].get("social_channels", 0),
