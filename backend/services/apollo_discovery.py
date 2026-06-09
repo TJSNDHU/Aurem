@@ -148,13 +148,56 @@ async def discover_organizations(
 
 # A tight list of SMB-friendly industries the founder explicitly named.
 DEFAULT_INDUSTRY_KEYWORDS = [
-    "roofing", "dental", "restaurant", "hvac", "plumbing",
-    "landscaping", "accounting",
+    # iter D-71 — Canada-wide, all-business default. The previous 7-item
+    # list (roofing/dental/restaurant/hvac/plumbing/landscaping/accounting)
+    # exhausted Apollo's pool after a few hunts and the campaign stalled
+    # with "no new leads to send". This is the broad SMB universe.
+    # Trades & home services
+    "roofing", "plumbing", "hvac", "landscaping", "electrician",
+    "general contractor", "painter", "flooring", "fencing", "handyman",
+    "pest control", "snow removal", "cleaning", "junk removal",
+    # Auto
+    "auto repair", "auto detailing", "tire shop", "body shop",
+    # Health & wellness
+    "dental", "chiropractor", "physiotherapy", "veterinarian",
+    "medical clinic", "pharmacy", "optometrist", "massage therapy",
+    # Beauty & personal care
+    "hair salon", "barber", "nail salon", "spa", "tattoo",
+    # Food & hospitality
+    "restaurant", "cafe", "bakery", "catering", "food truck",
+    # Professional services
+    "accounting", "law firm", "real estate", "insurance broker",
+    "financial planner", "marketing agency", "consulting",
+    # Fitness & retreats
+    "gym", "yoga studio", "personal training", "martial arts",
+    # Retail & e-commerce
+    "boutique", "florist", "jewelry store", "furniture store",
 ]
 
 DEFAULT_GTA_CITIES = [
-    "Mississauga", "Brampton", "Toronto",
-    "Scarborough", "North York", "Etobicoke",
+    # iter D-71 — Renamed conceptually to ALL-CANADA. Apollo billing is
+    # per-result not per-search so geographic breadth is free; what's
+    # NOT free is running the same exhausted GTA queries forever.
+    # ── Ontario ──
+    "Toronto", "Mississauga", "Brampton", "Vaughan", "Markham",
+    "Scarborough", "North York", "Etobicoke", "Ottawa", "Hamilton",
+    "London", "Kitchener", "Windsor", "Oakville", "Burlington",
+    "Barrie", "Guelph", "Kingston", "Waterloo", "Richmond Hill",
+    "Pickering", "Ajax", "Whitby",
+    # ── Quebec ──
+    "Montreal", "Laval", "Quebec City", "Gatineau", "Longueuil",
+    "Sherbrooke", "Trois-Rivieres",
+    # ── British Columbia ──
+    "Vancouver", "Surrey", "Burnaby", "Richmond", "Victoria",
+    "Abbotsford", "Coquitlam", "Kelowna", "Langley",
+    # ── Alberta ──
+    "Calgary", "Edmonton", "Red Deer", "Lethbridge", "St. Albert",
+    "Medicine Hat",
+    # ── Manitoba / Saskatchewan ──
+    "Winnipeg", "Brandon", "Saskatoon", "Regina",
+    # ── Atlantic Canada ──
+    "Halifax", "Moncton", "Fredericton", "Saint John",
+    "St. John's", "Charlottetown",
 ]
 
 
@@ -163,23 +206,30 @@ async def discover_for_default_targets(
     industries: list[str] | None = None,
     cities:     list[str] | None = None,
     per_combo:  int = 10,
+    max_combos: int = 40,
 ) -> List[Dict[str, Any]]:
-    """Loop over every (industry, city) combo and concat the results.
+    """Loop over (industry, city) combos and concat the results.
 
-    This is what daily_hunt calls. Caps to `per_combo` per pair to spread
-    credit cost. Returns one flat list of normalised lead dicts.
+    iter D-71 — Defaults now cover 56 cities × 50 industries (2,800 combos)
+    so we explicitly cap `max_combos` to 40 RANDOMLY sampled pairs per run.
+    A daily hunt at 40 × per_combo=10 = 400 leads/day. The matrix rotates
+    by RNG seed each call so over a week we touch the whole country.
+    Caller can override max_combos for one-off larger pulls.
     """
+    import random
     industries = industries or DEFAULT_INDUSTRY_KEYWORDS
     cities     = cities     or DEFAULT_GTA_CITIES
+    pairs = [(ind, city) for ind in industries for city in cities]
+    if len(pairs) > max_combos:
+        pairs = random.sample(pairs, max_combos)
     all_leads: List[Dict[str, Any]] = []
-    for ind in industries:
-        for city in cities:
-            try:
-                rows = await discover_organizations(
-                    industry_keyword=ind, city=city, per_page=per_combo,
-                )
-            except Exception as e:
-                logger.warning(f"[apollo-discovery] combo failed {ind}/{city}: {e}")
-                rows = []
-            all_leads.extend(rows)
+    for ind, city in pairs:
+        try:
+            rows = await discover_organizations(
+                industry_keyword=ind, city=city, per_page=per_combo,
+            )
+        except Exception as e:
+            logger.warning(f"[apollo-discovery] combo failed {ind}/{city}: {e}")
+            rows = []
+        all_leads.extend(rows)
     return all_leads

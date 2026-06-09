@@ -50,7 +50,8 @@ import time
 from typing import Any, Awaitable, Callable, Dict
 
 
-# Each bucket: {"value": Any, "expires_at": float, "lock": asyncio.Lock}
+# Each bucket: {"value": Any, "expires_at": float, "lock": asyncio.Lock,
+#               "hits": int, "misses": int, "last_load_ms": float}
 _CACHE: Dict[str, Dict[str, Any]] = {}
 _GLOBAL_LOCK = asyncio.Lock()
 
@@ -68,6 +69,7 @@ async def cached(
     now = time.time()
     bucket = _CACHE.get(key)
     if bucket and bucket["expires_at"] > now:
+        bucket["hits"] = bucket.get("hits", 0) + 1
         return bucket["value"]
 
     # Get or create per-key lock under a global lock (cheap, only on miss).
@@ -75,17 +77,24 @@ async def cached(
         async with _GLOBAL_LOCK:
             bucket = _CACHE.get(key)
             if bucket is None:
-                bucket = {"value": None, "expires_at": 0.0, "lock": asyncio.Lock()}
+                bucket = {
+                    "value": None, "expires_at": 0.0, "lock": asyncio.Lock(),
+                    "hits": 0, "misses": 0, "last_load_ms": 0.0,
+                }
                 _CACHE[key] = bucket
 
     async with bucket["lock"]:
         # Re-check: another coro may have refreshed while we waited.
         now = time.time()
         if bucket["expires_at"] > now:
+            bucket["hits"] = bucket.get("hits", 0) + 1
             return bucket["value"]
+        t0 = time.time()
         value = await loader()
+        bucket["last_load_ms"] = round((time.time() - t0) * 1000, 1)
         bucket["value"] = value
         bucket["expires_at"] = now + ttl_sec
+        bucket["misses"] = bucket.get("misses", 0) + 1
         return value
 
 
@@ -103,18 +112,42 @@ def invalidate_prefix(prefix: str) -> int:
 
 
 def stats() -> Dict[str, Any]:
-    """Diagnostics — exposed via /api/admin/poll-cache/stats for ops."""
+    """Diagnostics — exposed via /api/admin/poll-cache/stats for ops.
+
+    Each key reports hits / misses / hit-rate / last loader latency so the
+    admin sidebar widget can highlight any endpoint with a poor hit rate
+    (likely poll interval >= TTL → bump the TTL).
+    """
     now = time.time()
     live = sum(1 for b in _CACHE.values() if b["expires_at"] > now)
+    total_hits = sum(b.get("hits", 0) for b in _CACHE.values())
+    total_misses = sum(b.get("misses", 0) for b in _CACHE.values())
+    total_calls = total_hits + total_misses
+    overall_hit_rate = round(total_hits / total_calls * 100, 1) if total_calls else 0.0
+    keys: list = []
+    for k, b in _CACHE.items():
+        hits = b.get("hits", 0)
+        misses = b.get("misses", 0)
+        calls = hits + misses
+        hit_rate = round(hits / calls * 100, 1) if calls else 0.0
+        keys.append({
+            "key": k,
+            "ttl_remaining_sec": max(0, round(b["expires_at"] - now, 1)),
+            "hits": hits,
+            "misses": misses,
+            "calls": calls,
+            "hit_rate_pct": hit_rate,
+            "last_load_ms": b.get("last_load_ms", 0.0),
+        })
+    # Sort by call volume desc so the heaviest endpoints float to the top
+    keys.sort(key=lambda x: x["calls"], reverse=True)
     return {
         "total_keys": len(_CACHE),
         "live_keys": live,
         "expired_keys": len(_CACHE) - live,
-        "keys": [
-            {
-                "key": k,
-                "ttl_remaining_sec": max(0, round(b["expires_at"] - now, 1)),
-            }
-            for k, b in _CACHE.items()
-        ][:50],
+        "total_hits": total_hits,
+        "total_misses": total_misses,
+        "overall_hit_rate_pct": overall_hit_rate,
+        "db_ops_saved_estimate": total_hits,  # each hit = 1 avoided loader run
+        "keys": keys[:50],
     }

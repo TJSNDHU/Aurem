@@ -213,15 +213,27 @@ async def providers_health(authorization: Optional[str] = Header(None)):
 async def providers_health_public():
     """Same payload as /health but without admin auth — wired to the
     pillars-map drill-down so the founder can see chain status at a
-    glance. Read-only / safe."""
+    glance. Read-only / safe.
+
+    iter D-71 — Before any admin opens /api/admin/ora/providers/health,
+    the cache is empty and we used to 503. The frontend polls this every
+    20s which painted 100+ false P1 incidents per hour. Return an empty
+    snapshot with status="warming" instead — no error noise, frontend
+    handles the 'no data yet' state cleanly.
+    """
     if _CACHE["payload"]:
         cached = dict(_CACHE["payload"])
         cached["cached"] = (time.time() - _CACHE["ts"]) < _CACHE_TTL
-        # Strip latency/keys details — keep just status booleans for public.
         cached["providers"] = {
             k: {"ok": v.get("ok"), "configured": v.get("configured"),
                 "reason": v.get("reason")}
             for k, v in cached.get("providers", {}).items()
         }
         return cached
-    raise HTTPException(503, "no health snapshot yet — try /health (admin)")
+    return {
+        "status": "warming",
+        "providers": {},
+        "checked_at": time.time(),
+        "cached": False,
+        "reason": "snapshot not yet computed — hit /api/admin/ora/providers/health (admin) once to seed",
+    }

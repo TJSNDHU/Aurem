@@ -2719,6 +2719,13 @@ def register_all_routers(app, db):
                 run_email_sequence, run_whatsapp_sequence,
             )
 
+            # iter D-71 — auto_blast_scheduler() is launched by
+            # pillars/sales/worker.py at startup (the p1-worker). Verified
+            # by '[p1-worker] ✓ Auto-Blast scheduler attached' in the boot
+            # log. The cron jobs below are SEPARATE daily fixed-time
+            # triggers; the per-cycle blast loop runs every N min on its
+            # own from p1-worker.
+
             # Daily 9 AM EST — Scout scrapes new businesses
             aurem_scheduler.add_job(
                 run_daily_scrape,

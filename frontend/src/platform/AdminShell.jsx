@@ -35,6 +35,7 @@ import { PillarProvider, usePillarHealth } from './PillarHealthContext';
 import PillarGate, { PillarDot } from './PillarGate';
 import OrgSwitcher from './OrgSwitcher';
 import BugCatchWidget from './BugCatchWidget';   // iter D-60
+import CacheHitRateWidget from './CacheHitRateWidget';   // iter D-71 perf
 
 const API = BACKEND_URL;
 
@@ -570,6 +571,9 @@ const AdminShellInner = () => {
             </div>
           </div>
         )}
+
+        {/* CACHE HIT-RATE WIDGET — iter D-71 perf, admin sidebar */}
+        {!collapsed && <CacheHitRateWidget />}
 
         {/* FOUNDER TIMELINE — last 5 events */}
         {!collapsed && pulse.timeline.length > 0 && (

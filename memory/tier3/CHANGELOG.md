@@ -9942,3 +9942,73 @@ shows "Total Leads 0", (b) 20 P1 `backend_middleware` incidents per hour,
 **Press the "Deploy" button in the Emergent dashboard.** The last 3 weeks
 of fixes (D-65 scheduler, D-71 data consistency) are not yet on production.
 
+
+
+---
+
+## 2026-06-09 — D-71b: P0 sweep finale + cache widget + Canada expand
+
+### (b) P0 fixes — full root-cause coverage
+
+1. **`/api/search/history` returned 500 "Database not available"** — the
+   `set_smart_search_db` setter was imported in `server.py` but never
+   called. Added the call alongside `set_toon_service_db(db)`. Verified
+   live: now returns 200 with real search history.
+
+2. **`/api/admin/ora/providers/health/public` returned 503 noise** — the
+   endpoint raised `HTTPException(503)` when the provider snapshot was
+   empty (cold pod). Frontend polls every 20s, painting ~100 false P1
+   incidents/hr. Now returns 200 with `status: "warming"` until the
+   snapshot is seeded.
+
+3. **Campaign scheduler "Last run never"** — root cause was NOT the
+   scheduler attach (already done by `pillars/sales/worker.py`). It was
+   the `auto_blast.py` SyntaxError from D-71 cascading into the p1-worker
+   crashing silently. After D-71 fix, restart shows
+   `[p1-worker] Pillar 1 worker ready — 10 schedulers attached`
+   and `[auto-blast] cycle starting — 1 enabled tenant(s)` proving the
+   cycle is live. The "no-eligible-leads" note in the first cycle is
+   honest: 18 of 43 queued leads are contactless and the rest were
+   already blasted — exactly what Apollo Canada-wide expand below fixes.
+
+4. **CRM ← Scout sync** — already shipped in D-71. Re-verified:
+   `/api/leads/stats` returns 1469 leads, matches Dashboard. CRM list
+   falls back to `campaign_leads` when no scans exist.
+
+### (a) Cache hit-rate widget — admin sidebar
+
+- New component: `frontend/src/platform/CacheHitRateWidget.jsx`
+- Mounted in `AdminShell.jsx` between A2A rail and Founder Timeline
+- Renders: overall hit-rate gauge, DB-ops-saved counter, top 5 endpoints
+  with per-key colored hit-rate bars (green ≥80%, amber 40-79%, red <40%)
+- Click row to copy the cache key for manual invalidate
+- Backed by extended `services/poll_cache.py:stats()` which now tracks
+  `hits`, `misses`, `hit_rate_pct`, `last_load_ms` per key
+- Live verified: 80% hit-rate after 10 calls, 8 DB ops saved
+
+### (c) Apollo Canada-wide expansion
+
+- `services/apollo_discovery.py`:
+  - `DEFAULT_GTA_CITIES`: 6 cities → **56 cities** across all 10 provinces
+  - `DEFAULT_INDUSTRY_KEYWORDS`: 7 industries → **50 industries** (trades,
+    health, beauty, food, professional, fitness, retail)
+- `discover_for_default_targets` now caps to `max_combos=40` per run,
+  RANDOMLY sampled — over a week the rotation covers all 2,800 city ×
+  industry pairs without blowing Apollo credits
+
+### Tests — 38 passing across D-71/D-71b
+- `tests/test_d71_data_consistency_and_5xx_fixes.py` (7)
+- `tests/test_d71_poll_cache.py` (13)
+- `tests/test_d71b_perf_and_canada_expand.py` (9)
+- `tests/test_d70_codebase_health.py` (3)
+- Plus the pre-existing regression suite
+
+### Files touched
+- `backend/server.py` (smart_search wiring)
+- `backend/routers/ora_providers_router.py` (warming state instead of 503)
+- `backend/routers/registry.py` (campaign scheduler comment cleanup)
+- `backend/services/apollo_discovery.py` (Canada-wide defaults + sample cap)
+- `backend/services/poll_cache.py` (hits/misses/last_load_ms tracking)
+- `frontend/src/platform/CacheHitRateWidget.jsx` (new)
+- `frontend/src/platform/AdminShell.jsx` (mount the widget)
+

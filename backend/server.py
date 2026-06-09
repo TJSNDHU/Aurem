@@ -1938,6 +1938,12 @@ async def startup_event():
                 set_admin_plan_db(db)
             if set_toon_service_db:
                 set_toon_service_db(db)
+            # iter D-71 — smart_search.db was never wired, causing 500
+            # "Database not available" on every /api/search/history poll.
+            if set_smart_search_db:
+                set_smart_search_db(db)
+            if set_connector_ecosystem_db:
+                set_connector_ecosystem_db(db)
             logging.info("✓ Mission Control DB initialized")
         except Exception as e:
             logging.warning(f"Mission Control DB init failed: {e}")
