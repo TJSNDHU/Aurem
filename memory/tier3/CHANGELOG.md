@@ -10012,3 +10012,59 @@ of fixes (D-65 scheduler, D-71 data consistency) are not yet on production.
 - `frontend/src/platform/CacheHitRateWidget.jsx` (new)
 - `frontend/src/platform/AdminShell.jsx` (mount the widget)
 
+
+
+---
+
+## 2026-06-09 — D-71c: Cache Auto-Tune (one-click TTL doubling)
+
+### What
+
+The cache hit-rate widget now has a ⚡2× button per row. When an
+endpoint's hit-rate drops under 40% with ≥5 calls (backend computes
+`tunable=true`), the founder can click ONE button to double that
+endpoint's effective TTL — no code change, no redeploy, no manual math.
+
+### How it works
+
+1. `services/poll_cache.py` learned a `_TTL_OVERRIDES: Dict[str, float]`
+   registry. Every `cached()` call uses `max(developer_ttl, override)`
+   as the effective TTL, so an override only ever *helps*.
+2. New `tune(key, multiplier=2.0)` function bumps the override. Clamped
+   at 30 min ceiling so a fat-finger can't break live data freshness.
+3. New `POST /api/admin/poll-cache/tune` endpoint with body
+   `{key, multiplier}`. Multiplier server-clamped to `[1.1, 10.0]`.
+4. New `POST /api/admin/poll-cache/reset-tune` to drop an override.
+5. `stats()` now exposes `tunable`, `tuned`, `default_ttl_sec`,
+   `effective_ttl_sec` per key for the UI.
+6. Frontend widget renders the ⚡2× button only when `tunable=true`
+   and `!tuned` — prevents infinite doubling on the same row.
+7. Post-tune confirmation flash: `"✓ TTL 15s → 30s"` for 4 seconds.
+
+### Live verification
+
+```
+POST /api/admin/poll-cache/tune {"key":"aurem:agents:status","multiplier":2.0}
+→ {"ok":true, "previous_ttl_sec":10, "new_ttl_sec":20.0}
+GET /api/admin/poll-cache/stats
+→ aurem:agents:status default_ttl=10s effective_ttl=20.0s tuned=True tunable=False
+```
+
+### Tests — 8 new (all passing, 32/32 across D-71 suite)
+
+- `tune()` doubles known keys
+- Refuses unknown keys with `reason: unknown_key`
+- Clamped at 30 min
+- Takes effect on the next call (force-evicts the bucket)
+- `reset_tune()` clears overrides
+- Stats exposes `tunable`/`tuned` flags
+- Endpoint clamps multiplier `[1.1, 10.0]`
+- Widget reads backend `tunable` flag (UI never re-shows tune button for already-tuned keys)
+
+### Files touched
+
+- `backend/services/poll_cache.py` (+`_TTL_OVERRIDES`, `tune()`, `reset_tune()`, expanded `stats()`)
+- `backend/routers/poll_cache_stats_router.py` (+`POST /tune`, `POST /reset-tune`)
+- `frontend/src/platform/CacheHitRateWidget.jsx` (+button, +flash confirmation)
+- `backend/tests/test_d71c_cache_autotune.py` (new — 8 tests)
+

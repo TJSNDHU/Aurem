@@ -1,17 +1,19 @@
-/* CacheHitRateWidget — iter D-71 perf observability
+/* CacheHitRateWidget — iter D-71/D-71b perf observability
  *
  * Lives in the admin sidebar (between A2A rail and Founder Timeline).
  * Polls /api/admin/poll-cache/stats every 30s. Renders:
  *   - Overall hit-rate gauge (% across all cached endpoints)
  *   - DB-ops-saved counter (sum of cache hits since boot)
  *   - Top 5 endpoints by call volume with per-endpoint hit-rate bars
+ *   - Auto-tune ⚡ button per row when hit-rate < 40% (iter D-71b)
  *
  * Color coding:
  *   ≥80% hit-rate  green  (cache earning its keep)
  *   40-79%         amber  (TTL likely too short — bump it)
  *   <40%           red    (poll interval >= TTL → cache useless)
  *
- * Click an endpoint row to copy the key for manual invalidate.
+ * Click endpoint name to copy the key for manual invalidate.
+ * Click ⚡ to 2× the TTL (one click per endpoint, no manual math).
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { Database, Zap } from 'lucide-react';
@@ -36,6 +38,8 @@ const rateColor = (pct) => {
 const CacheHitRateWidget = () => {
   const [stats, setStats] = useState(null);
   const [err, setErr] = useState(null);
+  const [tuning, setTuning] = useState(null);   // key currently being tuned
+  const [flash, setFlash] = useState(null);     // brief "TTL 15s → 30s" confirmation
 
   const load = useCallback(async () => {
     try {
@@ -55,6 +59,30 @@ const CacheHitRateWidget = () => {
       setErr(String(e?.message || e));
     }
   }, []);
+
+  const autoTune = useCallback(async (key) => {
+    const token = localStorage.getItem('aurem_token') || localStorage.getItem('token') || localStorage.getItem('platform_token');
+    if (!token) return;
+    setTuning(key);
+    try {
+      const r = await fetch(`${API_URL}/api/admin/poll-cache/tune`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ key, multiplier: 2.0 }),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        setFlash({ key, prev: j.previous_ttl_sec, next: j.new_ttl_sec });
+        setTimeout(() => setFlash(null), 4000);
+        load();
+      }
+    } finally {
+      setTuning(null);
+    }
+  }, [load]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,22 +145,56 @@ const CacheHitRateWidget = () => {
         {topKeys.map((k) => {
           const pct = k.hit_rate_pct ?? 0;
           const color = rateColor(pct);
-          const short = k.key.length > 22 ? k.key.slice(0, 22) + '…' : k.key;
+          const short = k.key.length > 18 ? k.key.slice(0, 18) + '…' : k.key;
+          const isTuning = tuning === k.key;
+          const isFlashing = flash?.key === k.key;
+          // Only offer auto-tune for keys with enough calls AND poor hit-rate.
+          // Backend computes this via the `tunable` flag.
+          const showTune = !!k.tunable && !k.tuned;
           return (
             <div
               key={k.key}
-              title={`${k.key} · ${k.calls} calls · ${pct}% hit · ${k.last_load_ms}ms loader · ${k.ttl_remaining_sec}s TTL left`}
-              onClick={() => navigator.clipboard?.writeText(k.key)}
+              title={`${k.key} · ${k.calls} calls · ${pct}% hit · ${k.last_load_ms}ms loader · TTL ${k.effective_ttl_sec}s${k.tuned ? ' (tuned)' : ''}`}
               data-testid={`cache-key-${k.key.replace(/[:/]/g, '-')}`}
               style={{
                 fontSize: 8, fontFamily: 'JetBrains Mono, monospace',
-                color: '#9A9388', cursor: 'pointer',
+                color: '#9A9388',
               }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 1 }}>
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 1 }}>
+                <span
+                  onClick={() => navigator.clipboard?.writeText(k.key)}
+                  style={{
+                    flex: 1, whiteSpace: 'nowrap', overflow: 'hidden',
+                    textOverflow: 'ellipsis', cursor: 'pointer',
+                  }}>
                   {short}
+                  {k.tuned && (
+                    <span style={{ color: '#06B6D4', marginLeft: 3, fontWeight: 700 }}>·tuned</span>
+                  )}
                 </span>
-                <span style={{ color, fontWeight: 700 }}>
+                {showTune && (
+                  <button
+                    type="button"
+                    disabled={isTuning}
+                    onClick={(e) => { e.stopPropagation(); autoTune(k.key); }}
+                    data-testid={`cache-tune-${k.key.replace(/[:/]/g, '-')}`}
+                    title={`Auto-tune: double TTL from ${k.effective_ttl_sec}s to ${k.effective_ttl_sec * 2}s`}
+                    style={{
+                      background: isTuning ? 'rgba(245,158,11,0.15)' : 'rgba(212,175,55,0.18)',
+                      border: '1px solid rgba(212,175,55,0.4)',
+                      borderRadius: 3,
+                      color: '#D4AF37',
+                      cursor: isTuning ? 'wait' : 'pointer',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 7, fontWeight: 700,
+                      padding: '1px 4px',
+                      lineHeight: 1.2,
+                      letterSpacing: '0.08em',
+                    }}>
+                    {isTuning ? '…' : '⚡2×'}
+                  </button>
+                )}
+                <span style={{ color, fontWeight: 700, minWidth: 26, textAlign: 'right' }}>
                   {pct.toFixed(0)}%
                 </span>
               </div>
@@ -147,6 +209,16 @@ const CacheHitRateWidget = () => {
                   transition: 'width 220ms ease',
                 }} />
               </div>
+              {isFlashing && (
+                <div
+                  data-testid={`cache-tune-confirm-${k.key.replace(/[:/]/g, '-')}`}
+                  style={{
+                    fontSize: 7, color: '#22C55E', marginTop: 2,
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}>
+                  ✓ TTL {flash.prev}s → {flash.next}s
+                </div>
+              )}
             </div>
           );
         })}
@@ -156,7 +228,7 @@ const CacheHitRateWidget = () => {
         fontSize: 7, color: '#7A7468', marginTop: 6,
         fontStyle: 'italic',
       }}>
-        Click to copy key · refreshes 30s
+        Click name to copy · ⚡2× to auto-tune · refreshes 30s
       </div>
     </div>
   );
