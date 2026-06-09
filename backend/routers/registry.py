@@ -721,6 +721,7 @@ def register_all_routers(app, db):
         ("routers.feature_flags_router",       "Feature Flags admin (iter D-63 zero-downtime)"),
         ("routers.web_search_router",          "Web Search + URL Fetch (iter D-64 Tavily skills)"),
         ("routers.codebase_health_router",     "Codebase Health (iter D-70 live analyzer)"),
+        ("routers.poll_cache_stats_router",    "Poll Cache stats + invalidate (iter D-71 perf)"),
     ]
 
     for module_path, label in _aurem_with_db:

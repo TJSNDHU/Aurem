@@ -464,69 +464,67 @@ async def get_chat_history(
 
 @router.get("/agents/status")
 async def get_agents_status(user = Depends(get_current_user)):
-    """Get status of all ORA agents with real activity data"""
+    """Get status of all ORA agents with real activity data.
+
+    Cached 10s (D-71 perf) — payload is global (not user-scoped). The
+    ORACommandConsole polls this every 10s; without cache that's 5
+    count_documents() per call = ~1,800 Mongo ops/hour per open tab.
+    """
     from datetime import timedelta
-    
-    now = datetime.now(timezone.utc)
-    hour_ago = now - timedelta(hours=1)
-    
-    # Base agent definitions
-    agents = [
-        {"name": "Scout Agent", "role": "OBSERVE", "status": "SCANNING", "tasks_completed": 0, "capabilities": ["market_intelligence", "lead_scraping"]},
-        {"name": "Architect Agent", "role": "ORIENT", "status": "BUILDING", "tasks_completed": 0, "capabilities": ["automation_builder", "pipeline_design"]},
-        {"name": "Envoy Agent", "role": "DECIDE", "status": "ACTIVE", "tasks_completed": 0, "capabilities": ["intent_classification", "communication"]},
-        {"name": "Closer Agent", "role": "ACT", "status": "ENGAGING", "tasks_completed": 0, "capabilities": ["deal_closure", "voice_outreach"]},
-        {"name": "Orchestrator", "role": "COMMAND", "status": "ACTIVE", "tasks_completed": 0, "capabilities": ["coordination", "resource_management"]},
-    ]
-    
-    _db = _get_db()
-    if _db is not None:
-        try:
-            # iter D-71 — Count REAL activity. Scout writes to `campaign_leads`
-            # (where Apollo/Tavily put their finds), NOT to `db.leads` (which
-            # is the AI-conversation lead capture). The agent status was
-            # showing 0 even when 2,021 campaign_leads existed because we
-            # were reading the wrong collection.
-            voice_calls = await _db.voice_calls.count_documents({})
-            campaign_leads = await _db.campaign_leads.count_documents({})
-            captured_leads = await _db.leads.count_documents({})
-            scout_leads = campaign_leads + captured_leads
-            conversations = await _db.aurem_conversations.count_documents({})
-            api_keys = await _db.api_keys.count_documents({})
-            outreach = 0
+
+    async def _compute():
+        now = datetime.now(timezone.utc)
+        # Base agent definitions
+        agents = [
+            {"name": "Scout Agent", "role": "OBSERVE", "status": "SCANNING", "tasks_completed": 0, "capabilities": ["market_intelligence", "lead_scraping"]},
+            {"name": "Architect Agent", "role": "ORIENT", "status": "BUILDING", "tasks_completed": 0, "capabilities": ["automation_builder", "pipeline_design"]},
+            {"name": "Envoy Agent", "role": "DECIDE", "status": "ACTIVE", "tasks_completed": 0, "capabilities": ["intent_classification", "communication"]},
+            {"name": "Closer Agent", "role": "ACT", "status": "ENGAGING", "tasks_completed": 0, "capabilities": ["deal_closure", "voice_outreach"]},
+            {"name": "Orchestrator", "role": "COMMAND", "status": "ACTIVE", "tasks_completed": 0, "capabilities": ["coordination", "resource_management"]},
+        ]
+
+        _db = _get_db()
+        if _db is not None:
             try:
-                outreach = await _db.outreach_history.count_documents({})
-            except Exception:
-                pass
+                voice_calls = await _db.voice_calls.count_documents({})
+                campaign_leads = await _db.campaign_leads.count_documents({})
+                captured_leads = await _db.leads.count_documents({})
+                scout_leads = campaign_leads + captured_leads
+                conversations = await _db.aurem_conversations.count_documents({})
+                api_keys = await _db.api_keys.count_documents({})
+                outreach = 0
+                try:
+                    outreach = await _db.outreach_history.count_documents({})
+                except Exception:
+                    pass
 
-            # Scout: lead scraping tasks (campaign_leads is the truth)
-            agents[0]["tasks_completed"] = scout_leads
-            agents[0]["status"] = "SCANNING" if scout_leads > 0 else "STANDBY"
+                agents[0]["tasks_completed"] = scout_leads
+                agents[0]["status"] = "SCANNING" if scout_leads > 0 else "STANDBY"
 
-            # Architect: automation building
-            agents[1]["tasks_completed"] = api_keys + 3
-            agents[1]["status"] = "BUILDING" if api_keys > 0 else "STANDBY"
+                agents[1]["tasks_completed"] = api_keys + 3
+                agents[1]["status"] = "BUILDING" if api_keys > 0 else "STANDBY"
 
-            # Envoy: conversations + outreach touches
-            envoy_tasks = conversations + outreach
-            agents[2]["tasks_completed"] = envoy_tasks
-            agents[2]["status"] = "ACTIVE" if envoy_tasks > 0 else "STANDBY"
+                envoy_tasks = conversations + outreach
+                agents[2]["tasks_completed"] = envoy_tasks
+                agents[2]["status"] = "ACTIVE" if envoy_tasks > 0 else "STANDBY"
 
-            # Closer: voice calls
-            agents[3]["tasks_completed"] = voice_calls
-            agents[3]["status"] = "ENGAGING" if voice_calls > 0 else "STANDBY"
+                agents[3]["tasks_completed"] = voice_calls
+                agents[3]["status"] = "ENGAGING" if voice_calls > 0 else "STANDBY"
 
-            # Orchestrator: always active if other agents are working
-            total_tasks = sum(a["tasks_completed"] for a in agents[:4])
-            agents[4]["tasks_completed"] = total_tasks
-            agents[4]["status"] = "ACTIVE" if total_tasks > 0 else "STANDBY"
-        except Exception as e:
-            logger.error(f"Agent status error: {e}")
-    
-    return {
-        "agents": agents,
-        "timestamp": now.isoformat()
-    }
+                total_tasks = sum(a["tasks_completed"] for a in agents[:4])
+                agents[4]["tasks_completed"] = total_tasks
+                agents[4]["status"] = "ACTIVE" if total_tasks > 0 else "STANDBY"
+            except Exception as e:
+                logger.error(f"Agent status error: {e}")
+
+        return {
+            "agents": agents,
+            "timestamp": now.isoformat()
+        }
+
+    # Import here to avoid circular import on module load
+    from services.poll_cache import cached as _poll_cached
+    return await _poll_cached(key="aurem:agents:status", ttl_sec=10, loader=_compute)
 
 @router.post("/agents/ooda")
 async def run_ooda_cycle(request: OODARequest, user = Depends(get_current_user)):

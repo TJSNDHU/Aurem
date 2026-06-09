@@ -73,136 +73,135 @@ async def _verify_admin(request: Request) -> dict:
 
 @router.get("/pulse")
 async def dogfood_pulse(_admin: dict = __import__("fastapi").Depends(_verify_admin)):
-    """14-day health rollup for the dogfood BIN."""
+    """14-day health rollup for the dogfood BIN.
+
+    Cached 30s (D-71 perf) — heavy 14-day aggregate over service_usage_log
+    and service_call_log; polled by /admin/brain every 15s per tab.
+    """
     if _db is None:
         raise HTTPException(503, "DB not ready")
 
-    now = datetime.now(timezone.utc)
-    since = now - timedelta(days=WINDOW_DAYS)
-    since_iso = since.isoformat()
+    async def _compute():
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=WINDOW_DAYS)
+        since_iso = since.isoformat()
 
-    # 1) All catalog services (so dead zones show up even with zero rows)
-    catalog = await _db.service_catalog.find(
-        {}, {"_id": 0, "service_id": 1, "name": 1, "status": 1, "cluster": 1}
-    ).to_list(length=200)
-    service_by_id: Dict[str, dict] = {s["service_id"]: s for s in catalog if s.get("service_id")}
+        catalog = await _db.service_catalog.find(
+            {}, {"_id": 0, "service_id": 1, "name": 1, "status": 1, "cluster": 1}
+        ).to_list(length=200)
+        service_by_id: Dict[str, dict] = {s["service_id"]: s for s in catalog if s.get("service_id")}
 
-    # 2) Aggregate usage from `service_usage_log` keyed by BIN.
-    #    Fields stored by service_gate: business_id, service, ts (iso str), count, path
-    pipeline: List[dict] = [
-        {"$match": {
-            "business_id": DOGFOOD_BIN,
-            "ts": {"$gte": since_iso},
-        }},
-        {"$group": {
-            "_id": "$service",
-            "total_calls": {"$sum": {"$ifNull": ["$count", 1]}},
-            "last_used": {"$max": "$ts"},
-            "events": {"$sum": 1},
-        }},
-    ]
-    usage_rows: List[dict] = []
-    try:
-        async for row in _db.service_usage_log.aggregate(pipeline):
-            usage_rows.append(row)
-    except Exception as e:
-        logger.warning(f"[DogfoodPulse] usage_log aggregate failed: {e}")
-    usage_by_service: Dict[str, dict] = {r["_id"]: r for r in usage_rows if r.get("_id")}
-
-    # 3) Success-rate proxy from `service_call_log` (if present).
-    #    Optional collection — many gated handlers log here with status="ok"/"error".
-    success_by_service: Dict[str, dict] = {}
-    try:
-        pipe2 = [
+        pipeline: List[dict] = [
             {"$match": {
                 "business_id": DOGFOOD_BIN,
                 "ts": {"$gte": since_iso},
             }},
             {"$group": {
                 "_id": "$service",
-                "ok": {"$sum": {"$cond": [{"$eq": ["$status", "ok"]}, 1, 0]}},
-                "err": {"$sum": {"$cond": [{"$eq": ["$status", "error"]}, 1, 0]}},
-                "total": {"$sum": 1},
+                "total_calls": {"$sum": {"$ifNull": ["$count", 1]}},
+                "last_used": {"$max": "$ts"},
+                "events": {"$sum": 1},
             }},
         ]
-        async for row in _db.service_call_log.aggregate(pipe2):
-            success_by_service[row["_id"]] = row
-    except Exception:
-        pass  # Optional table
+        usage_rows: List[dict] = []
+        try:
+            async for row in _db.service_usage_log.aggregate(pipeline):
+                usage_rows.append(row)
+        except Exception as e:
+            logger.warning(f"[DogfoodPulse] usage_log aggregate failed: {e}")
+        usage_by_service: Dict[str, dict] = {r["_id"]: r for r in usage_rows if r.get("_id")}
 
-    # 4) Build per-service rollup — every catalog service, even with zero usage.
-    services: List[Dict[str, Any]] = []
-    dead_zone_count = 0
-    active_count = 0
-    total_calls = 0
-    seen_services: set = set()
-    for sid, meta in sorted(service_by_id.items(), key=lambda kv: kv[0]):
-        seen_services.add(sid)
-        u = usage_by_service.get(sid)
-        calls = int(u["total_calls"]) if u else 0
-        last_used = u.get("last_used") if u else None
-        sc = success_by_service.get(sid)
-        if sc and sc.get("total"):
-            success_rate = round(sc["ok"] / sc["total"], 3)
-        else:
-            # No call-log → assume the bare invoke succeeded if any usage exists
-            success_rate = 1.0 if calls > 0 else 0.0
-        is_dead = calls == 0
-        if is_dead:
-            dead_zone_count += 1
-        else:
-            active_count += 1
-        total_calls += calls
-        services.append({
-            "service_id": sid,
-            "service_name": meta.get("name") or sid,
-            "cluster": meta.get("cluster") or "",
-            "catalog_status": meta.get("status") or "unknown",
-            "total_calls": calls,
-            "success_rate": success_rate,
-            "last_used": last_used,
-            "status": "dead_zone" if is_dead else "active",
-        })
+        success_by_service: Dict[str, dict] = {}
+        try:
+            pipe2 = [
+                {"$match": {
+                    "business_id": DOGFOOD_BIN,
+                    "ts": {"$gte": since_iso},
+                }},
+                {"$group": {
+                    "_id": "$service",
+                    "ok": {"$sum": {"$cond": [{"$eq": ["$status", "ok"]}, 1, 0]}},
+                    "err": {"$sum": {"$cond": [{"$eq": ["$status", "error"]}, 1, 0]}},
+                    "total": {"$sum": 1},
+                }},
+            ]
+            async for row in _db.service_call_log.aggregate(pipe2):
+                success_by_service[row["_id"]] = row
+        except Exception:
+            pass
 
-    # 4b) Surface any usage-tracked services NOT in the catalog (e.g. `total_scout`).
-    #     These are still real customer touch-points worth monitoring.
-    for sid, u in sorted(usage_by_service.items()):
-        if sid in seen_services or not sid:
-            continue
-        calls = int(u.get("total_calls") or 0)
-        sc = success_by_service.get(sid)
-        if sc and sc.get("total"):
-            success_rate = round(sc["ok"] / sc["total"], 3)
-        else:
-            success_rate = 1.0 if calls > 0 else 0.0
-        if calls == 0:
-            dead_zone_count += 1
-        else:
-            active_count += 1
-        total_calls += calls
-        services.append({
-            "service_id": sid,
-            "service_name": sid.replace("_", " ").title(),
-            "cluster": "off-catalog",
-            "catalog_status": "off-catalog",
-            "total_calls": calls,
-            "success_rate": success_rate,
-            "last_used": u.get("last_used"),
-            "status": "dead_zone" if calls == 0 else "active",
-        })
+        services: List[Dict[str, Any]] = []
+        dead_zone_count = 0
+        active_count = 0
+        total_calls = 0
+        seen_services: set = set()
+        for sid, meta in sorted(service_by_id.items(), key=lambda kv: kv[0]):
+            seen_services.add(sid)
+            u = usage_by_service.get(sid)
+            calls = int(u["total_calls"]) if u else 0
+            last_used = u.get("last_used") if u else None
+            sc = success_by_service.get(sid)
+            if sc and sc.get("total"):
+                success_rate = round(sc["ok"] / sc["total"], 3)
+            else:
+                success_rate = 1.0 if calls > 0 else 0.0
+            is_dead = calls == 0
+            if is_dead:
+                dead_zone_count += 1
+            else:
+                active_count += 1
+            total_calls += calls
+            services.append({
+                "service_id": sid,
+                "service_name": meta.get("name") or sid,
+                "cluster": meta.get("cluster") or "",
+                "catalog_status": meta.get("status") or "unknown",
+                "total_calls": calls,
+                "success_rate": success_rate,
+                "last_used": last_used,
+                "status": "dead_zone" if is_dead else "active",
+            })
 
-    return {
-        "ok": True,
-        "bin": DOGFOOD_BIN,
-        "email": DOGFOOD_EMAIL,
-        "window_days": WINDOW_DAYS,
-        "generated_at": now.isoformat(),
-        "summary": {
-            "total_services": len(services),
-            "active": active_count,
-            "dead_zone": dead_zone_count,
-            "total_calls": total_calls,
-            "has_dead_zones": dead_zone_count > 0,
-        },
-        "services": services,
-    }
+        for sid, u in sorted(usage_by_service.items()):
+            if sid in seen_services or not sid:
+                continue
+            calls = int(u.get("total_calls") or 0)
+            sc = success_by_service.get(sid)
+            if sc and sc.get("total"):
+                success_rate = round(sc["ok"] / sc["total"], 3)
+            else:
+                success_rate = 1.0 if calls > 0 else 0.0
+            if calls == 0:
+                dead_zone_count += 1
+            else:
+                active_count += 1
+            total_calls += calls
+            services.append({
+                "service_id": sid,
+                "service_name": sid.replace("_", " ").title(),
+                "cluster": "off-catalog",
+                "catalog_status": "off-catalog",
+                "total_calls": calls,
+                "success_rate": success_rate,
+                "last_used": u.get("last_used"),
+                "status": "dead_zone" if calls == 0 else "active",
+            })
+
+        return {
+            "ok": True,
+            "bin": DOGFOOD_BIN,
+            "email": DOGFOOD_EMAIL,
+            "window_days": WINDOW_DAYS,
+            "generated_at": now.isoformat(),
+            "summary": {
+                "total_services": len(services),
+                "active": active_count,
+                "dead_zone": dead_zone_count,
+                "total_calls": total_calls,
+                "has_dead_zones": dead_zone_count > 0,
+            },
+            "services": services,
+        }
+
+    from services.poll_cache import cached as _poll_cached
+    return await _poll_cached(key="dogfood:pulse", ttl_sec=30, loader=_compute)

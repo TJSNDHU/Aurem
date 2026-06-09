@@ -378,75 +378,79 @@ async def sentinel_heartbeat(request: Request):
 # ═════════════════════════════════════════════════════════════════════
 @router.get("/api/admin/sentinel/overview")
 async def admin_overview(request: Request):
+    """Cached 15s (D-71 perf) — 4 aggregations + 3 count_documents per call,
+    polled by AdminSentinelClient every 30s and Mission Control every 20s."""
     await _require_admin(request)
     if _db is None:
         raise HTTPException(503, "db not ready")
 
-    now = datetime.now(timezone.utc)
-    cut_1h = (now - timedelta(hours=1)).isoformat()
-    cut_24h = (now - timedelta(hours=24)).isoformat()
+    async def _compute():
+        now = datetime.now(timezone.utc)
+        cut_1h = (now - timedelta(hours=1)).isoformat()
+        cut_24h = (now - timedelta(hours=24)).isoformat()
 
-    total_1h = await _db.client_errors.count_documents({"ts": {"$gte": cut_1h}})
-    total_24h = await _db.client_errors.count_documents({"ts": {"$gte": cut_24h}})
+        total_1h = await _db.client_errors.count_documents({"ts": {"$gte": cut_1h}})
+        total_24h = await _db.client_errors.count_documents({"ts": {"$gte": cut_24h}})
 
-    # Top error types (last 24h)
-    pipeline = [
-        {"$match": {"ts": {"$gte": cut_24h}}},
-        {"$group": {
-            "_id": "$classification",
-            "count": {"$sum": 1},
-            "users": {"$addToSet": "$user_email"},
-            "last_ts": {"$max": "$ts"},
-        }},
-        {"$sort": {"count": -1}},
-        {"$limit": 10},
-    ]
-    top_types = []
-    async for d in _db.client_errors.aggregate(pipeline):
-        users = [u for u in (d.get("users") or []) if u]
-        top_types.append({
-            "type": d["_id"],
-            "count": d["count"],
-            "unique_users": len(users),
-            "last_ts": d.get("last_ts"),
-        })
-
-    # Spike detector (same signature affecting > 10 users in 5 min)
-    cut_5m = (now - timedelta(minutes=5)).isoformat()
-    spike_pipeline = [
-        {"$match": {"ts": {"$gte": cut_5m}}},
-        {"$group": {
-            "_id": "$signature",
-            "count": {"$sum": 1},
-            "users": {"$addToSet": "$user_email"},
-            "sample": {"$first": "$message"},
-            "classification": {"$first": "$classification"},
-        }},
-        {"$match": {"count": {"$gte": 5}}},
-        {"$sort": {"count": -1}},
-    ]
-    spikes = []
-    async for d in _db.client_errors.aggregate(spike_pipeline):
-        users = [u for u in (d.get("users") or []) if u]
-        if len(users) >= 3:
-            spikes.append({
-                "signature": d["_id"],
+        pipeline = [
+            {"$match": {"ts": {"$gte": cut_24h}}},
+            {"$group": {
+                "_id": "$classification",
+                "count": {"$sum": 1},
+                "users": {"$addToSet": "$user_email"},
+                "last_ts": {"$max": "$ts"},
+            }},
+            {"$sort": {"count": -1}},
+            {"$limit": 10},
+        ]
+        top_types = []
+        async for d in _db.client_errors.aggregate(pipeline):
+            users = [u for u in (d.get("users") or []) if u]
+            top_types.append({
+                "type": d["_id"],
                 "count": d["count"],
                 "unique_users": len(users),
-                "sample": d.get("sample"),
-                "classification": d.get("classification"),
+                "last_ts": d.get("last_ts"),
             })
 
-    pending_suggestions = await _db.repair_suggestions.count_documents({"status": "pending"})
+        cut_5m = (now - timedelta(minutes=5)).isoformat()
+        spike_pipeline = [
+            {"$match": {"ts": {"$gte": cut_5m}}},
+            {"$group": {
+                "_id": "$signature",
+                "count": {"$sum": 1},
+                "users": {"$addToSet": "$user_email"},
+                "sample": {"$first": "$message"},
+                "classification": {"$first": "$classification"},
+            }},
+            {"$match": {"count": {"$gte": 5}}},
+            {"$sort": {"count": -1}},
+        ]
+        spikes = []
+        async for d in _db.client_errors.aggregate(spike_pipeline):
+            users = [u for u in (d.get("users") or []) if u]
+            if len(users) >= 3:
+                spikes.append({
+                    "signature": d["_id"],
+                    "count": d["count"],
+                    "unique_users": len(users),
+                    "sample": d.get("sample"),
+                    "classification": d.get("classification"),
+                })
 
-    return {
-        "ok": True,
-        "errors_1h": total_1h,
-        "errors_24h": total_24h,
-        "top_types": top_types,
-        "active_spikes": spikes,
-        "pending_ai_suggestions": pending_suggestions,
-    }
+        pending_suggestions = await _db.repair_suggestions.count_documents({"status": "pending"})
+
+        return {
+            "ok": True,
+            "errors_1h": total_1h,
+            "errors_24h": total_24h,
+            "top_types": top_types,
+            "active_spikes": spikes,
+            "pending_ai_suggestions": pending_suggestions,
+        }
+
+    from services.poll_cache import cached as _poll_cached
+    return await _poll_cached(key="sentinel:overview", ttl_sec=15, loader=_compute)
 
 
 @router.get("/api/admin/sentinel/errors")

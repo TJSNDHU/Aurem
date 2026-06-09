@@ -25,6 +25,7 @@ import secrets
 import logging
 
 from services.toon_service import get_toon_service
+from services.poll_cache import cached as _poll_cached
 from utils.fix_enrichment import enrich_issues_with_fix_status, enrich_scan_result_issues, build_confirmed_resolved
 
 logger = logging.getLogger(__name__)
@@ -220,34 +221,25 @@ async def verify_admin(authorization: Optional[str] = Header(None), x_admin_key:
 async def get_mission_control_dashboard(admin=Depends(verify_admin)):
     """
     Complete admin dashboard in TOON format
-    
-    Returns:
-    AdminDashboard:
-      metrics:
-        total_active_subscriptions: 150
-        mrr: $35000.00
-        arr: $420000.00
-      tiers:
-        free: 50
-        starter: 60
-        professional: 30
-        enterprise: 10
-      services: Service[15]{id, status, spend}: gpt-4o, active, 1234.56; voxtral, active, 234.50; ...
-      top_users: User[5]{id, tokens, cost}: user_abc, 150000, 45.67; ...
+
+    Cached 15s in-memory (D-71 perf) — payload is identical for every
+    admin viewer, polled every 20s per tab, so this cuts the toon
+    aggregation load by ~95%.
     """
-    toon_service = get_toon_service()
-    
-    try:
-        dashboard_toon = await toon_service.get_admin_dashboard_toon()
-        
-        return {
-            "format": "TOON",
-            "data": dashboard_toon,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        logger.error(f"[Mission Control] Dashboard error: {e}")
-        raise HTTPException(500, f"Failed to load dashboard: {str(e)}")
+    async def _compute():
+        toon_service = get_toon_service()
+        try:
+            dashboard_toon = await toon_service.get_admin_dashboard_toon()
+            return {
+                "format": "TOON",
+                "data": dashboard_toon,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            logger.error(f"[Mission Control] Dashboard error: {e}")
+            raise HTTPException(500, f"Failed to load dashboard: {str(e)}")
+
+    return await _poll_cached(key="mc:dashboard", ttl_sec=15, loader=_compute)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -573,71 +565,78 @@ async def trigger_client_rescan(profile_id: str, admin=Depends(verify_admin)):
 
 @router.get("/overview")
 async def get_overview_stats(admin=Depends(verify_admin)):
-    """Get real-time overview statistics for the dashboard."""
+    """Get real-time overview statistics for the dashboard.
+
+    Cached 15s (D-71 perf) — runs 8 count_documents + 2 aggregations per
+    call; payload is identical for every admin so we coalesce.
+    """
     db = _get_db()
     if db is None:
         raise HTTPException(500, "Database not initialized")
 
-    try:
-        total_clients = await _get_db().tenant_customers.count_documents({"is_self_client": {"$ne": True}})
-        active_clients = await _get_db().tenant_customers.count_documents({"is_active": True, "is_self_client": {"$ne": True}})
-        scan_history_count = await _get_db().scan_history.count_documents({})
-        system_scans_count = await _get_db().system_scans.count_documents({})
-        total_scans = scan_history_count + system_scans_count
-        deployed_fixes = await _get_db().repair_fixes.count_documents({"status": "deployed"})
-        total_repairs_collection = await _get_db().repair_fixes.count_documents({})
-        total_users = await _get_db().users.count_documents({}) + await _get_db().platform_users.count_documents({})
-
-        total_repairs = deployed_fixes or total_repairs_collection
-
-        # Count inline repairs from scan_history
-        pipeline = [
-            {"$match": {"repairs": {"$exists": True, "$ne": []}}},
-            {"$project": {"repair_count": {"$size": "$repairs"}}},
-            {"$group": {"_id": None, "total": {"$sum": "$repair_count"}}}
-        ]
+    async def _compute():
         try:
-            agg = await _get_db().scan_history.aggregate(pipeline).to_list(1)
-            inline_repair_count = agg[0]["total"] if agg else 0
-        except Exception:
-            inline_repair_count = 0
+            total_clients = await _get_db().tenant_customers.count_documents({"is_self_client": {"$ne": True}})
+            active_clients = await _get_db().tenant_customers.count_documents({"is_active": True, "is_self_client": {"$ne": True}})
+            scan_history_count = await _get_db().scan_history.count_documents({})
+            system_scans_count = await _get_db().system_scans.count_documents({})
+            total_scans = scan_history_count + system_scans_count
+            deployed_fixes = await _get_db().repair_fixes.count_documents({"status": "deployed"})
+            total_repairs_collection = await _get_db().repair_fixes.count_documents({})
+            total_users = await _get_db().users.count_documents({}) + await _get_db().platform_users.count_documents({})
 
-        total_repairs = total_repairs_collection + inline_repair_count
+            total_repairs = deployed_fixes or total_repairs_collection
 
-        # Average scan score from both collections
-        avg_scores = []
-        for coll_name in ("scan_history", "system_scans"):
-            coll = _db[coll_name]
-            score_pipeline = [
-                {"$match": {"overall_score": {"$exists": True}}},
-                {"$group": {"_id": None, "avg": {"$avg": "$overall_score"}, "count": {"$sum": 1}}}
+            # Count inline repairs from scan_history
+            pipeline = [
+                {"$match": {"repairs": {"$exists": True, "$ne": []}}},
+                {"$project": {"repair_count": {"$size": "$repairs"}}},
+                {"$group": {"_id": None, "total": {"$sum": "$repair_count"}}}
             ]
             try:
-                agg = await coll.aggregate(score_pipeline).to_list(1)
-                if agg:
-                    avg_scores.append((agg[0]["avg"], agg[0]["count"]))
+                agg = await _get_db().scan_history.aggregate(pipeline).to_list(1)
+                inline_repair_count = agg[0]["total"] if agg else 0
             except Exception:
-                pass
+                inline_repair_count = 0
 
-        if avg_scores:
-            weighted_sum = sum(a * c for a, c in avg_scores)
-            total_count = sum(c for _, c in avg_scores)
-            avg_score = round(weighted_sum / total_count) if total_count else 0
-        else:
-            avg_score = 0
+            total_repairs = total_repairs_collection + inline_repair_count
 
-        return {
-            "total_clients": total_clients,
-            "active_clients": active_clients,
-            "total_scans": total_scans,
-            "total_repairs": total_repairs,
-            "total_users": total_users,
-            "avg_scan_score": avg_score,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        logger.error(f"[Mission Control] Overview error: {e}")
-        raise HTTPException(500, f"Failed to load overview: {str(e)}")
+            # Average scan score from both collections
+            avg_scores = []
+            for coll_name in ("scan_history", "system_scans"):
+                coll = _db[coll_name]
+                score_pipeline = [
+                    {"$match": {"overall_score": {"$exists": True}}},
+                    {"$group": {"_id": None, "avg": {"$avg": "$overall_score"}, "count": {"$sum": 1}}}
+                ]
+                try:
+                    agg = await coll.aggregate(score_pipeline).to_list(1)
+                    if agg:
+                        avg_scores.append((agg[0]["avg"], agg[0]["count"]))
+                except Exception:
+                    pass
+
+            if avg_scores:
+                weighted_sum = sum(a * c for a, c in avg_scores)
+                total_count = sum(c for _, c in avg_scores)
+                avg_score = round(weighted_sum / total_count) if total_count else 0
+            else:
+                avg_score = 0
+
+            return {
+                "total_clients": total_clients,
+                "active_clients": active_clients,
+                "total_scans": total_scans,
+                "total_repairs": total_repairs,
+                "total_users": total_users,
+                "avg_scan_score": avg_score,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            logger.error(f"[Mission Control] Overview error: {e}")
+            raise HTTPException(500, f"Failed to load overview: {str(e)}")
+
+    return await _poll_cached(key="mc:overview", ttl_sec=15, loader=_compute)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -755,55 +754,38 @@ async def get_pixel_health(admin=Depends(verify_admin)):
 
 @router.get("/services")
 async def get_service_registry(admin=Depends(verify_admin)):
-    """
-    Get all available services in TOON format
-    
-    Returns:
-    Service[15]{id, cat, provider, cost, status, tiers}:
-      gpt-4o, llm, OpenAI, 0.005/1k, active, [sta|pro|ent]
-      gpt-4o-mini, llm, OpenAI, 0.00015/1k, active, [free|sta|pro|ent]
-      voxtral-tts, voice, Mistral, 0.002/min, no_keys, [pro|ent]
-      ...
-    """
-    toon_service = get_toon_service()
-    
-    try:
-        services_toon = await toon_service.get_service_registry_toon()
-        
-        return {
-            "format": "TOON",
-            "data": services_toon,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        logger.error(f"[Mission Control] Services error: {e}")
-        raise HTTPException(500, f"Failed to load services: {str(e)}")
+    """Get all available services in TOON format. Cached 30s (D-71 perf)."""
+    async def _compute():
+        toon_service = get_toon_service()
+        try:
+            services_toon = await toon_service.get_service_registry_toon()
+            return {
+                "format": "TOON",
+                "data": services_toon,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            logger.error(f"[Mission Control] Services error: {e}")
+            raise HTTPException(500, f"Failed to load services: {str(e)}")
+    return await _poll_cached(key="mc:services", ttl_sec=30, loader=_compute)
 
 
 @router.get("/api-keys")
 async def get_api_keys(admin=Depends(verify_admin)):
-    """
-    Get all API keys in TOON format (encrypted keys not shown)
-    
-    Returns:
-    APIKey[5]{service, preview, status, calls, spend, last_used}:
-      gpt-4o, sk-proj-...ABC, active, 15000, 45.67, 2026-01-15T10:30
-      voxtral-tts, sk-mist-...XYZ, active, 500, 12.34, 2026-01-14T15:20
-      ...
-    """
-    toon_service = get_toon_service()
-    
-    try:
-        keys_toon = await toon_service.get_api_keys_toon(admin)
-        
-        return {
-            "format": "TOON",
-            "data": keys_toon,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        logger.error(f"[Mission Control] API keys error: {e}")
-        raise HTTPException(500, f"Failed to load API keys: {str(e)}")
+    """Get all API keys (encrypted previews only). Cached 30s (D-71 perf)."""
+    async def _compute():
+        toon_service = get_toon_service()
+        try:
+            keys_toon = await toon_service.get_api_keys_toon(admin)
+            return {
+                "format": "TOON",
+                "data": keys_toon,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            logger.error(f"[Mission Control] API keys error: {e}")
+            raise HTTPException(500, f"Failed to load API keys: {str(e)}")
+    return await _poll_cached(key="mc:api-keys", ttl_sec=30, loader=_compute)
 
 
 @router.post("/services/add-key")

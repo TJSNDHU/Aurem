@@ -54,10 +54,16 @@ async def _require_admin(request: Request) -> Dict[str, Any]:
 
 @router.get("/overview")
 async def overview(request: Request) -> Dict[str, Any]:
+    """Cached 15s (D-71 perf) — 11-component snapshot, polled by /admin/brain."""
     await _require_admin(request)
     db = _get_db()
     from services.autonomous_stack import get_overview
-    return await get_overview(db)
+    from services.poll_cache import cached as _poll_cached
+    return await _poll_cached(
+        key="autonomous:overview",
+        ttl_sec=15,
+        loader=lambda: get_overview(db),
+    )
 
 
 @router.get("/pipeline-flow")
@@ -65,8 +71,13 @@ async def pipeline_flow(request: Request, limit: int = 10) -> Dict[str, Any]:
     await _require_admin(request)
     db = _get_db()
     from services.autonomous_stack import get_pipeline_flow
+    from services.poll_cache import cached as _poll_cached
     limit = max(1, min(50, limit))
-    return await get_pipeline_flow(db, limit=limit)
+    return await _poll_cached(
+        key=f"autonomous:pipeline-flow:{limit}",
+        ttl_sec=10,
+        loader=lambda: get_pipeline_flow(db, limit=limit),
+    )
 
 
 @router.get("/recent-decisions")
