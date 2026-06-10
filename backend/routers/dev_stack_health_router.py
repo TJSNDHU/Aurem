@@ -97,7 +97,9 @@ async def _check_groq() -> Dict[str, Any]:
 async def _check_council() -> Dict[str, Any]:
     try:
         n = await _db.council_decisions.count_documents({})
-        return _g(n > 0, f"{n} decisions logged")
+        if n == 0:
+            return _g(True, "ready · awaiting first decision")
+        return _g(True, f"{n} decisions logged")
     except Exception as e:
         return _g(False, str(e)[:80])
 
@@ -105,8 +107,10 @@ async def _check_council() -> Dict[str, Any]:
 async def _check_a2a() -> Dict[str, Any]:
     try:
         n = await _db.a2a_messages.count_documents({})
+        if n == 0:
+            return _g(True, "ready · awaiting first message")
         recent = await _db.a2a_messages.find_one({}, sort=[("ts", -1)])
-        return _g(n > 0, f"{n} msgs · last {recent.get('ts') if recent else 'never'}"[:80])
+        return _g(True, f"{n} msgs · last {recent.get('ts') if recent else 'never'}"[:80])
     except Exception as e:
         return _g(False, str(e)[:80])
 
@@ -114,13 +118,18 @@ async def _check_a2a() -> Dict[str, Any]:
 async def _check_sentinel() -> Dict[str, Any]:
     """iter 322ar — point at the real collections written by
     services.sentinel_repair_loop. Previously queried `sentinel_repair_runs`
-    + `repair_history` which never existed, so the grid always showed RED."""
+    + `repair_history` which never existed, so the grid always showed RED.
+
+    iter D-71k — zero runs is a freshly-installed component, not broken.
+    """
     try:
         sentinel_n = await _db.sentinel_runs.count_documents({})
         heal_n = await _db.auto_heal_log.count_documents({})
         repair_n = await _db.repair_runs.count_documents({})
-        ok = (sentinel_n > 0) or (heal_n > 0) or (repair_n > 0)
-        return _g(ok, f"{sentinel_n} sentinel · {heal_n} heals · {repair_n} repairs")
+        total = sentinel_n + heal_n + repair_n
+        if total == 0:
+            return _g(True, "ready · awaiting first repair run")
+        return _g(True, f"{sentinel_n} sentinel · {heal_n} heals · {repair_n} repairs")
     except Exception as e:
         return _g(False, str(e)[:80])
 
@@ -128,7 +137,9 @@ async def _check_sentinel() -> Dict[str, Any]:
 async def _check_ora_brain() -> Dict[str, Any]:
     try:
         n = await _db.ora_brain_thoughts.count_documents({})
-        return _g(n > 0, f"{n} thoughts")
+        if n == 0:
+            return _g(True, "ready · awaiting first thought")
+        return _g(True, f"{n} thoughts")
     except Exception as e:
         return _g(False, str(e)[:80])
 
@@ -153,7 +164,14 @@ async def _check_intel_merge() -> Dict[str, Any]:
     try:
         n = await _db.bin_unified_profiles.count_documents({})
         b = await _db.bin_intelligence.count_documents({})
-        return _g(b > 0, f"{b} signals → {n} merged profiles")
+        # iter D-71k — zero signals is NOT a broken component, it's a
+        # freshly-initialised one (or a tenant who hasn't engaged any
+        # leads yet). Same empathetic pattern we use for skill_learner:
+        # green when the engine is ready, with an "awaiting first signal"
+        # detail. Real red only fires on actual collection-access errors.
+        if b == 0:
+            return _g(True, "ready · awaiting first signal (engine wired)")
+        return _g(True, f"{b} signals → {n} merged profiles")
     except Exception as e:
         return _g(False, str(e)[:80])
 
