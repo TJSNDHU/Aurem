@@ -340,6 +340,15 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **#2 Route dedupe**: D-75 detector found **314 silent duplicate `(verb, path)` registrations** in `app.routes` — root cause was `registry.py`'s multiple lists each including the same router. Surgical idempotent guard wrapping `app.include_router` collapses **314 → 17** real handler conflicts (−94%). Added 2 boot-time observability functions: `_detect_duplicate_routes` (logs each remaining dupe with active+shadowed module paths) and `_detect_unwired_set_db_modules` (found **213 unwired modules** vs the audit's 8). Tests lock the dupe count ≤20. **5/5 tests**.
   - **Combined D-72 → D-75 #2 suite**: **68/68 green** — real backend, real Mongo, real OpenRouter, real Resend, real Twilio/ElevenLabs/Google probes. No mocks.
 
+- **D-75 Part 2 #3 (2026-06-10 — Top-20 set_db wiring sweep)**
+  - Full detail in `/app/memory/CHANGELOG.md` + `/app/memory/D75_PART3_STATUS.md`.
+  - **The find**: D-75 #2 detector revealed 213 unwired `set_db()` modules silently 503'ing every endpoint.
+  - **Fix**: `_wire_top_unwired_set_db_modules` in registry.py imports + calls `set_db(db)` for the top-20 ranked by `api_audit_log` traffic (`public_sites_router` 427k hits down to `ora_dispatcher_router` 9.2k hits). Detector unwired count: 212 → 193.
+  - **Live proof**: 12 probed endpoints, zero 503s (5×200 serving real data, 7×404 = real routing not error).
+  - **Strict-mode env gate**: `AUREM_STRICT_SETDB_WIRING=true` flips the boot warning to RuntimeError so any newly-added unwired module crashes loudly. Default false so the remaining 193 don't break boot.
+  - **Detector regex hardening**: now handles single-line, multi-line, dotted-access, AND the `TOP_20_UNWIRED` runtime list — fewer false positives.
+  - **Combined D-72 → D-75 #3 suite**: **71/71 green**.
+
 
 ## Backlog (P0 → P2)
 

@@ -4453,9 +4453,72 @@ def register_all_routers(app, db):
     # traffic to whichever loaded later. Boot-time detection makes
     # every future dupe regression LOUD instead of silent.
     _detect_duplicate_routes(app)
+
+    # iter D-75 Part 2 #3 — Top-20 by-traffic set_db wiring sweep.
+    # `api_audit_log` aggregation identified the 20 highest-traffic
+    # routers whose `set_db()` was never being called (= every
+    # endpoint silently 503'd). Wire them all here so the db handle
+    # actually reaches their module-level state.
+    _wire_top_unwired_set_db_modules(db)
+
     _detect_unwired_set_db_modules()
 
     logger.info("[REGISTRY] All routers registered")
+
+
+def _wire_top_unwired_set_db_modules(db) -> None:
+    """D-75 #3 — wire the top 20 high-traffic unwired set_db modules.
+    Order roughly by traffic rank (from api_audit_log aggregation).
+    Each entry is tried independently — one failure doesn't block
+    the rest. Failures are LOGGED loudly (no silent 503 risk)."""
+    import importlib
+    TOP_20_UNWIRED = [
+        # By traffic rank from api_audit_log aggregation
+        "public_sites_router",          # 427k hits (broad /api prefix)
+        "sovereign_node_router",        # 427k hits
+        "activity_feed_router",         # 114k hits
+        "admin_security_router",        # 114k hits
+        "mtth_router",                  # 114k hits
+        "onboarding_test_router",       # 114k hits
+        "pipeda_sla_router",            # 114k hits
+        "system_health_full_router",    # 114k hits
+        "tenant_migration_router",      # 114k hits
+        "aurem_vanguard_router",        # 23k hits
+        "morning_brief_router",         # 23k hits
+        "ora_github_lock_router",       # 18k hits
+        "ora_lesson_sources_router",    # 18k hits
+        "aurem_onboarding_router",      # 12k hits
+        "onboarding_router",            # 12k hits
+        "aurem_billing_router",         # 10k hits
+        "business_routes",              # 9.5k hits
+        "ora_action_router",            # 9.2k hits
+        "ora_command_router",           # 9.2k hits
+        "ora_dispatcher_router",        # 9.2k hits
+    ]
+    wired_count = 0
+    fail_count = 0
+    for mod_name in TOP_20_UNWIRED:
+        try:
+            mod = importlib.import_module(f"routers.{mod_name}")
+            fn = getattr(mod, "set_db", None)
+            if fn is None:
+                logger.warning(
+                    f"[REGISTRY] {mod_name} no longer defines set_db() — "
+                    "remove from TOP_20_UNWIRED list"
+                )
+                continue
+            fn(db)
+            wired_count += 1
+        except Exception as e:
+            fail_count += 1
+            logger.warning(
+                f"[REGISTRY] D-75 #3 wire failed for {mod_name}: "
+                f"{type(e).__name__}: {str(e)[:120]}"
+            )
+    logger.info(
+        f"[REGISTRY] D-75 #3 set_db sweep: wired={wired_count}/{len(TOP_20_UNWIRED)} "
+        f"failed={fail_count}"
+    )
 
 
 def _detect_duplicate_routes(app) -> None:
@@ -4515,11 +4578,27 @@ def _detect_unwired_set_db_modules() -> None:
     # Read OUR OWN source to find the set_db call sites
     my_src = open(__file__).read()
     called_modules: set[str] = set()
-    for m in re.finditer(r"from routers\.(\w+) import\s*\(?[^)]*set_db", my_src):
+    # Pattern 1: single-line `from routers.X import set_db [as _alias]`
+    for m in re.finditer(r"from routers\.(\w+) import [^\n]*set_db", my_src):
         called_modules.add(m.group(1))
-    for m in re.finditer(r"_set_\w+_db\s*\(\s*db\s*\)", my_src):
-        # this just confirms set_db was called — can't reverse-map
-        pass
+    # Pattern 2: multi-line `from routers.X import (\n  set_db as _alias,\n  ...)`
+    for m in re.finditer(
+        r"from routers\.(\w+) import\s*\([^)]*set_db", my_src, re.S,
+    ):
+        called_modules.add(m.group(1))
+    # Pattern 3: `routers.X.set_db(...)` direct dotted access
+    for m in re.finditer(r"routers\.(\w+)\.set_db\b", my_src):
+        called_modules.add(m.group(1))
+    # Pattern 4: iter D-75 #3 — modules wired via the TOP_20_UNWIRED
+    # runtime importlib loop in `_wire_top_unwired_set_db_modules`.
+    # Regex captures the literal string list inside that function.
+    m_block = re.search(
+        r"TOP_20_UNWIRED\s*=\s*\[(.*?)\]",
+        my_src, re.S,
+    )
+    if m_block:
+        for s in re.findall(r'"(\w+)"', m_block.group(1)):
+            called_modules.add(s)
 
     defined_but_unwired: list[str] = []
     for fn in sorted(os.listdir(routers_dir)):
@@ -4537,11 +4616,22 @@ def _detect_unwired_set_db_modules() -> None:
             if mod_name not in called_modules:
                 defined_but_unwired.append(mod_name)
     if defined_but_unwired:
-        logger.warning(
+        # iter D-75 #3 — env-gated strict mode. When the founder is
+        # ready to lock the wiring contract (i.e. they've wired the
+        # remaining 193+ modules from the next sessions), set
+        # `AUREM_STRICT_SETDB_WIRING=true` and any unwired module
+        # crashes boot LOUDLY instead of silently 503ing every endpoint.
+        strict = (os.environ.get("AUREM_STRICT_SETDB_WIRING") or "").lower() in (
+            "1", "true", "yes",
+        )
+        msg = (
             f"[REGISTRY] {len(defined_but_unwired)} routers define "
             "set_db() but never receive a DB handle — their endpoints "
             "will silently 503. List: " + ", ".join(defined_but_unwired)
         )
+        if strict:
+            raise RuntimeError(msg)
+        logger.warning(msg)
     else:
         logger.info("[REGISTRY] set_db wiring audit: 0 unwired modules")
 

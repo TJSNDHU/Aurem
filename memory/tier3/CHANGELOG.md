@@ -1,3 +1,76 @@
+## 2026-06-10 — iter D-75 Part 2 item #3 — Top-20 set_db wiring sweep
+
+D-75 #2 detector revealed 213 router modules that defined `set_db()` but
+never received a DB handle, causing every endpoint to silently 503 with
+"Database not available". Per founder's "wire the top 20 high-traffic
+ones" directive, ranked by `api_audit_log` aggregation and wired in
+`registry.py::_wire_top_unwired_set_db_modules`.
+
+### Modules wired (by traffic rank)
+
+  1.  `public_sites_router`         (427k hits)
+  2.  `sovereign_node_router`       (427k)
+  3.  `activity_feed_router`        (114k)
+  4.  `admin_security_router`       (114k)
+  5.  `mtth_router`                 (114k)
+  6.  `onboarding_test_router`      (114k)
+  7.  `pipeda_sla_router`           (114k)
+  8.  `system_health_full_router`   (114k)
+  9.  `tenant_migration_router`     (114k)
+  10. `aurem_vanguard_router`       (23k)
+  11. `morning_brief_router`        (23k)
+  12. `ora_github_lock_router`      (18k)
+  13. `ora_lesson_sources_router`   (18k)
+  14. `aurem_onboarding_router`     (12k)
+  15. `onboarding_router`           (12k)
+  16. `aurem_billing_router`        (10k)
+  17. `business_routes`             (9.5k)
+  18. `ora_action_router`           (9.2k)
+  19. `ora_command_router`          (9.2k)
+  20. `ora_dispatcher_router`       (9.2k)
+
+Live HTTP probe of representative endpoints confirmed **zero silent
+503s** post-wiring — endpoints either return 200 (data) or 404 (real
+routing, not error). `_detect_unwired_set_db_modules` count dropped
+from 212 to 193.
+
+### Strict mode env gate
+
+Added `AUREM_STRICT_SETDB_WIRING=true` env var. When set, the boot-time
+`_detect_unwired_set_db_modules` raises RuntimeError instead of
+warning. Founder flips this on after the remaining 193 modules are
+wired/removed across subsequent sessions, locking the contract
+permanently.
+
+### Tests (3 new in `test_d75_route_dedupe.py`)
+  * `test_top_20_unwired_list_exists` — list size locked at 20
+  * `test_top_20_modules_actually_define_set_db` — every entry must
+    actually have a `set_db` function (catches stale list)
+  * `test_strict_setdb_wiring_env_gate_exists` — env gate + RuntimeError
+    branch present
+
+### Detector regex hardening (D-75 #2 follow-up)
+
+Original `_detect_unwired_set_db_modules` regex only matched single-line
+`from routers.X import set_db`, producing false positives for any
+multi-line import or `as`-renamed import. Hardened with 4 patterns:
+  1. Single-line `from routers.X import [...] set_db`
+  2. Multi-line `from routers.X import (\n  set_db as _alias,\n  ...)`
+  3. Direct dotted: `routers.X.set_db(...)`
+  4. The new `TOP_20_UNWIRED` literal list inside
+     `_wire_top_unwired_set_db_modules`
+
+### Combined D-72 → D-75 #3 suite
+
+**71/71 green**. Real backend, real Mongo, real providers, no mocks.
+
+### Files
+  * `backend/routers/registry.py` (+`_wire_top_unwired_set_db_modules` + detector regex hardening + AUREM_STRICT_SETDB_WIRING env gate)
+  * `backend/tests/test_d75_route_dedupe.py` (+3 tests)
+  * `memory/D75_PART3_STATUS.md` (before/after table)
+
+
+
 ## 2026-06-10 — iter D-75 Part 2 (items #1 + #2) — Creds Health + Route Dedupe Guard
 
 ### Item #1 — `creds_health` dashboard (LIVE)

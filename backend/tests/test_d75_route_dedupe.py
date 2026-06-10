@@ -123,3 +123,53 @@ def test_live_route_table_dupe_count_under_threshold():
         "broad double-registration regression. Was 17 immediately "
         "post-D-75 #2."
     )
+
+
+# ─── D-75 #3 — set_db wire sweep guards ───────────────────────────────
+
+def test_top_20_unwired_list_exists():
+    """The TOP_20_UNWIRED list must exist + contain 20 modules. If
+    it shrinks below 20 because someone removed an entry, this fails
+    so the next session re-fills with the next 20 by-traffic."""
+    from routers import registry
+    import re
+    src = inspect.getsource(registry._wire_top_unwired_set_db_modules)
+    m = re.search(r"TOP_20_UNWIRED\s*=\s*\[(.*?)\]", src, re.S)
+    assert m, "TOP_20_UNWIRED list missing — D-75 #3 regression"
+    names = re.findall(r'"(\w+)"', m.group(1))
+    assert len(names) == 20, f"TOP_20_UNWIRED has {len(names)} entries, expected 20"
+
+
+def test_top_20_modules_actually_define_set_db():
+    """Every entry in TOP_20_UNWIRED must actually have a `set_db`
+    function to wire — otherwise the list is stale."""
+    from routers import registry
+    import re, importlib
+    src = inspect.getsource(registry._wire_top_unwired_set_db_modules)
+    m = re.search(r"TOP_20_UNWIRED\s*=\s*\[(.*?)\]", src, re.S)
+    names = re.findall(r'"(\w+)"', m.group(1))
+    stale = []
+    for name in names:
+        try:
+            mod = importlib.import_module(f"routers.{name}")
+            if not hasattr(mod, "set_db"):
+                stale.append(name)
+        except Exception as e:
+            stale.append(f"{name} (import error: {type(e).__name__})")
+    assert not stale, (
+        f"TOP_20_UNWIRED has stale entries (no set_db function): {stale}"
+    )
+
+
+def test_strict_setdb_wiring_env_gate_exists():
+    """The env-gated RuntimeError mode must be present so the founder
+    can flip to strict-mode once the remaining ~193 modules are
+    wired/removed."""
+    from routers import registry
+    src = inspect.getsource(registry._detect_unwired_set_db_modules)
+    assert "AUREM_STRICT_SETDB_WIRING" in src, (
+        "strict env gate missing from _detect_unwired_set_db_modules"
+    )
+    assert "raise RuntimeError" in src, (
+        "RuntimeError branch missing from detector — strict mode dead"
+    )
