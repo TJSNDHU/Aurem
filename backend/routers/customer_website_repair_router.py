@@ -7,14 +7,29 @@ Two feature areas in one router:
                      POST /api/customer/website/repair/start
                      GET  /api/customer/website/repair/status/{job_id}
 
-Design principles:
-- Uses REAL data from `pixel_events` and `sentinel_diagnoses` collections.
-- Score/issue generation is seeded deterministically by tenant BIN so repeat
-  visits show consistent numbers (not random each time).
-- Repair runs as a BACKGROUND asyncio task that writes real phase transitions
-  + event timestamps to `repair_jobs` collection. Frontend polls status.
-- ~90-second total demo duration (vs. the 5-min wait-to-bounce risk).
-- Honest score deltas: +24 to +38 points typical (defensible vs Lighthouse).
+iter D-75 honesty rewrite
+-------------------------
+Pre-D-75, `_run_repair_job` was a 90-second timer that:
+  • added `rng.randint(24, 38)` to the scan score (fake improvement),
+  • generated random commit hashes via `hashlib.sha1(rng.random())`,
+  • emitted fake events ("Canary rollout to 10%", "SOC 2 audit-chain
+    appended", "42/42 assertions passed"),
+  • built a hardcoded "improvements" array via `lcp * 0.35` math
+  • marked the job `status: completed` without ever touching the
+    customer's website.
+
+D-75 replaced that with HONEST work:
+  • Re-runs the real `website_audit_service.real_audit()` probe.
+  • Calls `services.llm_gateway_v2.route()` (DeepSeek V3.1 via
+    OpenRouter — same path as the autonomous CTO repair agent which
+    D-73 confirmed is working) to generate per-issue actionable fix
+    proposals with real DIFF snippets.
+  • Optionally emails the plan to the customer via Resend (best-effort).
+  • Saves status `plan_ready_for_customer` — NOT `completed`, because
+    we cannot apply fixes to the customer's server. `score_after`
+    stays `None` until the customer applies the fixes AND triggers a
+    re-scan.
+  • No random deltas, no fake commit hashes, no fake "deployed".
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -224,150 +239,256 @@ async def website_scan(body: ScanRequest, user: dict = Depends(_verify_platform_
     return doc
 
 
-# ─────────────────────── Repair engine ───────────────────────
+# ─────────────────────── Repair engine (D-75 honest rewrite) ───────────────
 
-REPAIR_PHASES = [
-    # (phase, label, pct_start, pct_end, duration_seconds, color)
-    ("diagnosing", "Extracting vulnerabilities from live DOM…", 0, 18, 12, "#EF4444"),
-    ("patching",   "Injecting SEO + Schema.org markup, compressing JS…", 18, 62, 36, "#F97316"),
-    ("validating", "Re-scanning with Sentinel + cross-browser verify…", 62, 88, 22, "#EAB308"),
-    ("deployed",   "Publishing patches + SOC 2 handshake…",            88, 100, 16, "#22C55E"),
+# iter D-75 — REAL phases. No fake "deployed" / "Canary rollout" lies.
+# We can't push code to the customer's server; we can analyze + generate
+# an actionable plan + email it. Customer applies + re-scans to update score.
+REAL_REPAIR_PHASES = [
+    ("scanning",   "Running real audit probe (SSL, Lighthouse, broken links, schema)…", 0, 35, "#EF4444"),
+    ("planning",   "Generating actionable repair plan via DeepSeek V3.1…",              35, 80, "#F97316"),
+    ("emailing",   "Emailing the repair plan to your inbox…",                           80, 95, "#EAB308"),
+    ("plan_ready", "Plan ready. Apply the fixes and trigger a re-scan to update your score.", 95, 100, "#22C55E"),
 ]
 
-EVENT_TEMPLATES = {
-    "diagnosing": [
-        "DOM audit started via Sentinel Overwatch",
-        "Detected {schema_errors} JSON-LD schema errors",
-        "LCP candidate located — hero image served uncompressed ({lcp}s)",
-        "CLS fingerprint locked at {cls} — layout shift traced to async font",
-        "{unused_kb}KB of unused JavaScript flagged for tree-shake",
-    ],
-    "patching": [
-        "Compiling Shopify 2026-04 schema package…",
-        "Tree-shaking bundle — removing {unused_kb}KB dead code",
-        "Critical CSS inlined → paint budget rebalanced",
-        "AUREM Guardrail signing patch {patch_id}",
-        "AI Repair engine pushed fix to staging commit {commit}",
-        "Deferring non-critical third-party scripts",
-    ],
-    "validating": [
-        "Lighthouse re-run scheduled on 3 network profiles",
-        "Playwright cross-browser probe: Chrome ✓ Safari ✓ Firefox ✓",
-        "Sentinel diagnosis: {delta:+d} points achieved",
-        "Regression suite green — 42/42 assertions passed",
-    ],
-    "deployed": [
-        "Canary rollout to 10% of traffic complete",
-        "CDN cache invalidated on 4 edges",
-        "SOC 2 audit-chain appended — hash {hash}",
-        "Full deploy confirmed — patch is live",
-    ],
-}
 
+async def _generate_repair_plan_via_llm(
+    audit: dict, customer_email: str, website: str,
+) -> List[dict]:
+    """For each issue in the audit, ask the LLM gateway for a concrete
+    fix proposal. Returns a list of plan items — never mocks, returns
+    `[]` if the gateway is unavailable so the caller surfaces the
+    failure honestly.
 
-async def _run_repair_job(job_id: str, tenant_bin: str, scan_score: int):
-    """Background task that advances the repair job through 4 phases."""
+    Uses the same llm_gateway_v2.route() as the autonomous CTO repair
+    agent (D-73 confirmed working — DeepSeek V3.1 via OpenRouter)."""
+    issues = audit.get("issues") or []
+    if not issues:
+        return []
+
     try:
-        rng = _seeded_random(tenant_bin, salt=f"repair:{job_id}")
+        from services.llm_gateway_v2 import route
+    except Exception as e:
+        logger.warning(f"[repair_plan] gateway import failed: {e}")
+        return []
 
-        # Decide final score (honest: +24 to +38 improvement, cap at 94)
-        delta = rng.randint(24, 38)
-        final_score = min(scan_score + delta, 94)
+    plan: List[dict] = []
+    # Cap to top-5 issues so plan generation stays under 30s + cost stays bounded
+    for i, issue in enumerate(issues[:5]):
+        title = issue.get("title") or issue.get("name") or f"Issue {i+1}"
+        severity = issue.get("severity") or "medium"
+        category = issue.get("category") or "general"
+        detail = issue.get("detail") or issue.get("description") or ""
 
-        # Pull 3-4 real patches from live_patches to show as "applied"
-        real_patches = []
+        system = (
+            "You are a senior web performance + security engineer. "
+            "An automated audit found an issue on a customer site. "
+            "Respond with EXACTLY this structure (no preamble):\n"
+            "  ROOT CAUSE: one sentence.\n"
+            "  FIX STEPS: numbered list, 2-5 concrete steps the website "
+            "owner (or their developer) can apply.\n"
+            "  CODE SNIPPET: a single fenced code block with the exact "
+            "file/config to change, OR the exact CLI command. If no code "
+            "applies (e.g. external action needed), write `(no code — "
+            "external action: <action>)`."
+        )
+        prompt = (
+            f"website  : {website}\n"
+            f"issue    : {title}\n"
+            f"category : {category}\n"
+            f"severity : {severity}\n"
+            f"detail   : {detail[:600]}\n"
+        )
         try:
-            cursor = db.live_patches.aggregate([
-                {"$match": {"status": {"$in": ["pending", "deployed"]}}},
-                {"$sample": {"size": 4}},
-                {"$project": {"_id": 0, "patch_id": 1, "type": 1, "category": 1, "description": 1}},
-            ])
-            async for p in cursor:
-                real_patches.append(p)
-        except Exception:
-            pass
-
-        # Get last scan metrics to template events
-        last_scan = await db.customer_scans.find_one({"tenant_bin": tenant_bin}, sort=[("created_at", -1)], projection={"_id": 0, "metrics": 1})
-        metrics = (last_scan or {}).get("metrics", {"lcp_s": 5.4, "cls": 0.22, "unused_js_kb": 1200, "schema_errors": 9})
-
-        def render(tmpl: str, extras: dict = None) -> str:
-            return tmpl.format(
-                lcp=metrics.get("lcp_s", 5.4),
-                cls=metrics.get("cls", 0.22),
-                unused_kb=metrics.get("unused_js_kb", 1200),
-                schema_errors=metrics.get("schema_errors", 9),
-                patch_id=(extras or {}).get("patch_id", f"p_{rng.randint(1000,9999)}"),
-                commit=(extras or {}).get("commit", hashlib.sha1(f"{job_id}{rng.random()}".encode()).hexdigest()[:7]),
-                delta=delta,
-                hash=(extras or {}).get("hash", hashlib.sha256(f"{job_id}{rng.random()}".encode()).hexdigest()[:10]),
+            res = await route(
+                task_type="repair_diagnose",
+                prompt=prompt,
+                system=system,
+                max_tokens=600,
             )
+        except Exception as e:
+            logger.warning(f"[repair_plan] gateway exc on {title}: {e}")
+            continue
+        if not (res or {}).get("ok") or not (res.get("text") or "").strip():
+            continue
+        plan.append({
+            "issue_title": title,
+            "severity": severity,
+            "category": category,
+            "llm_response": res.get("text", "")[:4000],
+            "llm_provider": res.get("provider"),
+            "llm_model": res.get("model"),
+            "llm_latency_ms": res.get("latency_ms"),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        })
+    return plan
 
-        for phase_idx, (phase, label, p_start, p_end, duration, color) in enumerate(REPAIR_PHASES):
-            # Mark phase start
+
+async def _email_repair_plan(customer_email: str, website: str,
+                              plan: List[dict], audit: dict) -> dict:
+    """Email the plan to the customer via Resend. Best-effort — returns
+    {"ok": bool, "error": str?} so the caller can surface it.
+    NO MOCK: if Resend is unconfigured or fails, we return ok=False
+    with the real error string."""
+    if not plan:
+        return {"ok": False, "error": "no_plan_items_to_email"}
+    if not customer_email:
+        return {"ok": False, "error": "no_customer_email"}
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return {"ok": False, "error": "resend_not_configured"}
+
+    # Build a clean text body
+    lines = [
+        f"AUREM Repair Plan for {website}",
+        f"Audit score: {audit.get('overall_score','?')}/100",
+        f"Issues found: {len(audit.get('issues') or [])}",
+        "",
+        "=" * 60,
+    ]
+    for i, item in enumerate(plan, 1):
+        lines.append(f"\n[{i}] {item['issue_title']}  (severity: {item['severity']})")
+        lines.append("-" * 60)
+        lines.append(item["llm_response"])
+    body = "\n".join(lines)
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0) as c:
+            r = await c.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}",
+                         "Content-Type": "application/json"},
+                json={
+                    "from": os.environ.get("RESEND_FROM_ADDRESS",
+                                           "AUREM <repairs@aurem.live>"),
+                    "to": [customer_email],
+                    "subject": f"Your AUREM repair plan for {website}",
+                    "text": body,
+                },
+            )
+    except Exception as e:
+        return {"ok": False, "error": f"resend_exc:{type(e).__name__}:{str(e)[:120]}"}
+    if r.status_code not in (200, 201, 202):
+        return {"ok": False, "error": f"resend_http_{r.status_code}",
+                "detail": r.text[:200]}
+    try:
+        return {"ok": True, "email_id": r.json().get("id")}
+    except Exception:
+        return {"ok": True}
+
+
+async def _run_repair_job(job_id: str, tenant_bin: str, website: str,
+                          customer_email: str):
+    """D-75 honest implementation. Real audit → real LLM plan → real
+    email. Status = `plan_ready_for_customer` (NOT `completed`).
+    `score_after` stays None until customer applies fixes + re-scans."""
+
+    async def _set(fields: dict):
+        try:
+            fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+            await db.repair_jobs.update_one({"job_id": job_id}, {"$set": fields})
+        except Exception as e:
+            logger.warning(f"[repair_job {job_id}] set failed: {e}")
+
+    async def _event(phase: str, message: str):
+        try:
             await db.repair_jobs.update_one(
                 {"job_id": job_id},
-                {"$set": {
-                    "current_phase": phase,
-                    "current_phase_label": label,
-                    "current_phase_color": color,
-                    "progress_pct": p_start,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }}
-            )
-
-            templates = EVENT_TEMPLATES.get(phase, [])
-            steps = max(len(templates), 1)
-            step_time = duration / steps
-            pct_step = (p_end - p_start) / steps
-
-            for i, tmpl in enumerate(templates):
-                await asyncio.sleep(step_time)
-                pct = int(p_start + pct_step * (i + 1))
-                extras = {}
-                if real_patches and "patch_id" in tmpl:
-                    extras["patch_id"] = real_patches[i % len(real_patches)].get("patch_id", f"p_{rng.randint(1000,9999)}")
-                event = {
+                {"$push": {"events": {
                     "at": datetime.now(timezone.utc).isoformat(),
                     "phase": phase,
-                    "message": render(tmpl, extras),
-                }
-                await db.repair_jobs.update_one(
-                    {"job_id": job_id},
-                    {"$push": {"events": event},
-                     "$set": {"progress_pct": pct, "updated_at": event["at"]}}
-                )
+                    "message": message,
+                }}},
+            )
+        except Exception as e:
+            logger.warning(f"[repair_job {job_id}] event failed: {e}")
 
-        # Final state
-        improvements = [
-            {"metric": "Load Speed (LCP)", "before": f"{metrics['lcp_s']}s", "after": f"{round(metrics['lcp_s']*0.35,1)}s", "benefit": "Fewer bounces — visitors stay 2-3× longer."},
-            {"metric": "Layout Stability (CLS)", "before": f"{metrics['cls']}", "after": "0.04", "benefit": "No jumpy UI — trust increases."},
-            {"metric": "SEO Schema", "before": f"{metrics['schema_errors']} errors", "after": "0 errors", "benefit": "Shopify 2026-04 compliant — eligible for rich snippets."},
-            {"metric": "JS Bundle", "before": f"{metrics['unused_js_kb']}KB bloat", "after": f"{int(metrics['unused_js_kb']*0.32)}KB lean", "benefit": "Faster mobile, happier Core Web Vitals."},
-        ]
+    try:
+        # Phase 1 — REAL audit
+        ph = REAL_REPAIR_PHASES[0]
+        await _set({"current_phase": ph[0], "current_phase_label": ph[1],
+                    "current_phase_color": ph[4], "progress_pct": ph[2]})
+        await _event(ph[0], f"Probing {website} — SSL, Lighthouse, broken links, schema")
 
-        await db.repair_jobs.update_one(
-            {"job_id": job_id},
-            {"$set": {
-                "status": "completed",
-                "current_phase": "completed",
-                "current_phase_label": "Repair completed successfully",
-                "current_phase_color": "#22C55E",
-                "progress_pct": 100,
-                "score_before": scan_score,
-                "score_after": final_score,
-                "delta": delta,
-                "applied_patches": real_patches,
-                "improvements": improvements,
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }}
-        )
+        from services.website_audit_service import real_audit
+        audit = await real_audit(website)
+        if not audit.get("ok"):
+            await _set({"status": "failed",
+                        "error": audit.get("error") or "audit_failed",
+                        "current_phase": "failed",
+                        "current_phase_color": "#EF4444"})
+            await _event("failed", f"Audit failed: {audit.get('error')}")
+            return
+
+        await _event(ph[0],
+                     f"Score: {audit.get('overall_score')}/100 — "
+                     f"{len(audit.get('issues') or [])} issues found")
+        await _set({"score_before": audit.get("overall_score"),
+                    "audit_snapshot": {k: audit.get(k) for k in (
+                        "url", "overall_score", "score_breakdown",
+                        "ssl", "pagespeed", "mobile",
+                        "broken_links", "contact_form", "social_links",
+                        "copyright_year", "google_maps",
+                        "repair_recommended", "rebuild_recommended",
+                        "finished_at", "duration_s",
+                    )},
+                    "issues": audit.get("issues") or [],
+                    "progress_pct": ph[3]})
+
+        # Phase 2 — REAL LLM plan generation
+        ph = REAL_REPAIR_PHASES[1]
+        await _set({"current_phase": ph[0], "current_phase_label": ph[1],
+                    "current_phase_color": ph[4], "progress_pct": ph[2]})
+        await _event(ph[0], f"Generating plan for top {min(5, len(audit.get('issues') or []))} issues")
+        plan = await _generate_repair_plan_via_llm(audit, customer_email, website)
+        if plan:
+            await _event(ph[0],
+                         f"Plan generated — {len(plan)} actionable items "
+                         f"via {plan[0].get('llm_provider')}/{plan[0].get('llm_model')}")
+        else:
+            await _event(ph[0],
+                         "LLM gateway unavailable or no issues to repair — plan empty")
+        await _set({"repair_plan": plan, "progress_pct": ph[3]})
+
+        # Phase 3 — REAL email via Resend (best-effort)
+        ph = REAL_REPAIR_PHASES[2]
+        await _set({"current_phase": ph[0], "current_phase_label": ph[1],
+                    "current_phase_color": ph[4], "progress_pct": ph[2]})
+        email_result = await _email_repair_plan(customer_email, website, plan, audit)
+        if email_result.get("ok"):
+            await _event(ph[0], f"Plan emailed to {customer_email}")
+        else:
+            await _event(ph[0],
+                         f"Email skipped: {email_result.get('error')}")
+        await _set({"email_result": email_result, "progress_pct": ph[3]})
+
+        # Phase 4 — PLAN READY (not "deployed" — customer must apply)
+        ph = REAL_REPAIR_PHASES[3]
+        await _set({
+            "status": "plan_ready_for_customer",
+            "current_phase": ph[0],
+            "current_phase_label": ph[1],
+            "current_phase_color": ph[4],
+            "progress_pct": 100,
+            "score_after": None,  # only re-scan updates this — HONEST
+            "next_step": (
+                "Apply the plan items above (DIY or hand to your developer), "
+                "then click `Re-scan` to see your updated score."
+            ),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await _event(ph[0],
+                     f"Plan ready with {len(plan)} items. "
+                     "Re-scan after applying to update your score.")
     except Exception as e:
         logger.exception(f"[repair_job {job_id}] failed: {e}")
         try:
             await db.repair_jobs.update_one(
                 {"job_id": job_id},
-                {"$set": {"status": "failed", "error": str(e)[:500]}}
+                {"$set": {"status": "failed", "error": str(e)[:500],
+                          "current_phase": "failed",
+                          "current_phase_color": "#EF4444"}},
             )
         except Exception:
             pass
@@ -379,37 +500,44 @@ class RepairStart(BaseModel):
 
 @router.post("/website/repair/start")
 async def repair_start(body: RepairStart, user: dict = Depends(_verify_platform_user)):
-    """Kicks off a background repair job and returns the job_id for polling."""
+    """Kicks off the REAL repair-plan job. Returns the job_id for polling.
+    The plan is generated via the LLM gateway; we never claim to have
+    deployed code to the customer's server."""
     tenant = await _resolve_tenant(user)
     bin_id = tenant.get("bin") or "UNKNOWN"
+    website = (tenant.get("website") or "").strip()
+    if not website:
+        # Try to resolve from the most recent scan
+        last = await db.customer_scans.find_one(
+            {"tenant_bin": bin_id}, sort=[("created_at", -1)],
+            projection={"website": 1, "_id": 0},
+        )
+        website = (last or {}).get("website", "")
+    if not website:
+        raise HTTPException(400, "no_website_on_tenant — set your site URL first")
 
-    # Get latest scan score
+    # Carry forward a recent scan_id if the customer passed one (for the UI's
+    # "score before" — final value comes from the live audit anyway).
     scan = None
     if body.scan_id:
         scan = await db.customer_scans.find_one({"scan_id": body.scan_id})
-    if not scan:
-        scan = await db.customer_scans.find_one({"tenant_bin": bin_id}, sort=[("created_at", -1)])
-    if not scan:
-        # Auto-scan fallback
-        await website_scan(ScanRequest(), user)
-        scan = await db.customer_scans.find_one({"tenant_bin": bin_id}, sort=[("created_at", -1)])
-
-    scan_score = int((scan or {}).get("score", 48))
 
     job_id = f"rep_{uuid.uuid4().hex[:14]}"
     doc = {
         "job_id": job_id,
         "tenant_bin": bin_id,
         "email": tenant.get("email"),
+        "website": website,
         "status": "running",
-        "current_phase": "diagnosing",
-        "current_phase_label": "Starting diagnosis…",
+        "current_phase": "scanning",
+        "current_phase_label": "Starting real audit…",
         "current_phase_color": "#EF4444",
         "progress_pct": 0,
-        "score_before": scan_score,
-        "score_after": None,
+        "score_before": (scan or {}).get("overall_score") or (scan or {}).get("score"),
+        "score_after": None,  # NEVER pre-populated — only re-scan fills this
         "scan_id": (scan or {}).get("scan_id"),
         "events": [],
+        "repair_plan": [],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -418,12 +546,20 @@ async def repair_start(body: RepairStart, user: dict = Depends(_verify_platform_
         doc.pop("_id", None)
     except Exception as e:
         logger.error(f"[repair_start] insert failed: {e}")
-        raise HTTPException(500, "could not start repair")
+        raise HTTPException(500, "could not start repair") from None
 
-    # Fire-and-forget background runner
-    asyncio.create_task(_run_repair_job(job_id, bin_id, scan_score))
+    # Real background work — audit + LLM plan + email
+    asyncio.create_task(
+        _run_repair_job(job_id, bin_id, website, tenant.get("email") or ""),
+    )
 
-    return {"ok": True, "job_id": job_id, "score_before": scan_score}
+    return {"ok": True, "job_id": job_id,
+            "score_before": doc.get("score_before"),
+            "honest_disclaimer": (
+                "AUREM generates an actionable repair PLAN — we do not "
+                "deploy code to your site. Apply the plan and re-scan to "
+                "update your score."
+            )}
 
 
 @router.get("/website/repair/status/{job_id}")

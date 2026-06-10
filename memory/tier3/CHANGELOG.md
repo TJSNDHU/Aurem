@@ -1,3 +1,146 @@
+## 2026-06-10 — iter D-75 part 1 — Pixel repair flow honesty rewrite
+
+### The mock that was running in prod
+
+User asked for an audit of the website-repair-through-pixel codes,
+looking for any mocks. `routers/customer_website_repair_router.py::
+_run_repair_job` turned out to be **pure theater** — a 90-second
+timer that:
+
+  * Added a random integer to the scan score for fake "improvement":
+    `delta = rng.randint(24, 38); final_score = scan_score + delta`
+  * Generated fake commit hashes via `hashlib.sha1(rng.random())`
+  * Emitted scripted events claiming work that never happened:
+    "AI Repair engine pushed fix to staging commit {commit}",
+    "Canary rollout to 10% of traffic complete",
+    "CDN cache invalidated on 4 edges",
+    "SOC 2 audit-chain appended — hash {hash}",
+    "Full deploy confirmed — patch is live",
+    "Regression suite green — 42/42 assertions passed"
+  * Built a hardcoded `improvements` array with `lcp * 0.35`
+    fake-percent math
+  * Pulled 3-4 random unrelated `live_patches` to display as
+    "applied_patches"
+  * Set status to `completed` even though the customer's website
+    was NEVER touched
+
+This is the exact "AI slop" pattern the founder has been hammering
+us about all month. It was sitting on the `/my/website` page being
+shown to real customers.
+
+### Honest rewrite
+
+Replaced `_run_repair_job` end-to-end. New flow:
+
+  1. **scanning** — runs the existing real `website_audit_service.
+     real_audit()` which does live HTTP probes (SSL via TLS handshake,
+     PageSpeed via Google API, broken links via httpx HEAD, schema
+     errors via BeautifulSoup, mobile via meta-viewport check).
+     Real `overall_score` written to job doc as `score_before`.
+
+  2. **planning** — for each issue (capped at top 5 for cost
+     control), calls `services.llm_gateway_v2.route()` with task type
+     `repair_diagnose` to generate a structured fix proposal:
+     `ROOT CAUSE / FIX STEPS / CODE SNIPPET`. Same gateway as the
+     autonomous CTO repair agent (D-73 proven working — DeepSeek
+     V3.1 via OpenRouter). Each plan item carries `llm_provider`,
+     `llm_model`, `llm_latency_ms`, `generated_at` for full audit
+     trail.
+
+  3. **emailing** — sends the assembled plan to the customer's email
+     via Resend. Honest error path: if Resend is unconfigured / fails,
+     `email_result.ok=False` carries the actual error string — never
+     a silent "true" mock-pass.
+
+  4. **plan_ready_for_customer** — terminal status, NOT `completed`.
+     `score_after` stays `None` because we cannot apply fixes to the
+     customer's server. `next_step` explicitly tells the customer:
+     "Apply the plan items above (DIY or hand to your developer),
+     then click `Re-scan` to see your updated score."
+
+`/repair/start` response now includes `honest_disclaimer`:
+  "AUREM generates an actionable repair PLAN — we do not deploy
+  code to your site. Apply the plan and re-scan to update your score."
+
+### Live proof — real DeepSeek + real Resend
+
+End-to-end against the founder's account on `https://aurem.live`:
+
+  ```
+  status: plan_ready_for_customer
+  score_before: 27          ← real audit score (not fake)
+  score_after: None         ← honest, only re-scan can set this
+  issues: 4                 ← real findings from real_audit
+  repair_plan: 4 items
+      item[0]:
+        title: "2 broken link(s)"
+        severity: medium
+        llm_provider: openrouter
+        llm_model: deepseek/deepseek-chat-v3.1
+        llm_latency_ms: 5802
+        response: "ROOT CAUSE: The website contains two external
+                   font links (from Google Fonts) that are outdated,
+                   blocked, or unreachable. FIX STEPS: 1. Verify the
+                   exact Google Fonts URLs..."
+  email_result:
+      ok: true
+      email_id: 34f5a2be-2d7c-4ec4-be53-40696bb3221b   ← real Resend ID
+  ```
+
+Resend API verification of the email_id confirmed `last_event:
+delivered` to `teji.ss1986@gmail.com`. The founder's inbox actually
+got a real plan.
+
+### Tests
+
+`backend/tests/test_d75_pixel_repair_honesty.py` — **8/8 green**:
+
+Source-level regression guards (cheap, fast):
+  * `test_no_random_score_delta` — fails if `rng.randint(24,38)` or
+    `final_score = scan_score + delta` come back
+  * `test_no_fake_deploy_events` — fails if any of the 8 forbidden
+    phrases ("Canary rollout to 10%", "SOC 2 audit-chain", etc) come
+    back in executable code (allows historical mention in audit
+    comments via docstring/comment stripping)
+  * `test_no_fake_improvements_array` — fails if the `lcp * 0.35`
+    fake math returns
+  * `test_uses_real_audit_and_llm_gateway` — asserts the actual real
+    imports are wired (`from services.website_audit_service import
+    real_audit`, `from services.llm_gateway_v2 import route`)
+  * `test_status_final_state_is_plan_ready_not_completed` — locks
+    the terminal status and `score_after: None` guarantee
+  * `test_honest_disclaimer_in_repair_start_response` — locks the
+    disclaimer in the API response
+
+Live E2E (real backend / real Mongo / real OpenRouter / real Resend):
+  * `test_repair_start_returns_honest_disclaimer` — disclaimer in
+    response body
+  * `test_repair_e2e_real_audit_real_llm_real_email` — full cycle.
+    Polls up to 120s tolerating transient preview-ingress 502s.
+    Asserts: terminal status is `plan_ready_for_customer`,
+    `score_after is None`, plan has ≥1 item with real `llm_provider`
+    + `llm_model` + positive `llm_latency_ms`, email_result has
+    either a real `email_id` OR an honest `error` string,
+    `next_step` mentions "re-scan", events contain none of the
+    forbidden fake phrases.
+
+### Combined suite (D-72 + D-73 + D-73a + D-74 + D-75)
+
+**54/54 green** — auth E2E (9) + twilio breaker (16) + autonomous-
+repair admin (12) + router-patch regressions (9) + pixel-repair
+honesty (8). Real backend, real Mongo, real LLM, real email
+provider, real Twilio probe. No mocks anywhere in the test corpus.
+
+### Files
+- `backend/routers/customer_website_repair_router.py` (gutted &
+  rewrote `_run_repair_job` + added `_generate_repair_plan_via_llm`,
+  `_email_repair_plan`. Removed `REPAIR_PHASES`, `EVENT_TEMPLATES`,
+  hardcoded improvements array, random delta logic, fake commit/
+  hash generators.)
+- `backend/tests/test_d75_pixel_repair_honesty.py` (new, 8 tests)
+
+
+
 ## 2026-06-10 — iter D-73a + D-74 — Twilio auto-probe + Pillars sweep
 
 ### D-73a — Twilio breaker auto-probe

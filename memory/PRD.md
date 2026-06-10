@@ -327,6 +327,13 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **D-74 credential probes**: Live-probed every major external provider. Tavily HTTP 432 caught (new stale credential alongside the known Twilio). Resend / OpenRouter / Stripe / Apollo all 200 OK.
   - **Combined D-72 + D-73 + D-73a + D-74 suite**: **46/46 green**. Pillar health table in `/app/memory/D74_PILLAR_HEALTH_REPORT.md` — 4 pillars moved from red/yellow to green this session (Auth E2E, Autonomous Repair, Scheduler, Test Suite). 3 stay yellow/red: Twilio + Tavily creds (founder rotation), DB Health TTL (founder mongodump-then-migrate), Route Integrity (7 dedupes scoped for D-75).
 
+- **D-75 part 1 (2026-06-10 — Pixel repair flow honesty rewrite)**
+  - Full detail in `/app/memory/CHANGELOG.md`.
+  - **The mock found**: `routers/customer_website_repair_router.py::_run_repair_job` was a 90-second timer that added `rng.randint(24, 38)` to scan score for fake "improvement", emitted scripted events ("Canary rollout to 10% complete / SOC 2 audit-chain appended / CDN cache invalidated / Full deploy confirmed"), built a hardcoded `improvements` array with `lcp * 0.35` fake math, and set status to `completed` even though the customer's website was never touched. This was on the customer-facing `/my/website` page.
+  - **Real fix**: Replaced with honest 4-phase flow — real `website_audit_service.real_audit()` (live HTTP probes), real LLM plan via `llm_gateway_v2.route()` (DeepSeek V3.1, same as D-73 autonomous CTO), real email via Resend with honest error surface. Terminal status `plan_ready_for_customer` (not `completed`), `score_after: None` (only re-scan can set it). API response carries `honest_disclaimer` stating "we do not deploy code to your site".
+  - **Live proof**: real DeepSeek V3.1 returned 4 actionable plan items in 5.8s for aurem.live (score_before=27/100); Resend delivered email `id: 34f5a2be-...` to founder's inbox (verified via Resend API as `last_event: delivered`).
+  - **8/8 pass**. Combined D-72 → D-75 part 1 suite: **54/54 green**.
+
 
 ## Backlog (P0 → P2)
 
