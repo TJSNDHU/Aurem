@@ -2294,4 +2294,28 @@ async def sync_now(authorization: Optional[str] = Header(None)):
 
 @router.get("/health")
 async def health():
-    return {"status": "ok", "component": "pillars-map", "db_ready": _db is not None}
+    """iter D-71i — defensive db lookup. On production cold-boot the
+    module-level `_db` may still be None when the frontend's Dash-Overview
+    panel hits this endpoint (1st render before set_db wiring completed).
+    Falls back to the canonical Mongo client so the health badge doesn't
+    paint red for a benign init race."""
+    db = _db
+    if db is None:
+        try:
+            from motor.motor_asyncio import AsyncIOMotorClient
+            url = os.environ.get("MONGO_URL")
+            name = os.environ.get("DB_NAME")
+            if url and name:
+                client = AsyncIOMotorClient(url, serverSelectionTimeoutMS=2000)
+                db = client[name]
+                # Quick sanity ping — if Mongo is actually unreachable,
+                # we want db_ready=false honestly, not a fake green.
+                await db.command("ping")
+        except Exception as e:
+            return {
+                "status":   "degraded",
+                "component": "pillars-map",
+                "db_ready":  False,
+                "reason":    f"db_unreachable: {type(e).__name__}",
+            }
+    return {"status": "ok", "component": "pillars-map", "db_ready": db is not None}
