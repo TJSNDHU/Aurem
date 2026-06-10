@@ -91,11 +91,17 @@ async def _list_campaign_ids() -> List[Optional[str]]:
     return real
 
 
-async def _funnel_one(campaign_id: Optional[str]) -> Dict[str, Any]:
+async def _funnel_one(campaign_id: Optional[str],
+                       *, known_collections: Optional[set] = None) -> Dict[str, Any]:
     """Build one campaign's funnel from real Mongo aggregations.
     Each section attaches a `source_collection` so the UI can show
     'powered by campaign_leads.outreach_history' instead of pretending
-    the numbers came from a metrics service we don't have yet."""
+    the numbers came from a metrics service we don't have yet.
+
+    `known_collections` is an optional pre-fetched set of collection
+    names — used by list_funnels() to avoid an N+1 admin call
+    (`list_collection_names()`) per campaign.
+    """
     match: Dict[str, Any] = {"campaign_id": campaign_id}
 
     # 1) Leads count
@@ -125,35 +131,42 @@ async def _funnel_one(campaign_id: Optional[str]) -> Dict[str, Any]:
 
     touches_total = sum(touches_by_channel.values())
     opens_total = sum(opens_by_channel.values())
+    # iter D-78 audit — surface "uncategorized" channels honestly so a
+    # future channel (e.g. linkedin, telegram) doesn't silently swell
+    # other_outreach_events. Log when the bucket is non-trivial so we
+    # remember to add it to TOUCH_CHANNELS/OPEN_CHANNELS.
+    if other_events:
+        unexpected = sum(other_events.values())
+        if unexpected >= 10:
+            logger.info(
+                "[funnel] campaign=%s has %d events in unclassified channels: %s",
+                campaign_id, unexpected, sorted(other_events.keys()),
+            )
 
-    # 3) Replies — match inbound_replies to this campaign via lead email/phone
-    # Pull the email + phone set for this campaign (cap at 10k so the
+    # 3) Replies — match inbound_replies to this campaign via lead email.
+    # We collect only the email set here; phone matching was attempted
+    # in earlier iterations but inbound_replies doesn't carry a
+    # normalized `from_phone` field, so the join would always miss —
+    # we'd just be running an extra query for nothing.
+    # Pull the email set for this campaign (cap at 10k so the
     # query stays bounded; almost no real campaign goes beyond that).
-    contact_keys: Dict[str, set] = {"emails": set(), "phones": set()}
-    proj = {"_id": 0, "email": 1, "phone": 1}
+    contact_emails: set = set()
+    proj = {"_id": 0, "email": 1}
     async for lead in _db.campaign_leads.find(match, proj).limit(10_000):
         em = (lead.get("email") or "").strip().lower()
         if em:
-            contact_keys["emails"].add(em)
-        ph = "".join(c for c in (lead.get("phone") or "") if c.isdigit())
-        if ph:
-            contact_keys["phones"].add(ph)
+            contact_emails.add(em)
 
     replies_total = 0
     replies_source_missing = False
-    if "inbound_replies" in await _db.list_collection_names():
-        # Match any reply whose `from` email or phone is in this campaign's set
-        rq: Dict[str, Any] = {"$or": []}
-        if contact_keys["emails"]:
-            rq["$or"].append({
-                "from": {"$in": list(contact_keys["emails"])},
+    if known_collections is None:
+        known_collections = set(await _db.list_collection_names())
+    if "inbound_replies" in known_collections:
+        if contact_emails:
+            replies_total = await _db.inbound_replies.count_documents({
+                "from": {"$in": list(contact_emails)},
             })
-        # phone match is harder — Twilio inbound stores E.164. We do a
-        # best-effort by stripping non-digits. Only run if we have phones.
-        if not rq["$or"]:
-            # No identifiers to match against → 0 replies (truthful)
-            rq = {"_id": {"$exists": False}}
-        replies_total = await _db.inbound_replies.count_documents(rq)
+        # else: contact_emails empty → 0 replies (truthful, not faked)
     else:
         replies_source_missing = True
 
@@ -164,9 +177,9 @@ async def _funnel_one(campaign_id: Optional[str]) -> Dict[str, Any]:
     })
     # Augment: campaign leads whose email is now a platform_user
     plat_user_emails: set = set()
-    if contact_keys["emails"]:
+    if contact_emails:
         cursor = _db.platform_users.find(
-            {"email": {"$in": list(contact_keys["emails"])}},
+            {"email": {"$in": list(contact_emails)}},
             {"_id": 0, "email": 1},
         )
         async for u in cursor:
@@ -238,10 +251,13 @@ async def list_funnels(
         raise HTTPException(status_code=503, detail="db_unavailable")
 
     ids = await _list_campaign_ids()
+    # iter D-78 audit fix — fetch collection list ONCE and pass into
+    # each _funnel_one call (was N+1: one admin op per campaign).
+    known_collections = set(await _db.list_collection_names())
     out = []
     for cid in ids[:limit]:
         try:
-            out.append(await _funnel_one(cid))
+            out.append(await _funnel_one(cid, known_collections=known_collections))
         except Exception as e:
             logger.exception(f"[funnel] campaign={cid} failed")
             out.append({

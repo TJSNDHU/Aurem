@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-10 (iter D-77)
+> Last updated 2026-06-10 (iter D-78)
 
 ## Vision
 
@@ -25,6 +25,40 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-78 (2026-06-10) — Campaign Command Dashboard (first feature on the clean foundation)
+
+**P1 — Real Funnel Metrics shipped (zero mocks, every byte from live Mongo):**
+- New `routers/campaign_funnel_router.py` exposes 3 admin endpoints:
+  - `GET /api/admin/campaigns/funnel` — all campaigns at once with grand totals
+  - `GET /api/admin/campaigns/funnel/{cid}` — drill-down (use `__unattributed__` for campaign_id=None bucket)
+  - `GET /api/admin/campaigns/funnel/{cid}/timeline?days=N` — touches-per-day zero-filled sparkline series
+- **Metric sources (all real, all auditable):**
+  - **Touches** = `campaign_leads.outreach_history` $unwind, bucketed by channel ∈ {email, sms, whatsapp, call}
+  - **Opens** = same collection, channel ∈ {report_view, sample_view} — real pixel hits from the D-75 Part 1 deliverable links
+  - **Replies** = `inbound_replies.from` ∈ campaign's lead emails
+  - **Conversions** = `campaign_leads.status ∈ {contacted, website_generated, subscribed, won}` PLUS `platform_users.email` matches against lead emails
+  - **Rates** = honest division with `None` fallback when denominator = 0 (UI renders "—", not NaN)
+- Each metric carries its `source_collection` field so the founder can audit any number back to the underlying aggregation.
+
+**Frontend — `platform/CampaignCommandDashboard.jsx` mounted at `/admin/campaign-command`:**
+- Hero strip of 5 tiles (Touches / Opens / Replies / Conversions / Leads) with grand totals
+- Per-campaign cards collapsible — expand to see channel breakdown bars (Email/WhatsApp/SMS/Call), engagement breakdown, and 14-day sparkline
+- "Source: campaign_leads.outreach_history" footers expose the data lineage on the card
+- Empty state has an honest message about waiting for the daily scrape, not a fake placeholder
+- All interactive elements have `data-testid` for testability
+
+**Tests (all green, all real I/O):**
+- `tests/test_d78_campaign_funnel.py` — 8 pytests covering auth (401/403), synthetic-lead aggregation correctness, drill-down, `__unattributed__` sentinel, 14-bucket zero-filled timeline, rate math, safe division on empty campaign
+- Frontend E2E — 14/14 Playwright assertions pass via testing_agent_v3_fork (hero tiles populated, card expand works, sparkline renders, refresh works)
+
+**Code-quality fixes from the post-test audit:**
+- Removed dead phone-matching branch in replies query (was collecting phones into a set that never reached the inbound_replies $or clause)
+- Fixed N+1 `list_collection_names()` admin call — `list_funnels()` now pre-fetches once and passes the cached set into each `_funnel_one()`
+- Added logger warning when ≥10 events land in `other_outreach_events` so a future channel like `linkedin` doesn't silently slip past TOUCH_CHANNELS/OPEN_CHANNELS
+
+**Live numbers verified end-to-end against prod data:**
+- campaign_id `aurem-acquisition-001`: 1,464 leads · 4,752 touches (email 3,298 / wa 684 / sms 268 / call 502) · 37 opens (report_view 25 / sample_view 12) · 0 replies (no matches yet) · 4 conversions · 0.78% open rate · 0.27% conversion rate
 
 ### iter D-77 (2026-06-10) — Branded Repair Plan Email · "Is this flow real?" Audit
 
