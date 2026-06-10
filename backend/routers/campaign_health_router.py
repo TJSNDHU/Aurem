@@ -55,18 +55,65 @@ async def _require_admin(authorization: str | None) -> str:
 
 @router.get("/health")
 async def health(authorization: str = Header(None)) -> dict[str, Any]:
+    """iter D-71g — bounded execution. Some of the 13 sub-checks (Retell,
+    Resend, OSM, Apollo) can hang briefly on external dependencies; if
+    the total exceeds the K8s ingress timeout (~60s) the gateway returns
+    an HTML 502/504 page and the frontend crashes with
+    'Unexpected token <'. We hard-cap at 25s and degrade gracefully."""
     await _require_admin(authorization)
     from services.campaign_health import full_report
-    return await full_report()
+    import asyncio as _async
+    try:
+        return await _async.wait_for(full_report(), timeout=25.0)
+    except _async.TimeoutError:
+        # Always return valid JSON so the frontend never sees HTML.
+        return {
+            "ok": False,
+            "partial": True,
+            "summary": {"green": 0, "yellow": 0, "red": 0},
+            "rows": [],
+            "error": "report_timeout — campaign health probe exceeded 25s budget",
+            "hint":  "External dependency (Retell/Resend/OSM) is slow; retry in a few seconds",
+        }
+    except Exception as e:
+        logger.exception("[campaign-health] full_report crashed")
+        return {
+            "ok": False,
+            "summary": {"green": 0, "yellow": 0, "red": 0},
+            "rows": [],
+            "error": f"report_crashed: {type(e).__name__}: {str(e)[:200]}",
+        }
 
 
 @router.post("/autofix/{tag}")
 async def autofix_one(tag: str = Path(..., min_length=2, max_length=40),
                        authorization: str = Header(None)
                        ) -> dict[str, Any]:
+    """iter D-71g — bounded execution. Same rationale as `/health`: an
+    autofix that exceeds the ingress timeout returns an HTML page and
+    crashes the frontend parser. Hard-cap and degrade gracefully."""
     await _require_admin(authorization)
     from services.campaign_autofix import apply
-    return await apply(tag)
+    import asyncio as _async
+    try:
+        return await _async.wait_for(apply(tag), timeout=25.0)
+    except _async.TimeoutError:
+        return {
+            "ok": False, "fixed": False, "component": tag,
+            "action_taken": "timeout",
+            "result": "autofix exceeded 25s budget",
+            "residual_issue": "timeout", "requires_human": True,
+            "human_hint": "Check external dependency (Apollo/Retell/Resend) and retry",
+        }
+    except Exception as e:
+        logger.exception(f"[campaign-autofix] {tag} crashed")
+        return {
+            "ok": False, "fixed": False, "component": tag,
+            "action_taken": "crashed",
+            "result": f"{type(e).__name__}: {str(e)[:200]}",
+            "residual_issue": "exception", "requires_human": True,
+            "human_hint": "Check backend logs",
+        }
 
 
 @router.post("/autofix-all")
