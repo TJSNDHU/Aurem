@@ -58,6 +58,39 @@ def register_all_routers(app, db):
     """Register every router with the FastAPI app. Must be called after DB init."""
 
     # ═══════════════════════════════════════════
+    # iter D-75 Part 2 #2 — Idempotent include_router guard.
+    # D-71p audit + D-75 detector found ~314 silent duplicate
+    # (verb, path) registrations because registry.py has multiple
+    # registration LISTS and the same router appears in more than
+    # one list. FastAPI's `include_router` doesn't dedupe — it just
+    # appends to `app.routes` each time. Result: every route gets
+    # silently shadowed by its own re-registration, boot time
+    # doubles, route lookup slows down, and the `route-dedupe audit`
+    # warning floods on every startup.
+    #
+    # This wrapper preserves the original `app.include_router`,
+    # tracks which router object IDs have already been added, and
+    # silently no-ops the 2nd+ call for the same router.
+    # ═══════════════════════════════════════════
+    _included_router_ids: set[int] = set()
+    _original_include_router = app.include_router
+
+    def _dedup_include_router(router, *args, **kwargs):
+        rid = id(router)
+        if rid in _included_router_ids:
+            # Quietly skip — first registration wins. Log at debug so
+            # ops can see it if they crank the level.
+            logger.debug(
+                f"[REGISTRY] skipping duplicate include_router for "
+                f"router id={rid}"
+            )
+            return None
+        _included_router_ids.add(rid)
+        return _original_include_router(router, *args, **kwargs)
+
+    app.include_router = _dedup_include_router
+
+    # ═══════════════════════════════════════════
     # PRODUCTION LEAN MODE — skip non-essential routers
     # Reduces from 2000+ routes to ~400 core routes
     # See routers/_registry_config.py for the full skip list.
@@ -1023,6 +1056,37 @@ def register_all_routers(app, db):
                     logger.info("[REGISTRY] autonomous_repair_admin_router wired")
                 except Exception as _ara_e:
                     logger.warning(f"[REGISTRY] autonomous_repair_admin_router not loaded: {_ara_e}")
+
+                # iter D-75 Part 2 #1 — Credentials Health dashboard.
+                # Single live-probe surface for every external provider
+                # (Twilio, Resend, OpenRouter, Stripe, Apollo, Tavily,
+                # GitHub, Emergent LLM, Firecrawl, Sentry, E2B, Vercel,
+                # ElevenLabs, Google PageSpeed, Deepgram, ORA).
+                # Built after D-72 (stale Twilio) + D-74 (stale Tavily)
+                # showed "probe-then-discover" was the wrong cadence —
+                # the dashboard makes the next stale-cred outage visible
+                # the moment it happens.
+                try:
+                    from routers.creds_health_router import (
+                        router as _ch_router, set_db as _set_ch_db,
+                    )
+                    from services.creds_health import ensure_indexes as _ch_idx
+                    import asyncio as _ch_asyncio
+                    app.include_router(_ch_router)
+                    _set_ch_db(db)
+                    # Schedule the TTL index creation without blocking
+                    # registry boot (`register_all_routers` is sync).
+                    try:
+                        _ch_loop = _ch_asyncio.get_event_loop()
+                        if _ch_loop.is_running():
+                            _ch_asyncio.ensure_future(_ch_idx(db))
+                        else:
+                            _ch_loop.run_until_complete(_ch_idx(db))
+                    except Exception as _ch_ie:
+                        logger.warning(f"[REGISTRY] creds_health index task scheduling failed: {_ch_ie}")
+                    logger.info("[REGISTRY] creds_health_router wired")
+                except Exception as _ch_e:
+                    logger.warning(f"[REGISTRY] creds_health_router not loaded: {_ch_e}")
 
                 # iter D-47 — Save-to-GitHub dialog backend (list repos,
                 # list branches, commit manifest + chat history).
@@ -4383,4 +4447,101 @@ def register_all_routers(app, db):
     # ═══════════════════════════════════════════
     apply_lean_prune(app, LEAN_MODE)
 
+    # iter D-75 Part 2 #2 — Duplicate route detector + set_db wiring assertion.
+    # D-71p audit found 8 duplicate (verb, path) pairs across multiple
+    # routers, where FastAPI's last-wins behaviour silently routed
+    # traffic to whichever loaded later. Boot-time detection makes
+    # every future dupe regression LOUD instead of silent.
+    _detect_duplicate_routes(app)
+    _detect_unwired_set_db_modules()
+
     logger.info("[REGISTRY] All routers registered")
+
+
+def _detect_duplicate_routes(app) -> None:
+    """Walk the FastAPI route table and log a WARNING for each
+    (verb, path) pair registered more than once. Does NOT crash boot
+    (apps in the wild already rely on the last-wins behaviour) — it
+    makes the silent footgun visible to ops + tests."""
+    from collections import defaultdict
+    by_route: dict[tuple[str, str], list] = defaultdict(list)
+    for r in getattr(app, "routes", []):
+        path = getattr(r, "path", None)
+        methods = getattr(r, "methods", None)
+        if not path or not methods:
+            continue
+        # Skip the FastAPI internal /docs, /openapi, etc
+        if path.startswith("/openapi") or path.startswith("/docs") \
+                or path.startswith("/redoc"):
+            continue
+        endpoint = getattr(r, "endpoint", None)
+        endpoint_id = (
+            f"{endpoint.__module__}.{endpoint.__qualname__}"
+            if endpoint else "unknown"
+        )
+        for verb in methods:
+            by_route[(verb, path)].append(endpoint_id)
+
+    dupes = {k: v for k, v in by_route.items() if len(v) > 1}
+    if not dupes:
+        logger.info("[REGISTRY] route-dedupe audit: 0 duplicates")
+        return
+    logger.warning(
+        f"[REGISTRY] route-dedupe audit found {len(dupes)} duplicate "
+        "(verb, path) pairs — last-loaded wins for each:"
+    )
+    for (verb, path), endpoints in sorted(dupes.items()):
+        # Last one wins under FastAPI's matching
+        active = endpoints[-1]
+        shadowed = endpoints[:-1]
+        logger.warning(
+            f"[REGISTRY]   DUPE {verb:6s} {path}  active={active}  "
+            f"shadowed={shadowed}"
+        )
+
+
+def _detect_unwired_set_db_modules() -> None:
+    """D-71p audit found 8 routers that define `set_db(database)` but
+    never receive a call. Their endpoints silently 503 with
+    'Database not available' for the entire pod lifetime.
+
+    This scan logs a WARNING for any router module that defines
+    `set_db` but isn't referenced via `_set_*_db(db)` somewhere in
+    this registry. Founder ratified the design as 'fail loudly' so
+    next session can convert WARN → RuntimeError once we've wired
+    the known 8."""
+    import os, re, importlib
+    routers_dir = os.path.dirname(__file__)
+    # Read OUR OWN source to find the set_db call sites
+    my_src = open(__file__).read()
+    called_modules: set[str] = set()
+    for m in re.finditer(r"from routers\.(\w+) import\s*\(?[^)]*set_db", my_src):
+        called_modules.add(m.group(1))
+    for m in re.finditer(r"_set_\w+_db\s*\(\s*db\s*\)", my_src):
+        # this just confirms set_db was called — can't reverse-map
+        pass
+
+    defined_but_unwired: list[str] = []
+    for fn in sorted(os.listdir(routers_dir)):
+        if not fn.endswith(".py") or fn.startswith("_"):
+            continue
+        mod_name = fn[:-3]
+        if mod_name in ("registry", "__init__"):
+            continue
+        path = os.path.join(routers_dir, fn)
+        try:
+            src = open(path).read()
+        except Exception:
+            continue
+        if re.search(r"^\s*def\s+set_db\s*\(", src, re.M):
+            if mod_name not in called_modules:
+                defined_but_unwired.append(mod_name)
+    if defined_but_unwired:
+        logger.warning(
+            f"[REGISTRY] {len(defined_but_unwired)} routers define "
+            "set_db() but never receive a DB handle — their endpoints "
+            "will silently 503. List: " + ", ".join(defined_but_unwired)
+        )
+    else:
+        logger.info("[REGISTRY] set_db wiring audit: 0 unwired modules")
+

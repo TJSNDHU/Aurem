@@ -334,6 +334,12 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Live proof**: real DeepSeek V3.1 returned 4 actionable plan items in 5.8s for aurem.live (score_before=27/100); Resend delivered email `id: 34f5a2be-...` to founder's inbox (verified via Resend API as `last_event: delivered`).
   - **8/8 pass**. Combined D-72 → D-75 part 1 suite: **54/54 green**.
 
+- **D-75 Part 2 items #1 + #2 (2026-06-10 — Creds Health dashboard + Route dedupe guard)**
+  - Full detail in `/app/memory/CHANGELOG.md` + `/app/memory/D75_PART2_STATUS.md`.
+  - **#1 `creds_health` dashboard**: new admin surface live-probing 16 providers (Twilio, Resend, OpenRouter, Stripe, Apollo, Tavily, GitHub, Emergent LLM, Firecrawl, Sentry, E2B, Vercel, ElevenLabs, Google PageSpeed, Deepgram, ORA). 4 endpoints (`/probe-all`, `/probe/{provider}`, `/history`, `/providers`). Secret-masking guaranteed (key_tail = last 4 only). 30-day TTL on history in BSON Date form so it actually fires. **First probe caught 2 NEW stale creds: ElevenLabs 401 + Google PageSpeed 403** alongside the known Twilio + Tavily. **9/9 tests**.
+  - **#2 Route dedupe**: D-75 detector found **314 silent duplicate `(verb, path)` registrations** in `app.routes` — root cause was `registry.py`'s multiple lists each including the same router. Surgical idempotent guard wrapping `app.include_router` collapses **314 → 17** real handler conflicts (−94%). Added 2 boot-time observability functions: `_detect_duplicate_routes` (logs each remaining dupe with active+shadowed module paths) and `_detect_unwired_set_db_modules` (found **213 unwired modules** vs the audit's 8). Tests lock the dupe count ≤20. **5/5 tests**.
+  - **Combined D-72 → D-75 #2 suite**: **68/68 green** — real backend, real Mongo, real OpenRouter, real Resend, real Twilio/ElevenLabs/Google probes. No mocks.
+
 
 ## Backlog (P0 → P2)
 

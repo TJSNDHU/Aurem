@@ -1,3 +1,90 @@
+## 2026-06-10 — iter D-75 Part 2 (items #1 + #2) — Creds Health + Route Dedupe Guard
+
+### Item #1 — `creds_health` dashboard (LIVE)
+
+New: `services/creds_health.py` + `routers/creds_health_router.py`.
+Live-probes 16 providers in parallel via real HTTP:
+Twilio, Resend, OpenRouter, Stripe, Apollo, Tavily, GitHub,
+Emergent LLM, Firecrawl, Sentry, E2B, Vercel, ElevenLabs,
+Google PageSpeed, Deepgram, ORA.
+
+Endpoints (admin-only, JWT-gated, writes `creds_health_history`
+with BSON Date timestamps so the 30-day TTL actually fires):
+
+  * `GET  /api/admin/creds-health/providers` — known provider list
+  * `GET  /api/admin/creds-health/probe-all` — fan-out probe, all in parallel
+  * `POST /api/admin/creds-health/probe/{provider}` — single-provider re-probe
+  * `GET  /api/admin/creds-health/history?provider=&limit=` — trend rows
+
+Status set: `green` / `yellow` / `red` / `not_configured`. Each
+result carries `provider`, `http`, `latency_ms`, `probed_at`,
+`error`, `detail`, `key_tail` (last 4 of secret only — never full).
+
+**Pillar dashboard caught 2 NEW stale credentials on first probe**:
+  * 🔴 ElevenLabs `xi-api-key` 401 (tail `…3640`)
+  * 🔴 Google PageSpeed key 403 (tail `…iapA`)
+
+Plus confirmed the known stale Twilio (401) and Tavily (432).
+6 providers green: Apollo, Deepgram, Emergent LLM, OpenRouter,
+Resend, Stripe (latency 247–457 ms).
+4 providers not configured: E2B, GitHub, Sentry, Vercel.
+
+Tests: `backend/tests/test_d75_creds_health.py` — **9/9 green**.
+Coverage: shape, secret-masking, unknown-provider 404, history
+write+read, non-admin 403, TTL index in BSON Date form, known
+stale creds show RED.
+
+### Item #2 — Route dedupe (boot-time detector + idempotent guard)
+
+D-71p audit flagged 8 known duplicate routes; D-75 detector found
+**314 actual duplicate (verb, path) pairs in `app.routes`**. Root
+cause: `registry.py` has multiple registration lists; same router
+appears 2–3 times across lists; FastAPI's `include_router` doesn't
+dedupe and silently appends to `app.routes` each time.
+
+**Surgical fix**: idempotent wrapper around `app.include_router`
+at the top of `register_all_routers`. Tracks `_included_router_ids:
+set[int]`. Second+ calls for the same router object silently no-op
+(debug-logged only).
+
+**Result**: `314 → 17` route table dupes (−94%). The 17 remaining
+are GENUINE cross-handler conflicts requiring per-pair winner
+selection (queued for next session, full list in
+`/app/memory/D75_PART2_STATUS.md`).
+
+Also added two boot-time observability functions:
+  * `_detect_duplicate_routes(app)` — walks `app.routes` post-
+    registration, logs WARNING per duplicate with the active +
+    shadowed handler module paths. Makes silent footguns loud.
+  * `_detect_unwired_set_db_modules()` — scans every router file
+    for `def set_db(` and cross-references against registry's
+    `_set_*_db(db)` call sites. **Found 213 unwired modules** —
+    far worse than the audit-listed 8. Full list logged at startup
+    so the next session can wire/remove them with eyes-on review.
+
+Tests: `backend/tests/test_d75_route_dedupe.py` — **5/5 green**.
+Coverage: idempotent guard present, detector functions exist,
+synthetic dupe triggers WARNING, live route-table dupe count
+threshold (≤20) — was 314 pre-guard.
+
+### Combined D-72 → D-75 #2 suite
+
+**68/68 green** across the full ring: 9 auth E2E + 16 twilio
+breaker + 12 autonomous-repair admin + 9 router-patch + 8 pixel
+repair + 9 creds health + 5 route dedupe. Real backend, real
+Mongo, real OpenRouter, real Resend, real Twilio probe, real
+ElevenLabs/Google probe. No mocks anywhere.
+
+### Files
+  * `backend/services/creds_health.py` (new, ~340 LOC — 16 provider probes)
+  * `backend/routers/creds_health_router.py` (new, ~150 LOC — admin endpoints)
+  * `backend/routers/registry.py` (idempotent include_router guard + 2 detector functions)
+  * `backend/tests/test_d75_creds_health.py` (new, 9 tests)
+  * `backend/tests/test_d75_route_dedupe.py` (new, 5 tests)
+  * `memory/D75_PART2_STATUS.md` (handoff doc: 17 remaining dupes + 213 unwired set_db modules)
+
+
+
 ## 2026-06-10 — iter D-75 part 1 — Pixel repair flow honesty rewrite
 
 ### The mock that was running in prod
