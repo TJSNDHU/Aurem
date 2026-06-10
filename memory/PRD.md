@@ -312,6 +312,13 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Twilio breaker**: TWILIO_AUTH_TOKEN is stale → every blast cycle was 401-ing on SMS + voice. New `services/twilio_auth_breaker.py` opens on the first 401, short-circuits every Twilio call (blast_service + shared provider both), and surfaces RED in Campaign Health with the actionable rotation hint. **11/11 pass**. Founder must rotate the token + `sudo supervisorctl restart backend`.
   - **D-72 suite**: 9 auth E2E + 11 twilio breaker + 9 router patches = **29/29 green** (2 pre-existing failures unrelated to D-72).
 
+- **D-73 (2026-06-10 — Autonomous repair stack healed)**
+  - Full detail in `/app/memory/CHANGELOG.md`.
+  - **Root cause**: 442 stale rows in `pending_approvals` piled up over 2 months because 428 used pre-iter-325f schema (no `type`), 12 were Shannon scans against test-only domains (`*-test.com`), and 2 REAL `aurem.live` findings (HSTS missing, HTTP→HTTPS redirect missing) were buried. Plus `run_repair_tick` had a `db = db or _get_db()` PyMongo truthiness anti-pattern that crashed any explicit-db caller, and the string-vs-datetime mismatch (same as D-71p TTL bug) made staleness queries return 0.
+  - **Real fix**: New admin router `routers/autonomous_repair_admin_router.py` with stats, archive-legacy, archive-test-targets, reject, restore, expire-stale, ensure-ttl endpoints. Full audit trail via `autonomous_repair_audit` collection. `run_repair_tick` patched: PyMongo truthiness fix + observability fields (`legacy_count`, `stale_awaiting`).
+  - **Live result**: 442 → 2. The 2 surviving rows are real aurem.live security findings that got fresh DeepSeek V3.1 LLM proposals on the very next tick (HSTS header config + Nginx 301 redirect snippet, both tier-2 awaiting founder approval). 60-day TTL safety net active.
+  - **12/12 pass**. Combined D-72 + D-73 = **32/32 green**.
+
 
 ## Backlog (P0 → P2)
 

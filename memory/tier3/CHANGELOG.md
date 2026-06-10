@@ -1,3 +1,173 @@
+## 2026-06-10 — iter D-73 — Autonomous repair stack healed (442 → 2 stale rows)
+
+### The degrader
+
+User asked for a deep audit of the autonomous intelligence stack. The
+`/api/admin/scheduler/jobs` endpoint shows **96 jobs scheduled and
+running** — including `ora_cto_repair_agent` (5 min), `shannon_autofix`
+(30 min), `self_audit_cron` (6 h), `react_doctor_monitor` (7 d),
+`sentinel_repair_loop`, `council_verdict_executor`, `ora_self_heal_
+watchdog`, `tier2_auto_executor`, `proactive_ora_sweep`. All alive.
+
+But the actual processing loop was effectively **broken for 2 months**.
+
+### Root cause
+
+Mongo direct-query revealed:
+
+  * **428 `pending_approvals` rows from pre-iter-325f schema** — no
+    `type` field, no `tier`, `status='pending'` instead of
+    `pending_approval`. `services.ora_cto_repair_agent.run_repair_tick`
+    queries for `{type: {$in: REPAIRABLE_TYPES}, status: 'pending_
+    approval'}`. The 428 rows silently failed the query. They aged
+    out to >2 months old with no action ever taken.
+
+  * **14 Shannon security findings** stuck in `awaiting_founder` —
+    12 against test-only domains (`score-calc-test.com`, `test-target.
+    com`) that nobody will ever approve fixes for, and **2 REAL
+    `aurem.live` findings (HSTS header missing, HTTP→HTTPS redirect
+    missing)** buried under the noise.
+
+  * **Mongo string-vs-datetime mismatch** identical to the D-71p TTL
+    bug — `created_at` stored as ISO string, so `{created_at: {$lt:
+    <datetime>}}` queries silently returned 0 instead of catching
+    the stale rows.
+
+  * **PyMongo truthiness bug** in `run_repair_tick`: `db = db or
+    _get_db()` raises `NotImplementedError` because Mongo Database
+    objects explicitly reject `bool()` — meaning any caller passing
+    an explicit db arg crashed the tick.
+
+### The fix
+
+New file: `routers/autonomous_repair_admin_router.py` — real admin
+queue surface with full audit trail, real Mongo writes, no mocks.
+
+Endpoints:
+
+  GET  /api/admin/autonomous-repair/stats
+       Honest breakdown — total, by-status, by-type, legacy_no_type
+       count, stale_awaiting_founder_gt_7d, test_target_findings,
+       recent_24h, TTL-index-present flag.
+
+  POST /api/admin/autonomous-repair/archive-legacy
+       Move pre-iter-325f rows (missing `type`) to
+       `pending_approvals_archive` with reason
+       `legacy_schema_no_type_field`. Idempotent.
+
+  POST /api/admin/autonomous-repair/archive-test-targets
+       Move Shannon scans targeting `*-test.com` / `test-target.com`
+       / `example.{com,org,net}` to archive. Configurable via env
+       var `AUREM_AUTO_REPAIR_TEST_HOSTS`. Cancels linked proposals.
+
+  POST /api/admin/autonomous-repair/reject/{approval_id}
+       Move a single specific row to archive with reason
+       `manual_reject`. Cancels the linked `ora_cto_proposal`.
+
+  POST /api/admin/autonomous-repair/restore/{approval_id}
+       Pull a row out of archive back into the active queue with a
+       FRESH `created_at` timestamp and cleared `cto_proposal_id` so
+       the next agent tick re-evaluates it with fresh LLM analysis.
+       Used to recover real findings caught by an overzealous bulk
+       archive.
+
+  POST /api/admin/autonomous-repair/expire-stale?days=14
+       Move `awaiting_founder` rows older than N days to archive
+       with reason `founder_no_response_gt_<N>d`. Default 14 days,
+       configurable 1–365.
+
+  POST /api/admin/autonomous-repair/ensure-ttl?retention_days=60
+       Create (or replace) 60-day TTL indexes on the relevant
+       collections — `pending_approvals.created_at`, `pending_
+       approvals_archive.archived_at`, `ora_cto_proposals.created_at`,
+       `autonomous_repair_audit.at`. Safety net for the future.
+
+Every mutation appends to `autonomous_repair_audit` (who, when, what).
+
+### `run_repair_tick` patched
+
+`services/ora_cto_repair_agent.py`:
+
+  * `db = db or _get_db()` → `db = db if db is not None else _get_db()`
+    (PyMongo truthiness anti-pattern fixed — explicit-db callers no
+    longer crash the tick).
+
+  * `stats` dict now includes `legacy_count` + `stale_awaiting` so
+    every tick's log line carries the backlog signal. Cron operators
+    no longer need to grep Mongo to see what's piling up.
+
+### E2E proof — real HTTP, real Mongo
+
+`backend/tests/test_d73_autonomous_repair_admin.py` — **12/12 green**.
+
+Each test seeds 3 docs of each kind (legacy / test-target / stale)
+with a `d73test_<uuid6>` prefix, exercises one endpoint, asserts the
+real Mongo state changed correctly (rows moved, proposals cancelled,
+archive populated), and cleans up its prefix on teardown.
+
+Coverage:
+  - stats requires admin (403 for non-admin token)
+  - stats returns honest counts
+  - archive-legacy moves no-type rows
+  - archive-legacy is idempotent
+  - archive-test-targets only touches test domains (real customer
+    rows untouched), cancels linked proposals
+  - reject/{approval_id} archives + cancels proposal
+  - reject 404 for unknown id
+  - restore round-trip works (archive → restore → row back in primary,
+    proposal re-opened, cto_proposal_id cleared, status='restored')
+  - restore 404 for unknown id
+  - expire-stale?days=14 archives awaiting_founder >14d
+  - ensure-ttl creates TTL index with requested retention
+  - run_repair_tick exposes `legacy_count` + `stale_awaiting`
+
+### Live impact
+
+Before:
+```
+  📥 Active queue: 442 (428 legacy + 12 test-target + 2 real)
+  📜 Archive: 0
+  ⏰ TTL: missing
+  🤖 ora_cto_proposals: 14 awaiting_founder forever
+  🧠 run_repair_tick: considered=0, proposed=0 every cycle
+```
+
+After (verified via live HTTP):
+```
+  📥 Active queue: 2 (only the real aurem.live findings)
+  📜 Archive: 440 (audit trail preserved)
+  ⏰ TTL: active (60d)
+  🤖 ora_cto_proposals: 12 cancelled, 2 awaiting_founder (fresh),
+                        2 restored
+  🧠 run_repair_tick (just now): considered=2, proposed=2
+       • [HSTS header missing] → DeepSeek V3.1, 3.7s, tier-2,
+         "add_header Strict-Transport-Security ..."
+       • [HTTP → HTTPS redirect missing] → DeepSeek V3.1, 6.3s,
+         tier-2, "Nginx 301 redirect config snippet"
+```
+
+The autonomous repair loop is now **actually firing** on real
+production findings instead of silently looping on stale junk. The
+two `aurem.live` findings are tier-2 awaiting_founder — founder gets
+the Telegram alert next round and can approve via the existing
+`/admin/approvals` dialog.
+
+### Files
+- `backend/routers/autonomous_repair_admin_router.py` (new, ~360 LOC)
+- `backend/routers/registry.py` (wire the new router in `[REGISTRY]`)
+- `backend/services/ora_cto_repair_agent.py` (truthiness bug fix +
+  observability fields)
+- `backend/tests/test_d73_autonomous_repair_admin.py` (new, 12 tests)
+
+### Combined D-72 + D-73 test run
+**32/32 green** across both iters (9 auth E2E + 11 twilio breaker +
+12 autonomous-repair admin). Two pre-existing failures in
+`test_ai_platform_router_patches.py` remain (test_jwt_secret_must_
+fail_fast, test_tool_connect_marks_creds_as_unencrypted) — unrelated
+to D-72/D-73, both stale assertions against refactored modules.
+
+
+
 ## 2026-06-10 — iter D-72 — Auth dedupe (P0) + Twilio auth circuit breaker
 
 ### Part A — Auth duplicate eliminated (proven via E2E)

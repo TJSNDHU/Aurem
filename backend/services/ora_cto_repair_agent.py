@@ -49,7 +49,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -291,10 +291,39 @@ async def _notify_founder(approval: Dict[str, Any], proposal: Dict[str, Any]) ->
 # ─── Main loop ──────────────────────────────────────────────────────────
 async def run_repair_tick(db=None) -> Dict[str, Any]:
     """Single pass — process up to PROPOSAL_BATCH new approvals.
-    Returns a stats dict useful for cron logging + tests."""
-    db = db or _get_db()
+    Returns a stats dict useful for cron logging + tests.
+
+    iter D-73 also surfaces:
+      * `legacy_count` — pre-iter-325f rows the agent can't process,
+        so ops sees the backlog without grepping mongo.
+      * `stale_awaiting_founder` — Shannon/proposal rows >14d in
+        awaiting_founder state, waiting on the founder who'll never
+        come back. Visible in stats so the admin endpoint
+        /api/admin/autonomous-repair/expire-stale can clear them.
+    """
+    db = db if db is not None else _get_db()
     if db is None:
         return {"ok": False, "error": "db_unavailable"}
+
+    # iter D-73 — observability fields. Cheap counts, run once per tick.
+    legacy_count = 0
+    stale_awaiting = 0
+    try:
+        legacy_count = await db.pending_approvals.count_documents(
+            {"type": {"$exists": False}}
+        )
+        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        stale_awaiting = await db.pending_approvals.count_documents({
+            "status": "pending_approval",
+            "cto_status": "awaiting_founder",
+            "$or": [
+                {"created_at": {"$lt": cutoff}},
+                {"created_at": {"$lt": cutoff.isoformat()}},
+            ],
+        })
+    except Exception:
+        # Counts are observability, not correctness — never fail the tick.
+        pass
 
     # Pick rows we haven't proposed against yet (cto_proposal_id missing).
     cursor = db.pending_approvals.find(
@@ -306,7 +335,10 @@ async def run_repair_tick(db=None) -> Dict[str, Any]:
 
     stats = {"considered": 0, "proposed": 0, "tier1": 0, "tier2": 0,
              "cto_unavailable": 0, "errors": 0, "sensitive_routed": 0,
-             "llm_unavailable": 0}
+             "llm_unavailable": 0,
+             # iter D-73 observability
+             "legacy_count": legacy_count,
+             "stale_awaiting": stale_awaiting}
     async for approval in cursor:
         stats["considered"] += 1
         try:

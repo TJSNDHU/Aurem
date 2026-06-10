@@ -1007,6 +1007,23 @@ def register_all_routers(app, db):
                 except Exception as _sk_e:
                     logger.warning(f"[REGISTRY] security_keys_router not loaded: {_sk_e}")
 
+                # iter D-73 — Autonomous repair admin queue. D-71p audit
+                # found 442 stale `pending_approvals` rows that the
+                # repair agent silently couldn't process (legacy schema +
+                # test-target Shannon scans). This router lets the
+                # founder archive/reject/expire them with a real audit
+                # trail. See routers/autonomous_repair_admin_router.py
+                try:
+                    from routers.autonomous_repair_admin_router import (
+                        router as _ara_router,
+                        set_db as _set_ara_db,
+                    )
+                    app.include_router(_ara_router)
+                    _set_ara_db(db)
+                    logger.info("[REGISTRY] autonomous_repair_admin_router wired")
+                except Exception as _ara_e:
+                    logger.warning(f"[REGISTRY] autonomous_repair_admin_router not loaded: {_ara_e}")
+
                 # iter D-47 — Save-to-GitHub dialog backend (list repos,
                 # list branches, commit manifest + chat history).
                 try:
