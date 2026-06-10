@@ -1022,11 +1022,35 @@ async def reject_fix(fix_id: str, authorization: str = Header(None)):
 
 @router.get("/api/repair/scores")
 async def get_repair_scores(url: str, authorization: str = Header(None)):
-    """Get before/after scores for a URL based on pending + approved fixes."""
+    """Get before/after scores for a URL.
+
+    iter D-71n — SSOT: REAL pixel/scan data from `scan_history` is
+    authoritative for the customer's site (axis scores written by the
+    AUREM scan engine when the pixel pings home or the user runs a
+    scan). `repair_fixes` then provides the "score_after" projection by
+    counting how many issues are already approved/deployed.
+
+    Priority order for each axis:
+      1. latest `scan_history.scores.<axis>` for this URL (pixel truth)
+      2. fallback: 100 - (pending_fixes × penalty)  (legacy)
+    """
     from server import db
     user_id = _get_user_id(authorization)
     normalized = _normalize_url(url)
 
+    # ── Source 1 — REAL scan data (pixel + manual scans) ──────────
+    latest_scan = await db.scan_history.find_one(
+        {"$or": [
+            {"website_url": normalized},
+            {"website_url": url},
+            {"website_url": normalized.rstrip("/")},
+        ]},
+        {"scores": 1, "overall_score": 1, "created_at": 1, "_id": 0},
+        sort=[("created_at", -1)],
+    ) or {}
+    scan_scores = (latest_scan.get("scores") or {}) if isinstance(latest_scan, dict) else {}
+
+    # ── Source 2 — repair_fixes for the same URL ──────────────────
     fixes = await db.repair_fixes.find(
         {"user_id": user_id, "scan_url": normalized},
         {"_id": 0, "category": 1, "status": 1, "fix_type": 1}
@@ -1034,59 +1058,40 @@ async def get_repair_scores(url: str, authorization: str = Header(None)):
 
     seo_fixes = [f for f in fixes if f["category"] == "seo"]
     a11y_fixes = [f for f in fixes if f["category"] == "accessibility"]
-    # iter D-71m — pull GEO + security fixes too. Customer Live Health page
-    # has 4 tiles (GEO / SEC / ACC / SEO); previously only SEO + ACC came
-    # back so GEO and SEC tiles always rendered as 0, looking broken.
     geo_fixes  = [f for f in fixes if f["category"] in ("geo", "geo_readiness")]
     sec_fixes  = [f for f in fixes if f["category"] in ("security", "sec")]
 
-    seo_total = len(seo_fixes)
-    seo_approved = len([f for f in seo_fixes if f["status"] in ("approved", "deployed")])
-    seo_pending = len([f for f in seo_fixes if f["status"] == "pending_approval"])
-
-    a11y_total = len(a11y_fixes)
-    a11y_approved = len([f for f in a11y_fixes if f["status"] in ("approved", "deployed")])
-    a11y_pending = len([f for f in a11y_fixes if f["status"] == "pending_approval"])
-
-    geo_total = len(geo_fixes)
-    geo_approved = len([f for f in geo_fixes if f["status"] in ("approved", "deployed")])
-    geo_pending = len([f for f in geo_fixes if f["status"] == "pending_approval"])
-
-    sec_total = len(sec_fixes)
-    sec_approved = len([f for f in sec_fixes if f["status"] in ("approved", "deployed")])
-    sec_pending = len([f for f in sec_fixes if f["status"] == "pending_approval"])
+    def _axis(axis_key: str, fix_list: list, penalty: int) -> dict:
+        """Build the {score_before, score_after, total, approved, pending}
+        dict for one axis. score_before comes from REAL scan data when
+        available, otherwise derived from total pending fixes."""
+        total    = len(fix_list)
+        approved = len([f for f in fix_list if f["status"] in ("approved", "deployed")])
+        pending  = len([f for f in fix_list if f["status"] == "pending_approval"])
+        # Pixel truth wins for `score_before`
+        if axis_key in scan_scores and isinstance(scan_scores[axis_key], (int, float)):
+            score_before = int(scan_scores[axis_key])
+        else:
+            score_before = max(0, 100 - total * penalty)
+        # After-score = before + (penalty × approved) capped at 100
+        score_after = min(100, score_before + approved * penalty) if approved else score_before
+        return {
+            "score_before": score_before,
+            "score_after":  score_after,
+            "total_fixes":  total,
+            "approved":     approved,
+            "pending":      pending,
+        }
 
     return {
         "url": normalized,
-        "seo": {
-            "score_before": max(0, 100 - seo_total * 20),
-            "score_after": max(0, 100 - max(0, seo_total - seo_approved) * 20),
-            "total_fixes": seo_total,
-            "approved": seo_approved,
-            "pending": seo_pending,
-        },
-        "accessibility": {
-            "score_before": max(0, 100 - a11y_total * 12),
-            "score_after": max(0, 100 - max(0, a11y_total - a11y_approved) * 12),
-            "total_fixes": a11y_total,
-            "approved": a11y_approved,
-            "pending": a11y_pending,
-        },
-        # iter D-71m — wire the 2 missing axes the Live Health UI expects.
-        "geo": {
-            "score_before": max(0, 100 - geo_total * 15),
-            "score_after":  max(0, 100 - max(0, geo_total - geo_approved) * 15),
-            "total_fixes":  geo_total,
-            "approved":     geo_approved,
-            "pending":      geo_pending,
-        },
-        "security": {
-            "score_before": max(0, 100 - sec_total * 25),
-            "score_after":  max(0, 100 - max(0, sec_total - sec_approved) * 25),
-            "total_fixes":  sec_total,
-            "approved":     sec_approved,
-            "pending":      sec_pending,
-        },
+        "source": "scan_history+repair_fixes" if scan_scores else "repair_fixes_only",
+        "last_scan_at": latest_scan.get("created_at"),
+        "overall_score": latest_scan.get("overall_score"),
+        "seo":           _axis("seo",           seo_fixes, 20),
+        "accessibility": _axis("accessibility", a11y_fixes, 12),
+        "geo":           _axis("geo",           geo_fixes,  15),
+        "security":      _axis("security",      sec_fixes,  25),
     }
 
 

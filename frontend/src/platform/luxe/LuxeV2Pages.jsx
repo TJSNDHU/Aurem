@@ -159,11 +159,19 @@ const useApi = (path, deps = [], intervalMs = null) => {
 
 export const LuxeLiveHealth = () => {
   const toast = useV2Toast();
-  // iter 331c Sprint 6.3 — use env var so the page works on any deployed domain.
-  const _ownUrl = (process.env.REACT_APP_PUBLIC_BASE_URL
-                    || (typeof window !== 'undefined' ? window.location.origin : '')
-                    || 'https://aurem.live');
-  const scores = useApi(`/api/repair/scores?url=${encodeURIComponent(_ownUrl)}`, [], 30000);
+  // iter D-71n — Mismatch fix: Home Dashboard reads scores for the
+  // CUSTOMER's first-leaderboard site, but Live Health was reading
+  // scores for the AUREM platform URL itself (window.location.origin).
+  // Result: Home showed customer's real scores, Live Health showed
+  // platform scores → tiles didn't match. Now both read the same
+  // site so the customer sees ONE consistent set of numbers.
+  const leaderboard = useApi('/api/repair/scoreboard?limit=1', null, 60000);
+  const _customerSite = leaderboard?.sites?.[0]?.url
+                     || leaderboard?.[0]?.url
+                     || (process.env.REACT_APP_PUBLIC_BASE_URL
+                          || (typeof window !== 'undefined' ? window.location.origin : '')
+                          || 'https://aurem.live');
+  const scores = useApi(`/api/repair/scores?url=${encodeURIComponent(_customerSite)}`, [], 30000);
   const incidents = useApi('/api/incidents/list?limit=20', [], 30000);
   const [scanning, setScanning] = useState(false);
   const [resolvingId, setResolvingId] = useState(null);
