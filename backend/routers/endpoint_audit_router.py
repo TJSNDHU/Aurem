@@ -480,7 +480,7 @@ async def _build_audit_report() -> dict:
             or path_l.startswith("/api/qa/")
             or path_l.startswith("/api/booking/")
             or path_l.startswith("/api/aurem-llm/")
-            or path_l.startswith("/api/z-image/")
+            # iter D-76 — /api/z-image/ removed (z_image_router deleted)
             or path_l.startswith("/api/a2a-learning/")
             or path_l.startswith("/api/awb/")
             or path_l.startswith("/api/business-id/")

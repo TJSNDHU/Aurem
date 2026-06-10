@@ -316,21 +316,10 @@ async def get_current_platform_user(authorization: str = Header(None)):
 # PUBLIC ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/health")
-async def platform_health():
-    """
-    Kubernetes / nginx liveness probe target.
-    MUST stay dependency-free (no DB, no auth, no third-party) so it returns
-    instantly during cold-start. Hit by Emergent's ingress at /api/platform/health.
-    iter 322au — added to fix deployment health-check timeouts.
-    iter 322g+ — env label included so prod-guard activation is verifiable.
-    """
-    try:
-        from services.prod_guard import env_label
-        env = env_label()
-    except Exception:
-        env = "unknown"
-    return {"status": "ok", "service": "aurem-platform", "env": env}
+# iter D-76 dedupe — /api/platform/health moved fully to
+# bootstrap/health_routes.py (single source of truth). Previously
+# duplicated here, server.py inline, AND bootstrap, creating a 3-way
+# conflict in registry's dedupe-audit.
 
 
 @router.get("/tiers")

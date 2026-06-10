@@ -416,26 +416,9 @@ async def get_me(user = Depends(get_current_user)):
 # AI CHAT ROUTES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, user = Depends(get_current_user)):
-    """Send a message to AUREM AI"""
-    from services.aurem_ai_service import get_aurem_service
-    
-    aurem = get_aurem_service(db)
-    session_id = request.session_id or str(uuid.uuid4())
-    
-    result = await aurem.chat(
-        session_id=session_id,
-        message=request.message,
-        user_id=str(user.get("_id", "anonymous"))
-    )
-    
-    return ChatResponse(
-        response=result["response"],
-        session_id=result["session_id"],
-        intent=result.get("intent"),
-        timestamp=result["timestamp"]
-    )
+# iter D-76 dedupe — POST /chat removed; canonical handler lives in
+# routers/aurem_chat.py with the full 12-phase ORA pipeline + JWT
+# auth + 45s timeout. Keeping only /chat/history here (read-only).
 
 @router.get("/chat/history")
 async def get_chat_history(

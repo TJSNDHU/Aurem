@@ -714,38 +714,13 @@ app = FastAPI(
 #   /ready       — k8s readiness probe (some Helm charts)
 # iter 280.15 fix.
 # ─────────────────────────────────────────────────────────────────────
-@app.get("/health", include_in_schema=False)
-async def _liveness_health():
-    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
-    import time as _t
-    return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
-            "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
-
-
-@app.get("/ready", include_in_schema=False)
-async def _liveness_ready():
-    return {"status": "ready"}
-
-
-# Belt-and-braces: even though HealthProbeMiddleware short-circuits these
-# paths at the outermost ASGI layer, register direct routes too so any
-# request that bypasses the middleware (route prefix order, exception in
-# middleware code, etc.) still gets a fast OK response. Critical for K8s
-# readiness/liveness probes during production cold-start.
-@app.get("/api/platform/health", include_in_schema=False)
-async def _liveness_platform_health():
-    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
-    import time as _t
-    return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
-            "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
-
-
-@app.get("/api/health", include_in_schema=False)
-async def _liveness_api_health():
-    from middleware.health_probe import _BUILD_SHA, _BOOT_TS  # noqa: WPS433
-    import time as _t
-    return {"status": "ok", "platform": "aurem", "v": _BUILD_SHA,
-            "uptime_seconds": int(_t.monotonic() - _BOOT_TS)}
+# iter D-76 dedupe — /health, /ready, /api/health, /api/platform/health
+# moved fully to bootstrap/health_routes.py (single source of truth).
+# Previously these were registered both here AND in bootstrap, creating
+# 4 of the 17 (verb, path) dupes that registry's dedupe-audit flagged.
+# HealthProbeMiddleware still short-circuits these paths at the ASGI
+# layer before bootstrap's handlers are reached, so probe latency is
+# unchanged.
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -2586,25 +2561,12 @@ from routers.registry import register_all_routers
 # Note: api_router is included here because it holds RLS endpoints
 app.include_router(api_router)
 
-# iter 322ey — Founder Saves Audit Router (direct register; registry block
-# wasn't being reached after hot-reload, so wire it here as a safety net).
-try:
-    from routers.founder_saves_router import (
-        router as _founder_saves_router,
-        set_db as _set_founder_saves_db,
-    )
-    # db wiring deferred until startup_event() runs and `db` is bound,
-    # but include the router immediately so routes register.
-    app.include_router(_founder_saves_router)
-
-    @app.on_event("startup")
-    async def _wire_founder_saves_db():
-        # Late-bind the db handle once it's initialized.
-        from server import db as _bound_db  # type: ignore
-        _set_founder_saves_db(_bound_db)
-except Exception as _e:
-    import logging as _lg
-    _lg.getLogger(__name__).warning(f"[INLINE] founder_saves_router wire failed: {_e}")
+# iter D-76 dedupe — founder_saves_router inline include removed.
+# Routes were registered both here AND via routers/registry.py (line
+# ~1846), producing 3 self-dupes (/health, /summary, /timeline). The
+# registry block is now reliably reached after hot-reload — confirmed
+# via the dedupe-audit running on every boot. Trust the registry.
+# (Previous "safety net" comment from iter 322ey is obsolete.)
 
 # iter 322ey — Public Design-Extract lead magnet (NO auth)
 try:

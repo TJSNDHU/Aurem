@@ -395,6 +395,9 @@ async def _build_crm_snapshot(db, message: str) -> str:
 
 @router.post("/api/aurem/chat", response_model=ChatResponse)
 async def aurem_chat(request: ChatRequest, http_request: Request = None):
+    """iter D-76 dedupe winner — comprehensive 12-phase ORA pipeline.
+    The simpler aurem_routes./chat alias was removed to eliminate the
+    duplicate (POST, /api/aurem/chat) registration."""
     try:
         # Bug-fix #48 — endpoint was wide-open to the public internet,
         # letting any anonymous caller burn through our LLM budget for

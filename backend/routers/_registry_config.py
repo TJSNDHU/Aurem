@@ -122,7 +122,7 @@ SKIP_IN_LEAN: frozenset[str] = frozenset({
     "routes.data_security_routes",     # 4 routes, 0 refs
     # ── NEW: Standalone blocks — user confirmed safe to skip ──
     "routers.nexus_router",            # 6 routes, backlogged
-    "routers.z_image_router",          # 4 routes, backlogged
+    # iter D-76 — "routers.z_image_router" removed (file deleted)
     # "routers.proximity_blast_router" — RE-ENABLED (iter 284): wired to ProximityBlast.jsx sidebar widget
     # "routers.system_pulse_router" — WIRED to SystemPulseHUD.jsx (keep loaded)
     "routers.crypto_signal_engine",    # separate deployment

@@ -23,6 +23,7 @@ import BuildBadge from "../lib/BuildBadge";
 import DeployStatusPanel from "./DeployStatusPanel";
 import AutonomousRepairPanel from "./AutonomousRepairPanel";
 import PendingCodeFixesPanel from "./PendingCodeFixesPanel";
+import ApprovalInboxPanel from "./ApprovalInboxPanel";
 import TruthLedgerPanel from "./TruthLedgerPanel";
 import MTTHCard from "./MTTHCard";
 import TransparencyWall from "./TransparencyWall";
@@ -1222,6 +1223,11 @@ export default function AdminPillarsMap() {
         {/* iter 281 — Autonomous Repair Engine live feed */}
         <div className="mb-6">
           <AutonomousRepairPanel />
+        </div>
+
+        {/* iter D-76 — Approval Inbox: pending_approvals queue with one-click approve/reject */}
+        <div className="mb-6">
+          <ApprovalInboxPanel />
         </div>
 
         {/* iter 285 — Auto-Heal Bridge · Pending Code Fixes approval queue */}

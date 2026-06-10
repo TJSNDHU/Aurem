@@ -169,10 +169,11 @@ async def resolve_incident(incident_id: str, user=Depends(_require_user)):
     return {"ok": True, "incident_id": incident_id, "resolved_at": _now().isoformat()}
 
 
-# Backwards-compat singular alias the spec also mentions
-@router.post("/api/incident/resolve/{incident_id}")
-async def resolve_incident_alias(incident_id: str, user=Depends(_require_user)):
-    return await resolve_incident(incident_id, user)
+# iter D-76 dedupe — singular alias removed; canonical handler lives at
+# /api/incidents/resolve/{id} above (plural) and in
+# routers/incident_router.py with playbook-learning logic. The thin
+# alias here was producing a duplicate (POST,
+# /api/incident/resolve/{incident_id}) registration.
 
 
 # ─────────────────────────────────────────────────────────────────

@@ -77,17 +77,15 @@ async def self_audit_health() -> dict:
     }
 
 
-@router.post("/api/self-audit/run")
-async def self_audit_run_now(authorization: Optional[str] = Header(None)) -> dict:
-    """Manual trigger — admin only."""
-    _verify_admin(authorization)
-    db = _get_db()
-    row = await run_self_audit(db)
-    if isinstance(row.get("started_at"), datetime):
-        row["started_at"] = row["started_at"].isoformat()
-    if isinstance(row.get("completed_at"), datetime):
-        row["completed_at"] = row["completed_at"].isoformat()
-    return {"ok": True, "row": row}
+# iter D-76 dedupe — POST /api/self-audit/run moved fully to
+# routers/autonomy_router.py (the 5-agent system the frontend
+# AutonomyLog.jsx calls). The chip's manual-trigger here would conflict
+# with the autonomy engine entry point, so it's deleted. The chip's
+# state is still surfaced via the /api/self-audit/health route below.
+async def _chip_run_deleted_in_d76() -> dict:  # pragma: no cover
+    """Removed — see comment above."""
+    raise RuntimeError("removed in D-76 dedupe")
+
 
 
 @router.get("/api/self-audit/history")

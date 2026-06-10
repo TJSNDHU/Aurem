@@ -119,7 +119,7 @@ def init_all_service_dbs(db):
         "routers.openrouter_router",
         "routers.password_reset_router",
         "routers.stripe_payment_router",
-        "routers.google_oauth_callback",
+        # iter D-76 dedupe — google_oauth_callback removed; canonical is routes.auth
         "routers.shopify_billing_router",
         "routers.aurem_platform_router",
         "routers.google_oauth_router",

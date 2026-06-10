@@ -213,21 +213,11 @@ async def activate_member(member_id: str, request: Request):
 # ═══════════════════════════════════════════════════════════════════════
 # AUDIT TRAIL
 # ═══════════════════════════════════════════════════════════════════════
-
-@router.get("/audit")
-async def get_audit_trail(request: Request, limit: int = 50, skip: int = 0, action: Optional[str] = None):
-    """Fetch audit trail logs"""
-    user = await _get_user(request)
-    db = get_db()
-    tenant_id = user.get("tenant_id", user.get("user_id"))
-
-    query = {"tenant_id": tenant_id}
-    if action:
-        query["action"] = {"$regex": action, "$options": "i"}
-
-    logs = await db.audit_trail.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.audit_trail.count_documents(query)
-    return {"logs": logs, "total": total}
+# iter D-76 dedupe — /audit moved fully to routers/enterprise_router.py
+# (newer unified_audit-backed implementation). Both this file and
+# enterprise_router declare a router under /api/enterprise, producing a
+# duplicate (GET, /api/enterprise/audit). The unified-audit version is
+# the more mature handler (supports event filtering, CSV export).
 
 
 # ═══════════════════════════════════════════════════════════════════════

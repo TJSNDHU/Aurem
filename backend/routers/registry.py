@@ -651,7 +651,11 @@ def register_all_routers(app, db):
         ("routers.stripe_webhook_alias_router", "Stripe Webhook (alias /api/stripe/webhook)"),
         ("routers.payments_health_router", "Payments Health (Pillars Map)"),
         ("routers.ora_health_router", "ORA Self-Heal Status (Mission Control)"),
-        ("routers.google_oauth_callback", "Google OAuth Callback"),
+        # iter D-76 dedupe — routers.google_oauth_callback removed.
+        # Canonical handler is routes.auth.process_google_callback which
+        # intelligently routes admin (whitelist or team_member) vs
+        # customer flows. The simpler variant here was producing a
+        # duplicate (POST, /api/auth/google/callback) registration.
         ("routers.universal_connector_router", "Universal Connector"),
         ("routers.ucp_router", "UCP"),
         ("routers.ora_action_router", "ORA Action"),
@@ -2011,13 +2015,13 @@ def register_all_routers(app, db):
         except Exception:
             pass
 
-    # Z-Image-Turbo
-    if not _should_skip("routers.z_image_router"):
-        try:
-            from routers.z_image_router import router as z_image_router
-            app.include_router(z_image_router)
-        except Exception:
-            pass
+    # iter D-76 — z_image_router DELETED.
+    # The Z-Image-Turbo Gradio integration was 4 unused endpoints behind
+    # a public HuggingFace Space with no in-app callers (no frontend ref,
+    # no /api/z-image traffic on production audit). The silent
+    # try/except masked any import error so we never knew it was dead.
+    # File removed, import block deleted, _registry_config skip list
+    # entry purged.
 
     # AUREM Redis
     if not _should_skip("routers.aurem_redis_router"):
@@ -4468,7 +4472,11 @@ def register_all_routers(app, db):
 
 def _wire_top_unwired_set_db_modules(db) -> None:
     """D-75 #3 — wire the top 20 high-traffic unwired set_db modules.
-    Order roughly by traffic rank (from api_audit_log aggregation).
+    iter D-75 #4 — also wires EVERY module listed in the auto-
+    generated `_set_db_wire_list.ALL_SET_DB_MODULES`. The generator
+    is at `scripts/wire_all_set_db.py`. Modules in both lists are
+    de-duplicated (set union).
+
     Each entry is tried independently — one failure doesn't block
     the rest. Failures are LOGGED loudly (no silent 503 risk)."""
     import importlib
@@ -4495,28 +4503,38 @@ def _wire_top_unwired_set_db_modules(db) -> None:
         "ora_command_router",           # 9.2k hits
         "ora_dispatcher_router",        # 9.2k hits
     ]
+    # iter D-75 #4 — fold in the auto-generated full list (if present)
+    all_modules: set[str] = set(TOP_20_UNWIRED)
+    try:
+        from routers._set_db_wire_list import ALL_SET_DB_MODULES
+        all_modules.update(ALL_SET_DB_MODULES)
+        logger.info(
+            f"[REGISTRY] D-75 #4 auto-wire list loaded: "
+            f"{len(ALL_SET_DB_MODULES)} modules"
+        )
+    except Exception as _e:
+        logger.info(
+            "[REGISTRY] D-75 #4 _set_db_wire_list not generated yet — "
+            "run scripts/wire_all_set_db.py to enable the full sweep"
+        )
     wired_count = 0
     fail_count = 0
-    for mod_name in TOP_20_UNWIRED:
+    for mod_name in sorted(all_modules):
         try:
             mod = importlib.import_module(f"routers.{mod_name}")
             fn = getattr(mod, "set_db", None)
             if fn is None:
-                logger.warning(
-                    f"[REGISTRY] {mod_name} no longer defines set_db() — "
-                    "remove from TOP_20_UNWIRED list"
-                )
                 continue
             fn(db)
             wired_count += 1
         except Exception as e:
             fail_count += 1
             logger.warning(
-                f"[REGISTRY] D-75 #3 wire failed for {mod_name}: "
+                f"[REGISTRY] D-75 wire failed for {mod_name}: "
                 f"{type(e).__name__}: {str(e)[:120]}"
             )
     logger.info(
-        f"[REGISTRY] D-75 #3 set_db sweep: wired={wired_count}/{len(TOP_20_UNWIRED)} "
+        f"[REGISTRY] D-75 set_db sweep: wired={wired_count}/{len(all_modules)} "
         f"failed={fail_count}"
     )
 
@@ -4599,6 +4617,14 @@ def _detect_unwired_set_db_modules() -> None:
     if m_block:
         for s in re.findall(r'"(\w+)"', m_block.group(1)):
             called_modules.add(s)
+    # Pattern 5: iter D-75 #4 — auto-generated wire list. The full
+    # set is in `routers/_set_db_wire_list.py::ALL_SET_DB_MODULES`.
+    try:
+        from routers._set_db_wire_list import ALL_SET_DB_MODULES as _AUTO_LIST
+        for s in _AUTO_LIST:
+            called_modules.add(s)
+    except Exception:
+        pass
 
     defined_but_unwired: list[str] = []
     for fn in sorted(os.listdir(routers_dir)):

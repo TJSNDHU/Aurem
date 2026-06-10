@@ -27,7 +27,7 @@ LOCKED_FILES = [
     "/app/backend/routers/daily_intel_router.py",
     "/app/backend/routers/voice_agent_router.py",
     "/app/backend/routers/shopify_oauth_router.py",
-    "/app/backend/routers/google_oauth_callback.py",
+    # iter D-76 dedupe — google_oauth_callback.py removed (canonical is routes.auth)
     "/app/backend/services/sendgrid_compat.py",
     "/app/backend/services/email_service_resend.py",
     "/app/backend/services/lead_enrichment_casl.py",

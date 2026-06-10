@@ -125,6 +125,165 @@ async def _audit(action: str, by: str, payload: dict) -> None:
         logger.warning(f"[autonomous-repair-admin] audit write failed: {e}")
 
 
+def _strip_oid(d: dict) -> dict:
+    """Drop Mongo's `_id` so the doc is JSON-serializable."""
+    if not d:
+        return d
+    d = dict(d)
+    d.pop("_id", None)
+    # Coerce datetimes to ISO so FastAPI's JSON encoder doesn't choke
+    for k, v in list(d.items()):
+        if isinstance(v, datetime):
+            d[k] = v.isoformat()
+    return d
+
+
+# ─── List active pending approvals (Approval Inbox widget) ───────────
+
+@router.get("/list")
+async def list_pending(
+    limit: int = 50,
+    skip: int = 0,
+    status: Optional[str] = None,
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    """Live queue feed for the Approval Inbox widget. Joins the
+    `pending_approvals` row with its linked `ora_cto_proposals`
+    document so the founder sees the LLM's diagnosis + suggested
+    fix inline — zero round-trips needed.
+
+    No mocks: every row comes straight from Mongo. If a proposal
+    pointer is missing/stale we return `proposal: null` honestly
+    rather than fabricating one."""
+    await _require_admin(authorization)
+    if _db is None:
+        raise HTTPException(status_code=503, detail="db_unavailable")
+
+    limit = max(1, min(int(limit), 200))
+    skip = max(0, int(skip))
+
+    q: dict[str, Any] = {}
+    if status:
+        q["status"] = status
+
+    total = await _db.pending_approvals.count_documents(q)
+    cursor = (
+        _db.pending_approvals
+        .find(q)
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+    rows = [_strip_oid(d) async for d in cursor]
+
+    # Hydrate each row with its linked proposal (if any). Single
+    # batch fetch keeps this O(1) trips to Mongo.
+    proposal_ids = [r.get("cto_proposal_id") for r in rows if r.get("cto_proposal_id")]
+    proposals_by_id: dict[str, dict] = {}
+    if proposal_ids:
+        async for p in _db.ora_cto_proposals.find(
+            {"proposal_id": {"$in": proposal_ids}},
+        ):
+            proposals_by_id[p.get("proposal_id")] = _strip_oid(p)
+
+    items = []
+    for r in rows:
+        pid = r.get("cto_proposal_id")
+        items.append({
+            "approval_id": r.get("approval_id"),
+            "type": r.get("type") or "legacy",
+            "status": r.get("status"),
+            "cto_status": r.get("cto_status"),
+            "source": r.get("source"),
+            "tier": r.get("tier"),
+            "summary": r.get("summary") or r.get("title"),
+            "target": (r.get("metadata") or {}).get("target"),
+            "created_at": r.get("created_at"),
+            "proposal_id": pid,
+            "proposal": proposals_by_id.get(pid) if pid else None,
+            "raw": r,
+        })
+
+    return {
+        "ok": True,
+        "fetched_at": _now_iso(),
+        "total": total,
+        "returned": len(items),
+        "skip": skip,
+        "limit": limit,
+        "items": items,
+    }
+
+
+# ─── Approve one pending action (Approval Inbox: green button) ───────
+
+@router.post("/approve/{approval_id}")
+async def approve_one(
+    approval_id: str,
+    authorization: str = Header(None),
+) -> dict[str, Any]:
+    """Mark one specific approval as `approved` so the autonomous
+    repair tick picks it up + executes the linked proposal on its
+    next poll. Audit row written for the founder + system trace.
+
+    NOT a fake-success: we only flip the DB fields. The repair tick
+    (`services.ora_cto_repair_agent.run_repair_tick`) is what
+    actually executes the fix. If the proposal pointer is missing
+    we return 409 so the UI knows nothing will run."""
+    admin_email = await _require_admin(authorization)
+    if _db is None:
+        raise HTTPException(status_code=503, detail="db_unavailable")
+
+    doc = await _db.pending_approvals.find_one(
+        {"approval_id": approval_id}, {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"approval_id {approval_id!r} not found",
+        )
+
+    pid = doc.get("cto_proposal_id")
+    if not pid:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "approval has no linked cto_proposal — nothing to execute. "
+                "Wait for the repair agent to attach a proposal, or reject + "
+                "let it be re-proposed."
+            ),
+        )
+
+    now_iso = _now_iso()
+    await _db.pending_approvals.update_one(
+        {"approval_id": approval_id},
+        {"$set": {
+            "status": "approved",
+            "cto_status": "approved",
+            "approved_at": now_iso,
+            "approved_by": admin_email,
+        }},
+    )
+    await _db.ora_cto_proposals.update_one(
+        {"proposal_id": pid},
+        {"$set": {
+            "status": "approved",
+            "approved_at": now_iso,
+            "approved_by": admin_email,
+        }},
+    )
+
+    await _audit("approve", admin_email,
+                 {"approval_id": approval_id, "proposal_id": pid})
+    return {
+        "ok": True,
+        "approval_id": approval_id,
+        "proposal_id": pid,
+        "approved_at": now_iso,
+        "next_step": "ora_cto_repair_agent.run_repair_tick will execute on next poll",
+    }
+
+
 # ─── Stats ────────────────────────────────────────────────────────────
 
 @router.get("/stats")

@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-05-24 (iter 332b D-6)
+> Last updated 2026-06-10 (iter D-76)
 
 ## Vision
 
@@ -25,6 +25,37 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-76 (2026-06-10) — Route Dedupe Final · Approval Inbox · Codebase Cleanup
+
+**P0 — All 17 cross-handler route duplicates eliminated:**
+1. `server.py` liveness routes deleted (`/health`, `/ready`, `/api/health`, `/api/platform/health`) — canonical lives in `bootstrap/health_routes.py`
+2. `server.py` inline `founder_saves_router` block removed (was double-registering via registry) — 3 self-dupes gone
+3. `routers/server_misc_routes.py` `/auth/forgot-password|reset-password|verify-reset-token` deleted — canonical is `routes/auth.py` (sha256-hashed MongoDB token store)
+4. `routers/aurem_routes.py` `POST /chat` deleted — canonical is `routers/aurem_chat.py` (12-phase ORA pipeline + JWT + 45s timeout)
+5. `routers/inbound_email_router.py` `POST /api/email/inbound` + `/health` deleted — canonical is `routers/email_inbound_router.py` (Cloudflare-Worker → ORA reply pipeline)
+6. `routers/enterprise_engine.py` `GET /audit` deleted — canonical is `routers/enterprise_router.py` (unified_audit-backed)
+7. `routers/v2_customer_actions_router.py` `POST /api/incident/resolve/{id}` alias deleted — canonical is `routers/incident_router.py` (with playbook-learning)
+8. `routers/self_audit_router.py` `POST /api/self-audit/run` deleted — canonical is `routers/autonomy_router.py` (5-agent system that frontend AutonomyLog.jsx depends on)
+9. `routers/google_oauth_callback.py` **file deleted** — canonical is `routes/auth.process_google_callback` (intelligent admin-vs-customer routing)
+10. `routers/ai_platform_router.py` `/health` deleted (was the 3rd of the 3-way `/api/platform/health` conflict)
+
+**P0 — `scripts/wire_all_set_db.py` executed:** 323 router modules now have their `set_db()` auto-wired via the generated `routers/_set_db_wire_list.py`. The 193-unwired backlog is eliminated. `AUREM_STRICT_SETDB_WIRING=true` env gate is in place — flip it on whenever the next stale wiring slips in.
+
+**P0 — `z_image_router.py` file deleted:** 4 dead endpoints behind a silent try/except (gradio_client missing). Removed from registry, `_registry_config` skip list, `endpoint_audit_router` prefix allowlist.
+
+**P0 — 2 orphan Mongo collections dropped:** `awb_cleanup_log` and `site_monitor_admin_log` (1 doc each, zero code references).
+
+**P1 — Approval Inbox built (backend + frontend):**
+- Backend: `routers/autonomous_repair_admin_router.py` adds `GET /list` (joins pending_approvals with linked ora_cto_proposals inline) and `POST /approve/{id}` (flips status, writes audit row, refuses if no linked proposal with 409). Reject was already present.
+- Frontend: `platform/ApprovalInboxPanel.jsx` mounted on `/admin/pillars-map` between `AutonomousRepairPanel` and `PendingCodeFixesPanel`. One-click approve/reject, expandable LLM diagnosis + suggested fix inline, only-pending filter, refresh button, full empty state. Every interactive element has data-testid.
+
+**Tests added/passing:**
+- `tests/test_d76_dedupe.py` — 9 tests (no-dupes, deleted-handlers-gone, canonical-active per route, file-deletions verified)
+- `tests/test_d76_approval_inbox.py` — 6 tests (real JWT, real Mongo, list/approve/reject/audit-trail)
+- 23 total green across D-75 + D-76 suites
+
+**Lock-in validator updated:** locked-files count went 14 → 13 (google_oauth_callback.py removed from the manifest).
 
 ### iter D-60a (2026-06-02) — Production deploy hardening (post-mortem fix)
 
