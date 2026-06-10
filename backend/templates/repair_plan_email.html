@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Your AUREM repair plan for {{website}}</title>
+</head>
+<body style="margin:0;padding:0;background:#0A0A0A;font-family:'Helvetica Neue',Arial,sans-serif;color:#F2F2F2;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#0F0F0F;border:1px solid rgba(249,115,22,0.18);border-radius:14px;overflow:hidden;">
+
+        <!-- Brand -->
+        <tr><td align="center" style="padding:32px 32px 8px;">
+          <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#F97316,#EA580C);display:inline-block;line-height:44px;text-align:center;font-size:18px;font-weight:900;color:#0A0A00;">A</div>
+          <div style="font-family:'Cinzel','Trajan Pro',serif;font-size:16px;font-weight:700;letter-spacing:6px;color:#F2F2F2;margin-top:10px;">AUREM</div>
+        </td></tr>
+
+        <!-- Headline -->
+        <tr><td style="padding:24px 32px 8px;">
+          <p style="font-family:'Cinzel',serif;font-size:24px;color:#F97316;margin:0 0 6px;letter-spacing:1px;">Your repair plan is ready</p>
+          <p style="font-size:15px;color:#F2F2F2;margin:8px 0 4px;">Hi {{first_name}},</p>
+          <p style="font-size:14px;color:#9A9490;margin:0;line-height:1.6;">
+            We finished auditing <strong style="color:#F97316;">{{website}}</strong>. Below is the prioritized
+            plan our engine generated — each item is a real root-cause analysis plus a copy-pasteable fix.
+          </p>
+        </td></tr>
+
+        <!-- Score strip -->
+        <tr><td style="padding:20px 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;border:1px solid rgba(249,115,22,0.3);border-radius:10px;">
+            <tr>
+              <td align="center" style="padding:18px 8px;border-right:1px solid rgba(249,115,22,0.15);">
+                <div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;text-transform:uppercase;margin-bottom:6px;">Score</div>
+                <div style="font-family:'Cinzel',serif;font-size:28px;color:{{score_color}};font-weight:700;">{{score}}<span style="font-size:14px;color:#6A6070;">/100</span></div>
+              </td>
+              <td align="center" style="padding:18px 8px;border-right:1px solid rgba(249,115,22,0.15);">
+                <div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;text-transform:uppercase;margin-bottom:6px;">Issues</div>
+                <div style="font-family:'Cinzel',serif;font-size:28px;color:#F97316;font-weight:700;">{{issue_count}}</div>
+              </td>
+              <td align="center" style="padding:18px 8px;">
+                <div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;text-transform:uppercase;margin-bottom:6px;">Fix Items</div>
+                <div style="font-family:'Cinzel',serif;font-size:28px;color:#22c55e;font-weight:700;">{{plan_count}}</div>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+
+        <!-- Items -->
+        <tr><td style="padding:8px 32px 0;">
+          <p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:8px 0 16px;text-transform:uppercase;">Prioritized Repair Plan</p>
+        </td></tr>
+
+        {{plan_items_block}}
+
+        <!-- CTA -->
+        <tr><td align="center" style="padding:20px 32px 8px;">
+          <a href="{{portal_url}}"
+             style="display:inline-block;background:linear-gradient(135deg,#F97316,#EA580C);color:#0A0A0A;font-weight:700;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:14px;letter-spacing:1px;">
+            OPEN PORTAL · TRACK PROGRESS
+          </a>
+        </td></tr>
+
+        <!-- Note -->
+        <tr><td style="padding:16px 32px 0;">
+          <p style="font-size:12px;color:#6A6070;line-height:1.7;margin:0;">
+            Every item above was generated from a live scan of your site by our DeepSeek V3.1 engine —
+            no templates, no boilerplate. Apply the fixes, re-scan from the portal, and your score will
+            update with the actual delta.
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:28px 32px 32px;">
+          <hr style="border:none;border-top:1px solid rgba(249,115,22,0.12);margin:0 0 18px;">
+          <p style="font-size:11px;color:#6A6070;line-height:1.7;margin:0;">
+            <strong style="color:#9A9490;">AUREM · Polaris Built Inc.</strong><br>
+            Mississauga, Ontario, Canada · PIPEDA + Law 25 + GDPR compliant<br>
+            <a href="{{unsubscribe_url}}" style="color:#6A6070;text-decoration:underline;">Unsubscribe</a>
+            &nbsp;·&nbsp;
+            <a href="{{portal_url}}" style="color:#F97316;text-decoration:none;">Your portal</a>
+          </p>
+        </td></tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

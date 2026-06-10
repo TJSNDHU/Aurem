@@ -324,12 +324,43 @@ async def _generate_repair_plan_via_llm(
     return plan
 
 
+async def _lookup_first_name(customer_email: str) -> Optional[str]:
+    """Resolve a friendly first-name for the email template. Tries
+    platform_users first then users. Returns None if neither exists —
+    template falls back to "there"."""
+    if not customer_email:
+        return None
+    try:
+        for coll in ("platform_users", "users"):
+            doc = await db[coll].find_one(
+                {"email": customer_email.lower()},
+                {"_id": 0, "first_name": 1, "name": 1, "full_name": 1},
+            )
+            if doc:
+                fn = doc.get("first_name")
+                if fn:
+                    return fn
+                nm = doc.get("name") or doc.get("full_name") or ""
+                if nm:
+                    return nm.split(" ")[0]
+    except Exception as e:
+        logger.debug(f"[repair-email] first-name lookup failed: {e}")
+    return None
+
+
 async def _email_repair_plan(customer_email: str, website: str,
-                              plan: List[dict], audit: dict) -> dict:
+                              plan: List[dict], audit: dict,
+                              first_name: Optional[str] = None) -> dict:
     """Email the plan to the customer via Resend. Best-effort — returns
     {"ok": bool, "error": str?} so the caller can surface it.
     NO MOCK: if Resend is unconfigured or fails, we return ok=False
-    with the real error string."""
+    with the real error string.
+
+    iter D-77 — now sends both plaintext (deliverability fallback) AND
+    the branded HTML deliverable rendered via
+    `services.brand_emails.render_repair_plan`. The customer sees a
+    paid-deliverable-grade email instead of a raw text dump.
+    """
     if not plan:
         return {"ok": False, "error": "no_plan_items_to_email"}
     if not customer_email:
@@ -338,7 +369,7 @@ async def _email_repair_plan(customer_email: str, website: str,
     if not api_key:
         return {"ok": False, "error": "resend_not_configured"}
 
-    # Build a clean text body
+    # Build a clean text body (deliverability fallback for plain-text clients)
     lines = [
         f"AUREM Repair Plan for {website}",
         f"Audit score: {audit.get('overall_score','?')}/100",
@@ -350,7 +381,33 @@ async def _email_repair_plan(customer_email: str, website: str,
         lines.append(f"\n[{i}] {item['issue_title']}  (severity: {item['severity']})")
         lines.append("-" * 60)
         lines.append(item["llm_response"])
-    body = "\n".join(lines)
+    text_body = "\n".join(lines)
+
+    # iter D-77 — branded HTML deliverable
+    try:
+        from services.brand_emails import render_repair_plan
+        html_body = render_repair_plan(
+            customer_email=customer_email,
+            website=website,
+            audit=audit,
+            plan=plan,
+            first_name=first_name,
+        )
+    except Exception as e:
+        # If render fails for any reason, fall back to text-only — DO NOT
+        # block the email entirely; surface render failure honestly.
+        logger.warning(f"[repair-email] HTML render failed, sending text-only: {e}")
+        html_body = None
+
+    payload: dict = {
+        "from": os.environ.get("RESEND_FROM_ADDRESS",
+                               "AUREM <repairs@aurem.live>"),
+        "to": [customer_email],
+        "subject": f"Your AUREM repair plan for {website}",
+        "text": text_body,
+    }
+    if html_body:
+        payload["html"] = html_body
 
     try:
         import httpx
@@ -359,13 +416,7 @@ async def _email_repair_plan(customer_email: str, website: str,
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {api_key}",
                          "Content-Type": "application/json"},
-                json={
-                    "from": os.environ.get("RESEND_FROM_ADDRESS",
-                                           "AUREM <repairs@aurem.live>"),
-                    "to": [customer_email],
-                    "subject": f"Your AUREM repair plan for {website}",
-                    "text": body,
-                },
+                json=payload,
             )
     except Exception as e:
         return {"ok": False, "error": f"resend_exc:{type(e).__name__}:{str(e)[:120]}"}
@@ -373,9 +424,10 @@ async def _email_repair_plan(customer_email: str, website: str,
         return {"ok": False, "error": f"resend_http_{r.status_code}",
                 "detail": r.text[:200]}
     try:
-        return {"ok": True, "email_id": r.json().get("id")}
+        return {"ok": True, "email_id": r.json().get("id"),
+                "html_sent": bool(html_body)}
     except Exception:
-        return {"ok": True}
+        return {"ok": True, "html_sent": bool(html_body)}
 
 
 async def _run_repair_job(job_id: str, tenant_bin: str, website: str,
@@ -455,7 +507,10 @@ async def _run_repair_job(job_id: str, tenant_bin: str, website: str,
         ph = REAL_REPAIR_PHASES[2]
         await _set({"current_phase": ph[0], "current_phase_label": ph[1],
                     "current_phase_color": ph[4], "progress_pct": ph[2]})
-        email_result = await _email_repair_plan(customer_email, website, plan, audit)
+        email_result = await _email_repair_plan(
+            customer_email, website, plan, audit,
+            first_name=await _lookup_first_name(customer_email),
+        )
         if email_result.get("ok"):
             await _event(ph[0], f"Plan emailed to {customer_email}")
         else:

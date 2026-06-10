@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-10 (iter D-76)
+> Last updated 2026-06-10 (iter D-77)
 
 ## Vision
 
@@ -25,6 +25,23 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-77 (2026-06-10) — Branded Repair Plan Email · "Is this flow real?" Audit
+
+**P2 — HTML Repair Plan Email shipped:**
+- Built `/app/backend/templates/repair_plan_email.html` — paid-deliverable-grade dark theme with Cinzel display headers, severity-coded item cards (HIGH red / MEDIUM amber / LOW green), score strip, monospace code blocks for the LLM diagnosis + fix, CASL-compliant footer + unsubscribe link.
+- Added `services.brand_emails.render_repair_plan(customer_email, website, audit, plan, first_name)`. Handles HTML escaping of LLM bodies (so `<script>` tags can't render), unknown severity fallback to MEDIUM, empty-plan honest notice ("no actionable items"), score color thresholds (≥80 green, ≥50 amber, else red).
+- Wired into `routers/customer_website_repair_router._email_repair_plan` — now sends BOTH plaintext (deliverability fallback) AND branded HTML. Returns `html_sent: bool` in the result so the caller surfaces failure honestly. New helper `_lookup_first_name(email)` enriches the greeting.
+- 8/8 pytests in `tests/test_d77_repair_plan_email.py` — covers render correctness, severity tones, escape protection, empty plan fallback, real Resend payload structure.
+
+**P0 — "Is this flow real?" audit completed → `/app/memory/D77_FLOW_AUDIT_REPORT.md`:**
+- **Campaign blasts** (WhatsApp, SMS, Email, Voice, daily scrape, auto-blast cron) — all real engines (WHAPI, Twilio, Resend, Retell). 1 stale docstring fixed in `blast_service.test_whatsapp` (claimed "or mock if key missing" but always routed through real engine).
+- **CTO agent outputs** (12-phase chat, run-scout, import-leads, run-blast, verify, learning, codebase) — all real LLM + real GitHub + real `/api/version` polling. The `cto_verify_router` already has anti-hallucination patterns that REJECT placeholder code.
+- **Referrals** — pure MongoDB reads, zero faked counts. 97 LOC, every line honest.
+- **Billing** — Stripe webhook signature verified (Bug-fix #76 closed the unverified loophole), Customer.retrieve goes through `asyncio.to_thread` (Bug-fix #81), real price IDs from env.
+- Verdict: **zero theater code** remaining across all 4 audited surfaces. The cleanups from D-73 + D-75 Part 1 held.
+
+**P3 (deferred)** — Twilio SMS notification on new pending_approvals — skipped per founder directive. Twilio currently RED (401) per creds_health; building on a stale dep is backwards. Revisit post-rotation.
 
 ### iter D-76 (2026-06-10) — Route Dedupe Final · Approval Inbox · Codebase Cleanup
 

@@ -659,7 +659,11 @@ class TestWhatsAppRequest(BaseModel):
 
 @router.post("/test-whatsapp")
 async def test_whatsapp(data: TestWhatsAppRequest, request: Request):
-    """Send a test WhatsApp message via WHAPI (or mock if key missing)."""
+    """Send a test WhatsApp message via WHAPI/Meta. NO MOCKS — if the
+    engine returns success=False, this returns the real error string
+    so the caller knows the send actually failed. (iter D-77 audit:
+    stale docstring previously claimed 'or mock if key missing' but
+    the code has always routed through the real WhatsAppEngine.)"""
     _verify_admin(request)
 
     template_text = WHATSAPP_TEMPLATES.get(data.template, WHATSAPP_TEMPLATES["initial"])

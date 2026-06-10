@@ -199,3 +199,101 @@ def render_password_reset(*, reset_url: str) -> str:
     return _fill(_load("password_reset_email.html"), {
         "reset_url": reset_url,
     })
+
+
+# ─── Repair Plan deliverable (iter D-77) ────────────────────────────────────
+_SEVERITY_TONE = {
+    "high":   {"label": "HIGH",   "color": "#ef4444", "bg": "rgba(239,68,68,0.10)"},
+    "medium": {"label": "MEDIUM", "color": "#f59e0b", "bg": "rgba(245,158,11,0.10)"},
+    "low":    {"label": "LOW",    "color": "#22c55e", "bg": "rgba(34,197,94,0.10)"},
+}
+
+
+def _score_color(score: int) -> str:
+    if score >= 80:
+        return "#22c55e"
+    if score >= 50:
+        return "#f59e0b"
+    return "#ef4444"
+
+
+def _render_plan_item(idx: int, item: Dict[str, Any]) -> str:
+    """Render one plan card as an HTML table row block.
+    `item` keys (per customer_website_repair_router): issue_title, severity, llm_response."""
+    sev = str(item.get("severity") or "medium").lower()
+    tone = _SEVERITY_TONE.get(sev, _SEVERITY_TONE["medium"])
+    # The LLM body sometimes contains code fences — convert to a styled <pre>
+    body = str(item.get("llm_response") or item.get("body") or "").strip()
+    # Escape HTML so customer code samples don't render as markup
+    import html as _html
+    safe_body = _html.escape(body)
+    # Light code-fence styling: preserve fenced blocks visually with monospace background
+    safe_body = safe_body.replace("```", "")
+    title = _html.escape(str(item.get("issue_title") or item.get("title") or "Issue"))
+    return (
+        '<tr><td style="padding:0 32px 14px;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        f'style="background:#0A0A0A;border:1px solid {tone["color"]}33;border-left:3px solid {tone["color"]};border-radius:8px;">'
+        '<tr><td style="padding:16px 18px;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        '<tr>'
+        f'<td style="font-size:11px;color:#6A6070;letter-spacing:2px;font-weight:700;">#{idx:02d}</td>'
+        '<td align="right">'
+        f'<span style="display:inline-block;background:{tone["bg"]};color:{tone["color"]};'
+        f'font-size:10px;font-weight:700;letter-spacing:2px;padding:3px 10px;border-radius:99px;border:1px solid {tone["color"]}66;">'
+        f'{tone["label"]}'
+        '</span>'
+        '</td></tr></table>'
+        f'<div style="font-family:\'Cinzel\',serif;font-size:16px;color:#F2F2F2;margin:8px 0 10px;line-height:1.4;">{title}</div>'
+        f'<pre style="font-family:\'Courier New\',monospace;font-size:12px;color:#E8E0D0;background:#000;border-radius:6px;padding:14px;margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.6;">{safe_body}</pre>'
+        '</td></tr></table>'
+        '</td></tr>'
+    )
+
+
+def render_repair_plan(
+    *,
+    customer_email: Optional[str],
+    website: str,
+    audit: Dict[str, Any],
+    plan: list,
+    first_name: Optional[str] = None,
+    portal_url: Optional[str] = None,
+) -> str:
+    """Render the customer-facing repair plan deliverable.
+
+    `audit` carries `overall_score` + `issues`; `plan` is the list of
+    LLM-generated items from `customer_website_repair_router._generate_repair_plan_via_llm`.
+
+    No mocks: counts come straight from the inputs. If `plan` is empty
+    the items block renders an honest empty notice instead of fake
+    placeholder rows."""
+    base = (os.environ.get("AUREM_PUBLIC_URL") or "https://aurem.live").rstrip("/")
+    portal = portal_url or f"{base}/my/scans?src=repair_plan_email"
+    score = int(audit.get("overall_score") or 0)
+    issue_count = len(audit.get("issues") or [])
+
+    if plan:
+        items_html = "".join(_render_plan_item(i, item) for i, item in enumerate(plan, 1))
+    else:
+        items_html = (
+            '<tr><td style="padding:0 32px 20px;">'
+            '<div style="font-size:13px;color:#9A9490;background:#0A0A0A;'
+            'border:1px dashed rgba(249,115,22,0.3);border-radius:8px;padding:24px;text-align:center;">'
+            'No actionable items in this pass — the engine did not find any high-impact repairs '
+            'for this URL in the current scan window. Re-run the scan in a few hours or contact '
+            'us at <a href="mailto:hello@aurem.live" style="color:#F97316;text-decoration:none;">hello@aurem.live</a>.'
+            '</div></td></tr>'
+        )
+
+    return _fill(_load("repair_plan_email.html"), {
+        "first_name": first_name or "there",
+        "website": website,
+        "score": score,
+        "score_color": _score_color(score),
+        "issue_count": issue_count,
+        "plan_count": len(plan),
+        "plan_items_block": items_html,
+        "portal_url": portal,
+        "unsubscribe_url": _unsub_url(customer_email, "repair_plan"),
+    })
