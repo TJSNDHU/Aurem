@@ -10148,3 +10148,84 @@ Summary: {green: 8, yellow: 5, red: 0}
 - `backend/tests/test_d71d_campaign_health_sweep.py` (new — 6 tests)
 - DB: purged 46 test-fixture leads from `campaign_leads`
 
+
+
+---
+
+## 2026-06-10 — D-71e: Scout Auto-Topup background job
+
+### What
+
+A self-healing loop that keeps the eligible-lead pool above a floor.
+When `count_eligible(db) < FLOOR_LEADS` (default 50), the system fires
+a Canada-wide Apollo batch automatically. Founders should never see
+the "no_eligible_leads" yellow on Campaign Health again.
+
+### Architecture
+
+- **`services/scout_autotopup.py`** — new module
+  - `count_eligible(db)` — single SSOT filter (mirrors `_eligible_leads`)
+  - `trigger_topup(db, reason=...)` — fires one Apollo batch + persists leads
+  - `check_and_topup(db)` — guarded one-pass (floor + cooldown + ceiling)
+  - `autotopup_scheduler(db_getter)` — forever-loop launched by p1-worker
+  - `status(db)` — diagnostics for the admin endpoint
+- **`routers/scout_autotopup_router.py`** — new admin endpoints
+  - `GET  /api/admin/scout-autotopup/status`
+  - `POST /api/admin/scout-autotopup/trigger`  (body: `{force?: bool}`)
+- **`pillars/sales/worker.py`** — `_safe_task(autotopup_scheduler(...))` at boot
+
+### Guardrails
+
+| Lever | Default | Env override |
+|---|---|---|
+| Floor (trigger if eligible < N) | 50  | `SCOUT_AUTOTOPUP_FLOOR` |
+| Target (don't oversample once met) | 100 | `SCOUT_AUTOTOPUP_TARGET` |
+| Max API combos per run | 10  | `SCOUT_AUTOTOPUP_MAX_COMBOS` |
+| Leads per combo | 10  | `SCOUT_AUTOTOPUP_PER_COMBO` |
+| Cooldown between fires | 60min | `SCOUT_AUTOTOPUP_COOLDOWN_MIN` |
+| Daily ceiling | 6 fires (~240 leads) | `SCOUT_AUTOTOPUP_MAX_PER_DAY` |
+| Loop interval | 15min | `SCOUT_AUTOTOPUP_INTERVAL_MIN` |
+| Off switch | off | `SCOUT_AUTOTOPUP_DISABLED=true` |
+
+### Live verification (preview)
+
+```
+GET  /api/admin/scout-autotopup/status
+→ eligible_now=0  floor=50  would_fire_now=true
+
+POST /api/admin/scout-autotopup/trigger {"reason":"d71e_smoke_test"}
+→ {
+    outcome: "topup_fired",
+    reason:  "floor_breached_0lt50",
+    leads_returned: 30,
+    leads_inserted: 30,
+    eligible_after: 25,
+  }
+```
+
+Apollo returned 30 fresh Canadian SMB leads in 2.6 seconds. All 30
+persisted; 25 immediately blastable (some lacked email/phone, normal
+Apollo enrichment loss). Within 60s of restart the background
+scheduler will fire on its own.
+
+### Tests — 8 new, all pass
+
+`tests/test_d71e_scout_autotopup.py`:
+- count_eligible filter parity with `_eligible_leads`
+- `SCOUT_AUTOTOPUP_DISABLED=true` honoured
+- Missing `APOLLO_API_KEY` → graceful no-op
+- `check_and_topup` no-ops when floor met
+- `status()` returns expected shape
+- p1-worker attaches the scheduler at startup
+- Router registered in registry
+- Admin endpoints (`/status`, `/trigger` with `force`) present
+
+### Files touched
+
+- `backend/services/scout_autotopup.py` (new — 230 lines)
+- `backend/routers/scout_autotopup_router.py` (new)
+- `backend/routers/registry.py` (register router)
+- `backend/server.py` (wire `set_db` on startup)
+- `backend/pillars/sales/worker.py` (attach scheduler — 11 schedulers now)
+- `backend/tests/test_d71e_scout_autotopup.py` (new — 8 tests)
+

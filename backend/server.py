@@ -1942,6 +1942,12 @@ async def startup_event():
             # "Database not available" on every /api/search/history poll.
             if set_smart_search_db:
                 set_smart_search_db(db)
+            # iter D-71e — Scout Auto-Topup router DB wiring
+            try:
+                from routers.scout_autotopup_router import set_db as set_autotopup_db
+                set_autotopup_db(db)
+            except Exception as _e:
+                logging.warning(f"[startup] scout_autotopup wire failed: {_e}")
             if set_connector_ecosystem_db:
                 set_connector_ecosystem_db(db)
             logging.info("✓ Mission Control DB initialized")

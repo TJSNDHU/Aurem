@@ -184,6 +184,27 @@ def start_pillar1_worker(db, news_monitor_coro_factory=None) -> dict:
             failed.append({"task": "news_monitor_scheduler", "error": str(e)})
             print(f"[p1-worker] ✗ News Auto-Monitor failed: {e}", flush=True)
 
+    # ---- Scout Auto-Topup (iter D-71e — keep eligible pool above floor) ─
+    # When `auto_blast` runs out of eligible leads, founders see the dreaded
+    # "no_eligible_leads" yellow on Campaign Health. This loop fires an
+    # Apollo Canada-wide batch whenever the pool drops below the floor.
+    # Guarded by cooldown + daily ceiling so it can't blow API credits.
+    try:
+        from services.scout_autotopup import (
+            autotopup_scheduler,
+            RUN_EVERY_MIN as _autotopup_interval,
+        )
+        # Lazy db lookup so cron picks up the live wiring even if the
+        # main DB gets re-bound at runtime.
+        def _db_getter():
+            return db
+        _safe_task(autotopup_scheduler(_db_getter), "scout_autotopup_scheduler")
+        started.append(f"scout_autotopup_scheduler ({_autotopup_interval}m cycle)")
+        print("[p1-worker] ✓ Scout Auto-Topup scheduler attached", flush=True)
+    except Exception as e:
+        failed.append({"task": "scout_autotopup_scheduler", "error": str(e)})
+        print(f"[p1-worker] ✗ Scout Auto-Topup failed: {e}", flush=True)
+
     _worker_started = True
     summary = {
         "started_count": len(started),
