@@ -367,12 +367,54 @@ async def bridge_issue_to_builder(db, issue: dict, actor_email: str = "sentinel"
     Reusable bridge: convert an unfixable-issue document into a Builder build.
     Callable from HTTP handlers AND from background services (Sentinel Guard).
     Returns {success, build_id, builder_url, status, fingerprint}.
+
+    iter D-71h — `tenant_id` was being passed through as the literal string
+    "unknown" (default fallback in upstream scan loops) for sites that
+    have a row in system_auto_repairs but no matching tenant_customers
+    record. This caused Builder to log
+       "Customer: reroots.ca (tenant_id=unknown)"
+    and tanked the Builder success-rate KPI. We now resolve tenant_id
+    from the `site_url` via tenant_customers as a last-mile fallback.
     """
     from services import aurem_builder
     from routers.aurem_builder_router import _run_build_and_log
     import asyncio as _asyncio
 
     fingerprint = issue.get("fingerprint")
+
+    # iter D-71h — resolve tenant_id from site_url when missing/unknown.
+    tenant_id = issue.get("tenant_id")
+    if not tenant_id or tenant_id == "unknown":
+        site_url = (issue.get("site_url") or "").strip()
+        if site_url:
+            from urllib.parse import urlparse
+            try:
+                host = urlparse(site_url if "://" in site_url else f"https://{site_url}").netloc.lower()
+                host = host.replace("www.", "")
+            except Exception:
+                host = ""
+            if host:
+                # Look up tenant by exact website match, then by domain match
+                for q in (
+                    {"website": {"$regex": host, "$options": "i"}},
+                    {"website_url": {"$regex": host, "$options": "i"}},
+                    {"domain": host},
+                    {"primary_domain": host},
+                ):
+                    try:
+                        tdoc = await db.tenant_customers.find_one(q, {"tenant_id": 1, "business_id": 1, "_id": 0})
+                        if tdoc:
+                            tenant_id = tdoc.get("tenant_id") or tdoc.get("business_id")
+                            if tenant_id:
+                                # Patch back into the issue dict so the description renders correctly.
+                                issue["tenant_id"] = tenant_id
+                                break
+                    except Exception:
+                        continue
+        if not tenant_id or tenant_id == "unknown":
+            tenant_id = "unknown"  # honest fallback
+            issue["tenant_id"] = tenant_id
+
     description = (
         f"AUREM Self-Repair bridged an unfixable issue to you.\n\n"
         f"Customer: {issue.get('label')}  (tenant_id={issue.get('tenant_id')})\n"

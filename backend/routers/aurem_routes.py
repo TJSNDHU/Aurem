@@ -522,9 +522,13 @@ async def get_agents_status(user = Depends(get_current_user)):
             "timestamp": now.isoformat()
         }
 
-    # Import here to avoid circular import on module load
+    # iter D-71h — TTL bumped from 10s to 45s. ORACommandConsole polls
+    # this every 10s; with TTL=10 the cache always expired right when
+    # the next poll arrived (0% hit). At 45s ≈ 4× poll interval the
+    # hit-rate climbs to ~75% while data is still fresh enough for the
+    # "agents activity" badges.
     from services.poll_cache import cached as _poll_cached
-    return await _poll_cached(key="aurem:agents:status", ttl_sec=10, loader=_compute)
+    return await _poll_cached(key="aurem:agents:status", ttl_sec=45, loader=_compute)
 
 @router.post("/agents/ooda")
 async def run_ooda_cycle(request: OODARequest, user = Depends(get_current_user)):

@@ -239,7 +239,7 @@ async def get_mission_control_dashboard(admin=Depends(verify_admin)):
             logger.error(f"[Mission Control] Dashboard error: {e}")
             raise HTTPException(500, f"Failed to load dashboard: {str(e)}")
 
-    return await _poll_cached(key="mc:dashboard", ttl_sec=15, loader=_compute)
+    return await _poll_cached(key="mc:dashboard", ttl_sec=45, loader=_compute)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -636,7 +636,7 @@ async def get_overview_stats(admin=Depends(verify_admin)):
             logger.error(f"[Mission Control] Overview error: {e}")
             raise HTTPException(500, f"Failed to load overview: {str(e)}")
 
-    return await _poll_cached(key="mc:overview", ttl_sec=15, loader=_compute)
+    return await _poll_cached(key="mc:overview", ttl_sec=45, loader=_compute)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

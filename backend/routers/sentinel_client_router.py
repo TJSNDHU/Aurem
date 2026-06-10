@@ -450,7 +450,7 @@ async def admin_overview(request: Request):
         }
 
     from services.poll_cache import cached as _poll_cached
-    return await _poll_cached(key="sentinel:overview", ttl_sec=15, loader=_compute)
+    return await _poll_cached(key="sentinel:overview", ttl_sec=60, loader=_compute)
 
 
 @router.get("/api/admin/sentinel/errors")

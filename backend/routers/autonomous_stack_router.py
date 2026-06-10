@@ -59,9 +59,10 @@ async def overview(request: Request) -> Dict[str, Any]:
     db = _get_db()
     from services.autonomous_stack import get_overview
     from services.poll_cache import cached as _poll_cached
+    # iter D-71h — TTL 15s → 45s (3× the AdminBrainPage 15s poll interval)
     return await _poll_cached(
         key="autonomous:overview",
-        ttl_sec=15,
+        ttl_sec=45,
         loader=lambda: get_overview(db),
     )
 
@@ -75,7 +76,7 @@ async def pipeline_flow(request: Request, limit: int = 10) -> Dict[str, Any]:
     limit = max(1, min(50, limit))
     return await _poll_cached(
         key=f"autonomous:pipeline-flow:{limit}",
-        ttl_sec=10,
+        ttl_sec=30,    # iter D-71h — was 10s, well under 15s poll → 0% hit
         loader=lambda: get_pipeline_flow(db, limit=limit),
     )
 
