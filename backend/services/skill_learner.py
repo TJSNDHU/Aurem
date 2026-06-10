@@ -288,6 +288,13 @@ async def learning_engine_health(db) -> dict:
     ts = last.get("ts")
     ins = last.get("insights_count") or 0
     if isinstance(ts, datetime):
+        # iter D-71j — older skill_learnings rows were written with the
+        # legacy `datetime.utcnow()` (naive). Subtracting a tz-aware now()
+        # from a naive ts raises TypeError("can't subtract offset-naive
+        # and offset-aware datetimes") and painted the ORA Learning Engine
+        # health red on aurem.live. Normalise to UTC before diffing.
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
         age = datetime.now(timezone.utc) - ts
         status = "green" if age <= timedelta(hours=48) else "yellow"
         return {"ok": True, "status": status,
