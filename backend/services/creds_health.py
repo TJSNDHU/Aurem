@@ -187,11 +187,100 @@ async def probe_stripe(timeout: float = 5.0) -> ProbeResult:
 
 
 async def probe_apollo(timeout: float = 5.0) -> ProbeResult:
-    key = os.environ.get("APOLLO_API_KEY") or ""
-    return await _probe_http(
-        name="apollo", key_var="APOLLO_API_KEY",
-        url="https://api.apollo.io/api/v1/auth/health",
-        headers={"X-Api-Key": key}, timeout=timeout,
+    """Apollo probe — checks BOTH the cheap auth-health endpoint AND
+    the actual `/v1/organizations/search` endpoint we depend on for
+    daily_hunt lead discovery.
+
+    iter D-79 — previous version only hit `/api/v1/auth/health` so it
+    would report green even when search returned 403 (key tier missing
+    the search scope). Now if search is 403 we surface
+    `degraded: search_inaccessible` honestly so the campaign funnel
+    stops drying up silently.
+    """
+    started = time.time()
+    key = (os.environ.get("APOLLO_API_KEY") or "").strip()
+    if not key:
+        return ProbeResult(
+            provider="apollo", status="not_configured", http=None,
+            latency_ms=0, probed_at=_now_iso(),
+            error="APOLLO_API_KEY not set",
+        )
+
+    # 1) Cheap key-valid probe
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as c:
+            ah = await c.get(
+                "https://api.apollo.io/api/v1/auth/health",
+                headers={"X-Api-Key": key},
+            )
+    except Exception as e:
+        return ProbeResult(
+            provider="apollo", status="red", http=None,
+            latency_ms=int((time.time() - started) * 1000),
+            probed_at=_now_iso(),
+            error=f"{type(e).__name__}: {str(e)[:160]}",
+            key_tail=_key_tail(key),
+        )
+    if ah.status_code != 200:
+        return ProbeResult(
+            provider="apollo", status="red", http=ah.status_code,
+            latency_ms=int((time.time() - started) * 1000),
+            probed_at=_now_iso(),
+            error=f"auth/health http={ah.status_code}",
+            detail=(ah.text or "")[:200],
+            key_tail=_key_tail(key),
+        )
+
+    # 2) The endpoint daily_hunt actually depends on
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as c:
+            sr = await c.post(
+                "https://api.apollo.io/v1/organizations/search",
+                headers={
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-cache",
+                    "x-api-key": key,
+                },
+                json={
+                    "q_organization_keyword_tags": ["roofing"],
+                    "organization_locations": ["Toronto, Ontario, Canada"],
+                    "organization_num_employees_ranges": ["1,50"],
+                    "per_page": 1,
+                    "page": 1,
+                },
+            )
+    except Exception as e:
+        return ProbeResult(
+            provider="apollo", status="yellow",
+            http=ah.status_code,
+            latency_ms=int((time.time() - started) * 1000),
+            probed_at=_now_iso(),
+            error=f"auth_ok_search_failed: {type(e).__name__}",
+            detail=str(e)[:200],
+            key_tail=_key_tail(key),
+        )
+
+    latency = int((time.time() - started) * 1000)
+    if sr.status_code == 200:
+        try:
+            orgs_returned = len(sr.json().get("organizations") or [])
+        except Exception:
+            orgs_returned = 0
+        return ProbeResult(
+            provider="apollo", status="green", http=200,
+            latency_ms=latency, probed_at=_now_iso(),
+            detail=(f"auth=200 search=200 orgs_returned={orgs_returned}"),
+            key_tail=_key_tail(key),
+        )
+    # auth ok but search blocked = degraded
+    return ProbeResult(
+        provider="apollo",
+        status="yellow" if sr.status_code in (401, 403) else "red",
+        http=sr.status_code,
+        latency_ms=latency, probed_at=_now_iso(),
+        error=f"search_inaccessible_http_{sr.status_code}",
+        detail=(sr.text or "")[:240],
+        key_tail=_key_tail(key),
     )
 
 

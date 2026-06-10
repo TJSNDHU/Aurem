@@ -137,6 +137,14 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
   const [showLowModal, setShowLowModal] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [streamChars, setStreamChars] = useState(0);
+  // iter D-79 — Plan/Execute mode toggle. Persisted in localStorage
+  // so the user's choice survives reloads.
+  const [mode, setMode] = useState(() =>
+    (localStorage.getItem("cto_chat_mode") === "plan" ? "plan" : "execute"),
+  );
+  useEffect(() => {
+    localStorage.setItem("cto_chat_mode", mode);
+  }, [mode]);
 
   // iter 332b D-20 — uploads in progress + save-project modal state.
   const [uploading, setUploading] = useState(false);
@@ -247,6 +255,9 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           // iter D-43 — Maxx toggle overrides incoming modelTier; flips
           // to frontier (5 tokens/turn) when on, else cheap (1/turn).
           model_tier: maxx ? "frontier" : (modelTier || "cheap"),
+          // iter D-79 — Plan/Execute toggle. "plan" → server skips
+          // skill invocation, LLM forced into propose-only output.
+          mode,
         }),
       });
       if (!r.ok) {
@@ -830,6 +841,29 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                             transition: "all 160ms ease" }}>
             <Zap size={13} />
             {maxx ? "Maxx" : ""}
+          </button>
+          {/* iter D-79 — Plan/Execute toggle. Plan mode forces the
+              agent into propose-only output and skips skill execution
+              server-side so nothing runs without explicit approval. */}
+          <button data-testid="dev-cto-chat-mode-toggle"
+                   onClick={() => setMode(m => m === "plan" ? "execute" : "plan")}
+                   title={mode === "plan"
+                     ? "Plan mode — agent proposes only, no actions run. Click to switch to Execute."
+                     : "Execute mode — agent may run skills. Click to switch to Plan."}
+                   style={{ background: mode === "plan"
+                              ? "linear-gradient(135deg, rgba(59,130,246,0.22), rgba(59,130,246,0.12))"
+                              : "rgba(255,255,255,0.04)",
+                            border: mode === "plan"
+                              ? "1px solid rgba(59,130,246,0.45)"
+                              : "1px solid var(--dash-border)",
+                            color: mode === "plan" ? "#60A5FA"
+                                                   : "var(--dash-text-muted)",
+                            borderRadius: 4, padding: "0 12px",
+                            cursor: "pointer", height: 26,
+                            display: "flex", alignItems: "center", gap: 4,
+                            fontSize: 11, fontWeight: 500,
+                            transition: "all 160ms ease" }}>
+            {mode === "plan" ? "Plan" : "Execute"}
           </button>
           {/* iter D-47 — Save to GitHub button (next to Maxx). Disabled
               until a project is loaded so the dialog has somewhere to

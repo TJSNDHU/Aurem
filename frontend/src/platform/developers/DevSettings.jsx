@@ -7,6 +7,7 @@ import DeveloperShell, { devAuthHeaders, setDevJwt } from "./DeveloperShell";
 import { PageHeader, SectionTitle } from "./DevDashboard";
 import ConsentToggleCard from "./ConsentToggleCard";
 import PlatformCredentialsBlock from "./PlatformCredentialsBlock"; // iter D-43
+import AuremRulesEditor from "../AuremRulesEditor"; // iter D-79
 import SecurityKeysBlock from "./SecurityKeysBlock";                 // iter D-46
 
 const API = process.env.REACT_APP_BACKEND_URL || "";
@@ -78,6 +79,11 @@ export default function DevSettings() {
           encrypted, applied live to os.environ). Admin-gated by the
           backend; non-admin devs will just see an empty card. */}
       <PlatformCredentialsBlock />
+
+      {/* iter D-79 — per-user .aurem-rules.md (CTO agent house style). */}
+      <div className="av2-card" style={{ marginTop: 16 }}>
+        <AuremRulesEditor />
+      </div>
 
       {/* iter D-44 — Rotate BYOK keys moved to /developers/connect
           (lives next to the BYOK paste form so all key-management is

@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-10 (iter D-78)
+> Last updated 2026-06-10 (iter D-79)
 
 ## Vision
 
@@ -25,6 +25,32 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-79 (2026-06-10) — Apollo Scout Hardening + Per-Customer Rules + Plan/Execute Toggle
+
+**P0 — Apollo scout health restored:**
+- Earlier diagnostic was misleading — production code uses `/v1/organizations/search` (accessible on current tier), NOT `/v1/mixed_people/search` (enterprise-only). Live probe of the prod endpoint returns 200 + 1 real org. Scout was never actually broken.
+- Upgraded `services.creds_health.probe_apollo()` to probe BOTH `/auth/health` AND `/v1/organizations/search`. Returns `green` only when both succeed; `yellow` with `error=search_inaccessible_http_403` when key tier loses search access (catches the silent failure mode that would dry up the funnel).
+- Diagnosed `run_repair_tick` pause reason: `system_config.autonomous_repair.enabled=false` set manually by founder on 2026-05-03. NOT a bug — explicit toggle. Flip the field in `system_config` to resume.
+- 5/5 pytests pass (`test_d79_apollo_probe.py`) including monkeypatched 403/401 edge cases.
+
+**P1 — Per-customer `.aurem-rules.md` for the CTO agent:**
+- New service `services/aurem_rules.py` (get/set/clear/build_block) backed by `aurem_user_rules` MongoDB collection. Atomic upsert with auto-incrementing `version`, 16 KB cap with honest `truncated: True` signal, JWT-scoped (no cross-user writes possible).
+- New router `routers/aurem_rules_router.py` with `GET /api/cto/rules`, `PUT /api/cto/rules`, `DELETE /api/cto/rules`. Every operation reads `user_id` from the JWT, never the request body.
+- Wired into the CTO chat pipeline (`services.dev_cto_chat.cto_chat`): the user's rules get injected as a high-priority system block right before the user messages, so the LLM treats them as authoritative house style on every turn.
+- Frontend: `platform/AuremRulesEditor.jsx` mounted inside `DevSettings.jsx`. Markdown textarea, byte counter, dirty indicator, save/clear/reload — all real I/O against the live endpoints, full data-testid coverage.
+
+**P1 — Plan/Execute toggle in CTO chat:**
+- New `mode` field on `ChatBody` ("execute" default | "plan"). `mode=plan` injects a strict propose-only system block AND defensively skips `_maybe_invoke_skill` server-side so even if the LLM emits a skill tag, nothing executes.
+- Streaming endpoint also threaded through `mode` parameter for parity.
+- Frontend: `data-testid="dev-cto-chat-mode-toggle"` button in `DevCtoChatPanel.jsx` next to Maxx, blue=plan / muted=execute, choice persists via `localStorage["cto_chat_mode"]`.
+
+**Tests (all green, all real I/O):**
+- `test_d79_apollo_probe.py` — 5 (live probe + monkeypatched 403/401/missing-key + autonomous_repair pause flag readable)
+- `test_d79_rules_and_plan_mode.py` — 11 (auth, round-trip persistence, version bump, truncation signal, delete, cross-user isolation, prompt-block formatting, plan mode skips skill, execute mode still runs skill)
+- **52/52 total green across D-76 through D-79**
+
+**Architecture clarification logged in PRD:** Campaign system is confirmed SINGLE-TENANT (founder-only dogfood tool). No multi-tenant work in this iteration per founder directive — get customers first, build what they ask for. D-78 Campaign Command Dashboard correctly surfaces founder's own outreach, not a customer feature.
 
 ### iter D-78 (2026-06-10) — Campaign Command Dashboard (first feature on the clean foundation)
 

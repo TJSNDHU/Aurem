@@ -756,8 +756,21 @@ async def cto_chat(
     *,
     account: dict[str, Any],
     messages: list[dict[str, str]],
+    mode: str = "execute",
 ) -> dict[str, Any]:
-    """Returns {ok, reply, tokens_remaining, model_used, provider, tier}."""
+    """Returns {ok, reply, tokens_remaining, model_used, provider, tier}.
+
+    `mode` (iter D-79):
+      - "execute" (default): LLM may emit [[SKILL: ...]] tags and we
+        invoke the matching real action via _maybe_invoke_skill.
+      - "plan": forced propose-only. We inject a system block telling
+        the LLM to describe the change, NEVER emit skill tags, and we
+        also defensively skip skill invocation server-side. Lets the
+        founder review the diff before letting the agent run anything.
+    """
+    mode = (mode or "execute").lower()
+    if mode not in ("execute", "plan"):
+        mode = "execute"
     # Decrypt BYOK keys if present
     byok_envelope = account.get("byok_keys")
     byok_plain: dict[str, str] = {}
@@ -842,6 +855,48 @@ async def cto_chat(
         logger.warning(f"[cto_chat] intent classification failed: {_intent_e}")
         _intent = "unknown"
         _non_tech = False
+    # iter D-79 — inject the customer's `.aurem-rules.md` (per-account
+    # house style) so the LLM behaves like it knows their stack and
+    # preferences. Empty string when no rules set → no inject, no
+    # fake placeholder. Lives AFTER the intent block so the rules are
+    # the LAST authoritative system block before the user messages.
+    try:
+        from services.aurem_rules import (
+            get_rules as _ar_get,
+            build_rules_prompt_block as _ar_block,
+        )
+        _user_id = account.get("user_id") or ""
+        if _user_id:
+            _env = await _ar_get(_user_id)
+            _rules_block = _ar_block(_env.get("rules_md", ""))
+            if _rules_block:
+                full_messages.insert(
+                    -len(messages) if messages else len(full_messages),
+                    {"role": "system", "content": _rules_block},
+                )
+    except Exception as _rules_e:
+        logger.warning(f"[cto_chat] aurem-rules injection skipped: {_rules_e}")
+    # iter D-79 — Plan/Execute toggle. In `plan` mode we instruct the
+    # LLM to propose-only: no [[SKILL: ...]] tags, no irreversible
+    # claims, just a structured proposal the founder can review.
+    if mode == "plan":
+        _plan_block = (
+            "[MODE: PLAN-ONLY — DO NOT EXECUTE ANY ACTION]\n"
+            "You are in plan-only mode. The user wants a written\n"
+            "proposal before anything runs. Follow these rules:\n"
+            "  1. Describe the change in 3-7 bullet points (what + why).\n"
+            "  2. List EXACT files/endpoints/data you would touch.\n"
+            "  3. Call out reversibility, downtime risk, and rollback.\n"
+            "  4. End with: 'Approve to execute?' on its own line.\n"
+            "  5. DO NOT emit [[SKILL: ...]] tags, code blocks that\n"
+            "     would auto-run, or any irreversible language ('I have\n"
+            "     deployed', 'I deleted'). Use future tense.\n"
+            "[END MODE BLOCK]"
+        )
+        full_messages.insert(
+            -len(messages) if messages else len(full_messages),
+            {"role": "system", "content": _plan_block},
+        )
     # iter D-36 — AUREM Design System (Sonner/Vaul/animation rules) for
     # every UI-generation turn. See services.aurem_design_prompt.
     from services.aurem_design_prompt import inject_design_prompt
@@ -882,20 +937,26 @@ async def cto_chat(
     # Skill-call detection. If the LLM emitted a [[SKILL: ...]] marker,
     # execute the skill and append the JSON result to the reply so the
     # founder + frontend see both the LLM thinking AND the real action.
+    # iter D-79 — Plan mode strictly disables this. The LLM may still
+    # emit a skill tag (despite the system prompt telling it not to);
+    # we ignore it server-side so nothing executes.
     skill_result = None
-    try:
-        skill_result = await _maybe_invoke_skill(reply)
-        if skill_result is not None:
-            import json as _json
-            reply = (
-                reply + "\n\n---\n**Skill executed:** "
-                + skill_result.get("skill", "?")
-                + "\n```json\n"
-                + _json.dumps(skill_result, indent=2)[:1500]
-                + "\n```"
-            )
-    except Exception as _ske:
-        logger.warning(f"[cto_chat] skill invocation failed: {_ske}")
+    if mode == "plan":
+        skill_result = None
+    else:
+        try:
+            skill_result = await _maybe_invoke_skill(reply)
+            if skill_result is not None:
+                import json as _json
+                reply = (
+                    reply + "\n\n---\n**Skill executed:** "
+                    + skill_result.get("skill", "?")
+                    + "\n```json\n"
+                    + _json.dumps(skill_result, indent=2)[:1500]
+                    + "\n```"
+                )
+        except Exception as _ske:
+            logger.warning(f"[cto_chat] skill invocation failed: {_ske}")
 
     tokens_remaining = deduct.get("tokens_remaining")
     if tokens_remaining is None:
@@ -977,6 +1038,7 @@ async def _stream_openrouter(api_key: str, model: str,
 
 async def cto_chat_stream(
     *, account: dict[str, Any], messages: list[dict[str, str]],
+    mode: str = "execute",
 ):
     """Async generator that emits SSE-formatted JSON lines. Always emits
     at least a `meta` then either tokens+done OR an `error`. Never

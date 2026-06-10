@@ -258,6 +258,12 @@ class ChatBody(BaseModel):
     # PATCH the project after each turn.
     project_id: str = ""
     model_tier: str = "cheap"  # "cheap" or "frontier"
+    # iter D-79 — Plan/Execute toggle. "execute" = current behavior
+    # (LLM can emit [[SKILL]] tags that fire real actions). "plan" =
+    # LLM is forced into a propose-only mode; we strip + ignore any
+    # skill tags so nothing executes server-side. Lets founders draft
+    # a change with the agent before letting it run anything.
+    mode: str = "execute"
 
 
 @router.post("/api/developers/cto/chat")
@@ -270,7 +276,7 @@ async def cto_chat(body: ChatBody,
     msgs = [m.model_dump() for m in body.messages]
     if not msgs or msgs[-1].get("role") != "user":
         raise HTTPException(400, "last message must be from user")
-    r = await _do_chat(account=account, messages=msgs)
+    r = await _do_chat(account=account, messages=msgs, mode=body.mode)
     if not r.get("ok"):
         return r
     return r
@@ -323,7 +329,7 @@ async def cto_chat_stream_route(body: ChatBody,
                                                "X-Accel-Buffering": "no"})
 
     async def _wrapped():
-        async for raw in _stream(account=account, messages=msgs):
+        async for raw in _stream(account=account, messages=msgs, mode=body.mode):
             # Sniff token deltas so we can rebuild the full assistant reply.
             if raw.startswith("data: "):
                 try:
