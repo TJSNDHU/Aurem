@@ -1034,6 +1034,11 @@ async def get_repair_scores(url: str, authorization: str = Header(None)):
 
     seo_fixes = [f for f in fixes if f["category"] == "seo"]
     a11y_fixes = [f for f in fixes if f["category"] == "accessibility"]
+    # iter D-71m — pull GEO + security fixes too. Customer Live Health page
+    # has 4 tiles (GEO / SEC / ACC / SEO); previously only SEO + ACC came
+    # back so GEO and SEC tiles always rendered as 0, looking broken.
+    geo_fixes  = [f for f in fixes if f["category"] in ("geo", "geo_readiness")]
+    sec_fixes  = [f for f in fixes if f["category"] in ("security", "sec")]
 
     seo_total = len(seo_fixes)
     seo_approved = len([f for f in seo_fixes if f["status"] in ("approved", "deployed")])
@@ -1042,6 +1047,14 @@ async def get_repair_scores(url: str, authorization: str = Header(None)):
     a11y_total = len(a11y_fixes)
     a11y_approved = len([f for f in a11y_fixes if f["status"] in ("approved", "deployed")])
     a11y_pending = len([f for f in a11y_fixes if f["status"] == "pending_approval"])
+
+    geo_total = len(geo_fixes)
+    geo_approved = len([f for f in geo_fixes if f["status"] in ("approved", "deployed")])
+    geo_pending = len([f for f in geo_fixes if f["status"] == "pending_approval"])
+
+    sec_total = len(sec_fixes)
+    sec_approved = len([f for f in sec_fixes if f["status"] in ("approved", "deployed")])
+    sec_pending = len([f for f in sec_fixes if f["status"] == "pending_approval"])
 
     return {
         "url": normalized,
@@ -1058,6 +1071,21 @@ async def get_repair_scores(url: str, authorization: str = Header(None)):
             "total_fixes": a11y_total,
             "approved": a11y_approved,
             "pending": a11y_pending,
+        },
+        # iter D-71m — wire the 2 missing axes the Live Health UI expects.
+        "geo": {
+            "score_before": max(0, 100 - geo_total * 15),
+            "score_after":  max(0, 100 - max(0, geo_total - geo_approved) * 15),
+            "total_fixes":  geo_total,
+            "approved":     geo_approved,
+            "pending":      geo_pending,
+        },
+        "security": {
+            "score_before": max(0, 100 - sec_total * 25),
+            "score_after":  max(0, 100 - max(0, sec_total - sec_approved) * 25),
+            "total_fixes":  sec_total,
+            "approved":     sec_approved,
+            "pending":      sec_pending,
         },
     }
 
