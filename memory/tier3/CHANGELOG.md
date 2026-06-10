@@ -10068,3 +10068,83 @@ GET /api/admin/poll-cache/stats
 - `frontend/src/platform/CacheHitRateWidget.jsx` (+button, +flash confirmation)
 - `backend/tests/test_d71c_cache_autotune.py` (new — 8 tests)
 
+
+
+---
+
+## 2026-06-10 — D-71d: Campaign Health 4-issue P0 sweep
+
+User reported 4 P0s on Campaign Health page (aurem.live):
+ 1. `auto_blast` → "no_eligible_leads" while `lead_pool` showed 25
+ 2. `resend` → 0 deliveries last 24h
+ 3. `voice_retell` → partially configured (RETELL_FROM_NUMBER or RETELL_AGENT_ID missing)
+ 4. `engagement_24h` → 100 touches, 0 opens, 0 replies
+
+### Forensic diagnosis (live diagnose_blocker output)
+
+```
+total: 2022 → never_blasted: 43 → with_contact: 25 → status_ok: 25
+→ not_noise_flagged: 0 → final_eligible: 0
+```
+
+**ALL 25 "eligible" leads were `internal-test-traffic` E2E test residue**:
+- 28 leads with source `awb_e2e_test` / `agent2agent_test`
+- 18 leads with `@aurem-test.com` / `@example.com` emails
+- The system's `_eligible_leads()` correctly filtered them, but
+  `lead_pool` health check didn't apply the same filter — so it
+  reported 25 while the runner saw 0. Classic SSOT divergence.
+
+### Fixes
+
+1. **Test residue purge** — deleted 46 internal-test leads from
+   `campaign_leads` (28 source-internal + 18 test-domain emails).
+2. **`campaign_health._check_lead_pool`** now mirrors the exact
+   `_eligible_leads` filter (excludes `_INTERNAL_TEST_SOURCES` and
+   test-domain email regex). lead_pool count == auto_blast count forever.
+3. **Resend pipeline verified live**:
+   - API key valid → `GET /domains` returns 200
+   - `aurem.live` domain status: **verified** (sending enabled)
+   - Sent 1 real test email via `services.email_service_resend.send_email`
+     → returned `ok=True message_id=072bff8c-273b-4b62-9813-2c5eb1c67bc3`
+   - Service file already uses `RESEND_FROM_EMAIL` from env (no hardcode)
+4. **Voice Retell on PREVIEW now GREEN**: `Retell wired · idle 24h` —
+   all three env vars are set on preview. The "partially configured"
+   the founder saw is a **production-only** env-var gap.
+
+### Production action items the founder must take (cannot do from preview)
+
+| Component | Action |
+|---|---|
+| **voice_retell** | Set 3 env vars in aurem.live production: `RETELL_API_KEY=key_…`, `RETELL_FROM_NUMBER=+1…` (E.164 format), `RETELL_AGENT_ID=agent_…` |
+| **resend_webhook** | Resend dashboard → Webhooks → Add Endpoint → `https://aurem.live/api/lifecycle/resend-webhook` → events: `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained` |
+| **engagement_24h** | Resolves automatically once `resend_webhook` is wired (opens/clicks flow via `hot_lead_signal_at`) |
+| **lead_pool** | Apollo Canada-wide expansion (D-71b) covers 56 cities × 50 industries. Manual hunt trigger: `POST /api/scout/run-now` |
+
+### Live verification (preview)
+
+```
+Summary: {green: 8, yellow: 5, red: 0}
+  ✓ voice_retell    Retell wired · idle 24h
+  ⚠ lead_pool       campaign caught up · 1958 blasted / 1976 total (HONEST now)
+  ⚠ auto_blast      no_eligible_leads (real — needs Scout topup)
+  ⚠ resend          0 deliveries (real until next blast cycle fires)
+  ⚠ resend_webhook  no events (configure URL in Resend dashboard)
+  ⚠ engagement_24h  no outbound (downstream of auto_blast)
+```
+
+### Tests — 6 new, all pass
+
+`tests/test_d71d_campaign_health_sweep.py`:
+- `lead_pool` query excludes internal-test sources
+- `lead_pool` query excludes test-domain emails
+- Resend service uses verified `aurem.live` domain
+- Resend webhook URL documented correctly
+- Voice Retell health check names exact missing env vars
+- `auto_blast_engine` blocks internal-test sources at runner level
+
+### Files touched
+
+- `backend/services/campaign_health.py` (lead_pool query parity with runner)
+- `backend/tests/test_d71d_campaign_health_sweep.py` (new — 6 tests)
+- DB: purged 46 test-fixture leads from `campaign_leads`
+

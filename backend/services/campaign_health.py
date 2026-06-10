@@ -396,13 +396,30 @@ async def _check_lead_pool() -> dict[str, Any]:
         return {"component": "lead_pool", "status": "red",
                  "headline": "db unreachable", "detail": "",
                  "issue": "db", "autofix": None}
+
+    # iter D-71d — match the REAL eligibility filter the auto-blast runner
+    # uses (see _eligible_leads in auto_blast_engine.py). Without this,
+    # lead_pool showed "25 eligible" while auto_blast had 0 — exactly the
+    # mismatch the founder saw on aurem.live. The runner also excludes:
+    #   • internal test sources (awb_e2e_test, agent2agent_test, …)
+    #   • test-domain emails (aurem-test.com, example.com, test.com, …)
+    # The runner also requires a contact AND `noise_flag != True`.
+    _INTERNAL_TEST_SOURCES = (
+        "no_website_signup", "awb_e2e_test", "a2a_e2e_test",
+        "playwright_test", "qa_smoke", "agent2agent_test",
+        "builder_e2e", "qa_harness", "internal_test", "prod_smoke_test",
+    )
+    _TEST_EMAIL_RE = r"@(aurem-test|test|example)\."
+
     elig = await _db.campaign_leads.count_documents({
         "last_blast_at": {"$exists": False},
         "noise_flag":    {"$ne": True},
+        "source":        {"$nin": list(_INTERNAL_TEST_SOURCES)},
         "$or": [
             {"email": {"$nin": ["", None]}},
             {"phone": {"$nin": ["", None]}},
         ],
+        "email":  {"$not": {"$regex": _TEST_EMAIL_RE, "$options": "i"}},
         "status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]},
     })
     if elig == 0:
