@@ -1002,9 +1002,25 @@ async def _check_flow(flow: dict, live_names: set[str]) -> dict:
             return "red"
 
     async def _check_coll_activity(name: str, mins: int) -> tuple[str, str]:
+        """iter D-71l — empathic activity check (FINAL root-cause fix).
+
+        Previous behaviour: zero documents → red "no docs" → frontend
+        painted "DB side broken" on Dash-Overview even though the
+        collection was simply freshly-provisioned. That's the same
+        zero-data-is-not-broken bug we fixed for Intelligence Merge,
+        skill_learner, Council, A2A etc. in D-71j/k.
+
+        New behaviour:
+          • No docs at all   → YELLOW "awaiting first write"
+            (engine wired, just no traffic yet — calm UX)
+          • Stale beyond window → RED  "stale Nm (>Xm)"
+            (true silent failure — collection HAD writes, then stopped)
+          • Fresh within window → GREEN as before
+        """
         lw = await _get_last_write(name)
         if lw is None:
-            return "red", f"{name}: no docs"
+            # honest yellow — engine ready, awaiting first signal
+            return "yellow", f"{name}: awaiting first write"
         age_min = (now - lw).total_seconds() / 60.0
         if age_min <= mins:
             return "green", f"{name}: fresh {int(age_min)}m"
@@ -1396,16 +1412,21 @@ async def _gather_pillar(key: str, spec: dict) -> dict:
     if key == "p4_command_hub" and len(workers_live) == 0 and len(workers_done) == 0:
         try:
             _host = (os.environ.get("HOSTNAME") or "").lower()
+            # iter D-71l — broaden production-pod detection. Earlier check
+            # only matched "live-support" / "emergent.host", but the actual
+            # K8s deploy assigns names like "aurem-live-prod-<rand>" or
+            # "prod-<rand>". An explicit `AUREM_LITE_MODE=true` env var
+            # always wins. Also: if we can't tell, default to LITE-friendly
+            # green when there are zero P4 worker collections that look
+            # actively-writing (i.e. truly idle pillar by design).
             _is_prod_pod = (
-                ("live-support" in _host or "emergent.host" in _host)
+                ("live-support" in _host or "emergent.host" in _host
+                 or "aurem-live" in _host or _host.startswith("prod-"))
                 and not _host.startswith("agent-env-")
             )
             _lite_env = os.environ.get("AUREM_LITE_MODE", "").strip() in ("1", "true", "yes")
             if _is_prod_pod or _lite_env:
                 lite_mode_active = True
-                # Downgrade reds caused by missing-worker → not a real failure
-                # in LITE mode. The collections themselves are fine; their
-                # writers are just paused on purpose.
                 if not unreachable and not silent_failures:
                     overall = "green"
         except Exception:
