@@ -3599,6 +3599,26 @@ def register_all_routers(app, db):
         except Exception as rd_e:
             logger.warning(f"[REGISTRY] React Doctor monitor failed: {rd_e}")
 
+        # iter D-73a — Twilio breaker auto-probe.
+        # When the breaker is OPEN (creds returned 401), probe Twilio
+        # every 5 min and AUTO-RECOVER on 200. No more manual restart
+        # after rotating TWILIO_AUTH_TOKEN. Cheap no-op when closed.
+        try:
+            from services.twilio_auth_breaker import auto_probe_tick, PROBE_INTERVAL_S
+            aurem_scheduler.add_job(
+                auto_probe_tick,
+                trigger="interval",
+                seconds=PROBE_INTERVAL_S,
+                id="twilio_auth_auto_probe",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=120,
+            )
+            logger.info(f"[REGISTRY] Twilio auth auto-probe scheduled (every {PROBE_INTERVAL_S}s, open-only)")
+        except Exception as tap_e:
+            logger.warning(f"[REGISTRY] Twilio auth auto-probe failed: {tap_e}")
+
         # iter 324l — Scout Replenish Cron. Keeps campaign_leads queue topped
         # up via OSM hunts every 2h so auto_blast_engine never starves.
         try:

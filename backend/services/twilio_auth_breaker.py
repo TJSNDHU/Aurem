@@ -187,3 +187,62 @@ def _force_reset_for_tests() -> None:
         _reason = ""
         _failure_count = 0
         _last_alert_at = 0.0
+
+
+# ─── iter D-73a — Auto-probe while OPEN ──────────────────────────────
+#
+# Founder constraint:
+#   • Probe ONLY while the breaker is open. Stop when closed.
+#   • One Telegram alert per 24h regardless of probe failures
+#     (use the existing _send_one_alert dedup window).
+#   • Don't trigger Twilio rate-limiting — probe cadence ≥ 5 minutes.
+#   • Probe must NOT re-fire `mark_invalid()` (that path alerts);
+#     instead silently confirm-still-open on 401.
+#
+# Wired by `routers/registry.py` at startup as an APScheduler job
+# (every 5 min). The job is cheap when breaker is closed (early return)
+# and short-circuits if creds are missing.
+
+PROBE_INTERVAL_S = 300  # 5 minutes
+
+
+async def auto_probe_tick() -> dict:
+    """One probe tick. Cheap no-op when the breaker is closed."""
+    if not is_open():
+        return {"skipped": True, "reason": "breaker_closed"}
+
+    sid = os.environ.get("TWILIO_ACCOUNT_SID") or ""
+    tok = os.environ.get("TWILIO_AUTH_TOKEN") or ""
+    if not (sid and tok):
+        return {"skipped": True, "reason": "creds_missing"}
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as c:
+            r = await c.get(
+                f"https://api.twilio.com/2010-04-01/Accounts/{sid}.json",
+                auth=(sid, tok),
+            )
+    except Exception as e:
+        # Network blip / DNS / timeout — don't change state, don't alert.
+        return {"skipped": True, "reason": f"probe_exc:{type(e).__name__}"}
+
+    if r.status_code == 200:
+        # Recovery — credentials were rotated. Close the breaker so
+        # blast_service + shared/providers re-enable SMS+voice instantly.
+        mark_valid()
+        return {"status": "recovered", "http": 200}
+
+    if r.status_code == 401:
+        # Still bad. Bump failure counter (visibility) but DON'T call
+        # mark_invalid — that would re-fire Telegram (the 24h dedup
+        # would actually catch it, but we'd burn a counter slot each
+        # probe). Instead just observe.
+        global _failure_count
+        with _lock:
+            _failure_count += 1
+        return {"status": "still_open", "http": 401}
+
+    # Other status — server-side blip, keep breaker open, no change
+    return {"status": "still_open", "http": r.status_code}
+

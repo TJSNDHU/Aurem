@@ -319,6 +319,14 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
   - **Live result**: 442 → 2. The 2 surviving rows are real aurem.live security findings that got fresh DeepSeek V3.1 LLM proposals on the very next tick (HSTS header config + Nginx 301 redirect snippet, both tier-2 awaiting founder approval). 60-day TTL safety net active.
   - **12/12 pass**. Combined D-72 + D-73 = **32/32 green**.
 
+- **D-73a + D-74 (2026-06-10 — Twilio auto-probe + Pillar health sweep)**
+  - Full detail in `/app/memory/CHANGELOG.md` + `/app/memory/D74_PILLAR_HEALTH_REPORT.md`.
+  - **D-73a**: Twilio breaker auto-probe (every 5 min while OPEN, auto-recovers on 200, no Telegram re-fire on 401 probe failures). After token rotation, founder no longer needs `supervisorctl restart` — breaker closes automatically. 5 new tests, **16/16** breaker total.
+  - **D-74 timestamp audit**: Scanned all 614 Mongo collections for 14 timestamp field names → **797,928 rows across 359 collection-field pairs** store ISO strings (silently breaking TTL + range queries). Migration script `scripts/migrate_string_timestamps_d74.py` with dry-run mode, auto-discovery, graceful malformed-row handling. Dry-run: 0 unparseable across all 359 pairs in 4.3s. Live execution left to founder (per mongodump-first rule).
+  - **D-74 stale-test furniture cleared**: Both pre-existing failures rewritten — `test_jwt_secret_resolves_via_three_tier_fallback` (locks the iter 272+324d K8s-safe resolver) and `test_tool_connect_uses_fernet_encryption_envelope` (locks the iter 326ww Fernet encryption). Each guards the current correct behavior.
+  - **D-74 credential probes**: Live-probed every major external provider. Tavily HTTP 432 caught (new stale credential alongside the known Twilio). Resend / OpenRouter / Stripe / Apollo all 200 OK.
+  - **Combined D-72 + D-73 + D-73a + D-74 suite**: **46/46 green**. Pillar health table in `/app/memory/D74_PILLAR_HEALTH_REPORT.md` — 4 pillars moved from red/yellow to green this session (Auth E2E, Autonomous Repair, Scheduler, Test Suite). 3 stay yellow/red: Twilio + Tavily creds (founder rotation), DB Health TTL (founder mongodump-then-migrate), Route Integrity (7 dedupes scoped for D-75).
+
 
 ## Backlog (P0 → P2)
 

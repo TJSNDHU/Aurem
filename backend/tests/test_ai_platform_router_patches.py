@@ -30,28 +30,59 @@ def _load_router_module():
     return ai_platform_router
 
 
-# ── FIX #5: JWT_SECRET fail-fast ─────────────────────────────────────
-def test_jwt_secret_must_fail_fast_when_unset():
-    """Re-importing without JWT_SECRET must raise (no hardcoded fallback)."""
+# ── FIX #5: JWT_SECRET hardcoded-default eliminated (iter 322fi) ────
+#
+# iter D-74 re-evaluation: when this test was originally written, the
+# ask was "fail loudly if JWT_SECRET is missing". Since then,
+# iter 272 + 324d introduced a 3-tier resolver in `config.py`
+# (env → /app/.jwt_secret file → ephemeral generation) so that uvicorn
+# never crashes at module import time — that was causing K8s liveness
+# probes to ECONNREFUSED and the pod to restart-loop.
+#
+# The original SECURITY concern (hardcoded fallback secret) is still
+# covered by `test_jwt_secret_has_no_default_string_in_source` below.
+# This test now guards the CURRENT contract:
+#   • Module imports successfully whether JWT_SECRET is set or not
+#     (no K8s death-spiral).
+#   • `JWT_SECRET` is always a non-empty string at module level
+#     (so encode/decode can't crash on None).
+#   • config.py has the 3-tier audit comment so the design intent
+#     survives future PRs.
+def test_jwt_secret_resolves_via_three_tier_fallback():
+    """Confirms the iter 272+324d K8s-safe 3-tier resolver is in place
+    and `JWT_SECRET` is always populated. Hardcoded-default elimination
+    is asserted separately by `_has_no_default_string_in_source`."""
     import importlib
     orig = os.environ.get("JWT_SECRET")
     os.environ.pop("JWT_SECRET", None)
-    # Drop any cached import so the module re-evaluates the env check
+    # Drop cached imports so config.py + router re-evaluate
     for mod in list(sys.modules.keys()):
-        if mod == "routers.ai_platform_router":
+        if mod in ("config", "routers.ai_platform_router"):
             del sys.modules[mod]
     try:
-        try:
-            importlib.import_module("routers.ai_platform_router")
-        except RuntimeError as e:
-            assert "JWT_SECRET" in str(e)
-            return
-        raise AssertionError("import succeeded without JWT_SECRET (Bug #5 not fixed)")
+        # Module MUST import without JWT_SECRET set — the resolver
+        # falls back to file / ephemeral and the pod stays up.
+        cfg = importlib.import_module("config")
+        assert cfg.JWT_SECRET, (
+            "config.JWT_SECRET resolved to falsy value — K8s pod would "
+            "be functional but every JWT call would crash"
+        )
+        assert isinstance(cfg.JWT_SECRET, str)
+        assert len(cfg.JWT_SECRET) >= 16, (
+            f"resolved JWT_SECRET suspiciously short ({len(cfg.JWT_SECRET)} chars)"
+        )
+        # Confirms which tier it came from is logged
+        assert hasattr(cfg, "_JWT_SECRET_SOURCE")
+        assert cfg._JWT_SECRET_SOURCE in ("env", "file", "file-new", "ephemeral"), (
+            f"unexpected JWT secret source: {cfg._JWT_SECRET_SOURCE!r}"
+        )
+        # Router must also import cleanly (it does `from config import JWT_SECRET`)
+        importlib.import_module("routers.ai_platform_router")
     finally:
         if orig is not None:
             os.environ["JWT_SECRET"] = orig
         for mod in list(sys.modules.keys()):
-            if mod == "routers.ai_platform_router":
+            if mod in ("config", "routers.ai_platform_router"):
                 del sys.modules[mod]
 
 
@@ -135,17 +166,64 @@ def test_execute_crew_uses_atomic_increment():
         )
 
 
-# ── FIX #4: credentials stored with explicit unencrypted flag ────────
-def test_tool_connect_marks_creds_as_unencrypted():
-    """Until a real encryption layer lands, the connect_tool route must at
-    least flag the row so future migrations can target it."""
+# ── FIX #4 (re-evaluated D-74): credentials now encrypted via Fernet ─
+def test_tool_connect_uses_fernet_encryption_envelope():
+    """iter D-74 re-evaluation: the original test asserted
+    `_encrypted: False` because credentials WERE stored in plaintext
+    with that hardcoded marker. iter 326ww replaced that with real
+    Fernet AES encryption via `services/credential_crypto.py`, and the
+    `_encrypted` field is now `bool(envelope.get("_encrypted"))` —
+    i.e. it reflects ACTUAL encryption state, not a hardcoded flag.
+
+    This test now locks the CURRENT correct contract:
+      • `connect_tool` calls `encrypt_credentials` from
+        `credential_crypto` (real encryption, no mock).
+      • The persisted row stores the encrypted envelope, NOT the
+        plaintext `data.credentials`.
+      • If encryption is unavailable AND the tool is in the sensitive
+        list (whatsapp/email/twilio/stripe/openai/gemini/claude/smtp),
+        the endpoint REFUSES with HTTP 503 instead of silently writing
+        plaintext.
+    """
     apr = _load_router_module()
     src = inspect.getsource(apr.connect_tool)
-    assert '"_encrypted": False' in src or "'_encrypted': False" in src, (
-        "credentials row missing _encrypted=False migration marker (Bug #4)"
+
+    # The encryption layer is wired in
+    assert "encrypt_credentials" in src, (
+        "connect_tool no longer calls encrypt_credentials — "
+        "iter 326ww Fernet encryption regressed"
     )
-    assert "PLAINTEXT" in src.upper() or "FIX #4" in src, (
-        "no audit marker comment on connect_tool credential write"
+    assert "credential_crypto" in src, (
+        "connect_tool source no longer imports credential_crypto"
+    )
+
+    # The persisted row stores the envelope, not the plaintext
+    assert "config_envelope" in src, (
+        "connect_tool no longer persists `config_envelope` field — "
+        "the encrypted shape changed without updating this guard"
+    )
+    # `_encrypted` is reflective, not hardcoded
+    code_only = "\n".join(
+        line for line in src.splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    assert '"_encrypted":      bool(envelope.get("_encrypted"))' in src or \
+           '"_encrypted": bool(envelope.get("_encrypted"))' in src, (
+        "_encrypted field is not derived from the actual envelope state"
+    )
+    # Hardcoded plaintext marker must be gone
+    assert '"_encrypted": False' not in code_only, (
+        "connect_tool still uses the hardcoded `_encrypted: False` "
+        "plaintext marker — iter 326ww refactor incomplete"
+    )
+
+    # The 503 refusal-to-store-plaintext branch must exist
+    assert "503" in src and "Encryption key not configured" in src, (
+        "connect_tool no longer refuses with 503 when encryption is "
+        "unavailable for sensitive tools — silent plaintext write risk"
+    )
+    assert "is_encryption_available" in src, (
+        "encryption availability check missing"
     )
 
 
@@ -231,13 +309,13 @@ def test_only_platform_auth_router_serves_login():
 
 if __name__ == "__main__":
     tests = [
-        test_jwt_secret_must_fail_fast_when_unset,
+        test_jwt_secret_resolves_via_three_tier_fallback,
         test_jwt_secret_has_no_default_string_in_source,
         test_get_api_key_handles_missing_field_gracefully,
         test_api_execute_validates_crew_config,
         test_webhook_actually_dispatches,
         test_execute_crew_uses_atomic_increment,
-        test_tool_connect_marks_creds_as_unencrypted,
+        test_tool_connect_uses_fernet_encryption_envelope,
         test_rate_limit_assumption_documented,
         test_only_platform_auth_router_serves_login,
     ]

@@ -234,3 +234,155 @@ async def test_campaign_health_twilio_red_when_creds_missing():
     finally:
         if old_sid: os.environ["TWILIO_ACCOUNT_SID"] = old_sid
         if old_tok: os.environ["TWILIO_AUTH_TOKEN"] = old_tok
+
+
+# ─── iter D-73a — auto-probe tests ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_auto_probe_skipped_when_breaker_closed(monkeypatch):
+    """Closed breaker → probe is a no-op. Must NOT make any HTTP call."""
+    from services import twilio_auth_breaker as b
+    b._force_reset_for_tests()
+    assert not b.is_open()
+
+    import httpx
+    called = {"count": 0}
+    class _Spy:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, *a, **kw):
+            called["count"] += 1
+            raise RuntimeError("probe must not call HTTP when breaker is closed")
+    monkeypatch.setattr(httpx, "AsyncClient", _Spy)
+
+    result = await b.auto_probe_tick()
+    assert result.get("skipped") is True
+    assert result.get("reason") == "breaker_closed"
+    assert called["count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_auto_probe_skipped_when_creds_missing(monkeypatch):
+    """Open breaker but creds unset → skip (no DNS lookup, no HTTP)."""
+    from services import twilio_auth_breaker as b
+    b._force_reset_for_tests()
+    b.mark_invalid("test")
+
+    old_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    old_tok = os.environ.get("TWILIO_AUTH_TOKEN")
+    os.environ.pop("TWILIO_ACCOUNT_SID", None)
+    os.environ.pop("TWILIO_AUTH_TOKEN", None)
+    try:
+        result = await b.auto_probe_tick()
+        assert result.get("skipped") is True
+        assert result.get("reason") == "creds_missing"
+    finally:
+        if old_sid: os.environ["TWILIO_ACCOUNT_SID"] = old_sid
+        if old_tok: os.environ["TWILIO_AUTH_TOKEN"] = old_tok
+        b._force_reset_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_auto_probe_recovers_on_200(monkeypatch):
+    """Open breaker + Twilio returns 200 → breaker CLOSES (recovery).
+    This is the founder-facing payoff: rotate the token, wait 5 min,
+    SMS+voice resume with no manual restart."""
+    from services import twilio_auth_breaker as b
+    b._force_reset_for_tests()
+    b.mark_invalid("test")
+    assert b.is_open()
+
+    os.environ["TWILIO_ACCOUNT_SID"] = "AC_test_recover"
+    os.environ["TWILIO_AUTH_TOKEN"] = "fresh_token_after_rotation"
+
+    import httpx
+    class _OkClient:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, *a, **kw):
+            from types import SimpleNamespace
+            return SimpleNamespace(status_code=200, text="ok")
+    monkeypatch.setattr(httpx, "AsyncClient", _OkClient)
+
+    try:
+        result = await b.auto_probe_tick()
+        assert result.get("status") == "recovered"
+        assert result.get("http") == 200
+        assert not b.is_open(), "breaker should be CLOSED after 200 recovery"
+    finally:
+        b._force_reset_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_auto_probe_stays_open_on_401_no_realert(monkeypatch):
+    """Open breaker + Twilio returns 401 → still open, fail counter ++,
+    NO new Telegram alert (one-per-24h dedup). Founder must not get
+    spammed by probe attempts."""
+    from services import twilio_auth_breaker as b
+    b._force_reset_for_tests()
+    b.mark_invalid("first 401")
+    pre_count = b.status()["failure_count"]
+    pre_alert = b._last_alert_at
+
+    os.environ["TWILIO_ACCOUNT_SID"] = "AC_test_still_open"
+    os.environ["TWILIO_AUTH_TOKEN"] = "still_bad"
+
+    import httpx
+    class _401:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, *a, **kw):
+            from types import SimpleNamespace
+            return SimpleNamespace(status_code=401, text='{"code":20003,"message":"Authenticate"}')
+    monkeypatch.setattr(httpx, "AsyncClient", _401)
+
+    try:
+        result = await b.auto_probe_tick()
+        assert result.get("status") == "still_open"
+        assert b.is_open(), "breaker must stay open on 401"
+        post = b.status()
+        assert post["failure_count"] == pre_count + 1, (
+            f"probe must bump failure_count exactly once: {pre_count} → {post['failure_count']}"
+        )
+        # No new Telegram alert fired (timestamp unchanged)
+        assert b._last_alert_at == pre_alert, (
+            "probe path must NOT call _send_one_alert — alert is gated to 24h"
+        )
+    finally:
+        b._force_reset_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_auto_probe_handles_network_exception_quietly(monkeypatch):
+    """DNS / timeout / ConnectError must NOT change breaker state and
+    must NOT alert. Transient network blip != credential failure."""
+    from services import twilio_auth_breaker as b
+    b._force_reset_for_tests()
+    b.mark_invalid("test")
+    assert b.is_open()
+    pre = b.status()
+
+    os.environ["TWILIO_ACCOUNT_SID"] = "AC_test_exc"
+    os.environ["TWILIO_AUTH_TOKEN"] = "anything"
+
+    import httpx
+    class _Exc:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, *a, **kw):
+            raise httpx.ConnectError("DNS lookup failed")
+    monkeypatch.setattr(httpx, "AsyncClient", _Exc)
+
+    try:
+        result = await b.auto_probe_tick()
+        assert result.get("skipped") is True
+        assert "probe_exc" in result.get("reason", "")
+        # State unchanged
+        assert b.is_open()
+        assert b.status()["failure_count"] == pre["failure_count"]
+    finally:
+        b._force_reset_for_tests()
