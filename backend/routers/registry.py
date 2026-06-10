@@ -671,6 +671,7 @@ def register_all_routers(app, db):
         ("routers.lead_enrichment_router", "Lead Enrichment"),
         ("routers.revenue_forecast_router", "Revenue Forecast"),
         ("routers.campaign_router", "Campaign Outbound"),
+        ("routers.campaign_funnel_router", "Campaign Command Funnel (D-78)"),
         ("routers.conviction_router", "Conviction / Adaptive ORA"),
         ("routers.aurem_public_report_router", "AUREM Public Report"),
         ("routers.aurem_onboarding_router", "AUREM Onboarding"),
