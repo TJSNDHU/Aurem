@@ -284,23 +284,38 @@ async def execute_blast_for_lead(
 
     # 2) SMS (Twilio)
     if phone and _gate_open("sms"):
-        try:
-            import httpx
-            sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
-            token = os.environ.get("TWILIO_AUTH_TOKEN", "")
-            from_num = os.environ.get("TWILIO_PHONE_NUMBER", "")
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.post(
-                    f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",
-                    auth=(sid, token),
-                    data={"From": from_num, "To": phone, "Body": render_sms(lead)},
-                )
-                data = resp.json()
-            ok = resp.status_code in (200, 201)
-            results["sms"] = {"success": ok, "sid": data.get("sid"), "to": phone, "status_code": resp.status_code, "error": data.get("message") if not ok else None}
-            history_entries.append({"type": "sms", "to": phone, "status": "sent" if ok else "failed", "sid": data.get("sid", ""), "template": "aurem_v1", "source": source, "timestamp": now})
-        except Exception as e:
-            results["sms"] = {"success": False, "error": str(e), "to": phone}
+        # iter D-72 — breaker short-circuit. When TWILIO_AUTH_TOKEN is stale
+        # / rotated / wrong, every Twilio request returns HTTP 401. Without
+        # this gate every cycle burned ~15s per lead per channel waiting on
+        # Twilio. After one 401 the breaker opens and SMS skips instantly
+        # until backend restart with fresh creds.
+        from services.twilio_auth_breaker import is_open as _twa_open, record_response as _twa_record
+        if _twa_open():
+            results["sms"] = {
+                "success": False,
+                "error": "twilio_auth_invalid",
+                "to": phone,
+                "skipped_by_breaker": True,
+            }
+        else:
+            try:
+                import httpx
+                sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
+                token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+                from_num = os.environ.get("TWILIO_PHONE_NUMBER", "")
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(
+                        f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",
+                        auth=(sid, token),
+                        data={"From": from_num, "To": phone, "Body": render_sms(lead)},
+                    )
+                    data = resp.json()
+                _twa_record(resp.status_code, resp.text)  # open/close the breaker
+                ok = resp.status_code in (200, 201)
+                results["sms"] = {"success": ok, "sid": data.get("sid"), "to": phone, "status_code": resp.status_code, "error": data.get("message") if not ok else None}
+                history_entries.append({"type": "sms", "to": phone, "status": "sent" if ok else "failed", "sid": data.get("sid", ""), "template": "aurem_v1", "source": source, "timestamp": now})
+            except Exception as e:
+                results["sms"] = {"success": False, "error": str(e), "to": phone}
     elif phone and not _gate_open("sms"):
         results["sms"] = {"success": False, "error": "gated", "to": phone}
     else:
@@ -435,24 +450,36 @@ async def execute_blast_for_lead(
 
     # 4) VOICE CALL (Twilio)
     if phone and _gate_open("call"):
-        try:
-            import httpx
-            sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
-            token = os.environ.get("TWILIO_AUTH_TOKEN", "")
-            from_num = os.environ.get("TWILIO_PHONE_NUMBER", "")
-            twiml = f'<Response><Say voice="Polly.Joanna">{render_voice_script(lead)}</Say></Response>'
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.post(
-                    f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json",
-                    auth=(sid, token),
-                    data={"From": from_num, "To": phone, "Twiml": twiml},
-                )
-                data = resp.json()
-            ok = resp.status_code in (200, 201)
-            results["voice"] = {"success": ok, "call_sid": data.get("sid"), "status": data.get("status"), "to": phone, "status_code": resp.status_code, "error": data.get("message") if not ok else None}
-            history_entries.append({"type": "call", "to": phone, "status": data.get("status", "queued"), "call_sid": data.get("sid", ""), "template": "aurem_v1", "source": source, "timestamp": now})
-        except Exception as e:
-            results["voice"] = {"success": False, "error": str(e), "to": phone}
+        # iter D-72 — same breaker as SMS. Voice path uses identical Twilio
+        # creds; if SMS is 401-ing, voice will too.
+        from services.twilio_auth_breaker import is_open as _twa_open, record_response as _twa_record
+        if _twa_open():
+            results["voice"] = {
+                "success": False,
+                "error": "twilio_auth_invalid",
+                "to": phone,
+                "skipped_by_breaker": True,
+            }
+        else:
+            try:
+                import httpx
+                sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
+                token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+                from_num = os.environ.get("TWILIO_PHONE_NUMBER", "")
+                twiml = f'<Response><Say voice="Polly.Joanna">{render_voice_script(lead)}</Say></Response>'
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(
+                        f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json",
+                        auth=(sid, token),
+                        data={"From": from_num, "To": phone, "Twiml": twiml},
+                    )
+                    data = resp.json()
+                _twa_record(resp.status_code, resp.text)  # open/close the breaker
+                ok = resp.status_code in (200, 201)
+                results["voice"] = {"success": ok, "call_sid": data.get("sid"), "status": data.get("status"), "to": phone, "status_code": resp.status_code, "error": data.get("message") if not ok else None}
+                history_entries.append({"type": "call", "to": phone, "status": data.get("status", "queued"), "call_sid": data.get("sid", ""), "template": "aurem_v1", "source": source, "timestamp": now})
+            except Exception as e:
+                results["voice"] = {"success": False, "error": str(e), "to": phone}
     elif phone and not _gate_open("call"):
         results["voice"] = {"success": False, "error": "gated", "to": phone}
     else:

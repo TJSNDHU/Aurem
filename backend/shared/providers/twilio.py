@@ -22,8 +22,23 @@ _twilio_client = None
 
 
 def get_twilio_client():
-    """Get or create Twilio client."""
+    """Get or create Twilio client.
+
+    iter D-72 — honors the global Twilio auth breaker. When the breaker
+    is OPEN (because a previous call observed HTTP 401), this returns
+    None so every caller's existing `if not client: return ...` short-
+    circuit fires instantly instead of waiting on another doomed Twilio
+    SDK round-trip. The breaker resets on backend restart, so rotating
+    TWILIO_AUTH_TOKEN + restarting re-arms every Twilio code path."""
     global _twilio_client
+    # Breaker gate — fail fast process-wide if creds are known-bad
+    try:
+        from services.twilio_auth_breaker import is_open as _twa_open
+        if _twa_open():
+            return None
+    except Exception:
+        pass
+
     if _twilio_client is None:
         try:
             from twilio.rest import Client
@@ -275,6 +290,13 @@ async def send_whatsapp_message(phone: str, message: str) -> dict:
         }
     except Exception as e:
         logger.error(f"WhatsApp send failed to {mask_phone_number(normalized)}: {str(e)}")
+        # iter D-72 — feed auth-flavored exceptions into the breaker so the
+        # rest of the process stops calling Twilio with known-bad creds.
+        try:
+            from services.twilio_auth_breaker import mark_invalid_from_exception as _twa_mark
+            _twa_mark(e)
+        except Exception:
+            pass
         return {"success": False, "error": str(e)}
 
 
@@ -378,6 +400,12 @@ async def send_sms(phone: str, message: str) -> dict:
         }
     except Exception as e:
         logger.error(f"SMS send failed to {mask_phone_number(normalized)}: {str(e)}")
+        # iter D-72 — feed auth-flavored exceptions into the breaker.
+        try:
+            from services.twilio_auth_breaker import mark_invalid_from_exception as _twa_mark
+            _twa_mark(e)
+        except Exception:
+            pass
         return {"success": False, "error": str(e)}
 
 
@@ -440,6 +468,12 @@ async def make_voice_call(
         }
     except Exception as e:
         logger.error(f"Voice call failed to {mask_phone_number(normalized)}: {str(e)}")
+        # iter D-72 — feed auth-flavored exceptions into the breaker.
+        try:
+            from services.twilio_auth_breaker import mark_invalid_from_exception as _twa_mark
+            _twa_mark(e)
+        except Exception:
+            pass
         return {"success": False, "error": str(e)}
 
 

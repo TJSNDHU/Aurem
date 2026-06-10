@@ -151,14 +151,81 @@ def test_tool_connect_marks_creds_as_unencrypted():
 
 # ── FIX #6: single-pod assumption documented ─────────────────────────
 def test_rate_limit_assumption_documented():
-    """The in-memory rate limiter must carry a documented single-pod caveat
-    so future maintainers know it has to move to Redis when scaling out."""
+    """iter D-72 — Auth dedupe: the `_login_attempts` rate-limiter (along
+    with the /auth/login + /auth/register handlers it guarded) has been
+    DELETED from this file. The route now lives exclusively in
+    `routers.platform_auth_router`, which itself uses MongoDB-based brute
+    force tracking (login_attempts collection) — superior to the old
+    in-memory single-pod approach this test originally validated.
+
+    This test is now a regression guard: assert the duplicate is gone
+    so future PRs can't silently re-introduce it. The audit comment
+    block stays as the historical breadcrumb."""
     apr = _load_router_module()
     src = inspect.getsource(apr)
-    assert "_login_attempts" in src
-    # The audit comment block must exist near the declaration
-    assert "single-pod" in src.lower() or "single pod" in src.lower(), (
-        "no single-pod assumption documented (Bug #6 mitigation missing)"
+
+    # Strip Python comments — historical mention in the audit block is OK
+    code_only = "\n".join(
+        line for line in src.splitlines()
+        if not line.lstrip().startswith("#")
+    )
+
+    # The duplicate auth handlers must NOT come back in code
+    assert "@router.post(\"/auth/login\")" not in code_only, (
+        "Duplicate /auth/login handler re-introduced in ai_platform_router "
+        "— it must live ONLY in platform_auth_router (iter D-72)"
+    )
+    assert "@router.post(\"/auth/register\")" not in code_only, (
+        "Duplicate /auth/register handler re-introduced in ai_platform_router "
+        "— it must live ONLY in platform_auth_router (iter D-72)"
+    )
+    # Orphan rate-limiter dict must stay deleted
+    assert "_login_attempts = {}" not in code_only, (
+        "_login_attempts in-memory dict re-introduced; brute-force tracking "
+        "now lives in platform_auth_router's login_attempts collection"
+    )
+    # Audit-comment breadcrumb must remain so future maintainers find this
+    assert "iter D-72" in src and "Auth dedupe" in src, (
+        "iter D-72 auth-dedupe audit-comment block missing — required so "
+        "future readers know why these handlers are absent"
+    )
+
+
+# ── iter D-72: confirm platform_auth_router is the only owner ────────
+def test_only_platform_auth_router_serves_login():
+    """The /auth/login + /auth/register routes must be exposed by
+    platform_auth_router and NOT by ai_platform_router. Last-loaded-wins
+    means a duplicate handler in either file would silently shadow the
+    other. This test pins ownership."""
+    import sys
+    # Reset module cache so both routers re-evaluate against current env
+    for mod_name in ("routers.platform_auth_router", "routers.ai_platform_router"):
+        sys.modules.pop(mod_name, None)
+    os.environ.setdefault("JWT_SECRET", "test-secret-for-import-only")
+
+    from routers import platform_auth_router as par  # noqa: WPS433
+    from routers import ai_platform_router as apr  # noqa: WPS433
+
+    par_routes = {(r.path, tuple(sorted(r.methods))) for r in par.router.routes}
+    apr_routes = {(r.path, tuple(sorted(r.methods))) for r in apr.router.routes}
+
+    # platform_auth_router MUST own /api/platform/auth/login + /register
+    assert ("/api/platform/auth/login", ("POST",)) in par_routes, (
+        "platform_auth_router lost ownership of /api/platform/auth/login"
+    )
+    assert ("/api/platform/auth/register", ("POST",)) in par_routes, (
+        "platform_auth_router lost ownership of /api/platform/auth/register"
+    )
+
+    # ai_platform_router MUST NOT have those routes anymore
+    apr_paths = {p for p, _ in apr_routes}
+    assert "/api/platform/auth/login" not in apr_paths, (
+        "ai_platform_router re-introduced /auth/login — duplicate auth "
+        "handler returned (iter D-72 regression)"
+    )
+    assert "/api/platform/auth/register" not in apr_paths, (
+        "ai_platform_router re-introduced /auth/register — duplicate auth "
+        "handler returned (iter D-72 regression)"
     )
 
 
@@ -172,6 +239,7 @@ if __name__ == "__main__":
         test_execute_crew_uses_atomic_increment,
         test_tool_connect_marks_creds_as_unencrypted,
         test_rate_limit_assumption_documented,
+        test_only_platform_auth_router_serves_login,
     ]
     for t in tests:
         t()

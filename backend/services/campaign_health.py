@@ -173,6 +173,82 @@ async def _check_twilio() -> dict[str, Any]:
             "issue":    "twilio_creds_missing",
             "autofix":  None,
         }
+
+    # iter D-72 — surface the in-process auth breaker. If any blast cycle
+    # already saw a 401 from Twilio, every SMS + voice attempt is being
+    # skipped. Health must scream RED so the founder knows to rotate the
+    # token, not just "creds present" (which they nominally are).
+    try:
+        from services.twilio_auth_breaker import status as _twa_status, is_open as _twa_open
+        breaker = _twa_status()
+        if _twa_open():
+            return {
+                "component": "twilio",
+                "status":   "red",
+                "headline": "TWILIO auth invalid (HTTP 401)",
+                "detail":   (
+                    f"Breaker OPEN since {breaker.get('opened_at')} after "
+                    f"{breaker.get('failure_count')} failed sends. "
+                    f"Rotate TWILIO_AUTH_TOKEN (current tail: …{breaker.get('auth_token_tail')}) "
+                    "in /app/backend/.env and `sudo supervisorctl restart backend`."
+                ),
+                "issue":    "twilio_auth_invalid",
+                "autofix":  None,
+                "breaker":  breaker,
+            }
+    except Exception:
+        breaker = {"open": False}
+
+    # iter D-72 — proactive auth probe. Even if no real blast has fired
+    # yet, hit Twilio's own Accounts endpoint to confirm the creds work.
+    # 5s budget — well under the 25s health-report cap.
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=5.0) as _c:
+            _r = await _c.get(
+                f"https://api.twilio.com/2010-04-01/Accounts/{sid}.json",
+                auth=(sid, tok),
+            )
+        if _r.status_code == 401:
+            # Eagerly open the breaker so the next blast cycle short-circuits.
+            try:
+                from services.twilio_auth_breaker import mark_invalid as _twa_mark
+                _twa_mark(f"campaign_health probe got 401: {_r.text[:120]}")
+            except Exception:
+                pass
+            return {
+                "component": "twilio",
+                "status":   "red",
+                "headline": "TWILIO auth invalid (HTTP 401)",
+                "detail":   (
+                    "Live probe to Twilio Accounts API returned 401. "
+                    f"Rotate TWILIO_AUTH_TOKEN (tail: …{tok[-4:]}) in "
+                    "/app/backend/.env and `sudo supervisorctl restart backend`."
+                ),
+                "issue":    "twilio_auth_invalid",
+                "autofix":  None,
+                "probe_status": 401,
+            }
+        if _r.status_code >= 500:
+            # Transient — don't open breaker, but flag yellow.
+            return {
+                "component": "twilio",
+                "status":   "yellow",
+                "headline": f"Twilio probe got HTTP {_r.status_code}",
+                "detail":   "Transient; will retry on next cycle.",
+                "issue":    "twilio_probe_5xx",
+                "autofix":  None,
+                "probe_status": _r.status_code,
+            }
+    except Exception as _probe_err:
+        # Network blip — don't change status, fall through to baseline checks
+        logger_msg = f"twilio probe non-fatal: {type(_probe_err).__name__}"
+        try:
+            import logging
+            logging.getLogger(__name__).debug(logger_msg)
+        except Exception:
+            pass
+
     if not wa:
         # iter D-66 — WhatsApp via Twilio isn't the only path. If WHAPI
         # is wired (TOKEN set and not disabled), or SMS is the only need

@@ -1,3 +1,139 @@
+## 2026-06-10 — iter D-72 — Auth dedupe (P0) + Twilio auth circuit breaker
+
+### Part A — Auth duplicate eliminated (proven via E2E)
+
+D-71p system audit flagged `routers/ai_platform_router.py` and
+`routers/platform_auth_router.py` as both registering the same
+`/api/platform/auth/login` and `/api/platform/auth/register` routes.
+With `ai_platform_router` loading later in `registry.py` (line 599 vs
+578), FastAPI's last-loaded-wins gave the **weaker** router production
+traffic: sync bcrypt (event-loop blocker), 24h JWT TTL, no JTI, no
+revocation, no signup lifecycle.
+
+**Surgical fix** — only the duplicate handlers + their orphan helpers
+were removed from `ai_platform_router.py` (other endpoints in that file
+— `/tiers`, `/templates`, `/me`, `/api-key/*`, `/tools/*`, `/crews/*`,
+`/webhooks`, `/analytics`, `/v1/*` — stay intact and continue using the
+preserved `get_current_platform_user` helper).
+
+Deleted from `ai_platform_router.py`:
+- `PlatformUserCreate`, `PlatformUserLogin` Pydantic models
+- `hash_password`, `verify_password`, `create_token` helpers
+- `_login_attempts` in-memory rate-limit dict
+- `register_platform_user` route handler
+- `login_platform_user` route handler
+
+`platform_auth_router.py` is now the sole owner with:
+- async bcrypt via `asyncio.to_thread` (no event-loop block)
+- 7-day JWT TTL with JTI for revocation
+- MongoDB `jwt_blocklist` for real revocation on `/logout`
+- Unified admin+customer flow (db.users → platform_users fallback)
+- Full signup lifecycle (trial engine, business_id, billing seed,
+  welcome package, Telegram alert, ORA learner hook)
+- SHA-256 → bcrypt auto-migration on legacy logins
+- BIN-or-email identifier login
+
+**E2E proof** — `backend/tests/test_d72_auth_dedupe_e2e.py` hits the
+real backend over HTTP, with real MongoDB blocklist:
+1. Login → token has 168h TTL (winner), JTI claim, business_id/plan/is_admin
+2. Login response role = `super_admin` (winner-specific)
+3. `/api/platform/me` accepts the winner's token shape
+4. `/api/platform/auth/logout` → "Token revoked" via JTI blocklist
+5. Re-using revoked token → 401 "Token has been revoked"
+6. Login accepts `identifier` field (winner-only Pydantic model)
+7. Pydantic EmailStr validation on register endpoint
+8. Route table inspection asserts ai_platform_router does NOT own
+   `/auth/login` or `/auth/register` anymore
+
+`backend/tests/test_ai_platform_router_patches.py::test_rate_limit_
+assumption_documented` repurposed as a regression guard — fails if any
+future PR re-introduces `@router.post("/auth/login")` or the
+`_login_attempts` dict in ai_platform_router.
+
+**9/9 E2E tests pass.** Loser handler is provably dead.
+
+### Part B — Twilio auth circuit breaker (production blast loop)
+
+Founder pointed at the campaign logs. Direct probe to Twilio Accounts
+API returned HTTP 401 — the TWILIO_AUTH_TOKEN in `.env` is stale.
+Without a circuit breaker, every auto-blast cycle was:
+- spending ~15s on SMS HTTP + ~15s on voice HTTP per lead
+- producing identical "Authenticate" warnings 100+ times per cycle
+- timing out the autonomous-restart_blast task at 90s
+- showing Twilio as 🟢 GREEN in Campaign Health (creds *present* but
+  not actually working)
+
+**Real fix, no mocks.** Process-level breaker in
+`services/twilio_auth_breaker.py`:
+- `record_response(status, body)` — opens on 401, closes on 200/201/202
+- `mark_invalid_from_exception(exc)` — opens only when exception text
+  contains "401" / "unauthorized" / "authenticate" (transient network
+  blips don't open the breaker)
+- `is_open()` — thread-safe peek for hot paths
+- `status()` — surfaces `failure_count`, `opened_at`, `reason`, and
+  the **last 4 chars** of TWILIO_AUTH_TOKEN (never the full token)
+- One Telegram alert per 24h on first trip — actionable rotation hint
+- Auto-resets on backend restart (rotate token + `supervisorctl
+  restart backend` re-arms every Twilio code path)
+
+Wired in:
+1. `pillars/sales/routes/blast_service.py` SMS path (lines 286-318)
+2. `pillars/sales/routes/blast_service.py` voice path (lines 449-481)
+3. `shared/providers/twilio.py::get_twilio_client()` returns None
+   when breaker is open → every shared Twilio helper short-circuits
+   via its existing `if not client: return` early-out
+4. `shared/providers/twilio.py` send_whatsapp_message / send_sms /
+   make_voice_call catch blocks → `mark_invalid_from_exception(e)` so
+   any code path's 401 trips the breaker process-wide
+5. `services/campaign_health.py::_check_twilio` — RED when breaker
+   is open OR when a fresh 5s probe to Twilio's Accounts API returns
+   401. Detail message names the env var, shows token tail, and gives
+   the exact rotate-and-restart shell command
+
+**Campaign Health, post-D-72:**
+```
+🟢 8 green: ghost_scout, resend, whapi, voice_retell, proactive_ora,
+   template_perf, daily_brief, emergent_llm
+🟡 4 yellow: auto_blast pool empty, lead_pool caught up (2108/2150),
+   resend_webhook (no events 24h), engagement_24h (idle)
+🔴 1 RED: twilio — "Rotate TWILIO_AUTH_TOKEN (tail: …b6db) in
+   /app/backend/.env and `sudo supervisorctl restart backend`"
+```
+
+Honest. Actionable. No silent green.
+
+**Tests:** `backend/tests/test_d72_twilio_breaker.py` — 11 tests
+covering: breaker starts closed, opens on 401, closes on 200, ignores
+5xx/4xx-non-401, idempotent re-opens, exception-keyword filter,
+token-masking (no full secret leakage), blast_service source
+references the breaker, both SMS + voice paths call record_response,
+campaign_health returns RED when breaker is open, campaign_health
+preserves the "creds missing" RED case.
+
+**Combined D-72 suite:** 9 auth E2E + 11 twilio breaker + 9 router
+patches = **29/29 green** (2 pre-existing failures unrelated:
+test_jwt_secret_must_fail_fast was broken since config.py's 3-tier
+fallback shipped in iter 324d; test_tool_connect_marks_creds_as_
+unencrypted was stale since iter 326ww Fernet encryption refactor).
+
+### Files
+- `backend/routers/ai_platform_router.py` (-130 LOC — duplicate handlers + helpers)
+- `backend/services/twilio_auth_breaker.py` (new, +180 LOC)
+- `backend/services/campaign_health.py` (+_check_twilio probe + breaker surface)
+- `backend/pillars/sales/routes/blast_service.py` (+breaker gates on SMS + voice)
+- `backend/shared/providers/twilio.py` (get_twilio_client honors breaker, 3 catch blocks feed exceptions)
+- `backend/tests/test_d72_auth_dedupe_e2e.py` (new, 9 tests)
+- `backend/tests/test_d72_twilio_breaker.py` (new, 11 tests)
+- `backend/tests/test_ai_platform_router_patches.py` (rate-limit test repurposed as regression guard)
+
+### Founder action required
+Rotate `TWILIO_AUTH_TOKEN` (current tail …b6db) in
+`/app/backend/.env`, then `sudo supervisorctl restart backend`.
+Breaker will close on the next successful Twilio response and SMS
++ voice channels resume automatically.
+
+
+
 ## 2026-06-05 — iter D-70 — Live Codebase Health dashboard (auto-updating)
 
 **Goal:** founder asked for live, auto-updating codebase health — no script

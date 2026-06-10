@@ -222,19 +222,6 @@ CREW_TEMPLATES = {
 # MODELS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class PlatformUserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    company_name: str
-    full_name: str
-
-class PlatformUserLogin(BaseModel):
-    # Accept ANY string here so customers can sign in with either an
-    # email or their AUREM Business ID (BIN, e.g. "RERO-3DEJ"). The
-    # handler validates / resolves to a real email below.
-    email: str
-    password: str
-
 class ToolConnection(BaseModel):
     tool_type: str  # email, whatsapp, voice, etc.
     credentials: Dict[str, str]
@@ -254,21 +241,26 @@ class WebhookConfig(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 # AUTH HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode(), hashed.encode())
-
-def create_token(user_id: str, email: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "email": email,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
-        "iat": datetime.now(timezone.utc)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+#
+# iter D-72 — Auth dedupe: the /auth/login + /auth/register handlers that
+# previously lived in this file were inferior duplicates of the handlers in
+# `routers.platform_auth_router` (sync bcrypt, 24h TTL, no JTI, no
+# revocation, no signup lifecycle). Because both routers registered the
+# SAME path and this file loaded LATER in registry.py, prod was silently
+# running the weaker handler. Both handlers + the orphan helpers
+# (hash_password, verify_password, create_token, _login_attempts,
+# PlatformUserCreate, PlatformUserLogin) have been deleted.
+#
+# All `/api/platform/auth/*` traffic now hits platform_auth_router which:
+#   • runs bcrypt in asyncio.to_thread (no event-loop block)
+#   • issues 7-day JWTs with a JTI claim
+#   • supports real revocation via MongoDB jwt_blocklist on /logout
+#   • runs the full signup lifecycle (trial engine, business_id, billing
+#     seed, welcome package, telegram alert, ORA learner hook)
+#
+# `get_current_platform_user` below is still used by /me, /api-key/*,
+# /tools/*, /crews/*, /webhooks, /analytics so it stays — it already
+# tolerates tokens issued by platform_auth_router via the email fallback.
 
 async def get_current_platform_user(authorization: str = Header(None)):
     import logging
@@ -353,162 +345,6 @@ async def get_crew_templates():
     return {
         "templates": CREW_TEMPLATES,
         "categories": list(set(t["category"] for t in CREW_TEMPLATES.values()))
-    }
-
-
-@router.post("/auth/register")
-async def register_platform_user(data: PlatformUserCreate):
-    """Register new platform customer"""
-    # Check if email exists
-    existing = await db.platform_users.find_one({"email": data.email.lower()})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    user_id = f"plat_{secrets.token_hex(12)}"
-    api_key = f"rra_{secrets.token_hex(24)}"
-    
-    user_doc = {
-        "_id": user_id,
-        "email": data.email.lower(),
-        "password_hash": hash_password(data.password),
-        "company_name": data.company_name,
-        "full_name": data.full_name,
-        "tier": "starter",
-        "tier_status": "trial",  # trial, active, cancelled
-        "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=14),
-        "api_key": api_key,
-        "api_key_hash": hashlib.sha256(api_key.encode()).hexdigest(),
-        "usage": {
-            "crew_executions": 0,
-            "voice_minutes": 0,
-            "whatsapp_messages": 0,
-            "period_start": datetime.now(timezone.utc)
-        },
-        "tool_connections": {},
-        "webhooks": [],
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc)
-    }
-    
-    await db.platform_users.insert_one(user_doc)
-    
-    token = create_token(user_id, data.email.lower())
-    
-    return {
-        "user_id": user_id,
-        "email": data.email.lower(),
-        "token": token,
-        "api_key": api_key,
-        "tier": "starter",
-        "trial_ends_at": user_doc["trial_ends_at"].isoformat(),
-        "message": "Welcome! Your 14-day free trial has started."
-    }
-
-
-# FIX #6 (audit) — Note: this in-memory dict is single-pod only.
-# AUREM currently runs ONE backend pod via supervisor with ONE uvicorn worker,
-# so all login traffic hits the same process and the dict is sufficient.
-# IF we scale to multi-worker / multi-pod, this MUST move to Redis or a
-# MongoDB-backed counter (TTL index on first_at). Until then a brute-force
-# attacker would have to distribute requests across pods we don't have.
-# An asyncio.Lock would also help if we move to multi-worker uvicorn.
-_login_attempts = {}  # {ip: {"count": int, "first_at": float}}
-
-@router.post("/auth/login")
-async def login_platform_user(request: Request, data: PlatformUserLogin):
-    """Login platform customer — rate limited to 5/minute"""
-    import time
-    client_ip = request.client.host if request.client else "unknown"
-    now = time.time()
-    
-    # Rate limiting: 5 attempts per minute per IP
-    if client_ip in _login_attempts:
-        attempts = _login_attempts[client_ip]
-        if now - attempts["first_at"] > 60:
-            _login_attempts[client_ip] = {"count": 1, "first_at": now}
-        else:
-            attempts["count"] += 1
-            if attempts["count"] > 5:
-                raise HTTPException(status_code=429, detail="Too many login attempts. Try again in 1 minute.")
-    else:
-        _login_attempts[client_ip] = {"count": 1, "first_at": now}
-    
-    import hashlib
-
-    # ─── BIN-or-email login (P0 — customer convenience) ─────────
-    # If the input looks like a BIN (e.g. "RERO-3DEJ", "AURE-3M4G"),
-    # resolve it to the underlying email before the password check.
-    raw_input = (data.email or "").strip()
-    import re as _re
-    bin_pattern = _re.compile(r"^[a-z]{3,5}-[a-z0-9]{3,6}$", _re.IGNORECASE)
-    if "@" not in raw_input and bin_pattern.match(raw_input):
-        bid = raw_input.upper()
-        try:
-            from server import db as _srv_db
-            _db = _srv_db
-        except Exception:
-            _db = None
-        if _db is not None:
-            doc = await _db.platform_users.find_one(
-                {"business_id": bid}, {"_id": 0, "email": 1}
-            )
-            if not doc:
-                doc = await _db.users.find_one(
-                    {"business_id": bid}, {"_id": 0, "email": 1}
-                )
-            if doc and doc.get("email"):
-                # Replace the input email with the resolved one.
-                data.email = doc["email"]
-            else:
-                # Unknown BIN — return a generic 401 (don't leak whether
-                # a BIN exists or not).
-                raise HTTPException(status_code=401, detail="Invalid credentials")
-    elif "@" not in raw_input:
-        # Not a valid email AND not a BIN — generic 401
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # Check admin credentials from ENV (never hardcoded)
-    email_lower = data.email.lower()
-    admin_configs = [
-        {"email": os.getenv("ADMIN_EMAIL_1", "teji.ss1986@gmail.com").lower(), "hash_env": "ADMIN_PASSWORD_HASH_1"},
-        {"email": os.getenv("ADMIN_EMAIL_2", "admin@aurem.live").lower(), "hash_env": "ADMIN_PASSWORD_HASH_2"},
-        {"email": "admin@aurem.live", "hash_env": "ADMIN_PASSWORD_HASH_2"},
-    ]
-    for admin in admin_configs:
-        if email_lower == admin["email"]:
-            pw_hash = os.getenv(admin["hash_env"], "").replace("$$", "$")
-            if pw_hash and bcrypt.checkpw(data.password.encode("utf-8"), pw_hash.encode("utf-8")):
-                token = create_token("admin", email_lower)
-                return {
-                    "user_id": "admin",
-                    "email": email_lower,
-                    "token": token,
-                    "company_name": "AUREM Platform",
-                    "full_name": "AUREM Admin",
-                    "tier": "enterprise",
-                    "tier_status": "active",
-                    "role": "admin"
-                }
-    
-    # Check database if available
-    if db is None:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    user = await db.platform_users.find_one({"email": data.email.lower()})
-    if not user or not verify_password(data.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    token = create_token(user["_id"], user["email"])
-    
-    return {
-        "user_id": user["_id"],
-        "email": user["email"],
-        "token": token,
-        "company_name": user["company_name"],
-        "full_name": user.get("full_name", ""),
-        "tier": user["tier"],
-        "tier_status": user["tier_status"],
-        "role": user.get("role", "user")
     }
 
 

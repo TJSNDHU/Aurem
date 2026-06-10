@@ -306,6 +306,12 @@ See `/app/memory/tier1/progress.md` for the full ledger. Highlights:
 
   - **Tests**: 10/10 new pytest in `test_security_keys_d46.py` (triplet randomness, generate returns plaintext-once + applies to env + tails match, rotate marks old row, status hides plaintext, admin list aggregates + hides plaintext, history returns all rows, force-rotate inserts new active row + records reason, 404 on rotate-with-no-keys, 503 when DB missing). The crypt_key fixture pre-touches `JWT_SECRET`/`CORS_ORIGINS` via monkeypatch so test-driven env mutations don't leak into D-38's JWT assertions. Full active suite **123/123 green** across D-36→D-46 ring. Lint clean. Backend healthy on preview (`/api/developers/security/status` 401, `/api/admin/security-keys` 401, `/api/admin/security` 404 as expected).
 
+- **D-72 (2026-06-10 — Auth dedupe (P0 from D-71p audit) + Twilio circuit breaker)**
+  - Two-part safety slice. Full detail in `/app/memory/CHANGELOG.md`.
+  - **Auth dedupe**: `ai_platform_router.py` and `platform_auth_router.py` both registered `/api/platform/auth/login` + `/register`. Load order let the weaker handler (24h JWT, sync bcrypt, no JTI, no revocation) win prod. Deleted only the duplicates from `ai_platform_router.py` (kept its other endpoints intact). `platform_auth_router` is the sole owner — 7-day JWT with JTI, async bcrypt, real revocation via Mongo `jwt_blocklist`. E2E test hits real backend + real DB: login → token → /me → logout → revoked-token-401. **9/9 pass**.
+  - **Twilio breaker**: TWILIO_AUTH_TOKEN is stale → every blast cycle was 401-ing on SMS + voice. New `services/twilio_auth_breaker.py` opens on the first 401, short-circuits every Twilio call (blast_service + shared provider both), and surfaces RED in Campaign Health with the actionable rotation hint. **11/11 pass**. Founder must rotate the token + `sudo supervisorctl restart backend`.
+  - **D-72 suite**: 9 auth E2E + 11 twilio breaker + 9 router patches = **29/29 green** (2 pre-existing failures unrelated to D-72).
+
 
 ## Backlog (P0 → P2)
 
