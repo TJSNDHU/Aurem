@@ -297,18 +297,35 @@ export default function AdminControlCenter() {
 
         {/* Agents */}
         <Card title="4-Agent Autonomous System" icon={Zap} testid="cc-card-agents">
-          {(system?.agents || []).map((a) => (
-            <div key={a.agent_id} data-testid={`cc-agent-${a.agent_id}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-              <div>
-                <div style={{fontSize:12.5,color:'#FFF',fontWeight:600}}>{a.emoji} {a.name}</div>
-                <div style={{fontSize:10.5,color:C.textD,marginTop:2}}>{a.sent_today}/{a.daily_cap} today · {a.current_task}</div>
+          {(system?.agents || []).map((a) => {
+            // iter D-81d — derive badge tone from actual agent state.
+            // Previously hardcoded tone="bad" which painted all 4 agents
+            // red even when system verdict was "healthy" — pure visual
+            // contradiction. Real states:
+            //   active + cap not reached → LIVE (green)
+            //   active + cap reached     → CAPPED (neutral)
+            //   paused                   → PAUSED (neutral)
+            //   any other status         → DOWN  (bad)
+            const isActive = a.status === 'active' || a.status === 'running';
+            const isPaused = a.paused === true || a.status === 'paused';
+            const isCapped = a.cap_reached === true;
+            let badgeTone = 'bad';
+            let badgeLabel = (a.status || 'unknown').toUpperCase();
+            if (isPaused) { badgeTone = 'neutral'; badgeLabel = 'PAUSED'; }
+            else if (isActive && isCapped) { badgeTone = 'neutral'; badgeLabel = 'CAPPED'; }
+            else if (isActive) { badgeTone = 'good'; badgeLabel = 'LIVE'; }
+            return (
+              <div key={a.agent_id} data-testid={`cc-agent-${a.agent_id}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                <div>
+                  <div style={{fontSize:12.5,color:'#FFF',fontWeight:600}}>{a.emoji} {a.name}</div>
+                  <div style={{fontSize:10.5,color:C.textD,marginTop:2}}>{a.sent_today}/{a.daily_cap} today · {a.current_task}</div>
+                </div>
+                <div style={{display:'flex',gap:5}}>
+                  <Badge tone={badgeTone}>{badgeLabel}</Badge>
+                </div>
               </div>
-              <div style={{display:'flex',gap:5}}>
-                <Badge tone="bad">LIVE</Badge>
-                {a.paused && <Badge tone="neutral">Paused</Badge>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </Card>
 
         {/* Scheduler */}
