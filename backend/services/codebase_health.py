@@ -73,6 +73,39 @@ def _count_lines(path: str) -> int:
 
 
 def _python_imports(path: str) -> list[str]:
+    """Return list of imported module names — TOP-LEVEL only.
+
+    Lazy imports nested inside functions/methods are the canonical Python
+    idiom for breaking cycles. Counting them as cycle edges yields false
+    positives (e.g. `from services.foo import bar` inside a function is
+    intentional, not a cycle). We walk only the module body.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+            tree = ast.parse(fh.read(), filename=path)
+    except (SyntaxError, OSError):
+        return []
+    mods: list[str] = []
+    for node in tree.body:                              # ← module top-level
+        if isinstance(node, ast.Import):
+            mods.extend(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            mods.append(node.module)
+        elif isinstance(node, ast.If):
+            # Top-level conditional imports (e.g. `if TYPE_CHECKING:` blocks)
+            # still count — they're resolved at import time.
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Import):
+                    mods.extend(a.name for a in sub.names)
+                elif isinstance(sub, ast.ImportFrom) and sub.module:
+                    mods.append(sub.module)
+    return mods
+
+
+def _python_all_imports(path: str) -> list[str]:
+    """Every import in the file, including nested. Used for the per-file
+    `imports` count surfaced to the dashboard (informational, not for
+    cycle detection)."""
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as fh:
             tree = ast.parse(fh.read(), filename=path)
@@ -151,10 +184,11 @@ def _analyze_python(root: str, label: str) -> dict[str, Any]:
         if rel.startswith("tests/") or "/tests/" in rel:
             continue
         lines = _count_lines(path)
-        imps  = _python_imports(path)
-        files.append({"path": rel, "lines": lines, "imports": len(imps)})
+        top_imps = _python_imports(path)           # top-level only — for graph
+        all_imps = _python_all_imports(path)       # all — for display count
+        files.append({"path": rel, "lines": lines, "imports": len(all_imps)})
         mod = rel[:-3].replace(os.sep, ".")
-        for imp in imps:
+        for imp in top_imps:
             if imp.startswith(("routers.", "services.", "utils.",
                                 "pillars.", "middleware.", "shared.",
                                 "cto_skills.", "ora_skills.")):
@@ -184,12 +218,16 @@ def _analyze_python(root: str, label: str) -> dict[str, Any]:
         logger.warning(f"[codebase-health] radon scan failed: {e}")
     cc_top.sort(key=lambda x: -x["cc"])
 
-    # God-files: imports OR is-imported-by >= threshold
+    # God-files: imports OR is-imported-by >= threshold (TOP-LEVEL imports only —
+    # see _python_imports). Small utility files (<200 lines) that are only
+    # imported (out-degree zero) are legitimate shared utils, not god files.
     god_files = []
     for f in files:
         mod = f["path"][:-3].replace(os.sep, ".")
         in_n  = len(rev_graph.get(mod, ()))
         out_n = len(graph.get(mod, ()))
+        if out_n == 0 and f["lines"] < 200:
+            continue  # tiny shared utility — not a god file
         if max(in_n, out_n) >= _GOD_IMPORTS:
             god_files.append({
                 "path":            f["path"],
@@ -243,32 +281,57 @@ def _bucketize(files: list[dict[str, Any]]) -> dict[str, int]:
 
 # ─────────────────────── health score + action ──────────────────
 def _score_and_action(be: dict[str, Any], fe: dict[str, Any]) -> tuple[float, dict[str, str]]:
-    """Compute 0-10 health score + the single top actionable file."""
+    """Compute 0-10 health score + the single top actionable file.
+
+    Scoring philosophy:
+      • TRUE BREAKAGE (cycles, god files, runaway complexity) is penalized
+        absolutely — these block work and must reach zero.
+      • FILE SIZE is scored as a PROPORTION of the codebase. A mature
+        backend with 1,250+ files naturally accumulates 1-2% large files;
+        that is normal, not "broken". The signal we care about is the
+        *ratio* of refactor targets to total surface area.
+    """
     god      = len(be["god_files"])
     cyc      = len(be["circular"])
     big_red  = be["size_buckets"]["ge_1500"]
     big_org  = be["size_buckets"]["ge_800"]
     cc_red   = sum(1 for c in be["cc_top"] if c["cc"] >= _CC_RED)
+    total    = max(1, be["totals"]["files"])
+
+    # Proportions (0.0 - 1.0). 1% red files → 0.01.
+    red_ratio    = big_red / total
+    orange_ratio = big_org / total
+    cc_ratio     = cc_red  / total
 
     score = 10.0
-    score -= big_red  * 1.2       # each 1500+ file
-    score -= big_org  * 0.3
-    score -= god      * 0.6
-    score -= cyc      * 1.5       # circular imports are painful
-    score -= cc_red   * 0.4
-    score  = max(0.0, min(10.0, round(score, 1)))
+    # Hard breakage — must be zero.
+    score -= cyc * 1.5
+    score -= god * 0.8
+
+    # Soft amber zone — % of codebase that needs refactor.
+    # 1% red files = -0.6, 5% red = -3.0, 10% red = -6.0.
+    score -= red_ratio    * 60
+    score -= orange_ratio * 25
+    score -= cc_ratio     * 40
+
+    score = max(0.0, min(10.0, round(score, 1)))
 
     # Top actionable — pick the single most painful file across all signals.
     candidates: list[tuple[int, str, str]] = []  # (priority, path, reason)
     for f in be["biggest"][:3]:
         if f["lines"] >= _SIZE_RED:
-            r = f"{f['lines']} lines"
+            r = f"{f['lines']} lines, {f['imports']} imports"
             # Annotate if it also imports/is-imported by many
             for g in be["god_files"]:
                 if g["path"] == f["path"]:
-                    r += (f", imports {g['imports']} modules"
+                    r += (f" · imports {g['imports']} modules"
                            if g["imports"] > g["imported_by"]
-                           else f", imported by {g['imported_by']} modules")
+                           else f" · imported by {g['imported_by']} modules")
+                    break
+            # Annotate with worst CC function inside the file, if any.
+            for c in be["cc_top"]:
+                if c["path"] == f["path"] and c["cc"] >= _CC_ORANGE:
+                    r += f" · worst: {c['fn']}() cc={c['cc']}"
                     break
             candidates.append((f["lines"], f["path"], r))
     for c in be["cc_top"][:3]:
