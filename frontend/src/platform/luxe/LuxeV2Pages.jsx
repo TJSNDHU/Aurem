@@ -124,6 +124,13 @@ const useApi = (path, deps = [], intervalMs = null) => {
   const mountedRef = useRef(true);
 
   const reload = useCallback(async () => {
+    // iter D-81e — allow callers to pass null to defer the fetch until
+    // a prerequisite resolves (e.g. business_url not loaded yet). Without
+    // this guard, axios.get(null) crashed the dependent components.
+    if (!path) {
+      if (mountedRef.current) setLoading(false);
+      return;
+    }
     try {
       const { data: payload } = await v2api.get(path);
       if (mountedRef.current) {
@@ -159,19 +166,27 @@ const useApi = (path, deps = [], intervalMs = null) => {
 
 export const LuxeLiveHealth = () => {
   const toast = useV2Toast();
-  // iter D-71n — Mismatch fix: Home Dashboard reads scores for the
-  // CUSTOMER's first-leaderboard site, but Live Health was reading
-  // scores for the AUREM platform URL itself (window.location.origin).
-  // Result: Home showed customer's real scores, Live Health showed
-  // platform scores → tiles didn't match. Now both read the same
-  // site so the customer sees ONE consistent set of numbers.
-  const leaderboard = useApi('/api/repair/scoreboard?limit=1', null, 60000);
-  const _customerSite = leaderboard?.sites?.[0]?.url
-                     || leaderboard?.[0]?.url
-                     || (process.env.REACT_APP_PUBLIC_BASE_URL
-                          || (typeof window !== 'undefined' ? window.location.origin : '')
-                          || 'https://aurem.live');
-  const scores = useApi(`/api/repair/scores?url=${encodeURIComponent(_customerSite)}`, [], 30000);
+  // iter D-81e — Live Health must show the LOGGED-IN customer's own site,
+  // not the AUREM platform URL. Previous logic called /api/repair/scoreboard
+  // which doesn't exist (404), then fell back to window.location.origin
+  // (= aurem.live in production). Result: every customer saw the platform's
+  // scores instead of their own.
+  //
+  // Real source of truth: the BIN-scoped customer_business_profile written
+  // by the /onboarding flow (D-81b). Read it once, then scan that URL.
+  const profile = useApi('/api/onboarding/business-profile', [], 300000);
+  const profileUrl = profile.data?.profile?.business_url || null;
+  // Site monitor as secondary truth — if the customer set up monitoring
+  // before completing onboarding (rare but possible), prefer that.
+  const monitored = useApi('/api/site-monitor/me/sites', [], 300000);
+  const monitoredUrl = monitored.data?.sites?.[0]?.url || null;
+  const _customerSite = profileUrl || monitoredUrl || null;
+
+  const scores = useApi(
+    _customerSite ? `/api/repair/scores?url=${encodeURIComponent(_customerSite)}` : null,
+    [_customerSite],
+    30000,
+  );
   const incidents = useApi('/api/incidents/list?limit=20', [], 30000);
   const [scanning, setScanning] = useState(false);
   const [resolvingId, setResolvingId] = useState(null);
@@ -231,15 +246,35 @@ export const LuxeLiveHealth = () => {
 
   return (
     <div data-testid="page-live-health" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <PageHeader title="Live Health" subtitle="Real-time site health + incident log"
-                  right={<Btn testid="scan-now-btn" onClick={runScan} loading={scanning}><Activity size={12}/> Scan Now</Btn>} />
-      {scores.error && <ErrorCard error={scores.error} />}
-      <div className="av2-grid-4">
-        <Score label="GEO" value={geo} color="var(--dash-blue)" />
-        <Score label="SEC" value={sec} color="var(--dash-amber)" />
-        <Score label="ACC" value={acc} color="var(--dash-green)" />
-        <Score label="SEO" value={seo} color="var(--dash-purple)" />
-      </div>
+      <PageHeader title="Live Health" subtitle={_customerSite ? `Real-time site health for ${_customerSite}` : "Real-time site health + incident log"}
+                  right={<Btn testid="scan-now-btn" onClick={runScan} loading={scanning} disabled={!_customerSite}><Activity size={12}/> Scan Now</Btn>} />
+
+      {/* iter D-81e — guide customer to complete onboarding when no site URL
+          is known yet, instead of silently showing the AUREM platform's
+          scores (which would be misleading). */}
+      {!profile.loading && !_customerSite && (
+        <section className="av2-card" data-testid="liveh-no-site-empty"
+                 style={{ background: 'rgba(201,162,39,0.06)', border: '1px solid rgba(201,162,39,0.25)' }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Tell us your website</h3>
+          <p style={{ fontSize: 12, color: 'var(--dash-text-muted)', margin: '8px 0 12px' }}>
+            ORA needs your business URL to scan it for SEO, GEO, accessibility and security.
+            This only takes 30 seconds.
+          </p>
+          <Btn testid="liveh-go-onboarding-btn" onClick={() => window.location.href = '/onboarding'}>
+            Complete onboarding
+          </Btn>
+        </section>
+      )}
+
+      {_customerSite && scores.error && <ErrorCard error={scores.error} />}
+      {_customerSite && (
+        <div className="av2-grid-4">
+          <Score label="GEO" value={geo} color="var(--dash-blue)" />
+          <Score label="SEC" value={sec} color="var(--dash-amber)" />
+          <Score label="ACC" value={acc} color="var(--dash-green)" />
+          <Score label="SEO" value={seo} color="var(--dash-purple)" />
+        </div>
+      )}
       <section className="av2-card" data-testid="incidents-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Open Incidents</h3>

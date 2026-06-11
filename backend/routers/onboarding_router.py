@@ -160,10 +160,19 @@ _ALLOWED_INDUSTRIES = {
 _ALLOWED_COUNTRIES = {"CA", "US", "GB", "AU", "IN", "OTHER"}
 
 
-def _get_bin_ctx(request: Request) -> dict:
-    """Pull (user_id, email, business_id) from JWT. Returns plain dict.
-    BinContextMiddleware already runs, but we keep a self-contained
-    decoder so this router is testable in isolation.
+async def _get_bin_ctx(request: Request) -> dict:
+    """Pull (user_id, email, business_id) from JWT, with DB fallback for
+    legacy tokens.
+
+    iter D-81e — existing customer JWTs issued before D-81b don't carry
+    `business_id` on the claim set. Re-logging in every customer is
+    operationally hostile. Instead we mirror what `_require_user` in
+    `me_pwa_router` does: decode the token, look up the user in
+    `platform_users` by email, and derive the BIN from that record.
+
+    Returns dict with email, user_id, business_id. 401 if token invalid.
+    403 only if the user genuinely has no BIN on record (account never
+    properly provisioned).
     """
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -175,12 +184,29 @@ def _get_bin_ctx(request: Request) -> dict:
         claims = jwt.decode(auth[7:], secret, algorithms=["HS256"])
     except Exception:
         raise HTTPException(401, "Invalid token")
+
+    email = (claims.get("email") or claims.get("sub") or "").lower()
+    user_id = claims.get("user_id") or claims.get("sub") or claims.get("id") or ""
     bin_id = claims.get("business_id") or claims.get("bin")
+
+    # Fallback: derive BIN from platform_users by email (legacy tokens).
+    if not bin_id and email:
+        try:
+            db = get_db()
+            u = await db.platform_users.find_one(
+                {"email": email}, {"_id": 0, "bin": 1, "user_id": 1}
+            )
+            if u:
+                bin_id = u.get("bin") or "AURE-CUSTOMER"
+                user_id = user_id or u.get("user_id") or email
+        except Exception:
+            pass
+
     if not bin_id:
         raise HTTPException(403, "No business_id (BIN) on token — re-login required")
     return {
-        "user_id": claims.get("user_id") or claims.get("sub") or claims.get("id") or "",
-        "email": (claims.get("email") or "").lower(),
+        "user_id":     user_id,
+        "email":       email,
         "business_id": bin_id,
     }
 
@@ -236,7 +262,7 @@ async def save_business_profile(request: Request):
     }
     Returns { ok: true, business_id, redirect_to: "/dashboard" }.
     """
-    ctx = _get_bin_ctx(request)
+    ctx = await _get_bin_ctx(request)
     body = await request.json()
 
     business_name = (body.get("business_name") or "").strip()
@@ -323,7 +349,7 @@ async def save_business_profile(request: Request):
 async def get_business_profile(request: Request):
     """D-81b — read back the BIN's profile. Returns 404 if not yet saved
     so the frontend knows to show the onboarding form."""
-    ctx = _get_bin_ctx(request)
+    ctx = await _get_bin_ctx(request)
     db = get_db()
     doc = await db.customer_business_profile.find_one(
         {"business_id": ctx["business_id"]}, {"_id": 0}
