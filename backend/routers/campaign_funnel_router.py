@@ -44,6 +44,15 @@ _db = None  # populated by set_db at startup
 def set_db(db) -> None:
     global _db
     _db = db
+    # iter D-80 — email_events module is queried by _funnel_one for
+    # real Resend open/click counts. Wire its _db here so the funnel
+    # can read the data without depending on lead_lifecycle_router's
+    # startup order.
+    try:
+        from services import email_events as _ee
+        _ee.set_db(db)
+    except Exception:
+        pass
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────
@@ -130,7 +139,40 @@ async def _funnel_one(campaign_id: Optional[str],
             other_events[ch] = n
 
     touches_total = sum(touches_by_channel.values())
-    opens_total = sum(opens_by_channel.values())
+    opens_total = sum(opens_by_channel.values())  # pixel views (D-75)
+    # iter D-80 — add REAL Resend opens/clicks to the funnel.
+    # email_events is the canonical per-email engagement log (the
+    # pixel-only outreach_history rows were a partial signal from
+    # D-75 Part 1 deliverable links only). We sum both sources and
+    # break them out so the UI can show "pixel vs resend" honestly.
+    real_opens = 0
+    real_clicks = 0
+    real_delivered = 0
+    real_bounced = 0
+    email_events_source_missing = False
+    # iter D-80 — pre-fetch the collection list ONCE so both this
+    # email_events check AND the replies-collection check below
+    # share a single round-trip. Previously the email_events block
+    # ran before `known_collections` was hydrated, raising
+    # TypeError("argument of type 'NoneType' is not iterable") which
+    # got swallowed by the except clause and silently flagged
+    # source_missing=True even though the data was present.
+    if known_collections is None:
+        known_collections = set(await _db.list_collection_names())
+    try:
+        from services import email_events as _ee
+        if "email_events" in known_collections:
+            real_opens = await _ee.count_for_campaign(campaign_id, "email.opened")
+            real_clicks = await _ee.count_for_campaign(campaign_id, "email.clicked")
+            real_delivered = await _ee.count_for_campaign(campaign_id, "email.delivered")
+            real_bounced = await _ee.count_for_campaign(campaign_id, "email.bounced")
+        else:
+            email_events_source_missing = True
+    except Exception as _ee_e:
+        logger.warning(f"[funnel] email_events read failed: {_ee_e}")
+        email_events_source_missing = True
+    pixel_opens = opens_total
+    opens_total = pixel_opens + real_opens  # combined
     # iter D-78 audit — surface "uncategorized" channels honestly so a
     # future channel (e.g. linkedin, telegram) doesn't silently swell
     # other_outreach_events. Log when the bucket is non-trivial so we
@@ -209,9 +251,26 @@ async def _funnel_one(campaign_id: Optional[str],
         },
         "opens": {
             "total": opens_total,
+            "pixel_opens": pixel_opens,
+            "resend_opens": real_opens,
             "by_channel": opens_by_channel,
-            "source_collection": "campaign_leads.outreach_history (type=report_view|sample_view)",
-            "note": "Real pixel hits from /api/r/scan/{slug} and /api/r/sample/{slug}",
+            "source_collection": (
+                "campaign_leads.outreach_history (pixel) "
+                "+ email_events (Resend webhook, D-80)"
+            ),
+            "email_events_source_missing": email_events_source_missing,
+            "note": (
+                "pixel = report_view/sample_view hits on D-75 deliverable "
+                "links · resend = real /webhook/resend email.opened events"
+            ),
+        },
+        "resend_engagement": {
+            "delivered": real_delivered,
+            "opened": real_opens,
+            "clicked": real_clicks,
+            "bounced": real_bounced,
+            "source_collection": "email_events",
+            "source_missing": email_events_source_missing,
         },
         "replies": {
             "total": replies_total,

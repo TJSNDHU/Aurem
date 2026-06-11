@@ -25,6 +25,14 @@ _db = None
 def set_db(db):
     global _db
     _db = db
+    # iter D-80 — propagate to email_events so its module-level _db
+    # is wired in the same startup pass. Indexes are created
+    # lazily on first record_event call.
+    try:
+        from services import email_events as _ee
+        _ee.set_db(db)
+    except Exception:
+        pass
 
 
 def _get_db():
@@ -236,7 +244,11 @@ async def _find_lead_by_email(db, email: str) -> Optional[dict]:
         return None
     return await db.campaign_leads.find_one(
         {"email": {"$regex": f"^{email}$", "$options": "i"}},
-        {"_id": 0, "lead_id": 1, "lifecycle_stage": 1, "business_name": 1, "flame_score": 1},
+        {"_id": 0, "lead_id": 1, "lifecycle_stage": 1, "business_name": 1,
+         "flame_score": 1,
+         # iter D-80 — include campaign_id so the resend webhook can
+         # propagate it into email_events for funnel aggregation.
+         "campaign_id": 1},
     )
 
 
@@ -305,10 +317,10 @@ async def resend_webhook(request: Request):
     # tags / headers Resend sends back include the template_id we
     # passed in `send_email(...)`. Best-effort, never blocks the
     # webhook.
+    template_id = ""
     try:
         from services.template_performance import record_event as _tp_evt
         tags = data.get("tags") or []
-        template_id = ""
         for t in tags:
             if isinstance(t, dict) and t.get("name") == "template_id":
                 template_id = t.get("value") or ""
@@ -326,6 +338,31 @@ async def resend_webhook(request: Request):
         logger.warning(f"[lead-lifecycle] tpl-perf event drop: {_tp_e}")
 
     lead = await _find_lead_by_email(db, email_to)
+    # iter D-80 — Resend webhook → email_events time-series.
+    # Persist EVERY event (not just opens/clicks) into the canonical
+    # email_events collection so the Campaign Command Funnel can
+    # aggregate real per-email opens/clicks instead of relying on
+    # pixel-only outreach_history rows. Lead/campaign join happens
+    # here once — funnel queries no longer need it.
+    try:
+        from services import email_events as _ee
+        click_url = ""
+        if event_type == "email.clicked":
+            click_url = (data.get("click") or {}).get("link") or ""
+        await _ee.record_event(
+            event_type=event_type,
+            email_id=data.get("email_id") or "",
+            email_to=email_to,
+            raw=event,
+            lead_id=(lead or {}).get("lead_id"),
+            campaign_id=(lead or {}).get("campaign_id"),
+            template_id=template_id or None,
+            click_url=click_url or None,
+            created_at=data.get("created_at") or event.get("created_at"),
+        )
+    except Exception as _ee_e:
+        logger.warning(f"[lead-lifecycle] email_events persist drop: {_ee_e}")
+
     if not lead:
         return {"received": True, "matched_lead": False, "type": event_type}
 

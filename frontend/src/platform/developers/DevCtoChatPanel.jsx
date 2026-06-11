@@ -232,9 +232,13 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
     return () => window.removeEventListener("aurem-maxx-toggle", onExt);
   }, []);
 
-  async function send(textOverride) {
+  async function send(textOverride, modeOverride) {
     const text = (textOverride ?? input).trim();
     if (!text || busy) return;
+    // iter D-80 — `modeOverride` lets the "Apply proposed plan" button
+    // re-run the conversation in execute mode without flipping the
+    // user's persisted preference. Falls back to the toggle state.
+    const useMode = modeOverride || mode;
     setError(null);
     const next = [...messages, { role: "user", content: text }];
     setMessages(next);
@@ -257,7 +261,7 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
           model_tier: maxx ? "frontier" : (modelTier || "cheap"),
           // iter D-79 — Plan/Execute toggle. "plan" → server skips
           // skill invocation, LLM forced into propose-only output.
-          mode,
+          mode: useMode,
         }),
       });
       if (!r.ok) {
@@ -268,7 +272,13 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                     catch { return `HTTP ${r.status}`; } })();
         throw new Error(friendly);
       }
-      setMessages(m => [...m, { role: "assistant", content: "" }]);
+      setMessages(m => [...m, {
+        role: "assistant",
+        content: "",
+        // iter D-80 — remember which mode produced this turn so the
+        // "Apply proposed plan" button only shows on plan-mode replies.
+        mode_used: useMode,
+      }]);
       const reader = r.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -733,6 +743,54 @@ export default function DevCtoChatPanel({ onTokensUpdate, fullScreen = false,
                                       index={i}
                                       messageId={m.id}
                                       projectId={projectId} />
+                  )}
+                  {/* iter D-80 — "Apply proposed plan" button. Only
+                      appears on the most recent plan-mode assistant
+                      reply that hasn't been applied yet. One click
+                      re-runs in execute mode without retyping. */}
+                  {m.role === "assistant"
+                   && m.mode_used === "plan"
+                   && displayed && !busy
+                   && i === messages.length - 1
+                   && !m.applied && (
+                    <div style={{ marginTop: 10,
+                                   display: "flex", alignItems: "center",
+                                   gap: 8 }}>
+                      <button
+                        data-testid="dev-cto-apply-plan"
+                        onClick={() => {
+                          // Mark this proposal as applied so the
+                          // button can't be double-clicked, then
+                          // re-run as execute.
+                          setMessages(prev => prev.map((mm, idx) =>
+                            idx === i ? { ...mm, applied: true } : mm,
+                          ));
+                          send(
+                            "Approved — execute the plan above as written. "
+                            + "Run the skills now.",
+                            "execute",
+                          );
+                        }}
+                        style={{
+                          background: "linear-gradient(135deg, "
+                                      + "rgba(34,197,94,0.22), "
+                                      + "rgba(34,197,94,0.12))",
+                          border: "1px solid rgba(34,197,94,0.45)",
+                          color: "#86EFAC", borderRadius: 4,
+                          padding: "5px 12px", cursor: "pointer",
+                          fontSize: 11, fontWeight: 500,
+                          display: "inline-flex",
+                          alignItems: "center", gap: 6,
+                          transition: "all 160ms ease",
+                        }}
+                        title="Re-run the plan above in execute mode. Skills will fire.">
+                        ▶ Apply proposed plan
+                      </button>
+                      <span style={{ fontSize: 10,
+                                      color: "var(--dash-text-muted)" }}>
+                        plan-mode reply &middot; click to execute
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

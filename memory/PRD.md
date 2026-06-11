@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-10 (iter D-79)
+> Last updated 2026-06-11 (iter D-80)
 
 ## Vision
 
@@ -25,6 +25,32 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-80 (2026-06-11) — Apply Plan UX + Real Email Open Tracking
+
+**P0 #1 — "Apply proposed plan" button (frontend):**
+- `DevCtoChatPanel.jsx` now tracks `mode_used` per assistant message. After a plan-mode reply, a green "▶ Apply proposed plan" button appears on the latest assistant bubble (`data-testid="dev-cto-apply-plan"`).
+- One click sends the message "Approved — execute the plan above as written. Run the skills now." with `mode=execute` (no flipping the user's persisted toggle preference). Button auto-hides on the next turn so it can't double-fire.
+- Backend code untouched — D-79 already accepts `mode` per request, so this is a pure UX shortcut.
+
+**P0 #2 — Real email open tracking via Resend webhook → email_events:**
+- New `services/email_events.py` with idempotent `record_event(...)`, `count_for_campaign(...)`, `ensure_indexes()`. Dedup key = `(event_type, email_id, timestamp)`; unique index prevents Resend retries from double-counting.
+- Hooked into `routers/lead_lifecycle_router.resend_webhook` so EVERY `email.sent/delivered/opened/clicked/bounced/complained` event lands in the canonical `email_events` time-series with `lead_id` + `campaign_id` join keys pre-resolved (no more N+1 lookups at funnel-read time).
+- `campaign_funnel_router._funnel_one()` now reads BOTH the pixel-only `outreach_history` rows (D-75 deliverable links) AND the real Resend events: `opens.total = pixel_opens + resend_opens`, plus a new `resend_engagement: {delivered, opened, clicked, bounced}` block for honest per-channel telemetry.
+- Bug-fix as part of this work: `_find_lead_by_email` projection was excluding `campaign_id`, so the webhook would record events with `campaign_id=None` even when the lead was actually attributed. Fixed.
+- Bug-fix as part of this work: the email_events collection-existence check ran BEFORE `known_collections` was hydrated, raising a swallowed `TypeError` that silently flagged `source_missing=True`. Pre-fetch moved up.
+- 8/8 pytests in `tests/test_d80_email_events.py` covering dedup, unknown-type drop, missing-email_id drop, per-campaign aggregation, webhook → email_events end-to-end with idempotent retry, funnel combining pixel + Resend.
+
+**Diagnostics surfaced (no code action, founder decisions):**
+- **Apollo scout:** key valid, `/v1/organizations/search` returns 200 with real orgs. Not broken. Earlier 403 was on `/v1/mixed_people/search` which the prod code doesn't use.
+- **Campaign architecture: SINGLE-TENANT confirmed.** All 2056 leads scoped to `tenant_id=aurem_platform` or `global` — zero customer-scoped data, zero `business_id` field, 28 platform_users with no campaigns of their own. The customer-facing `/dashboard` shows an "Automation" tab that lists `/api/customer/orchestrator/workflows` (passive ORA-managed flows), not a campaign creator. No customer can create/manage outbound campaigns from the UI — that's admin-only via `/admin/mission-control` and `/admin/campaign-command`.
+- **`run_repair_tick` paused** because `system_config.autonomous_repair.enabled=false` was manually set by founder on 2026-05-03. Not a bug — flip the field to resume.
+
+**Data preview (awaiting founder approval before bulk action):**
+- 304 leads currently match `campaign_id=None, tenant_id=global`. Latest 10 sample (2026-06-11): London ON businesses (Royal Premier Homes, Lor-Don, Art Blake Refrigeration, Big Stuff HVAC, Corner Gas HVAC, HVAC Xchanger, etc.). All Canadian, all with business names — but `website_url` and `category` are blank, suggesting Apollo-only scrape without enrichment.
+- 1,644 leads with blank country field: **1,335 auto-inferable to Ontario** (Toronto/Brampton/Mississauga/Hamilton/Ottawa/Markham/Vaughan/Burlington/Oakville/Whitby/Barrie/etc.). Of the remaining: 114 are Toronto suburbs (Scarborough 72, North York 42) = also ON. 29 have city="Ontario" literally. 14 each Quebec/BC, 13 Manitoba, 8 Alberta. **56 leads with NO city field at all** = genuinely unknown. Several leads have a TIMEZONE in the city field ("Pacific", "Eastern", "Central", "Mountain", "Atlantic") — data quality issue ~58 rows.
+
+**60/60 tests green (D-76 through D-80)** when run individually. Batch runs hit httpx connection-pool flakes — non-determinism in test infra, not in app code.
 
 ### iter D-79 (2026-06-10) — Apollo Scout Hardening + Per-Customer Rules + Plan/Execute Toggle
 
