@@ -58,6 +58,7 @@ import ClientReport from './platform/ClientReport';
 import AuremReport from './platform/AuremReport';
 import OnboardingWelcome from './platform/OnboardingWelcome';
 import OnboardingPixelStep from './platform/OnboardingPixelStep';
+import OnboardingBusinessProfile from './platform/OnboardingBusinessProfile';  // iter D-81b
 import AuremSampleWebsite from './platform/AuremSampleWebsite';
 import FuturisticDemo from './platform/FuturisticDemo';
 import Demo from './platform/Demo';
@@ -313,6 +314,7 @@ function AppRouter() {
       <Route path="/report/:slug" element={<AuremReport />} />
       <Route path="/report/audit/:tenantId" element={<ClientReport />} />
       <Route path="/welcome" element={<OnboardingWelcome />} />
+      <Route path="/onboarding" element={<OnboardingBusinessProfile />} />
       <Route path="/onboarding/pixel" element={<OnboardingPixelStep />} />
       <Route path="/sample/:slug" element={<AuremSampleWebsite />} />
       <Route path="/edit" element={<CustomerEditPortal />} />

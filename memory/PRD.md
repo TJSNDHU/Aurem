@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-11 (iter D-81a)
+> Last updated 2026-06-11 (iter D-81b)
 
 ## Vision
 
@@ -25,6 +25,21 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-81b (2026-06-11) — Customer Onboarding (BIN-scoped) + Data Cleanup
+
+**P0 — Customer Activation flow:** `routers/onboarding_router.py`
+- `POST /api/onboarding/business-profile` — JWT must carry `business_id` (BIN), else 403. Validates: `business_name` + `business_url` (http/https) + `industry` (21-item whitelist) + `target_city` + `target_country` (CA/US/GB/AU/IN/OTHER). Upserts to `customer_business_profile` keyed by BIN (atomic, idempotent — re-POST flips `is_new=false`, no duplicate rows). Marks `business_profile` complete in the wizard checklist. Writes `audit_trail` row `onboarding.business_profile.saved`. Fires Resend welcome email best-effort on first creation (never blocks success).
+- `GET /api/onboarding/business-profile` — returns `{exists: bool, profile?}` for the calling BIN. Used by the frontend to skip the form when already activated.
+- Frontend `platform/OnboardingBusinessProfile.jsx` mounted at `/onboarding`. Auto-skips to `/dashboard` when profile already exists; routes to `/my` (login) when token missing/invalid. Full data-testid coverage (`onboarding-business-profile`, `onb-input-business-name|business-url|target-city`, `onb-select-industry|target-country`, `onb-submit-btn`, `onb-error`).
+- CTO skills `edit_file` + `write_file` (`cto_skills/edit_file.py`) — both BIN-audit-logged to `cto_file_edit_audit` per write. Unlocks the CTO agent's self-repair capability for the 331 tenant-scope violations queued by D-81a.
+
+**P2 — Data cleanup:** `scripts/cleanup_d81b.py` (dry-run by default, `--apply` to write).
+- Mutation 1 (304 bulk leads → founder BIN): **already done by D-81a backfill — 0 matches remaining.**
+- Mutation 2 (missing country field → infer from city): **1,168 leads tagged `country="CA"`** via 47-city CA inference table (ON / QC / BC / AB / MB / SK / Atlantic). 476 leads left untouched (no city or unknown city — never guess wrong).
+- Audit row `cleanup_d81b.applied` written to `audit_trail`.
+
+**Tests:** `tests/test_d81b_onboarding.py` — 11/11 green (auth gates, body validation table, BIN-scoped write, idempotency, audit trail, wizard checklist, GET round-trip, **cross-BIN isolation acceptance test with 2 synthetic customers**).
 
 ### iter D-81a (2026-06-11) — Tenant Isolation Foundation: Backfill + Boot Guard + Stripe Protection + Cross-BIN E2E
 
