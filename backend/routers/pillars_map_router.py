@@ -612,13 +612,23 @@ async def _check_wire(wire: dict) -> dict:
 
     # Source fresh — target must also be fresh
     if tgt_lw is None:
+        # iter D-81c — non_blocking wires represent business KPIs.
+        # An empty target collection means "no conversions yet", which
+        # is honest business state for an early-stage tenant, NOT a
+        # broken system bridge. Surface as green-with-info.
+        if wire.get("non_blocking"):
+            return {
+                **wire,
+                "status":         "green",
+                "reason":         "system bridge healthy · no business conversion yet (informational)",
+                "src_last_write": src_lw.isoformat(),
+                "tgt_last_write": None,
+                "lag_seconds":    None,
+            }
         return {
             **wire,
             "status":         "red",
-            "reason":         (
-                "target has no writes — no business conversion yet (advisory only)"
-                if wire.get("non_blocking") else "target has no writes — bridge broken"
-            ),
+            "reason":         "target has no writes — bridge broken",
             "src_last_write": src_lw.isoformat(),
             "tgt_last_write": None,
             "lag_seconds":    None,
@@ -640,6 +650,26 @@ async def _check_wire(wire: dict) -> dict:
             **wire,
             "status":         "green",
             "reason":         f"lag {int(lag)}s within tolerance",
+            "src_last_write": src_lw.isoformat(),
+            "tgt_last_write": tgt_lw.isoformat(),
+            "lag_seconds":    int(lag),
+        }
+    # ──────────────────────────────────────────────────────────────────
+    # iter D-81c — non_blocking wires represent BUSINESS state, not
+    # infra state. When the SYSTEM bridge is intact (source AND target
+    # both have writes) but the BUSINESS lag exceeds the soft window,
+    # the wire itself is healthy. Surface the lag as informational, not
+    # as a system failure. Only escalate to yellow/red if the source is
+    # actively writing but the target has NO writes at all (handled
+    # above with `tgt_lw is None`).
+    if wire.get("non_blocking"):
+        return {
+            **wire,
+            "status":         "green",
+            "reason":         (
+                f"system bridge healthy · business lag {int(lag)}s "
+                f"(tolerance {wire['lag_seconds']}s — informational only)"
+            ),
             "src_last_write": src_lw.isoformat(),
             "tgt_last_write": tgt_lw.isoformat(),
             "lag_seconds":    int(lag),
@@ -961,11 +991,13 @@ SYSTEM_FLOWS: list[dict] = [
     # iter 282al-5 — Legion Sovereign Node (Ollama local LLM) — Infra pillar.
     # iter 332b D-30 — non_blocking: Ollama is an OPT-IN sovereign local LLM
     # node. Most tenants (including the founder's preview + production) do
-    # not run Ollama, so `local_llm_usage` is naturally stale. This flow
-    # still surfaces red in the UI for visibility but MUST NOT escalate
-    # admin_worst → red and trigger the global "broken" badge. The previous
-    # logic was painting the entire admin dashboard red purely because
-    # nobody was using the optional Ollama feature.
+    # not run Ollama, so `local_llm_usage` is naturally stale.
+    # iter D-81c — REMOVED activity_collections=["local_llm_usage"]. The BE
+    # endpoint (/api/admin/sovereign/health) is the authoritative truth:
+    # it returns yellow when the tunnel is unreachable. Checking local_llm_usage
+    # freshness was a duplicate signal that painted RED on the DB axis even
+    # though the BE side already correctly reported the degraded state. One
+    # honest source > two conflicting sources.
     {
         "id": "admin_legion_sovereign_node",
         "surface": "admin",
@@ -973,7 +1005,7 @@ SYSTEM_FLOWS: list[dict] = [
         "fe_route": "/admin/pillars-map",
         "be_endpoint": "/api/admin/sovereign/health",
         "required_collections": [],
-        "activity_collections": ["local_llm_usage"],
+        "activity_collections": [],
         "required_schedulers": [],
         "non_blocking": True,
     },

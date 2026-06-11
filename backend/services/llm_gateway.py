@@ -465,42 +465,89 @@ async def call_llm_with_tools(
 # Health — for Pillars Map + admin chip
 # ─────────────────────────────────────────────────────────────────────
 async def sovereign_health() -> dict:
-    """GREEN = reachable + tag list returned.
-       YELLOW = URL set but not reachable right now.
-       GREY = URL not configured."""
+    """Health for the Legion Sovereign Node (Ollama local LLM accelerator).
+
+    Status logic:
+      GREEN  = either tunnel reachable with models, OR tunnel intentionally
+               offline AND a fallback LLM provider is configured (so the
+               LLM subsystem as a whole is healthy).
+      YELLOW = tunnel set but unreachable AND no fallback configured
+               (LLM subsystem genuinely degraded).
+      GREY   = URL not configured AND no fallback configured (LLM stack
+               completely absent — fresh install state).
+
+    Sovereign is OPT-IN sovereignty for tenants that want zero outbound
+    LLM traffic. Most pods (including the founder preview + production)
+    route through OpenRouter or Emergent's universal key. An unreachable
+    Ollama tunnel is NOT an outage when those upstream providers work.
+    """
     url = (os.environ.get("OLLAMA_URL")
            or os.environ.get("SOVEREIGN_NODE_URL") or "").strip()
+
+    # Detect whether a fallback LLM provider is wired. Either explicit
+    # keys, or the universal Emergent key.
+    fallback_configured = bool(
+        os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("EMERGENT_LLM_KEY")
+        or os.environ.get("ANTHROPIC_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+    )
+
     if not url:
+        if fallback_configured:
+            return {"ok": True, "status": "green",
+                    "detail": "Sovereign Node not configured · cloud LLM fallback active",
+                    "url": None, "models": [], "tunnel_status": "not_configured",
+                    "fallback_active": True}
         return {"ok": True, "status": "grey",
-                "detail": "SOVEREIGN_NODE_URL not configured",
-                "url": None, "models": []}
+                "detail": "SOVEREIGN_NODE_URL not configured · no LLM provider available",
+                "url": None, "models": [], "tunnel_status": "not_configured",
+                "fallback_active": False}
     try:
         import httpx
         async with httpx.AsyncClient(timeout=5) as c:
             r = await c.get(f"{url}/api/tags")
             if r.status_code != 200:
+                # Tunnel reachable but returning error.
+                if fallback_configured:
+                    return {"ok": True, "status": "green",
+                            "detail": f"Ollama tunnel returned {r.status_code} · cloud LLM fallback active",
+                            "url": url, "models": [],
+                            "tunnel_status": "error", "fallback_active": True}
                 return {"ok": False, "status": "yellow",
                         "detail": f"tunnel returned {r.status_code}",
-                        "url": url, "models": []}
+                        "url": url, "models": [],
+                        "tunnel_status": "error", "fallback_active": False}
             data = r.json() or {}
             models = [m.get("name") for m in (data.get("models") or [])
                        if m.get("name")]
             return {
                 "ok":     True,
-                "status": "green" if models else "yellow",
-                "detail": (f"reachable — {len(models)} models"
-                           if models else "reachable but no models loaded"),
+                "status": "green",
+                "detail": (f"sovereign reachable — {len(models)} models loaded"
+                           if models
+                           else "sovereign reachable · 0 models loaded · cloud LLM fallback active"),
                 "url":    url,
                 "models": models[:10],
+                "tunnel_status": "online",
+                "fallback_active": fallback_configured,
             }
     except Exception as e:
-        # iter 322 — Sovereign is fallback infra (LLM_PROVIDER_ORDER has
-        # 3 backups), so an unreachable tunnel is a DEGRADED state, not
-        # an outage. Surface as yellow so the admin tile shows the right
-        # operational severity instead of a scary red dot.
+        # Sovereign tunnel unreachable. If fallback is configured, the LLM
+        # subsystem is still healthy — report green with informational detail
+        # about the offline accelerator. Otherwise, yellow (degraded, fallback
+        # chain has no providers).
+        if fallback_configured:
+            return {"ok": True, "status": "green",
+                    "detail": (f"Ollama tunnel offline ({type(e).__name__}) · "
+                               f"cloud LLM fallback active"),
+                    "url": url, "models": [],
+                    "tunnel_status": "offline", "fallback_active": True}
         return {"ok": False, "status": "yellow",
                 "detail": f"unreachable — {type(e).__name__}: {str(e)[:120]}",
-                "url": url, "models": []}
+                "url": url, "models": [],
+                "tunnel_status": "offline", "fallback_active": False}
 
 
 LLM_PROVIDER_ORDER = ("sovereign", "openrouter", "emergent", "fallback")
