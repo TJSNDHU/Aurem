@@ -155,8 +155,8 @@ async def audit_existing_site(db, lead: Dict[str, Any]) -> Dict[str, Any]:
     # 1) scan
     scan: Dict[str, Any] = {}
     try:
-        from services.webclaw_client import scan_website
-        scan = await scan_website(website, db) or {}
+        from services.website_scraper import scan_website
+        scan = await scan_website(website) or {}
     except Exception as e:
         logger.warning(f"[repair] scan_website failed: {e}")
 
