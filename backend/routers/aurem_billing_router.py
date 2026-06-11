@@ -318,6 +318,32 @@ async def stripe_webhook(
     logger.info(f"[Billing] Webhook received: {event_type}")
     
     try:
+        # iter D-81a — Tenant scope guard for Stripe webhooks. Reject
+        # any subscription/invoice/customer event whose metadata
+        # doesn't carry a valid business_id. Closes the cross-tenant
+        # write path that would otherwise bypass the in-process guard.
+        if event_type.startswith(("customer.subscription.",
+                                    "invoice.",
+                                    "checkout.session.completed")):
+            try:
+                from services.tenant_scope_guard import (
+                    validate_stripe_subscription_event,
+                )
+                # Build a dict-shaped event the guard understands.
+                _evt = {"data": {"object": dict(event.data.object)}}
+                _bid = validate_stripe_subscription_event(_evt)
+                logger.info(
+                    f"[Billing][D-81a] event {event_type} accepted "
+                    f"for BIN={_bid}"
+                )
+            except ValueError as _bid_err:
+                logger.error(
+                    f"[Billing][D-81a] REJECTED {event_type} — {_bid_err}"
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"stripe_metadata_missing_business_id: {_bid_err}",
+                )
         # Handle subscription events
         if event_type == "customer.subscription.created":
             await billing_service.handle_subscription_created(event.data.object)

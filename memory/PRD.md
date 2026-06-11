@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-11 (iter D-80)
+> Last updated 2026-06-11 (iter D-81a)
 
 ## Vision
 
@@ -25,6 +25,40 @@ compliant. Sovereign data residency, plain-English communication
 5. **No silent failures** — every error must surface in unified_audit_log.
 
 ## What's been implemented (chronological highlights)
+
+### iter D-81a (2026-06-11) — Tenant Isolation Foundation: Backfill + Boot Guard + Stripe Protection + Cross-BIN E2E
+
+**Step 1 — Idempotent backfill migration:** `scripts/backfill_business_id_d81a.py`
+- Dry-run mode (default) prints per-collection counts before any write
+- `--apply` mode tags every unscoped row with `business_id="AUR-FNDR-001"` (founder dogfood BIN) and verifies 0 leftover rows post-write
+
+**Before/after row counts (live MongoDB):**
+| Collection | Before unscoped | After unscoped | Rows tagged |
+|---|---|---|---|
+| campaign_leads | 2,156 | **0** | 2,156 |
+| outreach_log | 655 | **0** | 655 |
+| email_events | 0 | 0 | 0 |
+| repair_jobs | 23 | **0** | 23 |
+| scan_history | 25 | **0** | 25 |
+| consent_records | 1 | **0** | 1 |
+| audit_trail | 100 | **0** | 100 |
+| inbound_replies | 4 | **0** | 4 |
+| pending_approvals | 2 | **0** | 2 |
+| ora_cto_proposals | 43 | **0** | 43 |
+| **TOTAL** | **3,009** | **0** | **3,009** |
+
+**Step 2 — Boot-time tenant scope guard:** `services/tenant_scope_guard.py`
+- `scan_routers()` — static analyzer walks `routers/`, `services/`, `pillars/` for Mongo query calls on the 15 scoped collections, flags any query missing a `business_id` filter in its ±8-line context window with exact `file:line` + snippet
+- `ADMIN_ONLY_FILES` allowlist (26 files) for founder dashboards / webhooks / auth that legitimately read cross-BIN
+- Inline `# tenant_scope_guard: admin_cross_tenant` comment escape hatch for one-off cross-tenant queries
+- `enforce_at_boot()` wired into `server.py` startup_event — default = WARN with full file:line list, `AUREM_TENANT_SCOPE_STRICT=true` flips to FAIL boot
+- **Current live state: 331 unscoped queries surfaced as warnings on every boot.** That's the actual backlog work queue for D-81b+
+- `validate_stripe_subscription_event()` — wired into `aurem_billing_router.stripe_webhook` — rejects any `customer.subscription.*` / `invoice.*` / `checkout.session.completed` event whose `metadata.business_id` is missing or doesn't match BIN format `^[A-Z][A-Z0-9]{2,}-[A-Z0-9\-]{2,32}$`. Closes the upstream-mis-tagging write path.
+
+**Step 3 — 2-BIN cross-isolation E2E test:** `tests/test_d81a_tenant_guard.py`
+- 8 pytests covering: backfill idempotency (post-migration leftover = 0), guard finds violations, guard respects admin allowlist, guard respects inline escape comment, Stripe validator accepts valid BINs, rejects missing metadata, rejects malformed BINs, **and the acceptance test: inserts leads for synthetic BIN A and BIN B, queries the customer-scoped `/api/cto/leads/hot` endpoint with BIN A's JWT, asserts BIN B's `lead_id` does NOT appear in the response body. Also DB-level: `count_documents(business_id=A, lead_id=B)` returns 0.** Real Mongo writes, real JWT, real HTTP.
+
+**68/68 tests pass individually** (8 D-81a + 60 prior D-76→D-80). Batch-run failures are httpx connection-pool flakes in the test client, not app regression.
 
 ### iter D-80 (2026-06-11) — Apply Plan UX + Real Email Open Tracking
 

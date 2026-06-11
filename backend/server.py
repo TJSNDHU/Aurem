@@ -1623,6 +1623,19 @@ async def startup_event():
         
         # Register ALL routers (extracted from server.py Phase 2)
         register_all_routers(app, db)
+        # iter D-81a — Tenant scope guard. Scans every router for
+        # unscoped customer-data queries. Default = WARN. Flip
+        # AUREM_TENANT_SCOPE_STRICT=true to FAIL boot on any
+        # violation once the backlog is clean.
+        try:
+            from services.tenant_scope_guard import enforce_at_boot
+            enforce_at_boot()
+        except RuntimeError:
+            raise
+        except Exception as _sg_e:
+            logging.getLogger(__name__).warning(
+                f"[TENANT-GUARD] scan failed (non-blocking): {_sg_e}"
+            )
         logging.info("✓ All routers registered via registry.py")
 
         # Wire db + twilio_client into the extracted email_templates module
