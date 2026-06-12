@@ -18,17 +18,19 @@ Live: **[https://aurem.live](https://aurem.live)** · Preview: internal Emergent
 6. [Zero-mocks policy](#zero-mocks-policy)
 7. [Codebase Health (live analyzer)](#codebase-health-live-analyzer)
 8. [Autonomous Security & Supply-Chain Self-Healing](#autonomous-security--supply-chain-self-healing)
-9. [Zero-downtime deploys](#zero-downtime-deploys)
-9. [Tech stack](#tech-stack)
-10. [Third-party integrations](#third-party-integrations)
-11. [Quick start (developers)](#quick-start-developers)
-12. [Environment variables](#environment-variables)
-13. [Founder-facing features](#founder-facing-features)
-14. [Public API (commercialised)](#public-api-commercialised)
-15. [Test coverage](#test-coverage)
-16. [Known debt](#known-debt)
-17. [Conventions & rules](#conventions--rules)
-18. [License](#license)
+9. [Customer portal (/my)](#customer-portal-my)
+10. [Wiring verifier (CI)](#wiring-verifier-ci)
+11. [Zero-downtime deploys](#zero-downtime-deploys)
+12. [Tech stack](#tech-stack)
+13. [Third-party integrations](#third-party-integrations)
+14. [Quick start (developers)](#quick-start-developers)
+15. [Environment variables](#environment-variables)
+16. [Founder-facing features](#founder-facing-features)
+17. [Public API (commercialised)](#public-api-commercialised)
+18. [Test coverage](#test-coverage)
+19. [Known debt](#known-debt)
+20. [Conventions & rules](#conventions--rules)
+21. [License](#license)
 
 ---
 
@@ -73,7 +75,7 @@ You connect your business profile (dental clinic, salon, contractor, accountant,
 │                            ↓                                         │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │  FASTAPI ROUTER REGISTRY  (routers/registry.py, 145+ routers)  │  │
-│  │   /api/admin/*       founder cockpit — 32 sidebar items        │  │
+│  │   /api/admin/*       founder cockpit — 9 sidebar groups        │  │
 │  │   /api/ora/*         ORA agent surfaces (chat, council, brain) │  │
 │  │   /api/customer/*    customer-facing surfaces                  │  │
 │  │   /api/v1/public/*   commercialised public API (metered)       │  │
@@ -103,7 +105,7 @@ You connect your business profile (dental clinic, salon, contractor, accountant,
          Frontend (React SPA, 375 .jsx files, 162 routes)
             ↑                                ↑
         Admin Shell                    Customer Shell
-   (32 sidebar items / 6 sections)    /me · /customer · /dashboard
+   (9 sidebar groups)            /my (URL-routed + CustomerGuard)
 ```
 
 ### Why this shape
@@ -172,7 +174,9 @@ The map shows every collection, every scheduler, every flow. If a worker hasn't 
 │   └── src/
 │       ├── App.js                      162 routes, single Router
 │       ├── platform/        (375)      admin + customer pages
-│       │   ├── AdminShell.jsx          32-item sidebar, 6 sections
+│       │   ├── AdminShell.jsx          9-group sidebar (D-82c), per-section collapse
+│       │   ├── admin/AdminSupplyChain.jsx  D-82 security posture cockpit
+│       │   ├── customer/CustomerShell.jsx   D-82c guarded /my portal (8 pages)
 │       │   ├── AdminPillarsMap.jsx     live telemetry with drill-down
 │       │   ├── AdminCodebaseHealth.jsx D-70 dashboard (30s auto-refresh)
 │       │   ├── CampaignHealthPage.jsx  D-66 multi-channel health + autofix
@@ -315,6 +319,40 @@ GET  /api/admin/supply-chain/remediations    — applied-fix audit log
 DAST against the live app (`ZAP`/`Nuclei`), PII discovery for Law 25
 (`Presidio`), container/IaC scanning (`Trivy`/`Checkov`), and an automated
 `yarn build` gate before frontend upgrades go live.
+
+
+## Customer portal (`/my`)
+
+The customer-facing portal is URL-routed and guarded (iter D-82c). `/my` is the
+public-with-overlay Luxe home; the 8 sub-pages mount inside **`CustomerShell`**
+behind **`CustomerGuard`** (valid customer token → render, else bounce to `/my`
+login overlay):
+
+```
+/my            Luxe dashboard home (public + auth overlay)
+/my/website    site score, vulnerabilities, "Initiate AUREM Repair", scan schedule
+/my/reviews    Google reviews          /my/social     social status
+/my/report     monthly report          /my/referrals  referral link + rewards
+/my/billing    Stripe + Apple Pay      /my/ora        ORA chat (business context)
+/my/settings   API key + install snippet
+```
+
+Six wiring gaps behind these pages were closed in `missing_endpoints_router.py`
+(iter D-83): `GET /api/admin/evolver/status`, `GET /api/admin/system-pulse-live`,
+`GET+POST /api/customer/scan-schedule`, `GET /api/sentinel/fixes-log`,
+`GET /api/sentinel/pulse-history`, `GET /api/site-monitor/me/sites` — every one
+reads a real collection (zero mocks).
+
+## Wiring verifier (CI)
+
+`scripts/wiring_check.py` diffs every frontend `/api/…` call against the backend
+route table (`--live <url>` reads `/openapi.json`; `--orphans` lists unimported
+components). `tests/test_lean_prune_drift.py` fails the build if any live frontend
+call matches a production-pruned prefix — so the lean-prune list can never
+silently 404 a working feature. The admin **`/admin/wiring-audit`** page verifies
+the full 9-group sidebar surface row-by-row at runtime.
+
+---
 
 ---
 
@@ -506,7 +544,8 @@ Docs: `memory/PUBLIC_API_USAGE.md`.
 | Misc | health chip signal | 3 |
 | D-82 | autonomous supply-chain scanner (bandit + detect-secrets + pip-audit + yarn-audit) | 4 |
 | D-82b | Council-gated remediation planner + version-safety + lanes | 4 |
-| | **Combined** | **103/103 PASS** |
+| D-82c | lean-prune drift guard (CI — frontend ref ∉ pruned prefix) | 1 |
+| | **Combined** | **104/104 PASS** |
 
 ---
 
@@ -609,4 +648,4 @@ Commercial use requires written permission.
 
 ---
 
-*Last updated: 2026-06-05 · iter D-70 · 95/95 tests pass*
+*Last updated: 2026-06-12 · iter D-83 · 104/104 tests pass*

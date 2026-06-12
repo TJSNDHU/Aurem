@@ -12,7 +12,7 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertTriangle, XCircle, HelpCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, HelpCircle, RefreshCw, Loader2, Wand2, Check } from 'lucide-react';
 import { getPlatformToken } from '../utils/secureTokenStore';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
@@ -31,7 +31,88 @@ function StatusIcon({ status }) {
   return <HelpCircle size={16} color={COLORS.textD}/>;
 }
 
-function Row({ item, idx }) {
+function ProbeFixCell({ item, reload }) {
+  const [open, setOpen] = useState(false);
+  const [sugs, setSugs] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const fetchSugs = useCallback(async () => {
+    setBusy(true); setOpen(true);
+    try {
+      const tok = getPlatformToken();
+      const r = await fetch(`${API}/api/admin/wiring-audit/suggest?probe=${encodeURIComponent(item.probe)}`,
+        { headers: { Authorization: `Bearer ${tok}` } });
+      const d = await r.json();
+      setSugs(d.suggestions || []);
+    } catch { setSugs([]); }
+    finally { setBusy(false); }
+  }, [item.probe]);
+
+  const confirmFix = async (probe) => {
+    setBusy(true);
+    try {
+      const tok = getPlatformToken();
+      await fetch(`${API}/api/admin/wiring-audit/probe-override`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature: item.feature, probe }),
+      });
+      setOpen(false);
+      await reload();   // re-probe with the confirmed override applied
+    } finally { setBusy(false); }
+  };
+
+  if (item.status !== 'missing' && !item.overridden) return <span style={{ color: '#444', fontSize: 10 }}>—</span>;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {item.overridden && (
+        <span title="probe overridden by admin" style={{ color: COLORS.accent, fontSize: 10, marginRight: 6 }}>● override</span>
+      )}
+      {item.status === 'missing' && (
+        <button
+          data-testid={`wiring-suggest-${item.feature.replace(/\s+/g, '-').toLowerCase()}`}
+          onClick={fetchSugs} disabled={busy}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px',
+                   background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)',
+                   borderRadius: 7, color: COLORS.accent, fontSize: 10, fontWeight: 700,
+                   cursor: 'pointer', letterSpacing: '0.05em' }}>
+          {busy ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Wand2 size={11} />}
+          Suggest fix
+        </button>
+      )}
+      {open && sugs && (
+        <div style={{ position: 'absolute', zIndex: 20, top: '110%', left: 0, minWidth: 320, maxWidth: 460,
+                      background: '#12121E', border: `1px solid ${COLORS.border}`, borderRadius: 10,
+                      padding: 10, boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }}>
+          <div style={{ fontSize: 10, color: COLORS.textD, marginBottom: 8, letterSpacing: '0.1em' }}>
+            CLOSEST REGISTERED ROUTES · click to confirm
+          </div>
+          {sugs.length === 0 && <div style={{ fontSize: 11, color: COLORS.textD }}>No close match — fix the probe string by hand.</div>}
+          {sugs.map((s, i) => (
+            <button key={i}
+              data-testid={`wiring-confirm-${i}`}
+              onClick={() => confirmFix(s)} disabled={busy}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                       padding: '7px 9px', marginBottom: 3, background: 'transparent',
+                       border: '1px solid transparent', borderRadius: 7, color: COLORS.text,
+                       fontFamily: "'JetBrains Mono',monospace", fontSize: 11, cursor: 'pointer' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(212,175,55,0.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+              <Check size={12} color={COLORS.good} /> {s}
+            </button>
+          ))}
+          <button onClick={() => setOpen(false)}
+            style={{ marginTop: 4, fontSize: 10, color: COLORS.textD, background: 'none', border: 'none', cursor: 'pointer' }}>
+            cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({ item, idx, reload }) {
   const badge = {
     ok:      { label: '✅ OK',      color: COLORS.good },
     wired:   { label: '🟡 WIRED',   color: COLORS.accent },
@@ -48,6 +129,7 @@ function Row({ item, idx }) {
         {item.probe} <span style={{color:'#555'}}>· {item.http}</span>
       </td>
       <td style={{...td, color:COLORS.textD, fontSize:10}}>{item.component}</td>
+      <td style={td}><ProbeFixCell item={item} reload={reload}/></td>
     </tr>
   );
 }
@@ -125,9 +207,9 @@ export default function AdminWiringAudit() {
       </div>
 
       {/* Admin panel table */}
-      <Section title="Admin Panel" subtitle="/dashboard + /admin/*" rows={data.admin || []} prefix="admin" testid="wiring-admin"/>
+      <Section title="Admin Panel" subtitle="/dashboard + /admin/*" rows={data.admin || []} prefix="admin" testid="wiring-admin" reload={load}/>
       <div style={{height:24}}/>
-      <Section title="Customer Portal" subtitle="/my/*" rows={data.customer || []} prefix="cust" testid="wiring-customer"/>
+      <Section title="Customer Portal" subtitle="/my/*" rows={data.customer || []} prefix="cust" testid="wiring-customer" reload={load}/>
       <div style={{height:24}}/>
 
       {/* Nightly audit history */}
@@ -186,7 +268,7 @@ function SumCard({ label, value, tone, testid }) {
   );
 }
 
-function Section({ title, subtitle, rows, prefix, testid }) {
+function Section({ title, subtitle, rows, prefix, testid, reload }) {
   return (
     <div data-testid={testid} style={{background:COLORS.panel,border:`1px solid ${COLORS.border}`,borderRadius:14,padding:'18px 22px',overflow:'hidden'}}>
       <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:12}}>
@@ -203,10 +285,11 @@ function Section({ title, subtitle, rows, prefix, testid }) {
               <th style={th}>Status</th>
               <th style={th}>Backend Probe</th>
               <th style={th}>Component</th>
+              <th style={th}>Self-Heal</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => <Row key={i} idx={`${prefix}-${i}`} item={r}/>)}
+            {rows.map((r, i) => <Row key={i} idx={`${prefix}-${i}`} item={r} reload={reload}/>)}
           </tbody>
         </table>
       </div>

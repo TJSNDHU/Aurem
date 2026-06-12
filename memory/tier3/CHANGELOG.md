@@ -1,3 +1,30 @@
+## 2026-06-12 — iter D-83b — README refresh + self-healing wiring-audit (suggest→confirm)
+
+Sequence a→b→c (user-approved). Completed (a) README + (b) auto-fix probe button.
+
+- **(a) README.md fully refreshed**: 9-group sidebar (was "32 items/6 sections"), new
+  "Customer portal (/my)" + "Wiring verifier (CI)" sections, supply-chain section (D-82),
+  6 D-83 endpoints, AdminSupplyChain/CustomerShell in repo tree, TOC, test table 104/104,
+  footer → iter D-83.
+- **(b) Self-healing wiring-audit (design rule honored: SUGGEST → human CONFIRM, never
+  auto-overwrite)**:
+  - Backend (`wiring_audit_router.py`): `GET /wiring-audit/suggest?probe=` (read-only,
+    difflib + same-family closest matches over 2422 live routes),
+    `POST /wiring-audit/probe-override` (admin one-click confirm → `wiring_probe_overrides`
+    collection, 422 on unknown feature / non-/api probe), `DELETE` to revert. Audit applies
+    overrides per-run and flags `overridden:true`.
+  - Frontend (`AdminWiringAudit.jsx`): new "Self-Heal" column — missing rows show a
+    "Suggest fix" button → dropdown of closest registered routes → click confirms the
+    override and re-probes. Verified live: 12 suggest buttons, 8 suggestion chips,
+    Campaign-health override → row flips to OK (48/59).
+  - 4 probe paths already corrected to real routes (skills/vanguard/integrations/council);
+    remaining 12 now fixable in-page by the founder, one click each.
+- 10 supply-chain/prune tests green; frontend clean compile.
+
+Pending: (c) Council-gated "Initiate AUREM Repair" on /my/website (next; needs scope
+confirm — wires to the existing customer site-repair flow, not the supply-chain loop).
+
+
 ## 2026-06-12 — iter D-83 — Backlog deep-dive: 6 real wiring gaps closed + audit synced
 
 Executed the backlog deep-dive deliverables, re-verifying every claim against

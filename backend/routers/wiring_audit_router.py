@@ -16,12 +16,14 @@ Status:
 from __future__ import annotations
 
 import os
+import difflib
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 import jwt
 
 logger = logging.getLogger(__name__)
@@ -227,6 +229,11 @@ async def wiring_audit(request: Request):
     # isn't misreported as "feature missing from the platform".
     registered_paths = _collect_registered_paths(request)
 
+    # Admin-confirmed probe corrections (iter D-83b). Applied here so the
+    # source-of-truth checklist stays declarative; the audit page suggests a
+    # fix, the admin one-click-confirms, and the override lands in this map.
+    overrides = await _load_overrides()
+
     # Base URL — probe loopback-internally (localhost:8001) to avoid ingress WAF
     # blocking backend-to-backend loopback traffic. This yields a true picture of
     # whether the router is registered, independent of external routing rules.
@@ -235,18 +242,20 @@ async def wiring_audit(request: Request):
     async with httpx.AsyncClient(verify=True, follow_redirects=True) as client:
         admin_rows: List[Dict[str, Any]] = []
         for feature, panel, probe, comp in ADMIN_CHECKLIST:
-            p = await _probe(client, base, probe, auth_header, registered_paths)
+            eff_probe = overrides.get(feature, probe)
+            p = await _probe(client, base, eff_probe, auth_header, registered_paths)
             admin_rows.append({
-                "feature": feature, "panel": panel, "probe": probe,
-                "component": comp, **p,
+                "feature": feature, "panel": panel, "probe": eff_probe,
+                "component": comp, "overridden": feature in overrides, **p,
             })
 
         customer_rows: List[Dict[str, Any]] = []
         for feature, panel, probe, comp in CUSTOMER_CHECKLIST:
-            p = await _probe(client, base, probe, auth_header, registered_paths)
+            eff_probe = overrides.get(feature, probe)
+            p = await _probe(client, base, eff_probe, auth_header, registered_paths)
             customer_rows.append({
-                "feature": feature, "panel": panel, "probe": probe,
-                "component": comp, **p,
+                "feature": feature, "panel": panel, "probe": eff_probe,
+                "component": comp, "overridden": feature in overrides, **p,
             })
 
     ok = sum(1 for r in admin_rows + customer_rows if r["status"] in ("ok", "wired"))
@@ -295,3 +304,79 @@ async def wiring_history(request: Request, limit: int = 14):
         {"_id": 0, "admin": 0, "customer": 0},  # trim per-row detail
     ).sort("ran_at", -1).limit(limit)
     return {"history": await cursor.to_list(limit)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Self-healing probe corrections (iter D-83b)
+# Design rule: the verifier SUGGESTS, the human CONFIRMS. The audit never
+# overwrites its own probe strings unattended — otherwise it could hide its
+# own mistakes. /suggest is read-only; /probe-override needs an admin click.
+# ═══════════════════════════════════════════════════════════════════════════
+async def _load_overrides() -> Dict[str, str]:
+    if _db is None:
+        return {}
+    try:
+        return {d["feature"]: d["probe"]
+                async for d in _db.wiring_probe_overrides.find({}, {"_id": 0, "feature": 1, "probe": 1})}
+    except Exception:
+        return {}
+
+
+@router.get("/wiring-audit/suggest")
+async def suggest_probe(request: Request, probe: str):
+    """Suggest the closest real registered routes for a missing probe.
+    Read-only — never mutates anything. Admin reviews + confirms via
+    POST /wiring-audit/probe-override."""
+    await _require_admin(request)
+    registered = sorted(p for p in _collect_registered_paths(request) if p.startswith("/api"))
+    base = probe.split("?", 1)[0].rstrip("/")
+
+    # 1) fuzzy similarity over the full path
+    fuzzy = difflib.get_close_matches(base, registered, n=8, cutoff=0.45)
+    # 2) same-family routes (share the first 4 path segments, e.g. /api/admin/ora/*)
+    fam_key = base.split("/")[:4]
+    family = [r for r in registered if r.split("/")[:4] == fam_key]
+    # merge, preserving order, dedup
+    seen: List[str] = []
+    for m in fuzzy + family:
+        if m not in seen:
+            seen.append(m)
+    return {"probe": probe, "suggestions": seen[:8],
+            "registered_count": len(registered)}
+
+
+class ProbeOverride(BaseModel):
+    feature: str
+    probe: str
+
+
+@router.post("/wiring-audit/probe-override")
+async def set_probe_override(body: ProbeOverride, request: Request):
+    """Admin one-click-confirm of a suggested probe correction. Persists the
+    override that the audit applies on the next run. Explicit human action."""
+    admin = await _require_admin(request)
+    if _db is None:
+        raise HTTPException(503, "DB not available")
+    known = {f for (f, _p, _pr, _c) in ADMIN_CHECKLIST} | {f for (f, _p, _pr, _c) in CUSTOMER_CHECKLIST}
+    if body.feature not in known:
+        raise HTTPException(422, f"Unknown feature: {body.feature}")
+    if not body.probe.startswith("/api/"):
+        raise HTTPException(422, "probe must start with /api/")
+    await _db.wiring_probe_overrides.update_one(
+        {"feature": body.feature},
+        {"$set": {"feature": body.feature, "probe": body.probe,
+                  "updated_at": datetime.now(timezone.utc).isoformat(),
+                  "updated_by": admin.get("email") or admin.get("sub") or "admin"}},
+        upsert=True,
+    )
+    return {"ok": True, "feature": body.feature, "probe": body.probe}
+
+
+@router.delete("/wiring-audit/probe-override")
+async def clear_probe_override(request: Request, feature: str):
+    """Revert a probe to its declared default (delete the override)."""
+    await _require_admin(request)
+    if _db is None:
+        raise HTTPException(503, "DB not available")
+    res = await _db.wiring_probe_overrides.delete_one({"feature": feature})
+    return {"ok": True, "feature": feature, "removed": res.deleted_count}
