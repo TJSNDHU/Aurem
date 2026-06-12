@@ -35,9 +35,11 @@ import Admin2FAEnroll from './platform/Admin2FAEnroll';
 import BoardroomPage from './platform/BoardroomPage';
 import AdminShell from './platform/AdminShell';
 import AdminDeveloperSignups from './platform/AdminDeveloperSignups';
+import AdminSupplyChain from './platform/admin/AdminSupplyChain';
 import UpgradeModal from './components/UpgradeModal';
 import TrialBanner from './components/TrialBanner';
-import MyBilling from './pages/MyBilling';
+// pages/MyBilling.jsx deleted (iter D-82c) — superseded by platform/customer/CustomerBilling.jsx
+import NotFound from './pages/NotFound';
 import AdminSSOT from './platform/AdminSSOT';
 import AdminConsole from './platform/AdminConsole';
 import AdminAntigravitySkills from './platform/AdminAntigravitySkills';
@@ -158,7 +160,16 @@ import BrainGraphShare from './pages/BrainGraphShare';
 
 
 
-import { AdminGuard } from './platform/RouteGuards';
+import { AdminGuard, CustomerGuard, TenantGuard } from './platform/RouteGuards';
+import CustomerShell from './platform/customer/CustomerShell';
+import CustomerWebsite from './platform/customer/CustomerWebsite';
+import CustomerReviews from './platform/customer/CustomerReviews';
+import CustomerSocial from './platform/customer/CustomerSocial';
+import CustomerReport from './platform/customer/CustomerReport';
+import CustomerReferrals from './platform/customer/CustomerReferrals';
+import CustomerBilling from './platform/customer/CustomerBilling';
+import CustomerOra from './platform/customer/CustomerOra';
+import CustomerSettings from './platform/customer/CustomerSettings';
 
 
 
@@ -395,9 +406,9 @@ function AppRouter() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       
-      {/* Dashboard */}
-      <Route path="/dashboard" element={<AuremDashboard />} />
-      <Route path="/dashboard/*" element={<AuremDashboard />} />
+      {/* Dashboard — tenant-guarded (iter D-82c P0-3) */}
+      <Route path="/dashboard" element={<TenantGuard><AuremDashboard /></TenantGuard>} />
+      <Route path="/dashboard/*" element={<TenantGuard><AuremDashboard /></TenantGuard>} />
       
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/admin/boardroom" replace />} />
@@ -478,6 +489,7 @@ function AppRouter() {
         <Route path="/admin/daily-log" element={<AdminDailyLog />} />
         <Route path="/admin/sovereignty-score" element={<AdminSovereigntyScore />} />
         <Route path="/admin/developer-signups" element={<AdminDeveloperSignups />} />
+        <Route path="/admin/supply-chain" element={<AdminSupplyChain />} />
       </Route>
 
       {/* Admin alias redirects (kept outside shell — they Navigate before shell mounts) */}
@@ -496,10 +508,10 @@ function AppRouter() {
       <Route path="/status/:bin" element={<PublicStatusPage />} />
       <Route path="/subscriptions/custom" element={<CustomSubscriptionBuilder />} />
       
-      {/* Leads Dashboard (Phase A) */}
-      <Route path="/leads" element={<LeadsDashboard />} />
-      <Route path="/settings/panic" element={<PanicSettings />} />
-      <Route path="/alerts/panic" element={<PanicAlerts />} />
+      {/* Leads Dashboard (Phase A) — tenant-guarded (iter D-82c P0-4) */}
+      <Route path="/leads" element={<TenantGuard><LeadsDashboard /></TenantGuard>} />
+      <Route path="/settings/panic" element={<TenantGuard><PanicSettings /></TenantGuard>} />
+      <Route path="/alerts/panic" element={<TenantGuard><PanicAlerts /></TenantGuard>} />
       <Route path="/demo/futuristic" element={<FuturisticDemo />} />
       <Route path="/demo" element={<Demo />} />
       
@@ -525,13 +537,24 @@ function AppRouter() {
       <Route path="/ora/*" element={<SentinelErrorBoundary><OraPWA /></SentinelErrorBoundary>} />
       <Route path="/app" element={<SentinelErrorBoundary><OraPWA /></SentinelErrorBoundary>} />
 
-      {/* Customer Portal — 8-item dedicated experience (isolated from /dashboard admin) */}
+      {/* Customer Portal — Luxe home stays public-with-overlay; the 8 sub-pages
+          are URL-routed + CustomerGuard-protected inside CustomerShell.
+          (iter D-82c — adopted the previously-orphaned platform/customer/ pages.) */}
       <Route path="/my" element={<LuxeDashboardPreview />} />
-      <Route path="/my/billing" element={<MyBilling />} />
-      <Route path="/my/*" element={<LuxeDashboardPreview />} />
+      <Route element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
+        <Route path="/my/website"   element={<CustomerWebsite />} />
+        <Route path="/my/reviews"   element={<CustomerReviews />} />
+        <Route path="/my/social"    element={<CustomerSocial />} />
+        <Route path="/my/report"    element={<CustomerReport />} />
+        <Route path="/my/referrals" element={<CustomerReferrals />} />
+        <Route path="/my/billing"   element={<CustomerBilling />} />
+        <Route path="/my/ora"       element={<CustomerOra />} />
+        <Route path="/my/settings"  element={<CustomerSettings />} />
+      </Route>
+      <Route path="/my/*" element={<Navigate to="/my" replace />} />
       
-      {/* Catch-all redirect */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Catch-all — real 404 (iter D-82c P2-8) */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
     </>
   );

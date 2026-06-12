@@ -1,3 +1,29 @@
+## 2026-06-12 — iter D-82c — Interface Blueprint execution (Batches 3→2→4→1)
+
+Executed the AUREM_INTERFACE_BLUEPRINT in the user's requested sequence. All verified.
+
+- **Batch 3 — Admin IA regroup**: AdminShell SECTIONS rebuilt from 6 → 9 groups
+  (Boardroom · Mission Control · Customers · ORA · Sentinel & Self-Repair · System
+  Health · Revenue · Security & Access · Labs). Every admin page lives in exactly
+  one group; per-section collapse added (Labs collapsed by default, persisted).
+  NEW page **AdminSupplyChain.jsx** (`/admin/supply-chain`) — live Security Posture
+  cockpit wired to the D-82 endpoints (score, 5-scanner status, lane-filtered
+  findings, Council fix log, Run-Sweep + Council-Auto-Fix buttons). Verified live.
+- **Batch 2 — Customer portal**: adopted the 12 orphaned `platform/customer/` pages.
+  Added **CustomerGuard** (RouteGuards) + **CustomerShell** (Luxe-token nav, mobile-
+  responsive, user's preferred version). Wired 8 URL-routed guarded pages under /my/*;
+  deleted duplicate `pages/MyBilling.jsx`. Verified: auth-gate bounces to /my login,
+  authed render shows CustomerWebsite live data.
+- **Batch 4 — wiring CI**: added `scripts/wiring_check.py` (static/live/orphans) +
+  `tests/test_lean_prune_drift.py` — fails the build if any frontend /api/ ref hits a
+  pruned prefix (P1-6 drift guard). Static check: 223 refs, 35 candidates; orphans 6.
+- **Batch 1 — security + guards**: deleted committed `/.jwt_secret` + added to
+  .gitignore (env-tier JWT_SECRET confirmed authoritative — no session breakage,
+  login verified). Wrapped /dashboard, /leads, /settings/panic, /alerts/panic in
+  **TenantGuard**. Replaced catch-all soft-404 with a real **NotFound** 404 page.
+- 9 backend tests green; frontend compiles clean.
+
+
 ## 2026-06-12 — iter D-82c — Council-gated MAX autofix (no human) + README refresh
 
 Routed supply-chain remediation through the ORA Council (the same CASL+QA engine

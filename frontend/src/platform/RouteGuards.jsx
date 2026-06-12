@@ -101,3 +101,36 @@ export const TenantGuard = ({ children }) => {
   }
   return children;
 };
+
+// CustomerGuard — guards /my/* sub-pages. Mirrors TenantGuard but bounces to
+// /my (LuxeDashboardPreview), whose LuxeAuthOverlay handles the login flow,
+// instead of the tenant /login page. (iter D-82c — customer portal wiring.)
+export const CustomerGuard = ({ children }) => {
+  const [status, setStatus] = useState('checking');
+
+  useEffect(() => {
+    const token = getPlatformToken();
+    if (!token) {
+      setStatus('no_token');
+      return;
+    }
+    const payload = decodeToken(token);
+    if (!payload) {
+      try { clearCustomerAuth(); } catch { /* ignore */ }
+      flagSessionExpired('customer');
+      setStatus('invalid');
+      return;
+    }
+    if (isExpired(payload)) {
+      try { clearCustomerAuth(); } catch { /* ignore */ }
+      flagSessionExpired('customer');
+      setStatus('expired');
+      return;
+    }
+    setStatus('authorized');
+  }, []);
+
+  if (status === 'checking') return null;
+  if (status !== 'authorized') return <Navigate to="/my" replace />;
+  return children;
+};

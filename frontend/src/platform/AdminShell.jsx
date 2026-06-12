@@ -13,7 +13,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Crown, Target, Compass, Brain, Activity, Wrench, Settings, ChevronLeft, Search,
+  Crown, Target, Brain, Activity, Wrench, Settings, ChevronLeft, ChevronDown, Search,
   // Cockpit
   Trophy, Zap, Layers, Grid3x3,
   // Operations
@@ -26,6 +26,8 @@ import {
   Hammer, Sparkles, FileText,
   // Settings
   Lock, DollarSign, Hash, Eye,
+  // D-82c regroup — 9-group IA
+  Users, HeartPulse, Beaker, ShieldCheck, LineChart,
   // HUD
   Flame, Dot, LogOut, MessageSquare, FileCode,
 } from 'lucide-react';
@@ -40,97 +42,125 @@ import CacheHitRateWidget from './CacheHitRateWidget';   // iter D-71 perf
 const API = BACKEND_URL;
 
 // ─────────────────────────────────────────────────────────────
-// SIDEBAR TREE — 32 items, 6 sections (iter D-69: -2 dupes, iter D-70: +1 Codebase Health)
-// Removed (still accessible via direct URL):
-//   /admin/console      → Console tab inside /admin/ora
-//   /admin/stem-fix     → PendingCodeFixesPanel inside /admin/pillars-map
-//   /admin/self-repair  → AutonomousRepairPanel inside /admin/pillars-map
-//   /admin/blocks       → Pillar Blocks (iter D-69)
-//   /admin/root-command → Root Command (iter D-69)
+// ─────────────────────────────────────────────────────────────
+// SIDEBAR TREE — iter D-82c · 9 groups (admin IA regroup).
+// Every admin page lives in exactly ONE group. No page deleted —
+// grouped / merged / demoted to Labs. Aliases stay as redirects in App.js.
+// Groups: Boardroom · Mission Control · Customers · ORA · Sentinel &
+//         Self-Repair · System Health · Revenue · Security & Access · Labs
 // ─────────────────────────────────────────────────────────────
 const SECTIONS = [
   {
-    id: 'cockpit', label: 'COCKPIT', icon: Crown, accent: '#4A8FD4', pillar: 'P1',
-    blurb: 'Observe — P&L, burn, system pulse',
+    id: 'boardroom', label: 'BOARDROOM', icon: Trophy, accent: '#4A8FD4', pillar: 'P1',
+    blurb: 'Observe — P&L, KPIs, daily brief',
     items: [
-      // iter D-68 — `/admin/console` removed from sidebar. Lives as the
-      // `Console` tab inside ORA · Unified (/admin/ora?tab=console).
-      // Direct route still works for bookmarks.
-      { to: '/admin/awb-cockpit',        label: 'Auto Site Cockpit',   icon: Globe,   hint: 'g w' },
-      { to: '/admin/boardroom',          label: 'Boardroom · P&L',     icon: Trophy,  hint: 'g b' },
-      { to: '/admin/system-pulse-live',  label: 'System Pulse · Live', icon: Zap,     hint: 'g p' },
-      { to: '/admin/system-overview',    label: 'System Overview',     icon: Layers,  hint: 'g s' },
-      // iter D-69 — `/admin/blocks` (Pillar Blocks) removed from sidebar
-      // per founder request. Route still mounted for bookmarks.
+      { to: '/admin/boardroom',          label: 'Boardroom · P&L',     icon: Trophy,        hint: 'g b' },
+      { to: '/admin/morning-brief',      label: 'Morning Brief',       icon: MessageSquare, hint: '' },
+      { to: '/admin/founder-saves',      label: 'Founder Saves',       icon: Crown,         hint: '' },
+      { to: '/admin/daily-log',          label: 'Daily Log',           icon: FileText,      hint: '' },
     ],
   },
   {
-    id: 'operations', label: 'OPERATIONS', icon: Compass, accent: '#C9A227', pillar: 'P3',
-    blurb: 'Orient — leads, clients, outreach',
+    id: 'mission', label: 'MISSION CONTROL', icon: Radar, accent: '#C9A227', pillar: 'P3',
+    blurb: 'Orient — campaigns, leads, outreach',
     items: [
-      { to: '/admin/mission-control',    label: 'Mission Control',     icon: Radar,   hint: 'g m' },
-      { to: '/admin/campaign-health',    label: 'Campaign Health',     icon: Activity,hint: 'g H' },  // iter D-59
-      { to: '/admin/openfang',           label: 'OpenFang · Lead Hand',icon: Phone,   hint: 'g o' },
-      { to: '/admin/site-monitor',       label: 'Site Monitor',        icon: Globe,   hint: '' },
-      { to: '/admin/hunter-test',        label: 'Hunter · Live Test',  icon: FlaskConical, hint: 'g h' },
+      { to: '/admin/mission-control',    label: 'Mission Control',     icon: Radar,    hint: 'g m' },
+      { to: '/admin/campaign-command',   label: 'Campaign Command',    icon: Target,   hint: '' },
+      { to: '/admin/campaign-health',    label: 'Campaign Health',     icon: Activity, hint: 'g H' },
+      { to: '/admin/leads-mining',       label: 'Leads Mining',        icon: Pickaxe,  hint: '' },
+      { to: '/admin/apollo-cost',        label: 'Apollo Cost',         icon: DollarSign, hint: 'g $' },
+      { to: '/admin/awb-cockpit',        label: 'Auto Site Cockpit',   icon: Globe,    hint: 'g w' },
+    ],
+  },
+  {
+    id: 'customers', label: 'CUSTOMERS', icon: Users, accent: '#4AD4A0', pillar: 'P3',
+    blurb: 'Tenant health · 360 · plans',
+    items: [
+      { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity, hint: 'g h' },
+      { to: '/admin/plans',              label: 'Plans · Pricing',     icon: DollarSign, hint: '' },
+      { to: '/admin/impersonation-log',  label: 'Impersonation Log',   icon: Eye,      hint: 'g l' },
     ],
   },
   {
     id: 'ora', label: 'ORA AGENTS', icon: Brain, accent: '#9B6DD4', pillar: 'P2',
-    blurb: 'AI workforce visibility',
+    blurb: 'AI workforce — chat, brain, skills',
     items: [
-      // iter 322fk — unified surface (replaces 4 separate ORA pages).
-      // Chat / Cockpit / Console / Optimizer / Settings live as tabs.
-      { to: '/admin/ora',                label: 'ORA · Unified',       icon: Brain,   hint: 'g o' },
-      { to: '/admin/brain-graph',        label: 'Brain Graph',         icon: Network, hint: '' },
-      { to: '/admin/browser-agent',      label: 'Browser Agent',       icon: Camera,  hint: '' },
-      { to: '/admin/avatar-manager',     label: 'Avatar Manager',      icon: Sparkles,hint: '' },
-      { to: '/admin/leads-mining',       label: 'Leads Mining',        icon: Pickaxe, hint: '' },
-      { to: '/admin/vanguard',           label: 'Vanguard',            icon: Sword,   hint: '' },
-      // iter D-69 — `/admin/root-command` removed from sidebar per
-      // founder request. Route still mounted for bookmarks.
-      { to: '/admin/skills-library',     label: 'Skills Library · 1.4k',icon: Sparkles,hint: 'g l' },
-      { to: '/admin/memoir',             label: 'Memoir · Memory',     icon: GitBranch,hint: 'g M' },
+      { to: '/admin/ora',                label: 'ORA · Unified',       icon: Brain,    hint: 'g o' },
+      { to: '/admin/brain',              label: 'Brain · Memory',      icon: Network,  hint: '' },
+      { to: '/admin/brain-graph',        label: 'Brain Graph',         icon: Network,  hint: '' },
+      { to: '/admin/council-audit',      label: 'Council Audit',       icon: Shield,   hint: '' },
+      { to: '/admin/ora-watchdog',       label: 'Watchdog',            icon: Eye,      hint: '' },
+      { to: '/admin/ora-voice',          label: 'Voice Profile',       icon: MessageSquare, hint: '' },
+      { to: '/admin/ora-skills',         label: 'Skills Marketplace',  icon: Sparkles, hint: '' },
     ],
   },
   {
-    id: 'health', label: 'HEALTH', icon: Activity, accent: '#F0A030', pillar: null,
-    blurb: 'System integrity · diagnostics',
+    id: 'sentinel', label: 'SENTINEL & SELF-REPAIR', icon: ShieldCheck, accent: '#E0574F', pillar: null,
+    blurb: 'Detect · auto-heal · supply-chain',
     items: [
-      { to: '/admin/pillars-map',        label: 'Pillars Map',         icon: Map,        hint: '' },
-      { to: '/admin/codebase-health',    label: 'Codebase Health',     icon: FileCode,   hint: '' },
       { to: '/admin/sentinel',           label: 'Diagnostics',         icon: Shield,     hint: 'g x' },
-      { to: '/admin/customer-health',    label: 'Customer Health',     icon: Activity,   hint: 'g h' },
-      // iter D-68 — `/admin/stem-fix` and `/admin/self-repair` removed
-      // from sidebar. Both surface inside Pillars Map as embedded panels
-      // (PendingCodeFixesPanel + AutonomousRepairPanel). Direct routes
-      // still work for bookmarks.
-      { to: '/admin/integrations',       label: 'Integrations',        icon: KeyRound,   hint: 'g i' },
+      { to: '/admin/self-repair',        label: 'Self-Repair',         icon: RotateCcw,  hint: '' },
+      { to: '/admin/stem-fix',           label: 'Stem Fix',            icon: Wrench,     hint: '' },
+      { to: '/admin/supply-chain',       label: 'Supply-Chain Security', icon: ShieldCheck, hint: '' },
+      { to: '/admin/incident-ledger',    label: 'Incident Ledger',     icon: FileText,   hint: '' },
       { to: '/admin/git-gate',           label: 'Git Commit Gate',     icon: GitBranch,  hint: '' },
+      { to: '/admin/vanguard',           label: 'Vanguard',            icon: Sword,      hint: '' },
     ],
   },
   {
-    id: 'build', label: 'BUILD', icon: Wrench, accent: '#4AD4A0', pillar: 'P1',
-    blurb: 'Construction layer',
+    id: 'health', label: 'SYSTEM HEALTH', icon: HeartPulse, accent: '#F0A030', pillar: null,
+    blurb: 'Integrity · pulse · audits',
     items: [
-      { to: '/admin/control-center',     label: 'Control Center',      icon: Hammer,     hint: 'g c' },
-      { to: '/admin/evolver',            label: 'EvoMap Evolver',      icon: Sparkles,   hint: 'g e' },
-      { to: '/admin/case-study',         label: 'Case Study Builder',  icon: FileText,   hint: 'g k' },
-      { to: '/admin/design-extract',     label: 'Design Extract',      icon: Sparkles,   hint: '' },
+      { to: '/admin/system-overview',    label: 'System Overview',     icon: Layers,   hint: 'g s' },
+      { to: '/admin/system-pulse-live',  label: 'System Pulse · Live', icon: Zap,      hint: 'g p' },
+      { to: '/admin/codebase-health',    label: 'Codebase Health',     icon: FileCode, hint: '' },
+      { to: '/admin/pillars-map',        label: 'Pillars Map',         icon: Map,      hint: '' },
+      { to: '/admin/site-monitor',       label: 'Site Monitor',        icon: Globe,    hint: '' },
+      { to: '/admin/wiring-audit',       label: 'Wiring Audit',        icon: Network,  hint: '' },
+      { to: '/admin/system-audit',       label: 'System Audit',        icon: Shield,   hint: '' },
+      { to: '/admin/control-center',     label: 'Control Center',      icon: Hammer,   hint: 'g c' },
+      { to: '/admin/bug-reports',        label: 'BugCatch · Reports',  icon: Hash,     hint: 'g R' },
     ],
   },
   {
-    id: 'settings', label: 'SETTINGS', icon: Settings, accent: '#7A7468', pillar: 'P4',
-    blurb: 'Config · access · plans',
+    id: 'revenue', label: 'REVENUE', icon: LineChart, accent: '#3FB984', pillar: 'P1',
+    blurb: 'Financials · analytics · sovereignty',
     items: [
+      { to: '/admin/analytics',          label: 'Analytics',           icon: LineChart, hint: '' },
+      { to: '/admin/sovereignty-score',  label: 'Sovereignty Score',   icon: Crown,     hint: '' },
+    ],
+  },
+  {
+    id: 'security', label: 'SECURITY & ACCESS', icon: Lock, accent: '#7A7468', pillar: 'P4',
+    blurb: 'Keys · identity · access',
+    items: [
+      { to: '/admin/security-keys',      label: 'Security Keys',       icon: KeyRound,   hint: '' },
+      { to: '/admin/api-keys',           label: 'Public API Keys',     icon: KeyRound,   hint: 'g k' },
       { to: '/admin/2fa',                label: '2FA Enrolment',       icon: Lock,       hint: '' },
-      { to: '/admin/ssot',               label: 'SSOT Console',        icon: DollarSign, hint: 'g s' },
-      { to: '/admin/plans',              label: 'Plans · Pricing',     icon: DollarSign, hint: '' },
-      { to: '/admin/api-keys',           label: 'Public API Keys',     icon: KeyRound,   hint: 'g k' },  // iter D-59 Part B
-      { to: '/admin/apollo-cost',        label: 'Apollo Cost',         icon: DollarSign, hint: 'g $' },
-      { to: '/admin/bug-reports',        label: 'BugCatch · Reports',  icon: Hash,       hint: 'g R' },  // iter D-60
       { to: '/admin/business-ids',       label: 'Business IDs',        icon: Hash,       hint: 'g i' },
-      { to: '/admin/impersonation-log',  label: 'Impersonation Log',   icon: Eye,        hint: 'g l' },
+      { to: '/admin/ssot',               label: 'SSOT Console',        icon: DollarSign, hint: 'g s' },
+      { to: '/admin/developer-signups',  label: 'Developer Signups',   icon: Users,      hint: '' },
+      { to: '/admin/integrations',       label: 'Integrations',        icon: KeyRound,   hint: '' },
+    ],
+  },
+  {
+    id: 'labs', label: 'LABS', icon: Beaker, accent: '#7A7468', pillar: null,
+    blurb: 'Experimental · power tools',
+    defaultCollapsed: true,
+    items: [
+      { to: '/admin/hunter-test',        label: 'Hunter · Live Test',  icon: FlaskConical, hint: 'g h' },
+      { to: '/admin/openfang',           label: 'OpenFang · Lead Hand',icon: Phone,        hint: '' },
+      { to: '/admin/case-study',         label: 'Case Study Builder',  icon: FileText,     hint: 'g k' },
+      { to: '/admin/design-extract',     label: 'Design Extract',      icon: Sparkles,     hint: '' },
+      { to: '/admin/evolver',            label: 'EvoMap Evolver',      icon: Sparkles,     hint: 'g e' },
+      { to: '/admin/avatar-manager',     label: 'Avatar Manager',      icon: Sparkles,     hint: '' },
+      { to: '/admin/memoir',             label: 'Memoir · Memory',     icon: GitBranch,    hint: 'g M' },
+      { to: '/admin/blocks',             label: 'Pillar Blocks',       icon: Grid3x3,      hint: '' },
+      { to: '/admin/browser-agent',      label: 'Browser Agent',       icon: Camera,       hint: '' },
+      { to: '/admin/skills-library',     label: 'Skills Library · 1.4k', icon: Sparkles,   hint: 'g l' },
+      { to: '/admin/root-command',       label: 'Root Command',        icon: Terminal,     hint: '' },
+      { to: '/admin/audit-live',         label: 'Audit Live',          icon: Activity,     hint: '' },
+      { to: '/admin/links',              label: 'Links Hub',           icon: Layers,       hint: '' },
     ],
   },
 ];
@@ -320,6 +350,22 @@ const AdminShellInner = () => {
   const ticker = useBoardroomTicker(token, true);
   const pulse  = usePulse(token, !collapsed);
   const customerCounts = useCustomerHealthCounts(token, true);
+
+  // Per-section collapse — Labs (defaultCollapsed) starts folded. Persisted.
+  const [sectionCollapsed, setSectionCollapsed] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('aurem_admin_sections') || 'null');
+      if (saved && typeof saved === 'object') return saved;
+    } catch { /* ignore */ }
+    return SECTIONS.reduce((acc, s) => { if (s.defaultCollapsed) acc[s.id] = true; return acc; }, {});
+  });
+  const toggleSection = useCallback((id) => {
+    setSectionCollapsed((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem('aurem_admin_sections', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   const [oraQuery, setOraQuery] = useState('');
   const [oraSending, setOraSending] = useState(false);
@@ -627,7 +673,10 @@ const AdminShellInner = () => {
               <div key={sec.id} data-testid={`section-${sec.id}`} style={{ marginBottom: 6 }}>
                 {/* Section header */}
                 {!collapsed ? (
-                  <div style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    onClick={() => toggleSection(sec.id)}
+                    data-testid={`section-header-${sec.id}`}
+                    style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
                     <Icon style={{ width: 11, height: 11, color: sec.accent }} />
                     <span style={{ fontSize: 9, color: sec.accent, letterSpacing: '0.25em', fontWeight: 600 }}>{sec.label}</span>
                     {pillarStatus && (
@@ -637,6 +686,10 @@ const AdminShellInner = () => {
                         title={`${sec.pillar} ${pillarStatus}`}
                       />
                     )}
+                    <ChevronDown
+                      style={{ width: 12, height: 12, color: sec.accent, opacity: 0.5, marginLeft: 'auto',
+                        transform: sectionCollapsed[sec.id] ? 'rotate(-90deg)' : 'none', transition: 'transform 120ms' }}
+                    />
                   </div>
                 ) : (
                   <div style={{ padding: '6px 0', display: 'flex', justifyContent: 'center', position: 'relative' }} title={`${sec.label}${pillarStatus ? ` · ${sec.pillar} ${pillarStatus}` : ''}`}>
@@ -648,8 +701,9 @@ const AdminShellInner = () => {
                     )}
                   </div>
                 )}
-                {/* Items — show only if expanded OR section is active (so collapsed mode keeps active section visible too) */}
-                {(!collapsed || isActive) && sec.items.map((it) => {
+                {/* Items — hidden when this section is manually collapsed (expanded sidebar).
+                    In collapsed-sidebar mode, only the active section's items show. */}
+                {((!collapsed && !sectionCollapsed[sec.id]) || (collapsed && isActive)) && sec.items.map((it) => {
                   const ItIcon = it.icon;
                   return (
                     <NavLink
