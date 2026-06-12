@@ -1,3 +1,29 @@
+## 2026-06-12 — iter D-82 — Autonomous Supply-Chain / Secret / SAST sweep (REAL, no-mock)
+
+Closed the scanning-taxonomy gaps (Cat 1 SAST + Cat 2 SCA/Secret) with a fully
+wired, fully autonomous self-scan loop. AUREM now dog-foods its own codebase.
+
+- **New service** `services/supply_chain_scanner.py` runs 5 REAL tools concurrently
+  (async subprocess, augmented PATH to reach the venv bin):
+  - `bandit` → Python SAST
+  - `detect-secrets` → secret scanning (persists via requirements.txt)
+  - `trufflehog` → verified-secret scanning (best-effort; graceful "skipped" if binary absent in prod)
+  - `pip-audit` → Python dependency CVEs
+  - `yarn audit` → frontend JS dependency CVEs
+  Normalises all findings → one schema; posture score; stores in
+  `supply_chain_scans` (history) + `supply_chain_latest` (snapshot), scoped to
+  `business_id="aurem_self"`. Writes a `notifications` row when critical/high regress.
+- **Autonomous loop** wired into Pillar-3 worker (`pillars/site_monitor/worker.py`),
+  6h cycle, 35-min boot delay, toggle `AUREM_SUPPLY_CHAIN_DISABLED=1`.
+- **New admin router** `routers/supply_chain_router.py`:
+  `GET /api/admin/supply-chain/latest|history`, `POST .../scan` (background task,
+  returns instantly — avoids ingress 502 on the ~60-90s sweep). Admin-only.
+- **Verified end-to-end** on preview: real sweep = 285 findings (1 crit, 210 high)
+  across bandit 57 / detect-secrets 40 / trufflehog 46 / pip-audit 57 / yarn 85.
+- **Tests** `tests/test_supply_chain_scanner.py` — 4 passing (logic + real detect-secrets proof).
+- requirements.txt updated (bandit, detect-secrets, stevedore).
+
+
 ## 2026-06-10 — iter D-75 Part 2 item #3 — Top-20 set_db wiring sweep
 
 D-75 #2 detector revealed 213 router modules that defined `set_db()` but

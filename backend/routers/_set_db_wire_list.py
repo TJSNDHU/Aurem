@@ -261,6 +261,7 @@ ALL_SET_DB_MODULES = [
     "scout_sources_router",
     "scout_unified_router",
     "security_audit_router",
+    "supply_chain_router",
     "security_keys_router",
     "security_patterns_router",
     "security_router",

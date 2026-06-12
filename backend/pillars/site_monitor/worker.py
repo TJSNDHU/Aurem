@@ -82,6 +82,17 @@ def start_pillar3_worker(db) -> dict:
         failed.append({"task": "self_repair_loop", "error": str(e)})
         print(f"[p3-worker] ✗ Self-Repair Loop failed: {e}", flush=True)
 
+    # ---- Supply-Chain Scanner (6h secret/SCA/SAST sweep) -----------
+    try:
+        from services.supply_chain_scanner import supply_chain_loop, set_db as set_sc_db
+        set_sc_db(db)
+        _safe_task(supply_chain_loop(), "supply_chain_scanner")
+        started.append("supply_chain_scanner (6h cycle)")
+        print("[p3-worker] \u2713 Supply-Chain Scanner attached", flush=True)
+    except Exception as e:
+        failed.append({"task": "supply_chain_scanner", "error": str(e)})
+        print(f"[p3-worker] \u2717 Supply-Chain Scanner failed: {e}", flush=True)
+
     # ---- Self-Scan Automation (continuous scan pipeline) -----------
     try:
         from services.self_scan_automation import self_scan_loop, set_db as set_ss_db

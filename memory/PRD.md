@@ -1,6 +1,6 @@
 # AUREM — Product Requirements Document
 
-> Last updated 2026-06-11 (iter D-81b)
+> Last updated 2026-06-12 (iter D-82)
 
 ## Vision
 
