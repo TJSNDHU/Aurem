@@ -1,3 +1,28 @@
+## 2026-06-12 — iter D-82b — Supply-Chain scanner integrated into Sentinel + REAL fix-apply
+
+Wired the new supply-chain sweep into AUREM's existing Sentinel "trust-but-verify"
+repair model, and gave Sentinel the ability to actually fix dependency issues.
+
+- **New engine** `services/supply_chain_remediation.py` — plans a remediation for
+  every finding and classifies into 3 lanes (mirrors Sentinel tiers):
+  - `auto_safe`      → same-major (patch/minor) pip upgrade w/ published fix → CAN auto-apply
+  - `needs_approval` → pip major bump + all yarn/JS upgrades → human review
+  - `manual_only`    → secrets (provider rotation) + SAST code smells → human review
+- **REAL apply** `apply_pip_upgrade()` — backup requirements.txt → real `pip install` →
+  smoke-import → rewrite pinned line → rollback on failure. Proven E2E: aiohttp
+  3.13.3→3.13.4 installed, requirements.txt updated, import OK. No mock.
+- **Sentinel integration**: all findings flow into `db.repair_suggestions` (the same
+  queue Sentinel's admin overview/suggestions endpoints read), source=`supply_chain`,
+  deduped by signature, severity→P0/P1/P2. Verified: 250 findings queued
+  (28 auto_safe / 49 needs_approval / 123 manual_only on the live snapshot).
+- **Autonomous**: scanner calls `remediate_after_scan()` at end of every 6h sweep.
+  Default SUGGEST-ONLY; set `AUREM_SUPPLY_CHAIN_AUTOFIX=true` to auto-apply safe pip upgrades.
+- **New endpoints**: `POST /api/admin/supply-chain/remediate?auto_apply=`,
+  `GET /api/admin/supply-chain/remediations`. Admin-only (401 guard verified).
+- **Tests** `tests/test_supply_chain_remediation.py` — 4 passing (semver/planner/lanes).
+  Total supply-chain suite now 8 green.
+
+
 ## 2026-06-12 — iter D-82 — Autonomous Supply-Chain / Secret / SAST sweep (REAL, no-mock)
 
 Closed the scanning-taxonomy gaps (Cat 1 SAST + Cat 2 SCA/Secret) with a fully

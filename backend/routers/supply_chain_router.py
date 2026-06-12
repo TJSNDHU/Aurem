@@ -32,6 +32,11 @@ def set_db(database) -> None:
         _set(database)
     except Exception as e:  # noqa: BLE001
         logger.warning("[supply-chain] scanner set_db failed: %s", e)
+    try:
+        from services.supply_chain_remediation import set_db as _set_rem
+        _set_rem(database)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[supply-chain] remediation set_db failed: %s", e)
 
 
 async def _require_admin(request: Request) -> Dict[str, Any]:
@@ -98,6 +103,30 @@ async def scan_now(request: Request) -> Dict[str, Any]:
         "status": "started",
         "message": "Sweep running in the background (~60-90s). Poll /api/admin/supply-chain/latest.",
     }
+
+
+@router.post("/remediate")
+async def remediate(request: Request, auto_apply: bool = False) -> Dict[str, Any]:
+    """Plan remediations from the latest sweep.
+    - auto_apply=false (default): SUGGEST-only — queues findings into the
+      Sentinel repair_suggestions review queue. Safe.
+    - auto_apply=true: applies safe (same-major) pip upgrades for real
+      (backup + install + smoke-import + rollback), queues the rest.
+    """
+    await _require_admin(request)
+    from services.supply_chain_remediation import run_remediation
+    try:
+        result = await asyncio.wait_for(run_remediation(auto_apply=auto_apply), timeout=280)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Remediation exceeded 4.5 min; check /remediations.")
+    return {"status": "ok", "result": result}
+
+
+@router.get("/remediations")
+async def remediations(request: Request, limit: int = 50) -> Dict[str, Any]:
+    await _require_admin(request)
+    from services.supply_chain_remediation import get_remediation_log
+    return {"status": "ok", "log": await get_remediation_log(limit=min(max(limit, 1), 200))}
 
 
 print("[STARTUP] Supply-Chain Router loaded", flush=True)

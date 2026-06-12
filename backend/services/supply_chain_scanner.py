@@ -388,6 +388,15 @@ async def run_supply_chain_scan(trigger: str = "scheduled") -> Dict[str, Any]:
         except Exception as e:  # noqa: BLE001
             logger.warning("[SupplyChain] persist failed: %s", e)
 
+    # ── Sentinel-integrated remediation: plan + queue + (opt) auto-apply ──
+    try:
+        from services.supply_chain_remediation import remediate_after_scan, set_db as _set_rem_db
+        _set_rem_db(_db)
+        rem = await remediate_after_scan()
+        logger.info("[SupplyChain] remediation: %s", rem.get("counts") or rem.get("status"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[SupplyChain] remediation hook failed: %s", e)
+
     logger.info(
         "[SupplyChain] done in %.1fs — score=%s crit=%s high=%s med=%s total=%s",
         doc["duration_s"], summary["posture_score"],
