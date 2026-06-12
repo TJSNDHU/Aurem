@@ -55,25 +55,72 @@ async def _require_admin(request: Request) -> dict:
 
 ADMIN_CHECKLIST = [
     # (feature, panel_route, backend_probe, frontend_component_path)
-    ("Living Audit Dashboard",      "/admin/system-audit",               "/api/admin/system-audit/health",           "AdminSystemAudit.jsx"),
-    ("4 Agents dry-run toggles",    "/admin/system-audit",               "/api/agents/status",                       "AdminSystemAudit.jsx"),
-    ("Per-customer pixel status",   "/admin/system-audit + pixel admin", "/api/pixel/admin/customer-status?email=teji.ss1986@gmail.com", "pixel_patches_router.py"),
-    ("BIN search",                  "/dashboard (admin)",                "/api/bin-auth/admin/search?q=rst",         "bin_auth_router.py"),
-    ("Scan history per customer",   "/my/website (customer)",            "/api/customer/scan-history",               "CustomerWebsite.jsx"),
-    ("Campaign HQ with Kanban",     "/dashboard → pipeline-kanban",      "/api/lifecycle/pipeline",                   "LeadPipelineKanban.jsx"),
-    ("Flame score + auto-dialer",   "/dashboard → voice-sales-agent",    "/api/lifecycle/pipeline",                   "lead_lifecycle_router.py"),
-    ("Morning digest history",      "/dashboard → brief-history",        "/api/brief/history",                         "brief_router.py"),
-    ("A2A activity feed",           "/dashboard → agent-observatory",    "/api/agents/a2a-feed",                     "AgentObservatory.jsx"),
-    ("Referral tracking (admin)",   "/dashboard → partner-referral",     "/api/customer/referrals",                  "PartnerReferralPortal.jsx"),
-    ("Apple Pay checkout sessions", "/admin/financials",                 "/api/stripe-embed/health",                 "stripe_embed_router.py"),
-    ("Nightly health check status", "/admin/system-audit",               "/api/admin/system-audit/health",           "AdminSystemAudit.jsx"),
-    ("Smart onboarding status",     "/my/onboarding (customer)",         "/api/smart-onboarding/health",             "CustomerOnboarding.jsx"),
-    ("API keys per customer",       "/dashboard → api-keys",             "/api/aurem-keys/scope-bundles",             "APIKeysManager.jsx"),
-    ("GitHub connection status",    "/my/website (customer)",            "/api/customer/github/status",              "CustomerWebsite.jsx"),
-    ("Pixel events per customer",   "/admin/system-audit (pixel card)",  "/api/pixel/status?key=invalid",            "pixel_patches_router.py"),
-    ("Auto-hunt queue + schedule",  "/dashboard → hunt-command",         "/api/auto-hunt/settings",                  "agents_router.py"),
-    ("CASL audit trail",            "/dashboard → security",             "/api/compliance/status",                    "agents_router.py"),
-    ("HST financial records",       "/admin/financials",                 "/api/admin/financials/hst-summary",         "admin_financials_router.py"),
+    # iter D-82c — synced 1:1 with the 9-group AdminShell sidebar (Batch 3).
+    # NOTE: a few probes use the most-likely existing path; the live audit page
+    # is the verifier — any "missing" row is a 1-line probe correction.
+
+    # ── 1 · BOARDROOM ──────────────────────────────────────────────────
+    ("Boardroom KPIs",            "/admin/boardroom",        "/api/admin/financials/hst-summary",        "BoardroomPage.jsx"),
+    ("Morning brief history",     "/admin/morning-brief",    "/api/brief/history",                       "MorningBriefMobile.jsx"),
+    ("Founder saves",             "/admin/founder-saves",    "/api/admin/founder-saves",                 "FounderSaves.jsx"),
+    ("Daily log",                 "/admin/daily-log",        "/api/admin/daily-log",                     "AdminDailyLog.jsx"),
+
+    # ── 2 · MISSION CONTROL ────────────────────────────────────────────
+    ("Mission Control dashboard", "/admin/mission-control",  "/api/admin/mission-control/dashboard",     "AdminMissionControl.jsx"),
+    ("Campaign command",          "/admin/campaign-command", "/api/lifecycle/pipeline",                  "CampaignCommandDashboard.jsx"),
+    ("Campaign health",           "/admin/campaign-health",  "/api/campaign-health/summary",             "CampaignHealthPage.jsx"),
+    ("Leads mining",              "/admin/leads-mining",     "/api/scout/status",                        "AdminLeadsMining.jsx"),
+    ("Apollo cost",               "/admin/apollo-cost",      "/api/apollo/cost/summary",                 "AdminApolloCostPage.jsx"),
+
+    # ── 3 · CUSTOMERS ──────────────────────────────────────────────────
+    ("Customer health panel",     "/admin/customer-health",  "/api/admin/customer-health",               "CustomerHealthPanel.jsx"),
+    ("Impersonation log",         "/admin/impersonation-log","/api/admin/impersonation-log",             "AdminImpersonationLog.jsx"),
+    ("Plan manager",              "/admin/plans",            "/api/admin/plans",                         "AdminPlanManager.jsx"),
+
+    # ── 4 · ORA ────────────────────────────────────────────────────────
+    ("ORA unified (chat/cockpit)","/admin/ora",              "/api/ora/pipeline/status",                 "OraAdminUnified.jsx"),
+    ("Council audit",             "/admin/council-audit",    "/api/admin/council/health",                "CouncilAuditPage.jsx"),
+    ("Brain",                     "/admin/brain",            "/api/brain/status",                        "AdminBrainPage.jsx"),
+    ("Watchdog",                  "/admin/ora-watchdog",     "/api/ora/watchdog/status",                 "OraWatchdogCockpit.jsx"),
+    ("Skills marketplace",        "/admin/ora-skills",       "/api/admin/ora/skills",                  "SkillsMarketplace.jsx"),
+
+    # ── 5 · SENTINEL & SELF-REPAIR ─────────────────────────────────────
+    ("Sentinel diagnostics",      "/admin/sentinel",         "/api/admin/sentinel/status",               "AdminDiagnostics.jsx"),
+    ("Self-repair",               "/admin/self-repair",      "/api/admin/autonomous-repair/stats",       "AdminSelfRepair.jsx"),
+    ("Stem fix",                  "/admin/stem-fix",         "/api/stem-fix/status",                     "AdminStemFix.jsx"),
+    ("Incident ledger",           "/admin/incident-ledger",  "/api/incidents/list",                      "IncidentLedger.jsx"),
+    ("Git commit gate",           "/admin/git-gate",         "/api/git-gate/pending",                    "GitCommitGate.jsx"),
+    ("Vanguard",                  "/admin/vanguard",         "/api/admin/ora/vanguard-status",                     "AdminVanguard.jsx"),
+    ("Supply-Chain posture",      "/admin/supply-chain",     "/api/admin/supply-chain/remediations",     "AdminSupplyChain.jsx"),
+
+    # ── 6 · SYSTEM HEALTH ──────────────────────────────────────────────
+    ("System overview",           "/admin/system-overview",  "/api/admin/system-audit/health",           "SystemOverview.jsx"),
+    ("System pulse live",         "/admin/system-pulse-live","/api/admin/system-pulse-live",             "SystemPulseLive.jsx"),
+    ("Codebase health",           "/admin/codebase-health",  "/api/codebase-health/latest",              "AdminCodebaseHealth.jsx"),
+    ("Wiring audit",              "/admin/wiring-audit",     "/api/admin/wiring-audit",                  "AdminWiringAudit.jsx"),
+    ("Site monitor",              "/admin/site-monitor",     "/api/admin/site-monitor/summary",          "AdminSiteMonitor.jsx"),
+    ("Pillars map",               "/admin/pillars-map",      "/api/pillars/health",                      "AdminPillarsMap.jsx"),
+    ("System audit",              "/admin/system-audit",     "/api/admin/system-audit/health",           "AdminSystemAudit.jsx"),
+    ("Control center",            "/admin/control-center",   "/api/admin/control-center/status",         "AdminControlCenter.jsx"),
+    ("BugCatch reports",          "/admin/bug-reports",      "/api/admin/bug-reports",                   "AdminBugReports.jsx"),
+
+    # ── 7 · REVENUE ────────────────────────────────────────────────────
+    ("Analytics",                 "/admin/analytics",        "/api/owner/analytics/dashboard",           "AnalyticsDashboard.jsx"),
+    ("Sovereignty score",         "/admin/sovereignty-score","/api/admin/sovereignty-score",             "AdminSovereigntyScore.jsx"),
+
+    # ── 8 · SECURITY & ACCESS ──────────────────────────────────────────
+    ("Security keys",             "/admin/security-keys",    "/api/admin/security-keys",                 "AdminSecurityKeys.jsx"),
+    ("API keys",                  "/admin/api-keys",         "/api/aurem-keys/scope-bundles",            "AdminApiKeysPage.jsx"),
+    ("Business IDs",              "/admin/business-ids",     "/api/bin-auth/admin/search?q=rst",         "AdminBusinessIds.jsx"),
+    ("SSOT",                      "/admin/ssot",             "/api/admin/ssot/status",                   "AdminSSOT.jsx"),
+    ("Developer signups",         "/admin/developer-signups","/api/admin/developer-signups",             "AdminDeveloperSignups.jsx"),
+    ("Integrations",              "/admin/integrations",     "/api/admin/integrations/health",           "AdminIntegrations.jsx"),
+
+    # ── 9 · LABS (collapsed) ───────────────────────────────────────────
+    ("Evolver",                   "/admin/evolver",          "/api/admin/evolver/status",                "AdminEvolver.jsx"),
+    ("Brain graph",               "/admin/brain-graph",      "/api/brain/graph",                         "AdminBrainGraph.jsx"),
+    ("Browser agent",             "/admin/browser-agent",    "/api/browser-agent/status",                "AdminBrowserAgent.jsx"),
+    ("Design extract",            "/admin/design-extract",   "/api/design-extract/status",               "DesignExtractStudio.jsx"),
 ]
 
 CUSTOMER_CHECKLIST = [
@@ -89,6 +136,9 @@ CUSTOMER_CHECKLIST = [
     ("Token balance",                 "/my/website",    "/api/customer/tokens",                    "CustomerWebsite.jsx"),
     ("Billing + Apple Pay",           "/my/billing",    "/api/stripe-embed/publishable-key",       "CustomerBilling.jsx + ApplePayCheckout.jsx"),
     ("ORA chat w/ business context",  "/my/ora",        "/api/bin-auth/customer-context",          "CustomerOra.jsx"),
+    # iter D-82c — gaps closed by missing_endpoints_router (Batch-2 portal live)
+    ("Scan schedule (get/set)",       "/my/website",    "/api/customer/scan-schedule",             "CustomerWebsite.jsx"),
+    ("Sentinel fixes log",            "/my",            "/api/sentinel/fixes-log",                 "LuxePages.jsx"),
 ]
 
 

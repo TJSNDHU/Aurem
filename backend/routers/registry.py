@@ -302,6 +302,7 @@ def register_all_routers(app, db):
         ("churn_prediction_router", "churn_prediction_router"),
         ("security_audit_router", "security_audit_router"),
         ("supply_chain_router", "supply_chain_router"),
+        ("missing_endpoints_router", "missing_endpoints_router"),
         ("subscription_router", "subscription_router"),
         ("openfang_router", "openfang_router"),
         ("zdr_router", "zdr_router"),

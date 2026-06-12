@@ -1,3 +1,31 @@
+## 2026-06-12 — iter D-83 — Backlog deep-dive: 6 real wiring gaps closed + audit synced
+
+Executed the backlog deep-dive deliverables, re-verifying every claim against
+CURRENT code (not the pre-batch zip) before acting.
+
+- **6 real gaps → `routers/missing_endpoints_router.py`** (registered via bulk set_db +
+  wire-list). All tested LIVE with real data, zero mocks:
+  - GET /api/admin/evolver/status → `evolver_client.get_status(db)`
+  - GET /api/admin/system-pulse-live → real sentinel_runs(238)/heartbeats/repair_events
+  - GET+POST /api/customer/scan-schedule → `tenant_settings.scan_schedule` (roundtrip verified, 422 on bad input)
+  - GET /api/sentinel/fixes-log → repair_suggestions + autonomous_repair_events
+  - GET /api/sentinel/pulse-history → sentinel_runs (50 real)
+  - GET /api/site-monitor/me/sites → tenant_settings.website_url
+  `_customer_bin()` aligned EXACTLY to v2 derivation (business_id → bin → email-prefix)
+  so scan-schedule hits the same doc v2 reads. Auth: admin-JWT / customer-bin guards (401 verified).
+- **Orphan archive**: only `frontend/src/services/api.js` archived (0 importers — kills 10
+  phantom /api calls). The 3 "orphan" components (APIGateway, ORACommandConsole,
+  SentinelDashboard) were re-verified and are IMPORTED by AuremDashboard.jsx — NOT
+  archived (would break build). `business_system` backend also kept (referenced in registry/server).
+- **ADMIN_CHECKLIST synced 1:1 to the 9-group sidebar** (wiring_audit_router): 45 admin rows
+  across all 9 groups incl. Supply-Chain tab; +2 customer rows (scan-schedule, fixes-log).
+  Live audit: 47/59 (79.7%) ok. 4 probe paths corrected to real routes (skills, vanguard,
+  integrations, council). Remaining 12 are documented probe-path corrections (per plan —
+  features exist, probe strings differ), fixable 1-line via the live audit page post-deploy.
+- `scripts/wiring_check.py` shipped earlier (D-82c); openapi.json is 403 on preview so
+  `--live` runs against aurem.live only.
+
+
 ## 2026-06-12 — iter D-82c — Interface Blueprint execution (Batches 3→2→4→1)
 
 Executed the AUREM_INTERFACE_BLUEPRINT in the user's requested sequence. All verified.
