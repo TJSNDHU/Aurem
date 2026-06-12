@@ -551,7 +551,8 @@ async def _post_verify_kickoff(db, tenant_id: str, domain: str):
         except Exception:
             # Fallback: queue a record the existing pipeline will pick up
             await db.scan_history.insert_one({
-                "tenant_id": tenant_id, "scan_url": domain,
+                "tenant_id": tenant_id, "business_id": tenant_id,
+                "scan_url": domain,
                 "queued_at": _dt.now(_tz.utc).isoformat(),
                 "source": "pixel_verify_kickoff",
                 "status": "queued",
@@ -559,7 +560,8 @@ async def _post_verify_kickoff(db, tenant_id: str, domain: str):
 
         # Pull issues found (best-effort)
         latest = await db.scan_history.find_one(
-            {"tenant_id": tenant_id, "scan_url": {"$regex": domain.replace(".", r"\.")}},
+            {"business_id": tenant_id,
+             "scan_url": {"$regex": domain.replace(".", r"\.")}},
             {"_id": 0, "issues": 1, "overall_score": 1},
             sort=[("queued_at", -1)],
         ) or {}

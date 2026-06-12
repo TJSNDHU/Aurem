@@ -147,6 +147,10 @@ CUSTOMER_CHECKLIST = [
     ("Leads list",                    "/my/leads",        "/api/customer/leads",                     "CustomerLeads.jsx"),
     ("Appointments",                  "/my/appointments", "/api/customer/appointments",              "CustomerAppointments.jsx"),
     ("Council repair eligibility",    "/my/website",      "/api/customer/repair/eligibility",        "CouncilRepairPanel.jsx"),
+    # iter D-85 — customer home aggregate + action endpoints (POST probes return 405→wired)
+    ("Home dashboard (aggregate)",    "/my",              "/api/me/home/dashboard",                  "LuxePages.jsx"),
+    ("Review request batch (POST)",   "/my/reviews",      "/api/customer/reviews/request-batch",     "CustomerReviews.jsx"),
+    ("Report generate now (POST)",    "/my/report",       "/api/customer/reports/generate",          "CustomerReport.jsx"),
 ]
 
 
@@ -169,7 +173,8 @@ async def _probe(client: httpx.AsyncClient, base: str, path: str, auth_header: s
         # 404 → either truly missing OR handler-level not-found; consult the route table.
         if code < 400:
             status = "ok"
-        elif code in (401, 403, 422):
+        elif code in (401, 403, 405, 422):
+            # 405 → POST/PUT-only route probed with GET: route exists (wired).
             status = "wired"
         elif code == 404:
             if _path_is_registered(path, registered_paths):

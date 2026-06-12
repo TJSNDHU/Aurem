@@ -31,6 +31,8 @@ from urllib.parse import quote_plus
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────
@@ -510,7 +512,7 @@ async def save_verified_profile(db, lead_id: str, verified: Dict[str, Any]) -> N
             {"lead_id": lead_id}, {"$set": doc}, upsert=True
         )
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$set": {
                 "verification": {
                     "verified_at": verified["verified_at"],
@@ -527,7 +529,7 @@ async def save_verified_profile(db, lead_id: str, verified: Dict[str, Any]) -> N
         # Both fire-and-forget so verification isn't slowed down.
         try:
             lead = await db.campaign_leads.find_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"_id": 0, "website_url": 1, "website": 1, "audit_score": 1,
                  "business_name": 1, "city": 1, "social_score": 1},
             ) or {}
@@ -574,7 +576,7 @@ async def _run_lead_audit(db, lead_id: str, website: str) -> None:
         }
         await db.customer_scans.insert_one(doc)
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$set": {
                 "audit_score": audit["overall_score"],
                 "audit_id": scan_id,
@@ -591,7 +593,7 @@ async def _run_lead_audit(db, lead_id: str, website: str) -> None:
             design = await extract_design(audit["url"], db=db)
             if design.get("ok"):
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {"$set": {"design_tokens": {
                         "extraction_success": True,
                         "extracted_at": design["extracted_at"],
@@ -621,7 +623,7 @@ async def _run_social_audit(db, lead_id: str, business_name: str,
         res = await check_social_presence(business_name, city or None)
         priority = classify_lead(False, res["social_score"])
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$set": {
                 "social_profiles": res["social_profiles"],
                 "social_score": res["social_score"],

@@ -18,6 +18,7 @@ from pillars.sales.routes._shared import (
     _get_db, _verify_admin, _get_today_schedule,
     WHATSAPP_TEMPLATES, EMAIL_SUBJECTS, TARGET_CATEGORIES, COMPETITOR_TEMPLATES,
 )
+from shared.tenant import FOUNDER_BIN
 
 router = APIRouter(prefix="/api/campaign", tags=["AUREM Campaign"])
 logger = logging.getLogger(__name__)
@@ -45,11 +46,12 @@ async def campaign_overview(request: Request):
         }
 
     # Lead counts
-    total_leads = await db.campaign_leads.count_documents({})
+    total_leads = await db.campaign_leads.count_documents({"business_id": FOUNDER_BIN})
     statuses = ["new", "scanned", "called", "emailed", "whatsapp_sent", "interested", "signed_up", "not_interested"]
     by_status = {}
     for s in statuses:
-        by_status[s] = await db.campaign_leads.count_documents({"status": s})
+        by_status[s] = await db.campaign_leads.count_documents(
+            {"status": s, "business_id": FOUNDER_BIN})
 
     return {
         "campaign": campaign,
@@ -99,7 +101,7 @@ async def list_leads(
     if not db:
         raise HTTPException(500, "DB not initialized")
 
-    query = {}
+    query = {"business_id": FOUNDER_BIN}
     if status:
         query["status"] = status
     if search:
@@ -109,6 +111,7 @@ async def list_leads(
             {"email": {"$regex": search, "$options": "i"}},
         ]
 
+    # `query` already carries the business_id tenant scope (set above)
     total = await db.campaign_leads.count_documents(query)
     skip = (page - 1) * limit
     leads = await db.campaign_leads.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
@@ -122,7 +125,8 @@ async def get_lead(lead_id: str, request: Request):
     db = _get_db()
     if not db:
         raise HTTPException(500, "DB not initialized")
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
     return lead
@@ -145,7 +149,8 @@ async def update_lead(lead_id: str, data: LeadUpdate, request: Request):
     if not updates:
         return {"success": True, "message": "No changes"}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.campaign_leads.update_one({"lead_id": lead_id}, {"$set": updates})
+    await db.campaign_leads.update_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$set": updates})
     return {"success": True}
 
 
@@ -161,6 +166,7 @@ async def add_lead(request: Request):
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "lead_id": lead_id,
+        "business_id": FOUNDER_BIN,
         "campaign_id": "aurem-acquisition-001",
         "business_name": body.get("business_name", ""),
         "phone": body.get("phone", ""),
@@ -176,7 +182,8 @@ async def add_lead(request: Request):
         "created_at": now,
         "updated_at": now,
     }
-    await db.campaign_leads.update_one({"lead_id": lead_id}, {"$set": doc}, upsert=True)
+    await db.campaign_leads.update_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$set": doc}, upsert=True)
 
     # AUTO-TRIGGER: if scout found a business without a website, generate sample site
     if not doc.get("website_url"):
@@ -222,7 +229,9 @@ async def add_dnc(data: DNCEntry, request: Request):
         removal_query["$or"].append({"email": {"$regex": f"^{data.email}$", "$options": "i"}})
 
     if removal_query["$or"]:
-        result = await db.campaign_leads.update_many(removal_query, {"$set": {"status": "not_interested", "dnc": True}})
+        result = await db.campaign_leads.update_many(
+            {**removal_query, "business_id": FOUNDER_BIN},
+            {"$set": {"status": "not_interested", "dnc": True}})
         return {"success": True, "leads_flagged": result.modified_count}
 
     return {"success": True, "leads_flagged": 0}
@@ -261,7 +270,8 @@ async def unsubscribe(email: str = ""):
         upsert=True,
     )
     await db.campaign_leads.update_many(
-        {"email": {"$regex": f"^{email}$", "$options": "i"}},
+        {"email": {"$regex": f"^{email}$", "$options": "i"},
+         "business_id": FOUNDER_BIN},
         {"$set": {"status": "not_interested", "dnc": True}},
     )
     return {"success": True, "message": f"{email} has been unsubscribed."}

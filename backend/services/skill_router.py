@@ -19,6 +19,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # iter 282al-29 — SKILLS_DIR now resolves relative to the backend package
@@ -618,14 +620,15 @@ async def _gather_live_system_scan(db) -> str:
         try:
             cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
             emailed = await db.campaign_leads.count_documents(
-                {"last_email_at": {"$gte": cutoff}},
+                {"last_email_at": {"$gte": cutoff}, "business_id": FOUNDER_BIN},
             )
             inbound_24h = await db.inbound_replies.count_documents(
-                {"received_at": {"$gte": datetime.now(timezone.utc) - timedelta(hours=24)}},
+                {"received_at": {"$gte": datetime.now(timezone.utc) - timedelta(hours=24)},
+                 "business_id": FOUNDER_BIN},
             )
             inbound_pos = await db.inbound_replies.count_documents(
                 {"received_at": {"$gte": datetime.now(timezone.utc) - timedelta(hours=24)},
-                 "intent": "positive"},
+                 "business_id": FOUNDER_BIN, "intent": "positive"},
             )
             lines.append(
                 f"[Outreach 24h] emails_sent={emailed} · "

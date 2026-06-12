@@ -11144,3 +11144,11 @@ scheduler will fire on its own.
 - Removed quotes from `MONGO_URL`/`DB_NAME` in `backend/.env` (deployment_agent WARN).
 - deployment_agent re-scan: no blockers (gitignore_blocks_required_files=false, compilation passed). Backend health 200 post-restart.
 - Remaining P0: tenant scope violations (~305 unscoped queries per boot warning) → then flip AUREM_TENANT_SCOPE_STRICT=true.
+
+## 2026-06-12/13 — Tenant scope ZERO + strict mode + customer endpoints (fork session)
+- Tenant scope: 329 → 0 violations across ~89 files. Pattern: founder-engine queries scoped to FOUNDER_BIN (`shared/tenant.py`, env-overridable), customer routers scoped to tenant BIN. Guard extended to accept equivalent tenant keys (tenant_bin/tenant_email/user_id).
+- DB migrations: backfill re-run (358 campaign_leads rows), repair_jobs/customer_scans/scan_history business_id aligned to tenant_bin/tenant_id.
+- `AUREM_TENANT_SCOPE_STRICT=true` flipped in backend/.env — boot now fails on any new unscoped query. Regression gate: `tests/test_tenant_scope_zero.py`.
+- Test fixtures updated (blast_chain, deduplication, followup_ora, flame_auto_dialer, engagement_webhooks, lead_lifecycle, inbound_reply, iter327m) — fake leads now carry business_id like real ingestion. 136 targeted tests green.
+- Customer endpoints verified E2E + wired into CUSTOMER_CHECKLIST: GET /api/me/home/dashboard (200 ok), POST /api/customer/reviews/request-batch (wired), POST /api/customer/reports/generate (wired; insert carries business_id). Wiring-audit probe now treats 405 as wired for POST-only routes.
+- Known pre-existing failures (NOT regressions): stale log-grep/route-count tests (pillar4, iter_284, d68/d69 sidebar), removed-endpoint tests (test_email_inbound — route LEAN-pruned earlier), BASE_URL tests hitting production aurem.live (502 until user redeploys).

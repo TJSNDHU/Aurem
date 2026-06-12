@@ -30,6 +30,8 @@ import logging
 import os
 from datetime import datetime, timezone
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 _CAP = int(os.environ.get("CLOSER_DAY5_CAP_PER_RUN", "20"))
@@ -56,6 +58,7 @@ async def run_closer_day5_sweep(db) -> dict:
     try:
         cur = db.campaign_leads.find(
             {
+                "business_id": FOUNDER_BIN,
                 "blast_chain.next_touch_n":  4,
                 "blast_chain.next_touch_at": {"$lte": now.isoformat()},
                 "closer_day5_armed_at":      {"$exists": False},
@@ -82,7 +85,7 @@ async def run_closer_day5_sweep(db) -> dict:
                 details.append({"lead_id": lead_id, "skipped": "do_not_contact"})
                 # Stamp so we don't keep evaluating this lead.
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {"$set": {"closer_day5_armed_at": now, "closer_day5_skip_reason": "dnc"}},
                 )
                 continue
@@ -95,7 +98,7 @@ async def run_closer_day5_sweep(db) -> dict:
             })
             # Mark the lead either way so we don't retry on every tick.
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "closer_day5_armed_at":   now,
                     "closer_day5_result":     (result or {}).get("ok"),

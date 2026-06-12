@@ -20,6 +20,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException, Header, Query
+from shared.tenant import FOUNDER_BIN
 
 router = APIRouter(prefix="/api/dashboard-feeds", tags=["Dashboard Feeds"])
 
@@ -399,7 +400,8 @@ async def hot_leads(
     top_engaged = []
     try:
         eng_cursor = db.campaign_leads.find(
-            {"$or": [
+            {"business_id": FOUNDER_BIN,
+             "$or": [
                 {"report_view_count": {"$gt": 0}},
                 {"sample_view_count": {"$gt": 0}},
             ]},

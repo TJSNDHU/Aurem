@@ -23,6 +23,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Local-time window for outbound calls (lead's timezone)
@@ -100,7 +102,8 @@ async def arm(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     # Parallel: fetch lead + idempotency check
     lead, existing_call = await asyncio.gather(
-        db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0}),
+        db.campaign_leads.find_one(
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0}),
         db.auto_call_log.find_one({"lead_id": lead_id, "trigger": trigger}),
         return_exceptions=True,
     )

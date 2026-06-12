@@ -41,6 +41,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # ── tunables (env-overridable) ───────────────────────────────────────
@@ -175,7 +177,7 @@ async def start_chain(
         "halted_reason": None,
     }
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {
             "blast_chain": chain_state,
             "last_blast_at": started,
@@ -247,7 +249,7 @@ async def advance_chain(db, lead: Dict[str, Any]) -> Dict[str, Any]:
         "completed": is_last,
     }
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {"blast_chain": new_state, "last_blast_at": sent_at}},
     )
     return {"ok": True, "chain": new_state, "fire": fire}
@@ -258,7 +260,7 @@ async def halt_chain(db, lead_id: str, reason: str) -> None:
     if db is None or not lead_id:
         return
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {
             "blast_chain.halted_reason": reason,
             "blast_chain.next_touch_at": None,
@@ -344,7 +346,7 @@ async def handle_reply(
 
     if cls == "hot":
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$set": {
                 "hot_lead_flag": True,
                 "hot_lead_at": _now(),
@@ -368,7 +370,8 @@ async def handle_reply(
     elif cls == "dnc":
         # Add to do_not_contact + halt
         lead = await db.campaign_leads.find_one(
-            {"lead_id": lead_id}, {"_id": 0, "phone": 1, "email": 1},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+            {"_id": 0, "phone": 1, "email": 1},
         ) or {}
         dnc_doc = {
             "lead_id": lead_id,
@@ -387,7 +390,7 @@ async def handle_reply(
         except Exception as e:
             logger.debug(f"[chain] dnc upsert skipped: {e}")
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$set": {"status": "unsubscribed", "dnc": True}},
         )
         await halt_chain(db, lead_id, "dnc")
@@ -436,6 +439,7 @@ async def _due_chain_leads(db, limit: int = 50) -> List[Dict[str, Any]]:
     """Find leads whose next_touch_at is in the past and chain is active."""
     now_iso = _now().isoformat()
     q = {
+        "business_id": FOUNDER_BIN,
         "blast_chain.next_touch_at": {"$lte": now_iso, "$ne": None},
         "blast_chain.completed": {"$ne": True},
         "blast_chain.halted_reason": {"$in": [None, ""]},

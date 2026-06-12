@@ -93,6 +93,7 @@ def test_same_phone_rejected():
         try:
             await db.campaign_leads.insert_one({
                 "lead_id": "seed-1", "business_name": "Seed Co",
+                "business_id": "AUR-FNDR-001",
                 "phone": "+1 (416) 555-0100",
                 "phone_normalized": "14165550100",
                 "city": "Toronto",
@@ -117,6 +118,7 @@ def test_same_domain_rejected():
         try:
             await db.campaign_leads.insert_one({
                 "lead_id": "seed-2", "business_name": "Seed Co",
+                "business_id": "AUR-FNDR-001",
                 "website_domain": "acmeplumbing.ca", "city": "Toronto",
             })
             return await is_duplicate_lead(db, {
@@ -139,6 +141,7 @@ def test_fuzzy_name_city_blocks():
         try:
             await db.campaign_leads.insert_one({
                 "lead_id": "seed-3", "business_name": "Mike's Plumbing Co",
+                "business_id": "AUR-FNDR-001",
                 "city": "Mississauga",
             })
             return await is_duplicate_lead(db, {

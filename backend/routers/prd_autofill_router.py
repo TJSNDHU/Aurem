@@ -15,6 +15,8 @@ from pydantic import BaseModel
 
 from services.prd_auto_fill import auto_fill_prd, prd_summary_for_llm
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -74,7 +76,7 @@ async def prd_preview(payload: LeadIdIn) -> dict:
         raise HTTPException(status_code=400, detail="lead_id required")
     try:
         lead = await db.campaign_leads.find_one(
-            {"lead_id": payload.lead_id},
+            {"lead_id": payload.lead_id, "business_id": FOUNDER_BIN},
             projection={"_id": 0},
         )
     except Exception as e:

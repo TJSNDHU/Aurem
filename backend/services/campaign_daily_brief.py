@@ -32,6 +32,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger("campaign-daily-brief")
 
 _TZ = ZoneInfo("America/Toronto")
@@ -121,6 +123,7 @@ async def collect_brief_metrics(db) -> Dict[str, Any]:
 
     leads_scraped = await _count(db, "campaign_leads", today_start_utc, tomorrow_start_utc, date_field="created_at")
     leads_real = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "created_at": {"$gte": today_start_utc, "$lt": tomorrow_start_utc},
         "status": {"$nin": ["not_interested", "unsubscribed"]},
     }) if leads_scraped else 0
@@ -151,8 +154,10 @@ async def collect_brief_metrics(db) -> Dict[str, Any]:
     })
 
     replies_today = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "replied_at": {"$gte": today_start_utc, "$lt": tomorrow_start_utc},
-    }) if await db.campaign_leads.count_documents({"replied_at": {"$exists": True}}) else email_replies
+    }) if await db.campaign_leads.count_documents(
+        {"replied_at": {"$exists": True}, "business_id": FOUNDER_BIN}) else email_replies
 
     sites_built = await db.auto_built_sites.count_documents({
         "created_at": {"$gte": today_start_utc, "$lt": tomorrow_start_utc},

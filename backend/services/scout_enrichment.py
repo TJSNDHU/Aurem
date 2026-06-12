@@ -47,6 +47,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Set, Tuple
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # ─── Industry vocabulary (matches spec order = priority 10..1) ────────
@@ -320,7 +322,8 @@ async def _existing_lead_keys(
     if phones:
         try:
             cursor = db.campaign_leads.find(
-                {"phone_e164": {"$in": list(phones)}},
+                {"phone_e164": {"$in": list(phones)},
+                 "business_id": FOUNDER_BIN},
                 {"_id": 0, "phone_e164": 1},
             )
             async for doc in cursor:
@@ -333,7 +336,8 @@ async def _existing_lead_keys(
     if name_postals:
         try:
             cursor = db.campaign_leads.find(
-                {"dedup_name_postal": {"$in": list(name_postals)}},
+                {"dedup_name_postal": {"$in": list(name_postals)},
+                 "business_id": FOUNDER_BIN},
                 {"_id": 0, "dedup_name_postal": 1},
             )
             async for doc in cursor:

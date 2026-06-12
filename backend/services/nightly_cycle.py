@@ -17,6 +17,8 @@ from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +37,8 @@ async def day_close(db) -> Dict[str, Any]:
     # 1. Requeue failed campaigns
     try:
         retry = await db.campaign_leads.update_many(
-            {"last_blast_status": "failed", "status": {"$nin": ["do_not_contact"]}},
+            {"last_blast_status": "failed", "status": {"$nin": ["do_not_contact"]},
+             "business_id": FOUNDER_BIN},
             {"$set": {"stage": "retry_pending"}},
         )
         summary["steps"].append({"retry_queued": retry.modified_count})
@@ -45,7 +48,8 @@ async def day_close(db) -> Dict[str, Any]:
     # 2. DNC sync — process STOP replies (any lead with stop_reply_received marker)
     try:
         dnc = await db.campaign_leads.update_many(
-            {"stop_reply_received": True, "status": {"$ne": "do_not_contact"}},
+            {"stop_reply_received": True, "status": {"$ne": "do_not_contact"},
+             "business_id": FOUNDER_BIN},
             {"$set": {"status": "do_not_contact", "dnc_synced_at": now.isoformat()}},
         )
         summary["steps"].append({"dnc_synced": dnc.modified_count})
@@ -68,7 +72,8 @@ async def day_close(db) -> Dict[str, Any]:
 
     # 4. Seal today's audit record (immutable)
     try:
-        leads_today = await db.campaign_leads.count_documents({"last_scouted_at": {"$gte": start}})
+        leads_today = await db.campaign_leads.count_documents(
+            {"last_scouted_at": {"$gte": start}, "business_id": FOUNDER_BIN})
         msgs_today = await db.message_log_complete.count_documents({"timestamp": {"$gte": start}})
         await db.audit_trail_daily.insert_one({
             "date": today,
@@ -137,7 +142,7 @@ async def auto_learn(db) -> Dict[str, Any]:
     try:
         # Best industry by reply rate
         cursor = db.campaign_leads.find(
-            {"created_at": {"$gte": cutoff}},
+            {"created_at": {"$gte": cutoff}, "business_id": FOUNDER_BIN},
             {"_id": 0, "category": 1, "last_reply_at": 1},
         ).limit(2000)
         leads = await cursor.to_list(length=2000)
@@ -193,16 +198,20 @@ async def evening_brief(db) -> Dict[str, Any]:
         return {"skipped": True}
 
     start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    contacted = await db.campaign_leads.count_documents({"last_scouted_at": {"$gte": start}})
+    contacted = await db.campaign_leads.count_documents(
+        {"last_scouted_at": {"$gte": start}, "business_id": FOUNDER_BIN})
     high_conf = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_scouted_at": {"$gte": start},
         "verification_confidence": "HIGH",
     })
     inferno = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_scouted_at": {"$gte": start},
         "flame_score": {"$gte": 80},
     })
-    replied = await db.campaign_leads.count_documents({"last_reply_at": {"$gte": start}})
+    replied = await db.campaign_leads.count_documents(
+        {"last_reply_at": {"$gte": start}, "business_id": FOUNDER_BIN})
 
     revenue_agg = await db.financial_log.aggregate([
         {"$match": {"timestamp": {"$gte": start}, "event_type": "revenue"}},

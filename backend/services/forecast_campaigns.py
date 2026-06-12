@@ -30,6 +30,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 FOUNDER_WHATSAPP = os.environ.get("FOUNDER_WHATSAPP", "+16134000000")
@@ -141,7 +143,7 @@ async def _match_leads(db, profile: Dict[str, Any],
 
     async def _query(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         return await db.campaign_leads.find(
-            filters, proj,
+            {**filters, "business_id": FOUNDER_BIN}, proj,
         ).sort([("conviction_score", -1), ("score", -1)]) \
             .limit(limit).to_list(limit)
 
@@ -292,7 +294,7 @@ async def _fire_campaign(db, camp: Dict[str, Any]) -> Dict[str, Any]:
 
     for lead_id in camp.get("lead_ids") or []:
         lead = await db.campaign_leads.find_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"_id": 0, "lead_id": 1, "phone": 1, "email": 1,
               "business_name": 1},
         )

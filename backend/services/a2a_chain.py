@@ -49,6 +49,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 CYCLE_SECONDS = 60
@@ -144,7 +146,7 @@ async def _architect_stage(db) -> Dict[str, int]:
     from services.a2a_bus import bus
 
     cursor = db.campaign_leads.find(
-        {"status": "new"}, {"_id": 0}
+        {"status": "new", "business_id": FOUNDER_BIN}, {"_id": 0}
     ).sort("created_at", 1).limit(_BATCH_SIZE)
     leads = await cursor.to_list(_BATCH_SIZE)
 
@@ -327,7 +329,8 @@ async def _envoy_stage(db) -> Dict[str, int]:
     failed = 0
     for plan in plans:
         lead_id = plan.get("lead_id")
-        lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+        lead = await db.campaign_leads.find_one(
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
         if not lead:
             skipped += 1
             continue
@@ -372,7 +375,7 @@ async def _envoy_stage(db) -> Dict[str, int]:
         if result.get("ok"):
             sent += 1
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {
                     "$set": {
                         "status": "contacted",
@@ -420,6 +423,7 @@ async def _closer_stage(db) -> Dict[str, int]:
 
     cursor = db.campaign_leads.find(
         {
+            "business_id": FOUNDER_BIN,
             "status": "replied",
             "$or": [
                 {"closer_scored_at": {"$exists": False}},
@@ -443,7 +447,7 @@ async def _closer_stage(db) -> Dict[str, int]:
         if not reply_text:
             # No reply content to score — mark scored with 0 so we don't loop.
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "closer_scored_at": _now_iso(),
                     "closer_score": 0,
@@ -483,7 +487,7 @@ async def _closer_stage(db) -> Dict[str, int]:
         now_iso = _now_iso()
 
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$set": {
                 "closer_score": score,
                 "closer_intent": intent,

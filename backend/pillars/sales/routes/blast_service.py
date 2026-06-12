@@ -18,6 +18,7 @@ from pillars.sales.routes._shared import (
     _get_db, _verify_admin, _get_today_schedule,
     WHATSAPP_TEMPLATES, EMAIL_SUBJECTS, TARGET_CATEGORIES, COMPETITOR_TEMPLATES,
 )
+from shared.tenant import FOUNDER_BIN
 
 router = APIRouter(prefix="/api/campaign", tags=["AUREM Campaign"])
 logger = logging.getLogger(__name__)
@@ -28,7 +29,8 @@ async def send_lead_email(lead_id: str, request: Request):
     """Send email to a campaign lead."""
     _verify_admin(request)
     db = _get_db()
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
     body = await request.json()
@@ -61,7 +63,7 @@ async def send_lead_email(lead_id: str, request: Request):
         email_id = r.get("id", str(r))
         now = datetime.now(timezone.utc).isoformat()
         _template_id = "aurem_v1" if use_template else "custom"
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "email", "to": to, "status": "sent", "email_id": email_id, "subject": subject, "subject_variant": chosen_variant, "template": _template_id, "template_id": _template_id, "timestamp": now}}, "$set": {"status": "emailed", "updated_at": now}})
+        await db.campaign_leads.update_one({"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$push": {"outreach_history": {"type": "email", "to": to, "status": "sent", "email_id": email_id, "subject": subject, "subject_variant": chosen_variant, "template": _template_id, "template_id": _template_id, "timestamp": now}}, "$set": {"status": "emailed", "updated_at": now}})
         # iter D-66 — also write to the top-level `outreach_history`
         # collection so the campaign-health template_perf check (which
         # queries by `template_id`) can count this send. Bare-minimum
@@ -91,7 +93,8 @@ async def send_lead_whatsapp(lead_id: str, request: Request):
     """Send WhatsApp to a campaign lead via WHAPI."""
     _verify_admin(request)
     db = _get_db()
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
     body = await request.json()
@@ -112,7 +115,7 @@ async def send_lead_whatsapp(lead_id: str, request: Request):
             resp = await client.post(f"{whapi_url}/messages/text", headers={"authorization": f"Bearer {whapi_token}", "content-type": "application/json"}, json={"to": f"{phone}@s.whatsapp.net", "body": message})
             data = resp.json()
         now = datetime.now(timezone.utc).isoformat()
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "whatsapp", "to": phone, "status": "sent" if resp.status_code == 200 else "failed", "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"updated_at": now}})
+        await db.campaign_leads.update_one({"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$push": {"outreach_history": {"type": "whatsapp", "to": phone, "status": "sent" if resp.status_code == 200 else "failed", "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"updated_at": now}})
         return {"success": resp.status_code == 200, "data": data}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -123,7 +126,8 @@ async def send_lead_sms(lead_id: str, request: Request):
     """Send SMS to a campaign lead via Twilio."""
     _verify_admin(request)
     db = _get_db()
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
     body = await request.json()
@@ -145,7 +149,7 @@ async def send_lead_sms(lead_id: str, request: Request):
             resp = await client.post(f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json", auth=(sid, token), data={"From": from_num, "To": phone, "Body": message})
             data = resp.json()
         now = datetime.now(timezone.utc).isoformat()
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "sms", "to": phone, "status": "sent" if resp.status_code in (200,201) else "failed", "sid": data.get("sid",""), "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"updated_at": now}})
+        await db.campaign_leads.update_one({"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$push": {"outreach_history": {"type": "sms", "to": phone, "status": "sent" if resp.status_code in (200,201) else "failed", "sid": data.get("sid",""), "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"updated_at": now}})
         return {"success": resp.status_code in (200,201), "sid": data.get("sid")}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -156,7 +160,8 @@ async def call_lead(lead_id: str, request: Request):
     """Make ORA voice call to a campaign lead via Twilio."""
     _verify_admin(request)
     db = _get_db()
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
     body = await request.json()
@@ -179,7 +184,7 @@ async def call_lead(lead_id: str, request: Request):
             resp = await client.post(f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json", auth=(sid, token), data={"From": from_num, "To": phone, "Twiml": twiml})
             data = resp.json()
         now = datetime.now(timezone.utc).isoformat()
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$push": {"outreach_history": {"type": "call", "to": phone, "status": data.get("status","queued"), "call_sid": data.get("sid",""), "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"updated_at": now}})
+        await db.campaign_leads.update_one({"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$push": {"outreach_history": {"type": "call", "to": phone, "status": data.get("status","queued"), "call_sid": data.get("sid",""), "template": "aurem_v1" if use_template else "custom", "timestamp": now}}, "$set": {"updated_at": now}})
         return {"success": resp.status_code in (200,201), "call_sid": data.get("sid"), "status": data.get("status")}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -206,7 +211,8 @@ async def execute_blast_for_lead(
             from routers.website_builder_router import auto_generate_if_missing
             await auto_generate_if_missing(db, lead)
             # Re-fetch to pick up generated url
-            fresh = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+            fresh = await db.campaign_leads.find_one(
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
             if fresh:
                 lead = fresh
         except Exception as e:
@@ -500,7 +506,7 @@ async def execute_blast_for_lead(
     if history_entries:
         new_status = "emailed" if results.get("email", {}).get("success") else lead.get("status", "contacted")
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$push": {"outreach_history": {"$each": history_entries}},
              "$set": {"status": new_status, "updated_at": now, "last_blast_at": now, "last_blast_source": source}},
         )
@@ -547,7 +553,8 @@ async def blast_all_channels(lead_id: str, request: Request):
     """
     _verify_admin(request)
     db = _get_db()
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
     return await execute_blast_for_lead(db, lead, respect_gating=False, source="manual")
@@ -751,7 +758,8 @@ async def voice_call_lead(lead_id: str, request: Request):
         engine = VoiceEngine(db)
 
         # Get lead phone number
-        lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+        lead = await db.campaign_leads.find_one(
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
         if not lead:
             lead = await db.envoy_outreach.find_one({"lead_id": lead_id}, {"_id": 0})
         if not lead or not lead.get("phone"):
@@ -785,7 +793,7 @@ async def voice_keypress_handler(lead_id: str, request: Request):
         # Interested — update lead
         if db:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {"status": "voice_interested", "updated_at": datetime.now(timezone.utc).isoformat()},
                  "$push": {"outreach_history": {"type": "voice_response", "response": "interested", "at": datetime.now(timezone.utc).isoformat()}}},
             )
@@ -799,7 +807,9 @@ async def voice_keypress_handler(lead_id: str, request: Request):
     elif digits == "2":
         # Opt out
         if db:
-            lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0, "phone": 1, "email": 1})
+            lead = await db.campaign_leads.find_one(
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+                {"_id": 0, "phone": 1, "email": 1})
             if lead:
                 await db.do_not_contact.update_one(
                     {"phone": lead.get("phone", "")},
@@ -809,7 +819,7 @@ async def voice_keypress_handler(lead_id: str, request: Request):
                     upsert=True,
                 )
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {"status": "opted_out", "dnc": True}},
             )
         twiml = (
@@ -852,7 +862,7 @@ async def whatsapp_stop_handler(request: Request):
                     upsert=True,
                 )
                 await db.campaign_leads.update_many(
-                    {"phone": phone},
+                    {"phone": phone, "business_id": FOUNDER_BIN},
                     {"$set": {"status": "not_interested", "dnc": True}},
                 )
                 logger.info(f"[CASL] WhatsApp STOP received from {phone}")

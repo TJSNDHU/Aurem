@@ -57,6 +57,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 NICHE_FALLBACK_TEMPLATE = "service-business"
@@ -547,7 +549,9 @@ async def _select_no_website_leads(db, limit: int = 5) -> List[Dict[str, Any]]:
     }
     if built_lead_ids:
         q["$and"].append({"lead_id": {"$nin": built_lead_ids}})
-    return await db.campaign_leads.find(q, {"_id": 0}).limit(int(limit)).to_list(int(limit))
+    return await db.campaign_leads.find(
+        {**q, "business_id": FOUNDER_BIN},
+        {"_id": 0}).limit(int(limit)).to_list(int(limit))
 
 
 # ─── Main pipeline ─────────────────────────────────────────────────────────
@@ -558,7 +562,8 @@ async def build_site_for_lead(db, lead_id: str,
                                audit_id: Optional[str] = None) -> Dict[str, Any]:
     if db is None:
         return {"ok": False, "error": "db unavailable"}
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         return {"ok": False, "error": f"lead {lead_id} not found"}
 
@@ -582,7 +587,7 @@ async def build_site_for_lead(db, lead_id: str,
             # future selector queries skip it.
             try:
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {"$set": {
                         "awb_built_at":  datetime.now(timezone.utc).isoformat(),
                         "awb_site_id":   existing.get("site_id"),
@@ -636,7 +641,7 @@ async def build_site_for_lead(db, lead_id: str,
                     # Cache on lead for next time
                     if design_tokens.get("ok"):
                         await db.campaign_leads.update_one(
-                            {"lead_id": lead_id},
+                            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                             {"$set": {"design_tokens": {
                                 "extraction_success": True,
                                 "extracted_at": design_tokens["extracted_at"],
@@ -862,7 +867,7 @@ async def build_site_for_lead(db, lead_id: str,
     if not style_hint:
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "awb_built_at": _now(),
                     "awb_site_id": site_id,

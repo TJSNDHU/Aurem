@@ -41,6 +41,8 @@ from typing import Any
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger("ghost_scout_iproyal")
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -559,7 +561,8 @@ async def harvest_leads(
             if phone:
                 dup_query["$or"].append({"phone": phone})
             if dup_query["$or"]:
-                exists = await db.campaign_leads.find_one(dup_query, {"_id": 1})
+                exists = await db.campaign_leads.find_one(
+                    {**dup_query, "business_id": FOUNDER_BIN}, {"_id": 1})
                 if exists:
                     skipped_dup += 1
                     continue
@@ -590,7 +593,8 @@ async def harvest_leads(
                 },
             }
             try:
-                await db.campaign_leads.insert_one(doc)
+                await db.campaign_leads.insert_one(
+                    {**doc, "business_id": FOUNDER_BIN})
                 inserted += 1
                 if email:
                     new_lead_emails.add(email)

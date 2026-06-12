@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 ADMIN_ALERT_PHONE = os.environ.get("AUREM_OPS_SMS", "+16134000000")
@@ -28,7 +30,8 @@ ADMIN_ALERT_PHONE = os.environ.get("AUREM_OPS_SMS", "+16134000000")
 async def get_lead_by_slug(db, slug: Optional[str]) -> Optional[Dict[str, Any]]:
     if not (db and slug):
         return None
-    return await db.campaign_leads.find_one({"lead_id": slug}, {"_id": 0})
+    return await db.campaign_leads.find_one(
+        {"lead_id": slug, "business_id": FOUNDER_BIN}, {"_id": 0})
 
 
 async def create_onboarding_record(
@@ -249,7 +252,8 @@ async def execute_google_scan(
     location = ""
     try:
         if lead_ref:
-            lead = await db.campaign_leads.find_one({"lead_id": lead_ref}, {"_id": 0})
+            lead = await db.campaign_leads.find_one(
+                {"lead_id": lead_ref, "business_id": FOUNDER_BIN}, {"_id": 0})
             if lead:
                 location = (
                     lead.get("city")

@@ -27,6 +27,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Watch window (Toronto local) — sentinel only runs during this period
@@ -122,7 +124,8 @@ async def _probe_agents(db) -> Dict[str, Any]:
         return {"ok": False, "reason": "db unavailable"}
     yesterday = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
     try:
-        cnt = await db.campaign_leads.count_documents({"created_at": {"$gte": yesterday}})
+        cnt = await db.campaign_leads.count_documents(
+            {"created_at": {"$gte": yesterday}, "business_id": FOUNDER_BIN})
     except Exception as e:
         return {"ok": False, "reason": f"campaign_leads probe: {e}"}
     if cnt == 0:

@@ -25,6 +25,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 MAX_LEADS_PER_RUN = 50
@@ -207,7 +209,8 @@ async def _run_watch(db, mode: str, query: dict | None, cap: int) -> dict:
 
     try:
         cursor = db.campaign_leads.find(
-            query or {"website_url": {"$exists": True, "$nin": [None, ""]}},
+            {**(query or {"website_url": {"$exists": True, "$nin": [None, ""]}}),
+             "business_id": FOUNDER_BIN},
             {
                 "_id": 0, "lead_id": 1, "website_url": 1,
                 "status": 1, "stage": 1, "email": 1, "phone": 1,
@@ -250,7 +253,7 @@ async def _run_watch(db, mode: str, query: dict | None, cap: int) -> dict:
         # Persist change-flag on the lead
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "site_changed":         True,
                     "site_changed_at":      datetime.now(timezone.utc),

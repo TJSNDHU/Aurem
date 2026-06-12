@@ -40,6 +40,8 @@ import re
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -401,7 +403,7 @@ async def _exec_scout(db, params: Dict[str, Any]) -> Dict[str, Any]:
         if db is not None:
             try:
                 await db.campaign_leads.update_one(
-                    {"lead_id": slug},
+                    {"lead_id": slug, "business_id": FOUNDER_BIN},
                     {"$setOnInsert": lead_doc, "$set": {"last_scouted_at": lead_doc["created_at"]}},
                     upsert=True,
                 )
@@ -427,11 +429,13 @@ async def _find_lead_by_name(db, name: str) -> Optional[Dict[str, Any]]:
         return None
     # Try exact lead_id (slug) first, then case-insensitive business_name
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    lead = await db.campaign_leads.find_one({"lead_id": slug}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": slug, "business_id": FOUNDER_BIN}, {"_id": 0})
     if lead:
         return lead
     return await db.campaign_leads.find_one(
-        {"business_name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0}
+        {"business_name": {"$regex": f"^{re.escape(name)}$", "$options": "i"},
+         "business_id": FOUNDER_BIN}, {"_id": 0}
     )
 
 
@@ -536,7 +540,7 @@ async def _exec_blast_one(db, params: Dict[str, Any]) -> Dict[str, Any]:
         # Persist history
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$set": {"last_blasted_at": datetime.now(timezone.utc).isoformat()},
                  "$inc": {"blast_count": 1}},
             )
@@ -556,7 +560,8 @@ async def _exec_blast_bulk(db, params: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "reply": "Database unavailable.", "data": {}}
 
     cursor = db.campaign_leads.find(
-        {"city": {"$regex": f"^{re.escape(city)}$", "$options": "i"}, "status": {"$ne": "do_not_contact"}},
+        {"city": {"$regex": f"^{re.escape(city)}$", "$options": "i"}, "status": {"$ne": "do_not_contact"},
+         "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "business_name": 1},
     ).limit(25)
     leads = await cursor.to_list(25)
@@ -586,9 +591,10 @@ async def _exec_stats(db, _params: Dict[str, Any]) -> Dict[str, Any]:
         {"campaign_id": "aurem-acquisition-001"}, {"_id": 0, "stats": 1, "status": 1}
     )
     stats = (campaign or {}).get("stats", {}) or {}
-    total_leads = await db.campaign_leads.count_documents({})
+    total_leads = await db.campaign_leads.count_documents({"business_id": FOUNDER_BIN})
     today = datetime.now(timezone.utc).date().isoformat()
-    leads_today = await db.campaign_leads.count_documents({"created_at": {"$gte": today}})
+    leads_today = await db.campaign_leads.count_documents(
+        {"business_id": FOUNDER_BIN, "created_at": {"$gte": today}})
     reply = (
         f"📊 *Campaign Stats*\n"
         f"Status: `{(campaign or {}).get('status','inactive')}`\n"
@@ -605,8 +611,9 @@ async def _exec_lead_count(db, _params: Dict[str, Any]) -> Dict[str, Any]:
     if db is None:
         return {"ok": False, "reply": "Database unavailable.", "data": {}}
     today = datetime.now(timezone.utc).date().isoformat()
-    total = await db.campaign_leads.count_documents({})
-    today_count = await db.campaign_leads.count_documents({"created_at": {"$gte": today}})
+    total = await db.campaign_leads.count_documents({"business_id": FOUNDER_BIN})
+    today_count = await db.campaign_leads.count_documents(
+        {"business_id": FOUNDER_BIN, "created_at": {"$gte": today}})
     return {
         "ok": True,
         "reply": f"📈 *{today_count}* leads captured today.\n_All-time:_ {total}",
@@ -619,7 +626,8 @@ async def _exec_replies(db, _params: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "reply": "Database unavailable.", "data": {}}
     since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     cursor = db.campaign_leads.find(
-        {"status": {"$in": ["replied", "interested", "hot"]}, "last_reply_at": {"$gte": since}},
+        {"status": {"$in": ["replied", "interested", "hot"]}, "last_reply_at": {"$gte": since},
+         "business_id": FOUNDER_BIN},
         {"_id": 0, "business_name": 1, "status": 1, "last_reply_at": 1, "last_reply_text": 1},
     ).sort("last_reply_at", -1).limit(10)
     items = await cursor.to_list(10)
@@ -639,8 +647,10 @@ async def _exec_pipeline(db, _params: Dict[str, Any]) -> Dict[str, Any]:
     statuses = ["new", "contacted", "replied", "interested", "hot", "closed_won", "closed_lost"]
     counts: Dict[str, int] = {}
     for s in statuses:
-        counts[s] = await db.campaign_leads.count_documents({"status": s})
-    unstatused = await db.campaign_leads.count_documents({"status": {"$exists": False}})
+        counts[s] = await db.campaign_leads.count_documents(
+            {"status": s, "business_id": FOUNDER_BIN})
+    unstatused = await db.campaign_leads.count_documents(
+        {"status": {"$exists": False}, "business_id": FOUNDER_BIN})
     total = sum(counts.values()) + unstatused
     lines = [f"📊 *Pipeline* (total {total})"]
     for s in statuses:
@@ -680,7 +690,7 @@ async def _exec_website_send(db, params: Dict[str, Any]) -> Dict[str, Any]:
     # Stamp lead with sample URL and trigger blast
     slug = lead["lead_id"]
     await db.campaign_leads.update_one(
-        {"lead_id": slug},
+        {"lead_id": slug, "business_id": FOUNDER_BIN},
         {"$set": {"sample_website_url": f"https://aurem.live/sample/{slug}"}},
     )
     return await _exec_blast_one(db, {"business_name": lead["business_name"]})
@@ -811,8 +821,9 @@ async def _exec_platform_status(db, _params: Dict[str, Any]) -> Dict[str, Any]:
             {**real_filter, "created_at": {"$gte": t24}})
         # Leads
         leads_24 = await db.campaign_leads.count_documents(
-            {"created_at": {"$gte": t24}})
-        leads_total = await db.campaign_leads.count_documents({})
+            {"business_id": FOUNDER_BIN, "created_at": {"$gte": t24}})
+        leads_total = await db.campaign_leads.count_documents(
+            {"business_id": FOUNDER_BIN})
         # Scans
         scans_24 = await db.customer_scans.count_documents(
             {"created_at": {"$gte": t24}})
@@ -1268,7 +1279,8 @@ async def _exec_system_health(db, params: Dict[str, Any]) -> Dict[str, Any]:
         lines.append(f"• Backend: ❌ {e}")
     if db is not None:
         try:
-            leads = await db.campaign_leads.count_documents({})
+            leads = await db.campaign_leads.count_documents(
+                {"business_id": FOUNDER_BIN})
             logs = await db.truth_logs.count_documents({})
             lines.append(f"• DB: ✅ leads={leads} truth_logs={logs}")
         except Exception as e:

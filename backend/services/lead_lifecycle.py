@@ -23,6 +23,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Any
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Canonical stage order
@@ -147,7 +149,7 @@ async def backfill_lifecycle_stages(db, dry_run: bool = False) -> dict:
     counts: dict[str, int] = {s: 0 for s in STAGES}
     scanned = 0
     updated = 0
-    cursor = db.campaign_leads.find(q, {"_id": 0})
+    cursor = db.campaign_leads.find({**q, "business_id": FOUNDER_BIN}, {"_id": 0})
     async for lead in cursor:
         scanned += 1
         stage = infer_stage(lead)
@@ -157,7 +159,7 @@ async def backfill_lifecycle_stages(db, dry_run: bool = False) -> dict:
         if dry_run:
             continue
         await db.campaign_leads.update_one(
-            {"lead_id": lead.get("lead_id")},
+            {"lead_id": lead.get("lead_id"), "business_id": FOUNDER_BIN},
             {"$set": {
                 "lifecycle_stage": stage,
                 "lifecycle_stage_changed_at": now_iso,
@@ -183,7 +185,9 @@ async def transition(
     if new_stage not in STAGES:
         return {"ok": False, "error": f"unknown stage: {new_stage}"}
 
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0, "lifecycle_stage": 1})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+        {"_id": 0, "lifecycle_stage": 1})
     if not lead:
         return {"ok": False, "error": "lead_not_found"}
 
@@ -229,7 +233,7 @@ async def transition(
         pass
 
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {
             "$set": update,
             "$push": {"lifecycle_history": history_entry},
@@ -260,7 +264,7 @@ async def record_touchpoint(
     }
     try:
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"$push": {"touchpoints": {"$each": [entry], "$slice": -200}}},  # keep last 200
         )
     except Exception as e:
@@ -274,7 +278,7 @@ async def add_note(db, lead_id: str, note: str, by: str = "admin") -> dict:
     if not note or not note.strip():
         return {"ok": False, "error": "empty_note"}
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$push": {"notes_log": {"note": note.strip(), "by": by, "at": _iso(_now())}}},
     )
     return {"ok": True}
@@ -282,7 +286,7 @@ async def add_note(db, lead_id: str, note: str, by: str = "admin") -> dict:
 
 async def set_next_action(db, lead_id: str, when_iso: str, action_type: str = "manual") -> dict:
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {"drip.next_action_at": when_iso, "drip.next_action_type_override": action_type}},
     )
     return {"ok": True, "next_action_at": when_iso}
@@ -297,7 +301,7 @@ async def get_pipeline_board(db, limit_per_stage: int = 50) -> dict:
     counts: dict[str, int] = {s: 0 for s in STAGES}
     for stage in STAGES:
         cursor = db.campaign_leads.find(
-            {"lifecycle_stage": stage},
+            {"lifecycle_stage": stage, "business_id": FOUNDER_BIN},
             {
                 "_id": 0, "lead_id": 1, "business_name": 1, "contact_name": 1,
                 "phone": 1, "email": 1, "website_url": 1, "tenant_id": 1,
@@ -317,11 +321,12 @@ async def get_pipeline_board(db, limit_per_stage: int = 50) -> dict:
             d["days_in_stage"] = days_in
             board[stage].append(d)
         # Total count (not just limited)
-        counts[stage] = await db.campaign_leads.count_documents({"lifecycle_stage": stage})
+        counts[stage] = await db.campaign_leads.count_documents(
+            {"lifecycle_stage": stage, "business_id": FOUNDER_BIN})
 
     # Unstaged (legacy leads without lifecycle_stage) → INFER stage per lead
     # and distribute across all columns (previously dumped everything into 'new').
-    unstaged_q = {"$or": [
+    unstaged_q = {"business_id": FOUNDER_BIN, "$or": [
         {"lifecycle_stage": {"$exists": False}},
         {"lifecycle_stage": None},
         {"lifecycle_stage": ""},
@@ -329,7 +334,7 @@ async def get_pipeline_board(db, limit_per_stage: int = 50) -> dict:
     unstaged_count = await db.campaign_leads.count_documents(unstaged_q)
     if unstaged_count > 0:
         cursor = db.campaign_leads.find(
-            unstaged_q,
+            unstaged_q,  # carries business_id scope
             {
                 "_id": 0, "lead_id": 1, "business_name": 1, "contact_name": 1,
                 "phone": 1, "email": 1, "website_url": 1, "tenant_id": 1,
@@ -372,9 +377,10 @@ async def get_metrics(db) -> dict:
     # Stage counts (distribute unstaged via infer_stage so metrics match Kanban)
     by_stage = {}
     for s in STAGES:
-        by_stage[s] = await db.campaign_leads.count_documents({"lifecycle_stage": s})
+        by_stage[s] = await db.campaign_leads.count_documents(
+            {"lifecycle_stage": s, "business_id": FOUNDER_BIN})
     unstaged_cursor = db.campaign_leads.find(
-        {"$or": [
+        {"business_id": FOUNDER_BIN, "$or": [
             {"lifecycle_stage": {"$exists": False}},
             {"lifecycle_stage": None},
             {"lifecycle_stage": ""},
@@ -405,7 +411,8 @@ async def get_metrics(db) -> dict:
 
     # Avg days to close (new → won)
     won_cursor = db.campaign_leads.find(
-        {"lifecycle_stage": "won", "lifecycle_history": {"$exists": True}},
+        {"lifecycle_stage": "won", "lifecycle_history": {"$exists": True},
+         "business_id": FOUNDER_BIN},
         {"_id": 0, "lifecycle_history": 1},
     ).limit(200)
     durations = []
@@ -426,6 +433,7 @@ async def get_metrics(db) -> dict:
     # Best channel — count touchpoints by channel with status=sent|answered|read
     try:
         agg = await db.campaign_leads.aggregate([
+            {"$match": {"business_id": FOUNDER_BIN}},
             {"$unwind": "$touchpoints"},
             {"$group": {
                 "_id": {"channel": "$touchpoints.channel", "status": "$touchpoints.status"},

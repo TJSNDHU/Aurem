@@ -15,6 +15,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,7 +89,8 @@ class VoiceEngine:
         # Fetch lead data if lead_id provided
         lead = {}
         if lead_id:
-            lead = await self.db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0}) or {}
+            lead = await self.db.campaign_leads.find_one(
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0}) or {}
             if not lead:
                 lead = await self.db.envoy_outreach.find_one({"lead_id": lead_id}, {"_id": 0}) or {}
 

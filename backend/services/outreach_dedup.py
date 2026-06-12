@@ -54,6 +54,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Module-level handle to the active Mongo db (set by server.py / set_db)
@@ -162,6 +164,7 @@ async def should_skip(
     try:
         recent = await db.outreach_log.find_one(
             {
+                "business_id": FOUNDER_BIN,
                 "phone": phone,
                 "message_type": message_type,
                 "sent_at": {"$gte": cutoff},
@@ -189,6 +192,7 @@ async def should_skip(
             wide_cutoff = _utc_now() - timedelta(days=7)
             same_body = await db.outreach_log.find_one(
                 {
+                    "business_id": FOUNDER_BIN,
                     "phone": phone,
                     "message_hash": message_hash,
                     "sent_at": {"$gte": wide_cutoff},
@@ -236,6 +240,7 @@ async def record_send(
         }
         if extra:
             doc.update({k: v for k, v in extra.items() if k not in doc})
+        doc.setdefault("business_id", FOUNDER_BIN)
         await db.outreach_log.insert_one(doc)
         return True
     except Exception as e:

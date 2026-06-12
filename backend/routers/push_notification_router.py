@@ -10,6 +10,8 @@ from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/push", tags=["push"])
 
@@ -404,7 +406,7 @@ async def pipeline_approve_lead(lead_id: str):
 
     # Update lead status in campaign_leads or envoy_outreach
     result = await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {"status": "approved", "approved_at": now, "approved_via": "push_notification"}},
     )
     if result.modified_count == 0:
@@ -438,7 +440,7 @@ async def pipeline_skip_lead(lead_id: str):
     now = datetime.now(timezone.utc).isoformat()
 
     result = await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {"status": "skipped", "skipped_at": now, "skipped_via": "push_notification"}},
     )
     if result.modified_count == 0:

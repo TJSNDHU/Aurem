@@ -383,6 +383,7 @@ class LeadCaptureService:
                 date_filter_campaign = {}
 
             # ── Primary source: campaign_leads (Scout / Apollo output) ──
+            # tenant_id == business_id scope; empty filter = founder/admin view
             scope_campaign = {} if not tenant_id else {"tenant_id": tenant_id}
             campaign_leads = await self.db.campaign_leads.find(
                 {**scope_campaign, **date_filter_campaign}, {"_id": 0}

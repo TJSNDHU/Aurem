@@ -15,6 +15,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scout", tags=["Accurate Scout"])
 
@@ -58,7 +60,8 @@ async def verify_and_persist(lead_id: str):
     db = _get_db()
     if db is None:
         raise HTTPException(503, "Database unavailable")
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, f"Lead '{lead_id}' not found")
 

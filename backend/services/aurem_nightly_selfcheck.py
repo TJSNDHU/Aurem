@@ -33,6 +33,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -284,7 +286,8 @@ async def _probe_scout_queue(db) -> Dict[str, Any]:
             "queued", "scout_pending", "retry_pending", "new",
             "emailed", "called", "messaged", "responded", "qualified",
         ]
-        leads_in_funnel = await db.campaign_leads.count_documents({"status": {"$in": active_statuses}})
+        leads_in_funnel = await db.campaign_leads.count_documents(
+            {"status": {"$in": active_statuses}, "business_id": FOUNDER_BIN})
 
         # ── Recent scout activity in brain thoughts
         recent_scouts = 0

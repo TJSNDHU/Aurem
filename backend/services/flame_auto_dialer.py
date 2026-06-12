@@ -23,6 +23,8 @@ from typing import Optional
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 INFERNO_THRESHOLD = 100  # flame score at which we auto-dial
@@ -182,7 +184,8 @@ async def try_auto_dial(db, viewer: dict, lead_id: Optional[str] = None) -> dict
     if not lead_id:
         return {"status": "no_lead"}
 
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         return {"status": "no_lead"}
 

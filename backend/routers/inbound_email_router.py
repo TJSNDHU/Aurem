@@ -16,6 +16,8 @@ from pydantic import BaseModel
 
 from services.inbound_reply_handler import handle_inbound_reply
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -76,7 +78,8 @@ async def inbound_recent(authorization: Optional[str] = Header(None)) -> dict:
         return {"items": [], "total": 0}
     try:
         cur = db.inbound_replies.find(
-            {}, projection={"_id": 0, "text": 0, "html": 0},
+            {"business_id": FOUNDER_BIN},
+            projection={"_id": 0, "text": 0, "html": 0},
         ).sort("received_at", -1).limit(50)
         items = [d async for d in cur]
         # Cast datetimes for JSON

@@ -80,6 +80,7 @@ ADMIN_ONLY_FILES = {
     "stripe_payment_router.py",
     "billing_plan_router.py",
     "aurem_billing_router.py",
+    "customer_360_router.py",          # admin support view (_require_admin) — cross-customer lookup by email
 }
 
 INLINE_ALLOW_COMMENT = "tenant_scope_guard: admin_cross_tenant"
@@ -144,6 +145,13 @@ def _scan_file(path: Path) -> List[ScopeViolation]:
             continue
         # Also accept if the very same function uses bin_ctx
         if "bin_ctx" in window_text:
+            continue
+        # Equivalent tenant keys (iter D-83): `tenant_bin` IS the BIN and
+        # `tenant_email` / `user_id` scope rows to a single customer —
+        # strictly narrower than business scope. Accept them so legacy
+        # customer-portal queries that isolate correctly don't get flagged.
+        if ("tenant_bin" in window_text or "tenant_email" in window_text
+                or '"user_id"' in window_text):
             continue
         violations.append(ScopeViolation(
             file=str(path.relative_to(Path("/app/backend"))),

@@ -28,6 +28,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +78,7 @@ async def _audit_then_outreach(db, lead: Dict[str, Any]) -> Dict[str, Any]:
     if db is not None and lead.get("_id"):
         try:
             await db.campaign_leads.update_one(
-                {"_id": lead["_id"]},
+                {"_id": lead["_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "site_score":         score,
                     "site_issues_count":  issues_ct,
@@ -213,7 +215,7 @@ async def _build_qa_then_notify(db, lead: Dict[str, Any]) -> Dict[str, Any]:
     if db is not None and lead.get("_id"):
         try:
             await db.campaign_leads.update_one(
-                {"_id": lead["_id"]},
+                {"_id": lead["_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "dispatch_route": "build_qa_then_notify",
                     "site_slug":      slug,

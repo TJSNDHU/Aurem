@@ -32,6 +32,8 @@ import httpx
 
 from services.lead_lifecycle import record_touchpoint, transition
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Schedule: (day, channel, step_name)
@@ -274,6 +276,7 @@ async def run_due_drips(db) -> dict:
 
     cursor = db.campaign_leads.find(
         {
+            "business_id": FOUNDER_BIN,
             "lifecycle_stage": {"$in": ["called_no_response", "following_up", "cold"]},
             "drip.next_action_at": {"$lte": now_iso},
             "$or": [{"drip.completed": {"$ne": True}}, {"lifecycle_stage": "cold"}],
@@ -295,7 +298,7 @@ async def run_due_drips(db) -> dict:
             res = await _execute_step(db, lead, 1, "whatsapp", "cold_reapproach_wa")
             results.append({"lead_id": lead["lead_id"], "cold_reapproach": res})
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$set": {"drip.next_action_at": (now + timedelta(days=90)).isoformat()}},
             )
             executed += 1
@@ -304,7 +307,7 @@ async def run_due_drips(db) -> dict:
         if not step:
             # No matching step — advance past this day
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$set": {"drip.next_action_at": (now + timedelta(days=7)).isoformat()}},
             )
             continue
@@ -346,7 +349,9 @@ async def run_due_drips(db) -> dict:
             steps_done.append(d)
 
         update["drip.steps_completed"] = steps_done
-        await db.campaign_leads.update_one({"lead_id": lead["lead_id"]}, {"$set": update})
+        await db.campaign_leads.update_one(
+            {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
+            {"$set": update})
         results.append({"lead_id": lead["lead_id"], "step": step_name, "status": res["status"]})
 
     return {"executed": executed, "results": results, "ran_at": now_iso}
@@ -357,7 +362,8 @@ async def run_due_drips(db) -> dict:
 # ─────────────────────────────────────────────────────────────
 async def fire_voicemail_blitz(db, lead_id: str, viewer: Optional[dict] = None) -> dict:
     """Send WhatsApp voice-note-style text + Gmail thread + SMS within ~60s."""
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         return {"ok": False, "error": "lead_not_found"}
 
@@ -405,7 +411,7 @@ async def fire_voicemail_blitz(db, lead_id: str, viewer: Optional[dict] = None) 
 
     # Mark blitz fired
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {"voicemail_blitz_fired_at": datetime.now(timezone.utc).isoformat()}},
     )
 

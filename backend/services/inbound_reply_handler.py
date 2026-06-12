@@ -29,6 +29,8 @@ import re
 import uuid
 from datetime import datetime, timezone
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,7 +102,8 @@ async def _find_lead_by_email(db, email: str) -> dict | None:
     e = email.strip().lower()
     try:
         return await db.campaign_leads.find_one(
-            {"email": {"$regex": f"^{re.escape(e)}$", "$options": "i"}},
+            {"email": {"$regex": f"^{re.escape(e)}$", "$options": "i"},
+             "business_id": FOUNDER_BIN},
             projection={"_id": 0},
         )
     except Exception:
@@ -304,7 +307,8 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
     }
     if db is not None:
         try:
-            await db.inbound_replies.insert_one(dict(record))
+            await db.inbound_replies.insert_one(
+                {**record, "business_id": (lead or {}).get("business_id") or FOUNDER_BIN})
         except Exception as e:
             logger.debug(f"[inbound] insert failed: {e}")
         # iter 322aj — Mirror to db.unified_inbox so customer-facing
@@ -336,7 +340,7 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
         try:
             inc = 30 if intent == "positive" else 10
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$inc": {"flame_score_boost": inc}},
             )
         except Exception:
@@ -400,7 +404,7 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
     if db is not None:
         try:
             await db.inbound_replies.update_one(
-                {"message_id": msg_id},
+                {"message_id": msg_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "auto_replied": bool(send.get("ok")),
                     "reply_id":     send.get("id"),
@@ -427,7 +431,7 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
         if lead and db is not None:
             try:
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead["lead_id"]},
+                    {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                     {"$set": {
                         "hot_lead_flag": True,
                         "hot_lead_source": "email_reply",
@@ -454,7 +458,7 @@ async def handle_inbound_reply(db, payload: dict) -> dict:
             if db is not None:
                 try:
                     await db.inbound_replies.update_one(
-                        {"message_id": msg_id},
+                        {"message_id": msg_id, "business_id": FOUNDER_BIN},
                         {"$set": {
                             "founder_alert_fired": True,
                             "founder_alert_telegram_ok": alert_result.get("telegram", {}).get("ok"),

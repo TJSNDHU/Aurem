@@ -27,6 +27,8 @@ from typing import Any, Dict, List, Optional
 import jwt
 from fastapi import APIRouter, Header, HTTPException
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["System Health"])
@@ -107,11 +109,12 @@ async def _shannon(db) -> Dict[str, Any]:
 
 async def _approvals(db) -> Dict[str, Any]:
     pending = await db.pending_approvals.count_documents(
-        {"status": "pending_approval"}
+        {"status": "pending_approval", "business_id": FOUNDER_BIN}
     )
     recent: List[Dict[str, Any]] = []
     async for row in db.pending_approvals.find(
-            {"status": "pending_approval"}, {"_id": 0}
+            {"status": "pending_approval", "business_id": FOUNDER_BIN},
+            {"_id": 0}
     ).sort("created_at", -1).limit(5):
         recent.append(row)
     return {"pending": pending, "recent": recent}
@@ -133,7 +136,7 @@ async def _campaign(db) -> Dict[str, Any]:
         {}, {"_id": 0}, sort=[("ts", -1)]
     )
     eligible = await db.campaign_leads.count_documents(
-        {"status": {"$in": ["queued", "ready"]}}
+        {"status": {"$in": ["queued", "ready"]}, "business_id": FOUNDER_BIN}
     )
     return {
         "zero_sent_streak": (state or {}).get("zero_streak", 0),
@@ -151,7 +154,8 @@ async def _react_doctor(db) -> Dict[str, Any]:
 
 async def _ora_cto(db) -> Dict[str, Any]:
     pending = await db.ora_cto_proposals.count_documents(
-        {"status": {"$in": ["awaiting_founder", "pending_apply"]}}
+        {"status": {"$in": ["awaiting_founder", "pending_apply"]},
+         "business_id": FOUNDER_BIN}
     )
     return {"proposals_pending": pending}
 

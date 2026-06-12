@@ -16,6 +16,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger("quick-scan")
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
@@ -185,9 +187,10 @@ async def email_report(body: _EmailReportBody, request: Request):
     # Push into campaign_leads so Envoy / Closer pick it up
     try:
         await db.campaign_leads.update_one(
-            {"email": str(body.email)},
+            {"email": str(body.email), "business_id": FOUNDER_BIN},
             {"$set": {
                 "email": str(body.email),
+                "business_id": FOUNDER_BIN,
                 "email_source": "quick_scan",
                 "domain": body.domain,
                 "scan_score": body.score,

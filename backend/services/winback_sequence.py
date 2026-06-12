@@ -27,6 +27,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 PUBLIC_BASE = (os.environ.get("AUREM_PUBLIC_URL", "https://aurem.live")
@@ -197,7 +199,7 @@ async def arm_winback_sequence(db, *, site_id: str, lead_id: Optional[str],
     phone = custom.get("phone") or ""
     if (not email or not phone) and lead_id:
         lead = await db.campaign_leads.find_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"_id": 0, "email": 1, "phone": 1}) or {}
         email = email or lead.get("email") or ""
         phone = phone or lead.get("phone") or ""

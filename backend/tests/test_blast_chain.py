@@ -171,6 +171,7 @@ async def test_start_chain_fires_first_touch_and_schedules_next():
     db = _FakeDB()
     lead = {
         "lead_id": "L1", "business_name": "Foo", "email": "a@b.c",
+        "business_id": "AUR-FNDR-001",
         "website": "https://foo.com",
         "blast_email_subject": "Hi", "blast_sms_body": "Hi",
     }
@@ -188,7 +189,8 @@ async def test_start_chain_fires_first_touch_and_schedules_next():
 @pytest.mark.asyncio
 async def test_advance_chain_fires_subsequent_touch():
     db = _FakeDB()
-    lead = {"lead_id": "L2", "email": "x@y.z", "blast_email_subject": "X"}
+    lead = {"lead_id": "L2", "email": "x@y.z", "blast_email_subject": "X",
+            "business_id": "AUR-FNDR-001"}
     await db.campaign_leads.insert_one(lead)
     await blast_chain.start_chain(db, lead, source="test")
     fresh = await db.campaign_leads.find_one({"lead_id": "L2"})
@@ -201,7 +203,7 @@ async def test_advance_chain_fires_subsequent_touch():
 @pytest.mark.asyncio
 async def test_advance_chain_completes_on_last_touch():
     db = _FakeDB()
-    lead = {"lead_id": "L3"}
+    lead = {"lead_id": "L3", "business_id": "AUR-FNDR-001"}
     await db.campaign_leads.insert_one(lead)
     await blast_chain.start_chain(db, lead, source="test")
     # advance 3 more times → 4 total touches → chain completes
@@ -217,7 +219,7 @@ async def test_advance_chain_completes_on_last_touch():
 @pytest.mark.asyncio
 async def test_handle_reply_hot_halts_chain_and_flags_lead():
     db = _FakeDB()
-    lead = {"lead_id": "L4", "email": "h@h.h"}
+    lead = {"lead_id": "L4", "email": "h@h.h", "business_id": "AUR-FNDR-001"}
     await db.campaign_leads.insert_one(lead)
     await blast_chain.start_chain(db, lead, source="test")
     res = await blast_chain.handle_reply(
@@ -233,7 +235,7 @@ async def test_handle_reply_hot_halts_chain_and_flags_lead():
 @pytest.mark.asyncio
 async def test_handle_reply_dnc_adds_to_do_not_contact():
     db = _FakeDB()
-    lead = {"lead_id": "L5", "phone": "+15551234567",
+    lead = {"lead_id": "L5", "phone": "+15551234567", "business_id": "AUR-FNDR-001",
             "email": "stop@me.now"}
     await db.campaign_leads.insert_one(lead)
     await blast_chain.start_chain(db, lead, source="test")
@@ -253,7 +255,7 @@ async def test_handle_reply_dnc_adds_to_do_not_contact():
 @pytest.mark.asyncio
 async def test_handle_reply_cold_does_not_halt_chain():
     db = _FakeDB()
-    lead = {"lead_id": "L6"}
+    lead = {"lead_id": "L6", "business_id": "AUR-FNDR-001"}
     await db.campaign_leads.insert_one(lead)
     await blast_chain.start_chain(db, lead, source="test")
     res = await blast_chain.handle_reply(
@@ -279,7 +281,7 @@ async def test_subject_prefix_applied_on_touch_2():
     sys.modules["routers.campaign_router"].execute_blast_for_lead = _capture  # type: ignore
 
     db = _FakeDB()
-    lead = {"lead_id": "L7", "blast_email_subject": "Audit ready",
+    lead = {"lead_id": "L7", "blast_email_subject": "Audit ready", "business_id": "AUR-FNDR-001",
             "blast_sms_body": "Tap link"}
     await db.campaign_leads.insert_one(lead)
     await blast_chain.start_chain(db, lead, source="test")

@@ -205,6 +205,7 @@ async def test_armed_outreach_calls_casl_gate_before_sending():
     db = mongomock_motor.AsyncMongoMockClient()["test_327m_armed"]
     await db.campaign_leads.insert_one({
         "lead_id":       "L1",
+        "business_id":   "AUR-FNDR-001",
         "business_name": "Acme Inc",
         "email":         "opted@out.test",
         "phone":         None,

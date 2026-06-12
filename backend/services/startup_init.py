@@ -14,6 +14,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -705,8 +707,12 @@ def start_all_background_schedulers(db):
         try:
             r1 = await db.agent_state.update_many({"dry_run": {"$exists": True}}, {"$unset": {"dry_run": ""}})
             r2 = await db.agent_config.update_many({"dry_run": {"$exists": True}}, {"$unset": {"dry_run": ""}})
-            r3 = await db.campaign_leads.update_many({"status": "dry_run"}, {"$set": {"status": "new"}})
-            r4 = await db.campaign_leads.update_many({"dry_run": {"$exists": True}}, {"$unset": {"dry_run": ""}})
+            r3 = await db.campaign_leads.update_many(
+                {"status": "dry_run", "business_id": FOUNDER_BIN},
+                {"$set": {"status": "new"}})
+            r4 = await db.campaign_leads.update_many(
+                {"dry_run": {"$exists": True}, "business_id": FOUNDER_BIN},
+                {"$unset": {"dry_run": ""}})
             r5 = await db.hunt_commands.update_many({"dry_run": {"$exists": True}}, {"$unset": {"dry_run": ""}})
             r6 = await db.agent_feed.update_many({"dry_run": {"$exists": True}}, {"$unset": {"dry_run": ""}})
             touched = (r1.modified_count + r2.modified_count + r3.modified_count +

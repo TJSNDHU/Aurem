@@ -29,6 +29,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # HUD node map — which FrameworkMap module should flash for each step
@@ -729,8 +731,8 @@ async def _run_hunt_pipeline(
         if db is not None and not mock:
             try:
                 await db.campaign_leads.update_one(
-                    {"lead_id": slug},
-                    {"$setOnInsert": lead_doc,
+                    {"lead_id": slug, "business_id": FOUNDER_BIN},
+                    {"$setOnInsert": {**lead_doc, "business_id": FOUNDER_BIN},
                      "$set": {"last_scouted_at": lead_doc["created_at"],
                               "verification_confidence": confidence,
                               "status": "new"}},
@@ -880,14 +882,15 @@ async def run_hunt_live(
         for _ in range(12):
             await asyncio.sleep(0.5)
             try:
-                n = await db.campaign_leads.count_documents({"hunt_id": hunt_id})
+                n = await db.campaign_leads.count_documents(
+                    {"hunt_id": hunt_id, "business_id": FOUNDER_BIN})
                 if n > 0:
                     break
             except Exception:
                 continue
         try:
             cursor = db.campaign_leads.find(
-                {"hunt_id": hunt_id},
+                {"hunt_id": hunt_id, "business_id": FOUNDER_BIN},
                 {"_id": 0},
             ).sort("created_at", -1).limit(int(limit))
             leads = await cursor.to_list(int(limit))

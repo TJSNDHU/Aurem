@@ -19,6 +19,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 OUTCOME_TYPES = {"responded", "booked", "paid"}
@@ -63,8 +65,9 @@ async def attribute_lead_outcome(
         lead_set["converted_at"] = now_iso
         lead_set["revenue_attributed_cad"] = float(revenue_cad or 0)
     try:
-        await db.campaign_leads.update_one({"lead_id": lead_id},
-                                              {"$set": lead_set})
+        await db.campaign_leads.update_one(
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+            {"$set": lead_set})
     except Exception as e:
         logger.debug(f"[attrib] lead update failed: {e}")
 

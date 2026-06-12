@@ -23,6 +23,8 @@ from services.adaptive_ora import (
     BUCKETS,
 )
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/conviction", tags=["conviction"])
 
@@ -94,7 +96,8 @@ async def get_config(request: Request):
     bucket_counts = {}
     try:
         pipeline = [
-            {"$match": {"conviction_bucket": {"$exists": True}}},
+            {"$match": {"conviction_bucket": {"$exists": True},
+                        "business_id": FOUNDER_BIN}},
             {"$group": {"_id": "$conviction_bucket", "count": {"$sum": 1}}},
         ]
         async for doc in db.campaign_leads.aggregate(pipeline):
@@ -128,7 +131,7 @@ async def get_automation_activity(request: Request, limit: int = 30, hours: int 
 
     # Closer hand-offs
     async for lead in db.campaign_leads.find(
-        {"handed_to_closer_at": {"$gte": since}},
+        {"handed_to_closer_at": {"$gte": since}, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "business_name": 1, "handed_to_closer_at": 1,
          "handed_to_closer_reason": 1, "conviction_score": 1, "conviction_bucket": 1, "stage": 1},
     ).sort("handed_to_closer_at", -1).limit(limit):
@@ -145,7 +148,7 @@ async def get_automation_activity(request: Request, limit: int = 30, hours: int 
 
     # Auto-halts
     async for lead in db.campaign_leads.find(
-        {"halted_at": {"$gte": since}},
+        {"halted_at": {"$gte": since}, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "business_name": 1, "halted_at": 1,
          "halted_reason": 1, "conviction_score": 1, "conviction_bucket": 1, "stage": 1},
     ).sort("halted_at", -1).limit(limit):
@@ -166,8 +169,10 @@ async def get_automation_activity(request: Request, limit: int = 30, hours: int 
 
     # 24h totals for the summary pills
     since_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    handoffs_24h = await db.campaign_leads.count_documents({"handed_to_closer_at": {"$gte": since_24h}})
-    halts_24h = await db.campaign_leads.count_documents({"halted_at": {"$gte": since_24h}})
+    handoffs_24h = await db.campaign_leads.count_documents(
+        {"handed_to_closer_at": {"$gte": since_24h}, "business_id": FOUNDER_BIN})
+    halts_24h = await db.campaign_leads.count_documents(
+        {"halted_at": {"$gte": since_24h}, "business_id": FOUNDER_BIN})
 
     mode = await get_mode(db)
 
@@ -203,7 +208,7 @@ async def get_lead_conviction(lead_id: str, request: Request):
     _require_admin(request)
     db = _get_db()
     lead = await db.campaign_leads.find_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "business_name": 1, "conviction_score": 1,
          "conviction_bucket": 1, "conviction_history": 1, "next_agent": 1,
          "next_run_at": 1, "last_signal": 1, "last_signal_at": 1},

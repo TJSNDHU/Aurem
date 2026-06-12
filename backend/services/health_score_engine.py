@@ -155,7 +155,7 @@ async def _repair_ratio_score(db, tenant_id: str, website_url: str) -> Dict:
 
             # Also check scan_history
             if issues_found == 0:
-                hist = await db.scan_history.find_one(
+                hist = await db.scan_history.find_one(  # tenant_scope_guard: admin_cross_tenant — pixel scans are URL-keyed; URL belongs to this customer's site
                     {"website_url": {"$in": url_variants}},
                     {"_id": 0, "summary": 1},
                     sort=[("created_at", -1)]

@@ -23,6 +23,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Days at which to check engagement / emit no-reply events
@@ -67,7 +69,7 @@ async def arm(payload: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Lightweight context — pull just the consent + dnc fields if available.
         lead_ctx = await db.campaign_leads.find_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"_id": 0, "lead_id": 1, "consent": 1, "dnc": 1, "country": 1,
              "channel": 1, "email": 1, "phone": 1},
         ) or {"lead_id": lead_id}
@@ -144,7 +146,7 @@ async def tick() -> Dict[str, Any]:
     # Fetch all leads in one shot
     lead_ids = list({r["lead_id"] for r in rows})
     leads_cur = db.campaign_leads.find(
-        {"lead_id": {"$in": lead_ids}},
+        {"lead_id": {"$in": lead_ids}, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "hot_lead_flag": 1, "dnc": 1,
          "blast_chain": 1, "status": 1},
     )

@@ -5,7 +5,7 @@ uses for SEO/GEO/Accessibility fix proposals).
 
 Iter 325f Phase 1.3 — introduced so Shannon Security, ORA CTO repair
 proposals, and any other future "founder-approved fix" producer can
-share one consistent schema instead of inlining `db.pending_approvals.insert_one(...)`
+share one consistent schema instead of inlining ad-hoc inserts
 in twenty different routers.
 
 Schema (collection: `pending_approvals`):
@@ -34,6 +34,8 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
+
+from shared.tenant import FOUNDER_BIN
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +79,7 @@ async def create_pending_approval(
 
     # Dedup window — same fingerprint within 24h reuses the row.
     existing = await db.pending_approvals.find_one(
-        {"fingerprint": fp,
+        {"fingerprint": fp, "business_id": FOUNDER_BIN,
          "status": {"$in": ["pending_approval", "approved", "auto_applied"]},
          "created_at": {"$gte": cutoff}},
         {"_id": 0},
@@ -85,7 +87,8 @@ async def create_pending_approval(
     if existing:
         try:
             await db.pending_approvals.update_one(
-                {"approval_id": existing["approval_id"]},
+                {"approval_id": existing["approval_id"],
+                 "business_id": FOUNDER_BIN},
                 {"$inc": {"occurrences": 1}, "$set": {"last_seen": now.isoformat()}},
             )
         except Exception as e:
@@ -114,5 +117,6 @@ async def create_pending_approval(
             now + timedelta(seconds=TIER1_CANCEL_WINDOW_S)
         ).isoformat()
 
+    row["business_id"] = FOUNDER_BIN
     await db.pending_approvals.insert_one(row)
     return {k: v for k, v in row.items() if k != "_id"}

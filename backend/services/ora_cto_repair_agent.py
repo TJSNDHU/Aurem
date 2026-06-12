@@ -52,6 +52,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Reserved for Legion daemon (future). When ORA_CTO_USE_LEGION=true,
@@ -254,9 +256,10 @@ async def _persist_proposal(
         "sensitive": bool(cto.get("sensitive")),
         "created_at": _now_iso(),
     }
-    await db.ora_cto_proposals.insert_one(row)
+    await db.ora_cto_proposals.insert_one({**row, "business_id": FOUNDER_BIN})
     await db.pending_approvals.update_one(
-        {"approval_id": approval.get("approval_id")},
+        {"approval_id": approval.get("approval_id"),
+         "business_id": FOUNDER_BIN},
         {"$set": {
             "cto_proposal_id": row["proposal_id"],
             "cto_status": status,
@@ -310,10 +313,11 @@ async def run_repair_tick(db=None) -> Dict[str, Any]:
     stale_awaiting = 0
     try:
         legacy_count = await db.pending_approvals.count_documents(
-            {"type": {"$exists": False}}
+            {"type": {"$exists": False}, "business_id": FOUNDER_BIN}
         )
         cutoff = datetime.now(timezone.utc) - timedelta(days=14)
         stale_awaiting = await db.pending_approvals.count_documents({
+            "business_id": FOUNDER_BIN,
             "status": "pending_approval",
             "cto_status": "awaiting_founder",
             "$or": [
@@ -328,6 +332,7 @@ async def run_repair_tick(db=None) -> Dict[str, Any]:
     # Pick rows we haven't proposed against yet (cto_proposal_id missing).
     cursor = db.pending_approvals.find(
         {"type": {"$in": list(REPAIRABLE_TYPES)},
+         "business_id": FOUNDER_BIN,
          "status": "pending_approval",
          "cto_proposal_id": {"$exists": False}},
         {"_id": 0},

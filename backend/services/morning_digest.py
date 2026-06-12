@@ -21,6 +21,8 @@ from typing import Optional
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,6 +56,7 @@ async def _collect_data(db) -> dict:
     # Email opens + clicks in last 24h — via touchpoints
     try:
         pipeline = [
+            {"$match": {"business_id": FOUNDER_BIN}},
             {"$unwind": "$touchpoints"},
             {"$match": {
                 "touchpoints.channel": "email",
@@ -66,6 +69,7 @@ async def _collect_data(db) -> dict:
             {"$sort": {"at": -1}},
             {"$limit": 20},
         ]
+        # pipeline[0] $match scopes business_id (see above)
         email_events = await db.campaign_leads.aggregate(pipeline).to_list(length=20)
     except Exception as e:
         logger.warning(f"[Digest] email agg failed: {e}")
@@ -87,6 +91,7 @@ async def _collect_data(db) -> dict:
     # Replies in last 24h requiring follow-up
     try:
         reply_pipe = [
+            {"$match": {"business_id": FOUNDER_BIN}},
             {"$unwind": "$touchpoints"},
             {"$match": {
                 "touchpoints.kind": {"$in": ["whapi_inbound", "resend_replied"]},
@@ -100,6 +105,7 @@ async def _collect_data(db) -> dict:
             {"$sort": {"at": -1}},
             {"$limit": 10},
         ]
+        # reply_pipe[0] $match scopes business_id (see above)
         replies = await db.campaign_leads.aggregate(reply_pipe).to_list(length=10)
     except Exception:
         replies = []
@@ -120,9 +126,11 @@ async def _collect_data(db) -> dict:
         stages = ["new", "contacted", "engaged", "called_no_response", "following_up", "won", "cold"]
         stage_counts = {}
         for s in stages:
-            stage_counts[s] = await db.campaign_leads.count_documents({"lifecycle_stage": s})
+            stage_counts[s] = await db.campaign_leads.count_documents(
+                {"lifecycle_stage": s, "business_id": FOUNDER_BIN})
         # Include legacy unstaged in 'new'
-        unstaged = await db.campaign_leads.count_documents({"lifecycle_stage": {"$exists": False}})
+        unstaged = await db.campaign_leads.count_documents(
+            {"lifecycle_stage": {"$exists": False}, "business_id": FOUNDER_BIN})
         stage_counts["new"] += unstaged
     except Exception:
         stage_counts = {}
@@ -130,6 +138,7 @@ async def _collect_data(db) -> dict:
     # Wins this week
     try:
         won_this_week = await db.campaign_leads.count_documents({
+            "business_id": FOUNDER_BIN,
             "lifecycle_stage": "won",
             "lifecycle_stage_changed_at": {"$gte": week_ago_iso},
         })
@@ -139,7 +148,7 @@ async def _collect_data(db) -> dict:
     # Avg days-to-close: this week vs last week
     async def _avg_days(start_iso, end_iso):
         cursor = db.campaign_leads.find(
-            {"lifecycle_stage": "won",
+            {"lifecycle_stage": "won", "business_id": FOUNDER_BIN,
              "lifecycle_stage_changed_at": {"$gte": start_iso, "$lt": end_iso}},
             {"_id": 0, "lifecycle_history": 1},
         ).limit(200)

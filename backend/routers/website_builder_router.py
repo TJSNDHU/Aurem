@@ -27,6 +27,8 @@ from pydantic import BaseModel
 
 from services.website_builder import generate_website
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/website-builder", tags=["AUREM Website Builder"])
 
@@ -97,7 +99,8 @@ async def generate(body: GenerateRequest, request: Request):
     if db is None:
         raise HTTPException(503, "Database unavailable")
 
-    lead = await db.campaign_leads.find_one({"lead_id": body.lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": body.lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
 
@@ -115,7 +118,7 @@ async def generate(body: GenerateRequest, request: Request):
     )
     # Log in lead history
     await db.campaign_leads.update_one(
-        {"lead_id": body.lead_id},
+        {"lead_id": body.lead_id, "business_id": FOUNDER_BIN},
         {"$push": {"outreach_history": {
             "type": "website_generated",
             "slug": website["slug"],
@@ -311,7 +314,8 @@ async def no_website_instant(
         "reviews_url": (body.reviews_url or "").strip(),
     }
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id}, {"$setOnInsert": lead}, upsert=True
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+        {"$setOnInsert": {**lead, "business_id": FOUNDER_BIN}}, upsert=True
     )
 
     # 2) Reserve the slug + queue background generation. Pre-write a
@@ -687,7 +691,7 @@ async def sample_visit(slug: str, event: VisitEvent, request: Request):
 
     # Also log a one-time visit in the lead's outreach history
     await db.campaign_leads.update_one(
-        {"lead_id": site.get("lead_id")},
+        {"lead_id": site.get("lead_id"), "business_id": FOUNDER_BIN},
         {
             "$push": {
                 "outreach_history": {
@@ -793,7 +797,8 @@ async def sample_engaged(slug: str, request: Request):
     if vd.get("engagement_nudge_fired"):
         return {"sent": False, "reason": "already_fired"}
 
-    lead = await db.campaign_leads.find_one({"lead_id": vd.get("lead_id")}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": vd.get("lead_id"), "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         return {"sent": False, "reason": "no_lead"}
 
@@ -826,7 +831,7 @@ async def sample_engaged(slug: str, request: Request):
         now_iso = datetime.now(timezone.utc).isoformat()
         await db.aurem_live_viewers.update_one({"session_id": session_id}, {"$set": {"engagement_nudge_fired": True, "engagement_nudge_at": now_iso}})
         await db.campaign_leads.update_one(
-            {"lead_id": vd.get("lead_id")},
+            {"lead_id": vd.get("lead_id"), "business_id": FOUNDER_BIN},
             {"$push": {"outreach_history": {
                 "type": "sample_engagement_nudge", "channel": "whatsapp", "to": phone,
                 "status": "sent" if ok else "failed", "template": "sample_30s_nudge_v1", "timestamp": now_iso,
@@ -886,7 +891,8 @@ async def send_website_campaign(slug: str, request: Request):
     if not site:
         raise HTTPException(404, "Website not found")
     lead_id = site["lead_id"]
-    lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
 
@@ -1009,7 +1015,7 @@ async def send_website_campaign(slug: str, request: Request):
 
     sent = sum(1 for r in results.values() if r.get("success"))
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$push": {"outreach_history": {"type": "website_campaign", "slug": slug, "sent_count": sent, "template": "aurem_website_v1", "timestamp": now}}, "$set": {"updated_at": now}},
     )
     await db[COLLECTION].update_one({"slug": slug}, {"$set": {"campaign_sent_at": now, "campaign_results": results}})

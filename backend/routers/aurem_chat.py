@@ -31,6 +31,8 @@ def _get_llm_key():
     return os.environ.get("EMERGENT_LLM_KEY", "")
 
 router = APIRouter()
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 db = None
@@ -381,6 +383,7 @@ async def _build_crm_snapshot(db, message: str, *, business_id: str | None = Non
                         - timedelta(days=7)).isoformat()
         outreach_7d = 0
         try:
+            # outreach_filter_base carries business_id for customer views
             outreach_7d = await db.outreach_log.count_documents(
                 {**outreach_filter_base, "ts": {"$gte": cutoff_iso}},
             )
@@ -419,9 +422,12 @@ async def _build_crm_snapshot(db, message: str, *, business_id: str | None = Non
 
     # Recent outreach (last 5)
     try:
+        # Same founder/BIN scoping as the counts above: founder view is
+        # platform-wide by design, customer views pass their business_id.
         recent = await db.outreach_log.find(
-            {}, projection={"_id": 0, "channel": 1, "lead_id": 1,
-                             "business_name": 1, "ts": 1, "status": 1},
+            outreach_filter_base,
+            projection={"_id": 0, "channel": 1, "lead_id": 1,
+                        "business_name": 1, "ts": 1, "status": 1},
         ).sort("ts", -1).to_list(length=5)
         non_empty = [r for r in recent
                       if r.get("channel") or r.get("business_name") or r.get("ts")]
@@ -535,7 +541,8 @@ async def _maybe_screenshot_response(
     if db is None:
         return None
     lead = await db.campaign_leads.find_one(
-        {"email": user_email, "awb_site_id": {"$exists": True}},
+        {"email": user_email, "awb_site_id": {"$exists": True},
+         "business_id": FOUNDER_BIN},
         {"_id": 0, "awb_site_id": 1, "awb_slug": 1},
     )
     if not lead:

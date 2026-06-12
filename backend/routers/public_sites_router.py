@@ -20,6 +20,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, JSONResponse
 from pydantic import BaseModel
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Public Sites"])
 
@@ -363,7 +365,8 @@ async def preview_themes(slug: str):
                 "themes": themes}
 
     lead = await db.campaign_leads.find_one(
-        {"lead_id": site.get("lead_id")}, {"_id": 0, "business_name": 1, "city": 1, "niche": 1, "category": 1},
+        {"lead_id": site.get("lead_id"), "business_id": FOUNDER_BIN},
+        {"_id": 0, "business_name": 1, "city": 1, "niche": 1, "category": 1},
     ) or {}
     site_niche = (site.get("niche") or "").strip().lower()
     if site_niche in ("", "service-business", "service business", "default"):
@@ -428,7 +431,7 @@ async def preview_custom_url(slug: str, body: CustomUrlPayload, request: Request
         "style": style, "source": "user-supplied",
     }
     await db.campaign_leads.update_one(
-        {"lead_id": site["lead_id"]},
+        {"lead_id": site["lead_id"], "business_id": FOUNDER_BIN},
         {"$set": {"selected_template": custom_template}},
     )
     await db.auto_built_sites.update_one(
@@ -475,7 +478,7 @@ async def preview_select_theme(slug: str, body: ThemeSelectPayload, request: Req
 
     # Persist selection on lead + site
     await db.campaign_leads.update_one(
-        {"lead_id": site["lead_id"]},
+        {"lead_id": site["lead_id"], "business_id": FOUNDER_BIN},
         {"$set": {"selected_template": {
             "idx": idx, "src_url": chosen.get("url"),
             "screenshot_url": chosen.get("screenshot_url"),
@@ -725,7 +728,7 @@ async def public_repair_report(slug: str):
     site_url = audit.get("website") or ""
     if audit.get("lead_id"):
         lead = await db.campaign_leads.find_one(
-            {"lead_id": audit["lead_id"]},
+            {"lead_id": audit["lead_id"], "business_id": FOUNDER_BIN},
             {"_id": 0, "business_name": 1, "website_url": 1, "audit_id": 1}
         ) or {}
         biz_name = lead.get("business_name") or biz_name

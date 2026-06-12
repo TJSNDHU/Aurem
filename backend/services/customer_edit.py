@@ -20,6 +20,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # 24 h request token, 4 h session token (after verify)
@@ -349,7 +351,7 @@ async def _trigger_rerender(db, site_id: str) -> Dict[str, Any]:
                                 for s in custom["services"]]
 
     lead = await db.campaign_leads.find_one(
-        {"id": site.get("lead_id")}, {"_id": 0},
+        {"id": site.get("lead_id"), "business_id": FOUNDER_BIN}, {"_id": 0},
     ) or {}
     if custom.get("business_name"):
         lead["business_name"] = custom["business_name"]

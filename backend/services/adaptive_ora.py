@@ -29,6 +29,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Tuple
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # ─── Tunables (can be overridden per-tenant later) ────────────────────────
@@ -162,7 +164,7 @@ async def _auto_act_on_transition(
             return None  # already there, don't double-wake
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "stage": "handed_to_closer",
                     "handed_to_closer_at": datetime.now(timezone.utc).isoformat(),
@@ -200,7 +202,7 @@ async def _auto_act_on_transition(
     if new_bucket == "HALT" and prev_bucket != "HALT":
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "stage": "halted",
                     "status": "do_not_contact",
@@ -244,7 +246,8 @@ async def record_signal(
         return None
 
     try:
-        lead = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+        lead = await db.campaign_leads.find_one(
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     except Exception as e:
         logger.warning(f"[AdaptiveORA] DB read failed for {lead_id}: {e}")
         return None
@@ -283,7 +286,7 @@ async def record_signal(
 
     try:
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {
                 "$set": {
                     "conviction_score": round(new_score, 1),
@@ -353,7 +356,8 @@ async def init_lead_conviction(db, lead_id: str, score: float = INITIAL_SCORE) -
     now = datetime.now(timezone.utc).isoformat()
     try:
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id, "conviction_score": {"$exists": False}},
+            {"lead_id": lead_id, "conviction_score": {"$exists": False},
+             "business_id": FOUNDER_BIN},
             {
                 "$set": {
                     "conviction_score": round(float(score), 1),
@@ -376,7 +380,7 @@ async def backfill_missing_scores(db, limit: int = 5000) -> int:
     """
     now_iso = datetime.now(timezone.utc).isoformat()
     res = await db.campaign_leads.update_many(
-        {"conviction_score": {"$exists": False}},
+        {"conviction_score": {"$exists": False}, "business_id": FOUNDER_BIN},
         {
             "$set": {
                 "conviction_score": INITIAL_SCORE,
@@ -393,7 +397,7 @@ async def backfill_missing_scores(db, limit: int = 5000) -> int:
 async def top_leads(db, limit: int = 20) -> list[Dict[str, Any]]:
     """Hot leads ranked by score — for admin heat map."""
     cursor = db.campaign_leads.find(
-        {"conviction_score": {"$exists": True}},
+        {"conviction_score": {"$exists": True}, "business_id": FOUNDER_BIN},
         {
             "_id": 0,
             "lead_id": 1,

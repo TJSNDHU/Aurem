@@ -196,8 +196,9 @@ async def request_reviews_batch(request: Request):
         return {"success": True, "message": "No recent customers to request reviews from yet.", "queued": 0}
 
     review_url = (await db.customer_sites.find_one({"email": email}, {"_id": 0, "google_review_url": 1}) or {}).get("google_review_url") \
-        or f"https://g.page/r/{user.get('business_id', '')}"
+        or f"https://g.page/r/{user.get('business_id') or user.get('bin') or ''}"
 
+    bin_id = user.get("business_id") or user.get("bin") or ""
     queued = 0
     try:
         from routers.whatsapp_alerts import send_whatsapp
@@ -212,6 +213,7 @@ async def request_reviews_batch(request: Request):
                 await send_whatsapp(phone, msg)
                 await db.review_requests.insert_one({
                     "email": email,
+                    "business_id": bin_id,
                     "to_phone": phone,
                     "to_name": lead.get("name", ""),
                     "sent_at": datetime.now(timezone.utc).isoformat(),
@@ -294,9 +296,11 @@ async def generate_report_now(request: Request):
     now = datetime.now(timezone.utc)
 
     # Queue job: insert pending report record, let nightly/queued worker render PDF
+    bin_id = user.get("business_id") or user.get("bin") or ""
     await db.customer_reports.insert_one({
         "email": email,
-        "bin": user.get("business_id", ""),
+        "bin": bin_id,
+        "business_id": bin_id,
         "title": f"Report — {now.strftime('%b %Y')}",
         "month": now.strftime("%Y-%m"),
         "status": "queued",

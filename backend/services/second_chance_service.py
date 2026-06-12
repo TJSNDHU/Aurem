@@ -31,6 +31,8 @@ from typing import Any, Dict, List, Optional
 
 import aurem_config as config
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,6 +113,7 @@ async def run_second_chance_outreach(
 
     try:
         cursor = db.campaign_leads.find({
+            "business_id":            FOUNDER_BIN,
             "second_chance_eligible": True,
             "second_chance_after":    {"$lte": _now},
             "second_chance_sent":     {"$ne": True},
@@ -176,7 +179,7 @@ async def run_second_chance_outreach(
         # Idempotency flag
         try:
             await db.campaign_leads.update_one(
-                {"_id": lead["_id"]},
+                {"_id": lead["_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "second_chance_sent":     True,
                     "second_chance_sent_at":  _now,

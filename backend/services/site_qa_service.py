@@ -28,6 +28,8 @@ import httpx
 
 import aurem_config as config
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_SECONDS = 5.0
@@ -427,7 +429,7 @@ async def send_site_to_customer(
     if db is not None and lead.get("_id"):
         try:
             await db.campaign_leads.update_one(
-                {"_id": lead["_id"]},
+                {"_id": lead["_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "status":          "site_sent",
                     "site_short_url":  short_url,

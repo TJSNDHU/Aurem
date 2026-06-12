@@ -17,6 +17,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 INTERVAL_SECONDS = 600   # every 10 min
@@ -114,6 +116,7 @@ async def fire_due_repair_outreach(db) -> Dict[str, Any]:
 
     cursor = db.campaign_leads.find(
         {
+            "business_id": FOUNDER_BIN,
             "audit_score": {"$lt": 60, "$exists": True},
             "$or": [{"repair_outreach_sent": {"$ne": True}},
                     {"repair_outreach_sent": {"$exists": False}}],
@@ -171,7 +174,7 @@ async def fire_due_repair_outreach(db) -> Dict[str, Any]:
             sent += 1
             now_iso = datetime.now(timezone.utc).isoformat()
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "repair_outreach_sent": True,
                     "repair_outreach_at": now_iso,
@@ -183,7 +186,8 @@ async def fire_due_repair_outreach(db) -> Dict[str, Any]:
             )
             try:
                 await db.outreach_log.insert_one({
-                    "lead_id": lead_id, "campaign_type": "website_repair_offer",
+                    "lead_id": lead_id, "business_id": FOUNDER_BIN,
+                    "campaign_type": "website_repair_offer",
                     "sent_at": now_iso, "channels": {"whatsapp": wa_ok, "email": email_ok},
                     "score": audit.get("overall_score"),
                 })

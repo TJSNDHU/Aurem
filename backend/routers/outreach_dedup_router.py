@@ -21,6 +21,8 @@ from typing import Optional
 import jwt
 from fastapi import APIRouter, HTTPException, Request
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/outreach-dedup", tags=["Outreach Dedup"])
 
@@ -72,16 +74,18 @@ async def stats(request: Request):
     cutoff_7d = now - timedelta(days=7)
 
     sms_24h = await db.outreach_log.count_documents(
-        {"message_type": "sms", "sent_at": {"$gte": cutoff_24h}}
+        {"message_type": "sms", "sent_at": {"$gte": cutoff_24h},
+         "business_id": FOUNDER_BIN}
     )
     wa_24h = await db.outreach_log.count_documents(
-        {"message_type": "whatsapp", "sent_at": {"$gte": cutoff_24h}}
+        {"message_type": "whatsapp", "sent_at": {"$gte": cutoff_24h},
+         "business_id": FOUNDER_BIN}
     )
     total_7d = await db.outreach_log.count_documents(
-        {"sent_at": {"$gte": cutoff_7d}}
+        {"sent_at": {"$gte": cutoff_7d}, "business_id": FOUNDER_BIN}
     )
     unique_phones_24h = len(await db.outreach_log.distinct(
-        "phone", {"sent_at": {"$gte": cutoff_24h}}
+        "phone", {"sent_at": {"$gte": cutoff_24h}, "business_id": FOUNDER_BIN}
     ))
     return {
         "sms_sent_24h": sms_24h,
@@ -97,7 +101,7 @@ async def recent(request: Request, limit: int = 50):
     await _require_admin(request)
     db = _get_db()
     rows = await db.outreach_log.find(
-        {}, {"_id": 0}
+        {"business_id": FOUNDER_BIN}, {"_id": 0}
     ).sort("sent_at", -1).limit(min(limit, 500)).to_list(min(limit, 500))
     # Mask phones in the response
     for r in rows:
@@ -111,7 +115,7 @@ async def check_phone(phone: str, request: Request, limit: int = 20):
     await _require_admin(request)
     db = _get_db()
     rows = await db.outreach_log.find(
-        {"phone": phone}, {"_id": 0}
+        {"phone": phone, "business_id": FOUNDER_BIN}, {"_id": 0}
     ).sort("sent_at", -1).limit(min(limit, 100)).to_list(min(limit, 100))
     return {
         "phone_masked": _mask(phone),
@@ -130,7 +134,8 @@ async def clear_entry(
     if message_type not in ("sms", "whatsapp", "voice"):
         raise HTTPException(400, "message_type must be sms|whatsapp|voice")
     db = _get_db()
-    q = {"phone": phone, "message_type": message_type}
+    q = {"phone": phone, "message_type": message_type,
+         "business_id": FOUNDER_BIN}
     if older_than_hours is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
         q["sent_at"] = {"$lt": cutoff}

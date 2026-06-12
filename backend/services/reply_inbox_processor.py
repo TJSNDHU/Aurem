@@ -29,6 +29,8 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 _PROCESSING_CAP = 30   # max replies per pass
@@ -94,7 +96,8 @@ async def process_reply(db, reply_doc: dict) -> dict:
     if sender_email:
         try:
             lead = await db.campaign_leads.find_one(
-                {"email": sender_email}, {"_id": 0},
+                {"email": sender_email, "business_id": FOUNDER_BIN},
+                {"_id": 0},
             )
         except Exception:
             lead = None
@@ -114,7 +117,7 @@ async def process_reply(db, reply_doc: dict) -> dict:
             )
             if lead:
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead.get("lead_id")},
+                    {"lead_id": lead.get("lead_id"), "business_id": FOUNDER_BIN},
                     {"$set": {
                         "status":            "not_interested",
                         "do_not_contact_at": _now(),

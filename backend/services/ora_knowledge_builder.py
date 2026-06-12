@@ -26,6 +26,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 _SKILLS_DIR     = Path(__file__).resolve().parent.parent / "ora_skills"
@@ -104,7 +106,7 @@ async def _build_market_patterns(db, since) -> str:
     """Section 3 — industry × city × no-website distribution."""
     try:
         rows = await db.campaign_leads.find(
-            {"created_at": {"$gte": since}},
+            {"created_at": {"$gte": since}, "business_id": FOUNDER_BIN},
             {"_id": 0, "category": 1, "city": 1, "website": 1},
         ).to_list(length=20000)
     except Exception as e:

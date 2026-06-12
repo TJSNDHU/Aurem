@@ -24,6 +24,8 @@ from fastapi import APIRouter, File, Header, HTTPException, UploadFile
 
 from routers.ora_dev_actions_router import verify_admin
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/leads", tags=["Admin Lead Assets"])
@@ -71,7 +73,8 @@ async def upload_lead_logo(
         raise HTTPException(503, "Database not ready")
 
     lead = await db.campaign_leads.find_one(
-        {"lead_id": lead_id}, {"_id": 0, "lead_id": 1, "logo_key": 1},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+        {"_id": 0, "lead_id": 1, "logo_key": 1},
     )
     if not lead:
         raise HTTPException(404, "Lead not found")
@@ -114,7 +117,7 @@ async def upload_lead_logo(
     )
 
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {
             "logo_url": public_url,
             "logo_key": key,
@@ -144,7 +147,8 @@ async def delete_lead_logo(
         raise HTTPException(503, "Database not ready")
 
     lead = await db.campaign_leads.find_one(
-        {"lead_id": lead_id}, {"_id": 0, "logo_key": 1},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+        {"_id": 0, "logo_key": 1},
     )
     if not lead:
         raise HTTPException(404, "Lead not found")
@@ -158,7 +162,7 @@ async def delete_lead_logo(
             logger.warning(f"[lead-logo] R2 delete failed: {e}")
 
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$unset": {"logo_url": "", "logo_key": "", "logo_size": "",
                     "logo_uploaded_at": "", "logo_uploaded_by": ""}},
     )

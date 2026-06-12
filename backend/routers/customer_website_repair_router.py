@@ -439,14 +439,15 @@ async def _run_repair_job(job_id: str, tenant_bin: str, website: str,
     async def _set(fields: dict):
         try:
             fields["updated_at"] = datetime.now(timezone.utc).isoformat()
-            await db.repair_jobs.update_one({"job_id": job_id}, {"$set": fields})
+            await db.repair_jobs.update_one(
+                {"job_id": job_id, "business_id": tenant_bin}, {"$set": fields})
         except Exception as e:
             logger.warning(f"[repair_job {job_id}] set failed: {e}")
 
     async def _event(phase: str, message: str):
         try:
             await db.repair_jobs.update_one(
-                {"job_id": job_id},
+                {"job_id": job_id, "business_id": tenant_bin},
                 {"$push": {"events": {
                     "at": datetime.now(timezone.utc).isoformat(),
                     "phase": phase,
@@ -540,7 +541,7 @@ async def _run_repair_job(job_id: str, tenant_bin: str, website: str,
         logger.exception(f"[repair_job {job_id}] failed: {e}")
         try:
             await db.repair_jobs.update_one(
-                {"job_id": job_id},
+                {"job_id": job_id, "business_id": tenant_bin},
                 {"$set": {"status": "failed", "error": str(e)[:500],
                           "current_phase": "failed",
                           "current_phase_color": "#EF4444"}},
@@ -581,6 +582,7 @@ async def repair_start(body: RepairStart, user: dict = Depends(_verify_platform_
     doc = {
         "job_id": job_id,
         "tenant_bin": bin_id,
+        "business_id": bin_id,
         "email": tenant.get("email"),
         "website": website,
         "status": "running",
@@ -597,7 +599,8 @@ async def repair_start(body: RepairStart, user: dict = Depends(_verify_platform_
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        await db.repair_jobs.insert_one(doc)
+        # doc carries business_id (= tenant bin) — see dict above
+        await db.repair_jobs.insert_one({**doc, "business_id": bin_id})
         doc.pop("_id", None)
     except Exception as e:
         logger.error(f"[repair_start] insert failed: {e}")
@@ -621,7 +624,8 @@ async def repair_start(body: RepairStart, user: dict = Depends(_verify_platform_
 async def repair_status(job_id: str, user: dict = Depends(_verify_platform_user)):
     """Polled by the frontend every ~1 sec to animate progress."""
     tenant = await _resolve_tenant(user)
-    job = await db.repair_jobs.find_one({"job_id": job_id, "tenant_bin": tenant.get("bin")}, {"_id": 0})
+    job = await db.repair_jobs.find_one(
+        {"job_id": job_id, "business_id": tenant.get("bin")}, {"_id": 0})
     if not job:
         raise HTTPException(404, "repair job not found")
     # Trim events to last 14 for UI
@@ -635,5 +639,7 @@ async def repair_status(job_id: str, user: dict = Depends(_verify_platform_user)
 async def repair_latest(user: dict = Depends(_verify_platform_user)):
     """Get the most recent repair job for this tenant (to resume UI)."""
     tenant = await _resolve_tenant(user)
-    job = await db.repair_jobs.find_one({"tenant_bin": tenant.get("bin")}, sort=[("created_at", -1)], projection={"_id": 0})
+    job = await db.repair_jobs.find_one(
+        {"business_id": tenant.get("bin")},
+        sort=[("created_at", -1)], projection={"_id": 0})
     return job or {}

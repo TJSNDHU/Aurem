@@ -18,6 +18,7 @@ from pillars.sales.routes._shared import (
     _get_db, _verify_admin, _get_today_schedule,
     WHATSAPP_TEMPLATES, EMAIL_SUBJECTS, TARGET_CATEGORIES, COMPETITOR_TEMPLATES,
 )
+from shared.tenant import FOUNDER_BIN
 
 router = APIRouter(prefix="/api/campaign", tags=["AUREM Campaign"])
 logger = logging.getLogger(__name__)
@@ -183,13 +184,15 @@ async def auto_blast_status(request: Request):
     tenant_id = payload.get("tenant_id") or "global"
     cfg = await db.auto_blast_config.find_one({"tenant_id": tenant_id}, {"_id": 0}) or {}
     # Counts of leads in each state
-    total = await db.campaign_leads.count_documents({})
-    never_blasted = await db.campaign_leads.count_documents({"last_blast_at": {"$exists": False}})
+    total = await db.campaign_leads.count_documents({"business_id": FOUNDER_BIN})
+    never_blasted = await db.campaign_leads.count_documents(
+        {"business_id": FOUNDER_BIN, "last_blast_at": {"$exists": False}})
     blasted = total - never_blasted
 
     # How many of the "queued" leads actually have NO contact info?
     # These are stuck forever until the scraper finds email/phone.
     queued_contactless = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_blast_at": {"$exists": False},
         "$and": [
             {"$or": [{"email": {"$in": ["", None]}}, {"email": {"$exists": False}}]},
@@ -449,7 +452,8 @@ async def scrape_leads(data: ScrapeRequest, request: Request):
             continue
 
         # Check if already in DB
-        existing = await db.campaign_leads.find_one({"business_name": name, "location": data.location})
+        existing = await db.campaign_leads.find_one(
+            {"business_name": name, "location": data.location, "business_id": FOUNDER_BIN})
         if existing:
             continue
 
@@ -457,6 +461,7 @@ async def scrape_leads(data: ScrapeRequest, request: Request):
         now = datetime.now(timezone.utc).isoformat()
         doc = {
             "lead_id": lead_id,
+            "business_id": FOUNDER_BIN,
             "tenant_id": "aurem_platform",
             "campaign_id": "aurem-acquisition-001",
             "business_name": name,
@@ -488,7 +493,7 @@ async def scrape_leads(data: ScrapeRequest, request: Request):
         except Exception:
             pass
 
-        await db.campaign_leads.insert_one(doc)
+        await db.campaign_leads.insert_one({**doc, "business_id": FOUNDER_BIN})
         saved += 1
         leads_out.append({"lead_id": lead_id, "business_name": name, "category": doc["category"]})
 
@@ -584,7 +589,8 @@ async def run_daily_scrape(categories: list = None, location: str = "Mississauga
                     total_skipped_no_contact += 1
                     continue
 
-                existing = await db.campaign_leads.find_one({"business_name": name, "location": location})
+                existing = await db.campaign_leads.find_one(
+                    {"business_name": name, "location": location, "business_id": FOUNDER_BIN})
                 if existing:
                     continue
                 dnc = await db.do_not_contact.find_one({"$or": [
@@ -597,6 +603,7 @@ async def run_daily_scrape(categories: list = None, location: str = "Mississauga
                 now = datetime.now(timezone.utc).isoformat()
                 _new_doc = {
                     "lead_id": lead_id,
+                    "business_id": FOUNDER_BIN,
                     "tenant_id": "aurem_platform",
                     "campaign_id": "aurem-acquisition-001",
                     "business_name": name,
@@ -629,7 +636,8 @@ async def run_daily_scrape(categories: list = None, location: str = "Mississauga
                     annotate_dedup_fields(_new_doc)
                 except Exception:
                     pass
-                await db.campaign_leads.insert_one(_new_doc)
+                await db.campaign_leads.insert_one(
+                    {**_new_doc, "business_id": FOUNDER_BIN})
                 total_saved += 1
         except Exception as e:
             logger.warning(f"[CAMPAIGN] Scrape error for {cat}: {e}")
@@ -661,7 +669,8 @@ async def run_website_scans():
         return
 
     leads = await db.campaign_leads.find(
-        {"status": "new", "website_url": {"$ne": ""}, "score": None}
+        {"status": "new", "website_url": {"$ne": ""}, "score": None,
+         "business_id": FOUNDER_BIN}
     ).limit(20).to_list(20)
 
     scanned = 0
@@ -684,7 +693,7 @@ async def run_website_scans():
             score = max(10, min(score, 95))
 
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "score": score,
                     "issues_count": len(issues),
@@ -732,6 +741,7 @@ async def run_email_sequence():
     from datetime import timedelta
     cutoff_iso = (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat()
     leads = await db.campaign_leads.find({
+        "business_id": FOUNDER_BIN,
         "email":     {"$regex": "^.+@.+\\..+$"},
         "dnc":       {"$ne": True},
         "score":     {"$ne": None},
@@ -771,7 +781,7 @@ async def run_email_sequence():
                 sent += 1
                 now_iso = datetime.now(timezone.utc).isoformat()
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead["lead_id"]},
+                    {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                     {
                         "$set": {"status": "emailed",
                                   "last_email_at": now_iso,
@@ -827,7 +837,8 @@ async def run_whatsapp_sequence():
         return
 
     leads = await db.campaign_leads.find(
-        {"status": {"$in": ["scanned", "emailed"]}, "phone": {"$ne": ""}, "dnc": {"$ne": True}}
+        {"status": {"$in": ["scanned", "emailed"]}, "phone": {"$ne": ""}, "dnc": {"$ne": True},
+         "business_id": FOUNDER_BIN}
     ).limit(campaign.get("daily_whatsapp_limit", 50)).to_list(50)
 
     sent = 0
@@ -851,7 +862,7 @@ async def run_whatsapp_sequence():
             if result.get("success"):
                     sent += 1
                     await db.campaign_leads.update_one(
-                        {"lead_id": lead["lead_id"]},
+                        {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                         {
                             "$set": {"status": "whatsapp_sent", "updated_at": datetime.now(timezone.utc).isoformat()},
                             "$push": {"outreach_history": {"type": "whatsapp", "template": "initial", "sent_at": datetime.now(timezone.utc).isoformat(), "engine": result.get("engine", "unknown")}},
@@ -887,7 +898,8 @@ async def run_sms_sequence():
 
     # Day 4: leads that got email + whatsapp but not yet SMS'd
     leads = await db.campaign_leads.find(
-        {"status": {"$in": ["emailed", "whatsapp_sent"]}, "phone": {"$ne": ""}, "dnc": {"$ne": True}, "sms_sent": {"$ne": True}}
+        {"status": {"$in": ["emailed", "whatsapp_sent"]}, "phone": {"$ne": ""}, "dnc": {"$ne": True}, "sms_sent": {"$ne": True},
+         "business_id": FOUNDER_BIN}
     ).limit(campaign.get("daily_sms_limit", 50)).to_list(50)
 
     sent = 0
@@ -905,7 +917,7 @@ async def run_sms_sequence():
             if result.get("success"):
                 sent += 1
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {
                         "$set": {"sms_sent": True, "updated_at": datetime.now(timezone.utc).isoformat()},
                         "$push": {"outreach_history": {
@@ -946,7 +958,7 @@ async def run_voice_sequence():
     # Day 7: leads that got email + WA + SMS but no response
     leads = await db.campaign_leads.find(
         {"status": {"$in": ["emailed", "whatsapp_sent"]}, "sms_sent": True, "voice_called": {"$ne": True},
-         "phone": {"$ne": ""}, "dnc": {"$ne": True}}
+         "phone": {"$ne": ""}, "dnc": {"$ne": True}, "business_id": FOUNDER_BIN}
     ).limit(campaign.get("daily_voice_limit", 20)).to_list(20)
 
     called = 0
@@ -958,7 +970,7 @@ async def run_voice_sequence():
             if result.get("success"):
                 called += 1
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {
                         "$set": {"voice_called": True, "updated_at": datetime.now(timezone.utc).isoformat()},
                         "$push": {"outreach_history": {

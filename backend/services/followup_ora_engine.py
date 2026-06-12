@@ -33,6 +33,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,7 +138,9 @@ async def run_followup_tick(db) -> Dict[str, Any]:
     skipped: List[str] = []
 
     try:
-        cursor = db.campaign_leads.find(query, {"_id": 0}).limit(FOLLOWUP_BATCH_SIZE)
+        cursor = db.campaign_leads.find(
+            {**query, "business_id": FOUNDER_BIN},
+            {"_id": 0}).limit(FOLLOWUP_BATCH_SIZE)
         async for lead in cursor:
             leads_scanned += 1
             lead_id = lead.get("lead_id") or lead.get("business_name") or ""
@@ -163,7 +167,7 @@ async def run_followup_tick(db) -> Dict[str, Any]:
             }
             try:
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {
                         "$push": {"outreach_history": attempt_row},
                         "$set": {"updated_at": _iso(_utc_now()),

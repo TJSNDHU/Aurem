@@ -94,7 +94,8 @@ def test_handle_opt_out_adds_to_dnc():
         try:
             # Seed lead + outreach history so dedup actually works
             await db.campaign_leads.insert_one({
-                "lead_id": "lead-opt", "email": "stop@example.com",
+                "lead_id": "lead-opt", "business_id": "AUR-FNDR-001",
+                "email": "stop@example.com",
                 "business_name": "Test", "city": "Toronto",
             })
             res = await handle_inbound_reply(db, {
@@ -122,7 +123,8 @@ def test_handle_positive_records_intent():
     async def _go():
         try:
             await db.campaign_leads.insert_one({
-                "lead_id": "lead-yes", "email": "happy@example.com",
+                "lead_id": "lead-yes", "business_id": "AUR-FNDR-001",
+                "email": "happy@example.com",
                 "business_name": "Mike Plumbing", "city": "Mississauga",
                 "category": "plumber",
             })
@@ -207,6 +209,7 @@ def test_webhook_endpoint_e2e():
     name = f"aurem_test_inbound_{uuid.uuid4().hex[:8]}"
     sync_client = MongoClient(mongo_url)
     sync_client[name].campaign_leads.insert_one({
+        "business_id": "AUR-FNDR-001",
         "lead_id": "lead-e2e", "email": "vet@example.com",
         "business_name": "Brampton Vet", "city": "Brampton",
         "category": "veterinarian",

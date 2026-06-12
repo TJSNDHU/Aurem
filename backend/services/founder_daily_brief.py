@@ -32,6 +32,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 TZ_EST = ZoneInfo("America/Toronto")
@@ -99,7 +101,8 @@ async def real_count_scout_today() -> int:
     if db is None:
         return 0
     iso = _today_start_est().isoformat()
-    return await db.campaign_leads.count_documents({"created_at": {"$gte": iso}})
+    return await db.campaign_leads.count_documents(
+        {"created_at": {"$gte": iso}, "business_id": FOUNDER_BIN})
 
 
 async def real_count_sites_built_today() -> Tuple[int, int, Optional[str]]:

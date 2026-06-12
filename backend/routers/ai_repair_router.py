@@ -1039,7 +1039,7 @@ async def get_repair_scores(url: str, authorization: str = Header(None)):
     normalized = _normalize_url(url)
 
     # ── Source 1 — REAL scan data (pixel + manual scans) ──────────
-    latest_scan = await db.scan_history.find_one(
+    latest_scan = await db.scan_history.find_one(  # tenant_scope_guard: admin_cross_tenant — pixel scans are URL-keyed; caller owns the URL (verified pixel install)
         {"$or": [
             {"website_url": normalized},
             {"website_url": url},

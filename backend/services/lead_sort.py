@@ -36,6 +36,8 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
@@ -366,7 +368,9 @@ async def _persist_sort(db, leads: List[Dict[str, Any]],
             "industry_priority": L.get("industry_priority"),
         }
         try:
-            await db.campaign_leads.update_one(key, {"$set": update}, upsert=False)
+            await db.campaign_leads.update_one(
+                {**key, "business_id": FOUNDER_BIN},
+                {"$set": update}, upsert=False)
         except Exception as e:
             logger.debug(f"[sort] persist skipped for {key}: {e}")
 

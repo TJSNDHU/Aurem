@@ -25,6 +25,8 @@ from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/platform", tags=["Platform Spine"])
 
@@ -285,7 +287,8 @@ async def admin_themes_for_site(slug: str, authorization: Optional[str] = Header
     if not site:
         raise HTTPException(404, "site not found")
     lead = await db.campaign_leads.find_one(
-        {"lead_id": site["lead_id"]}, {"_id": 0, "city": 1, "niche": 1, "category": 1},
+        {"lead_id": site["lead_id"], "business_id": FOUNDER_BIN},
+        {"_id": 0, "city": 1, "niche": 1, "category": 1},
     ) or {}
     biz_type = site.get("niche") or lead.get("niche") or lead.get("category") or "service business"
     city = lead.get("city") or "Toronto"
@@ -337,6 +340,7 @@ async def website_builder_cockpit(authorization: Optional[str] = Header(None)):
     # Queue: leads eligible for AWB but not yet built
     built_lead_ids = await db.auto_built_sites.distinct("lead_id")
     queue_size = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "lead_id": {"$nin": built_lead_ids or []},
         "$or": [
             {"website": {"$in": [None, ""]}},
@@ -381,7 +385,7 @@ async def website_builder_domains(authorization: Optional[str] = Header(None)):
     leads: Dict[str, Optional[str]] = {}
     if lead_ids:
         async for L in db.campaign_leads.find(
-            {"id": {"$in": lead_ids}},
+            {"id": {"$in": lead_ids}, "business_id": FOUNDER_BIN},
             {"_id": 0, "id": 1, "business_name": 1},
         ):
             leads[L["id"]] = L.get("business_name")

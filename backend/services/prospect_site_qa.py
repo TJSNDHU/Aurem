@@ -34,6 +34,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Tuple
 from urllib.parse import urlparse, urljoin
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # ── tunables (env-overridable) ───────────────────────────────────────
@@ -122,7 +124,7 @@ async def build_and_qa_no_website(
     if save:
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "qa_no_website": {
                         "site_id": site_id, "slug": slug,
@@ -175,7 +177,7 @@ async def _ensure_claim_artifacts(db, slug: str, lead_id: str) -> None:
     # Mirror identity fields from the lead row so the public picker can render
     # phone + name visibly (QA check #5)
     lead_row = await db.campaign_leads.find_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"_id": 0, "phone": 1, "business_phone": 1,
          "business_name": 1, "name": 1},
     ) or {}

@@ -21,6 +21,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger("apollo_enrich")
 
 
@@ -57,7 +59,7 @@ async def enrich_lead_with_apollo_diy(
             # Mark the lead so the noise pipeline can act on it.
             try:
                 await db.campaign_leads.update_one(
-                    {"lead_id": lead_id},
+                    {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                     {"$set": {
                         "enrichment_sources":  ["aggregator-skipped"],
                         "enriched_at":         datetime.now(timezone.utc).isoformat(),
@@ -205,7 +207,8 @@ async def enrich_lead_with_apollo_diy(
     if best_email:
         try:
             existing = await db.campaign_leads.find_one(
-                {"lead_id": lead_id}, {"_id": 0, "email": 1},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+                {"_id": 0, "email": 1},
             )
             # iter 288.6 fix — empty doc {} is falsy in Python; check None explicitly
             if existing is None or not existing.get("email"):
@@ -237,7 +240,8 @@ async def enrich_lead_with_apollo_diy(
         patch["apollo_candidates_tried"] = pattern_candidates
 
     try:
-        await db.campaign_leads.update_one({"lead_id": lead_id}, {"$set": patch})
+        await db.campaign_leads.update_one(
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$set": patch})
     except Exception as e:
         logger.warning(f"[enrich] lead update failed for {lead_id}: {e}")
 

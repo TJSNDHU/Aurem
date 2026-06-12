@@ -31,6 +31,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -241,10 +243,12 @@ async def ora_watchdog(db) -> Dict[str, Any]:
     # ── Check 3: Outreach queue moving? ──
     try:
         stalled_2h = await db.campaign_leads.count_documents({
+            "business_id": FOUNDER_BIN,
             "status": {"$in": ["queued", "emailed", "called", "messaged"]},
             "updated_at": {"$lt": cutoff_2h.isoformat()},
         })
         moved_30m = await db.campaign_leads.count_documents({
+            "business_id": FOUNDER_BIN,
             "updated_at": {"$gte": cutoff_30m.isoformat()},
         })
         ok = (stalled_2h < 100) or (moved_30m > 0)

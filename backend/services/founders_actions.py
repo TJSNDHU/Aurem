@@ -22,6 +22,8 @@ import logging
 import re
 from typing import Any, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Intents that should bypass the code-build pipeline.
@@ -110,12 +112,13 @@ async def _h_status(message: str, db) -> Dict[str, Any]:
     """Real database counts — no LLM."""
     out: Dict[str, Any] = {}
     try:
-        out["leads"] = await db.campaign_leads.count_documents({})
+        out["leads"] = await db.campaign_leads.count_documents(
+            {"business_id": FOUNDER_BIN})
     except Exception:
         out["leads"] = 0
     try:
         out["leads_today"] = await db.campaign_leads.count_documents(
-            {"created_at": {"$gte": _today_start()}}
+            {"created_at": {"$gte": _today_start()}, "business_id": FOUNDER_BIN}
         )
     except Exception:
         out["leads_today"] = 0
@@ -151,7 +154,8 @@ async def _h_leads(message: str, db) -> Dict[str, Any]:
     counts: Dict[str, int] = {}
     for s in stages:
         try:
-            counts[s] = await db.campaign_leads.count_documents({"lifecycle_stage": s})
+            counts[s] = await db.campaign_leads.count_documents(
+                {"lifecycle_stage": s, "business_id": FOUNDER_BIN})
         except Exception:
             counts[s] = 0
     total = sum(counts.values())

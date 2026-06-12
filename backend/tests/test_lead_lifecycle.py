@@ -54,7 +54,7 @@ def _run(coro):
 
 def test_valid_transition():
     db = FakeDB()
-    db.campaign_leads.docs.append({"lead_id": "l1", "lifecycle_stage": "new"})
+    db.campaign_leads.docs.append({"lead_id": "l1", "business_id": "AUR-FNDR-001", "lifecycle_stage": "new"})
     r = _run(transition(db, "l1", "contacted", reason="campaign"))
     assert r["ok"] is True
     assert r["to"] == "contacted"
@@ -62,7 +62,7 @@ def test_valid_transition():
 
 def test_invalid_transition_blocked():
     db = FakeDB()
-    db.campaign_leads.docs.append({"lead_id": "l2", "lifecycle_stage": "won"})
+    db.campaign_leads.docs.append({"lead_id": "l2", "business_id": "AUR-FNDR-001", "lifecycle_stage": "won"})
     # won is terminal — can't go back
     r = _run(transition(db, "l2", "contacted"))
     assert r["ok"] is False
@@ -70,14 +70,14 @@ def test_invalid_transition_blocked():
 
 def test_force_override_allowed():
     db = FakeDB()
-    db.campaign_leads.docs.append({"lead_id": "l3", "lifecycle_stage": "won"})
+    db.campaign_leads.docs.append({"lead_id": "l3", "business_id": "AUR-FNDR-001", "lifecycle_stage": "won"})
     r = _run(transition(db, "l3", "contacted", force=True))
     assert r["ok"] is True
 
 
 def test_called_no_response_starts_drip():
     db = FakeDB()
-    db.campaign_leads.docs.append({"lead_id": "l4", "lifecycle_stage": "engaged"})
+    db.campaign_leads.docs.append({"lead_id": "l4", "business_id": "AUR-FNDR-001", "lifecycle_stage": "engaged"})
     r = _run(transition(db, "l4", "called_no_response", reason="flame_dial_failed"))
     assert r["ok"] is True
     lead = db.campaign_leads.docs[0]
@@ -88,7 +88,8 @@ def test_called_no_response_starts_drip():
 def test_won_stops_drip():
     db = FakeDB()
     db.campaign_leads.docs.append({
-        "lead_id": "l5", "lifecycle_stage": "following_up",
+        "lead_id": "l5", "business_id": "AUR-FNDR-001",
+        "lifecycle_stage": "following_up",
         "drip.next_step_day": 7, "drip.completed": False,
     })
     r = _run(transition(db, "l5", "won"))
@@ -106,7 +107,7 @@ def test_all_allowed_transitions_consistent():
 
 def test_skip_when_already_in_stage():
     db = FakeDB()
-    db.campaign_leads.docs.append({"lead_id": "l6", "lifecycle_stage": "engaged"})
+    db.campaign_leads.docs.append({"lead_id": "l6", "business_id": "AUR-FNDR-001", "lifecycle_stage": "engaged"})
     r = _run(transition(db, "l6", "engaged"))
     assert r["ok"] is True
     assert r.get("skipped") == "already_in_stage"

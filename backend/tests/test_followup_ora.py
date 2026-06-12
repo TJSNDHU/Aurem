@@ -101,6 +101,7 @@ async def test_silent_lead_gets_followup_attempt():
     db = _FakeDB()
     db.campaign_leads.docs.append({
         "lead_id": "lead-1",
+        "business_id": "AUR-FNDR-001",
         "business_name": "Foo HVAC",
         "status": "outreach_sent",
         "updated_at": _iso_ago(days=5),
@@ -127,6 +128,7 @@ async def test_terminal_status_skipped():
     db = _FakeDB()
     db.campaign_leads.docs.append({
         "lead_id": "lead-1",
+        "business_id": "AUR-FNDR-001",
         "status": "responded",
         "updated_at": _iso_ago(days=5),
         "outreach_history": [{"type": "envoy_send", "ts": _iso_ago(days=5)}],
@@ -142,6 +144,7 @@ async def test_recent_followup_in_cooldown():
     db = _FakeDB()
     db.campaign_leads.docs.append({
         "lead_id": "lead-1",
+        "business_id": "AUR-FNDR-001",
         "status": "outreach_sent",
         "updated_at": _iso_ago(days=5),
         "outreach_history": [
@@ -161,6 +164,7 @@ async def test_dry_run_default_no_live_send():
     db = _FakeDB()
     db.campaign_leads.docs.append({
         "lead_id": "lead-1",
+        "business_id": "AUR-FNDR-001",
         "status": "outreach_sent",
         "updated_at": _iso_ago(days=5),
         "outreach_history": [{"type": "envoy_send", "ts": _iso_ago(days=5)}],

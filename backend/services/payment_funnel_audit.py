@@ -29,6 +29,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 ABANDONED_AGE_HOURS = int(os.environ.get("PAYMENT_AUDIT_ABANDONED_HOURS", "48"))
@@ -100,7 +102,7 @@ async def _fix_silent_payment(db, order: Dict[str, Any],
     try:
         if order.get("lead_id"):
             lead = await db.campaign_leads.find_one(
-                {"lead_id": order["lead_id"]},
+                {"lead_id": order["lead_id"], "business_id": FOUNDER_BIN},
                 {"_id": 0, "business_name": 1}) or {}
             biz = lead.get("business_name") or ""
     except Exception:
@@ -124,7 +126,7 @@ async def _flag_abandoned(db, order: Dict[str, Any]) -> Dict[str, Any]:
     try:
         if order.get("lead_id"):
             lead = await db.campaign_leads.find_one(
-                {"lead_id": order["lead_id"]},
+                {"lead_id": order["lead_id"], "business_id": FOUNDER_BIN},
                 {"_id": 0, "business_name": 1}) or {}
             biz = lead.get("business_name") or ""
     except Exception:

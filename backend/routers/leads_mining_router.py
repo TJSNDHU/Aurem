@@ -26,6 +26,8 @@ from pydantic import BaseModel
 
 from routers.ora_dev_actions_router import verify_admin
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/leads", tags=["Admin Leads Mining"])
@@ -76,7 +78,7 @@ async def _run_mine(lead_id: str, url: str, *, verify_mx: bool, max_pages: int):
             "email_mining_error": None,
         }
         await db.campaign_leads.update_one(
-            {"lead_id": lead_id}, {"$set": update},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"$set": update},
         )
         logger.info(
             f"[leads_mining] {lead_id} → {len(res.get('emails', []))} emails "
@@ -86,7 +88,7 @@ async def _run_mine(lead_id: str, url: str, *, verify_mx: bool, max_pages: int):
         logger.warning(f"[leads_mining] {lead_id} failed: {e}")
         try:
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "email_mining_status": "failed",
                     "email_mining_error": str(e)[:200],
@@ -108,7 +110,7 @@ async def mine_lead_emails(
     if db is None:
         raise HTTPException(503, "Database not ready")
     lead = await db.campaign_leads.find_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "business_name": 1, "website": 1,
          "website_url": 1},
     )
@@ -124,7 +126,7 @@ async def mine_lead_emails(
     # Mark lead as running immediately so UI can show spinner
     job_id = f"mine_{secrets.token_hex(5)}"
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"$set": {
             "email_mining_status": "running",
             "email_mining_job_id": job_id,
@@ -159,7 +161,7 @@ async def lead_mine_status(
     if db is None:
         raise HTTPException(503, "Database not ready")
     lead = await db.campaign_leads.find_one(
-        {"lead_id": lead_id},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "email_mining_status": 1,
          "email_mining_job_id": 1, "email_mining_started_at": 1,
          "email_mining_error": 1, "discovered_emails": 1,
@@ -206,7 +208,7 @@ async def _run_bulk_mine(job_id: str, lead_ids: list, *,
         async with sem:
             try:
                 lead = await db.campaign_leads.find_one(
-                    {"lead_id": lid},
+                    {"lead_id": lid, "business_id": FOUNDER_BIN},
                     {"_id": 0, "website": 1, "website_url": 1},
                 )
                 url = (lead or {}).get("website") or (lead or {}).get("website_url") or ""
@@ -218,7 +220,7 @@ async def _run_bulk_mine(job_id: str, lead_ids: list, *,
                 if not url.startswith(("http://", "https://")):
                     url = "https://" + url
                 await db.campaign_leads.update_one(
-                    {"lead_id": lid},
+                    {"lead_id": lid, "business_id": FOUNDER_BIN},
                     {"$set": {
                         "email_mining_status": "running",
                         "email_mining_job_id": job_id,
@@ -229,7 +231,8 @@ async def _run_bulk_mine(job_id: str, lead_ids: list, *,
                 await _run_mine(lid, url, verify_mx=True, max_pages=5)
                 # _run_mine writes complete or failed status into the doc
                 doc = await db.campaign_leads.find_one(
-                    {"lead_id": lid}, {"_id": 0, "email_mining_status": 1},
+                    {"lead_id": lid, "business_id": FOUNDER_BIN},
+                    {"_id": 0, "email_mining_status": 1},
                 )
                 if (doc or {}).get("email_mining_status") == "complete":
                     succeeded += 1
@@ -296,7 +299,7 @@ async def _send_bulk_completion_email(db, job_id: str, lead_ids: list,
 
     # Pull discovered emails for these leads, sort by score
     enriched = await db.campaign_leads.find(
-        {"lead_id": {"$in": lead_ids},
+        {"lead_id": {"$in": lead_ids}, "business_id": FOUNDER_BIN,
          "discovered_emails": {"$exists": True, "$ne": []}},
         {"_id": 0, "lead_id": 1, "business_name": 1,
          "website": 1, "discovered_emails": 1},
@@ -426,7 +429,8 @@ async def bulk_mine(
                 {"discovered_emails_count": {"$in": [None, 0]}},
                 {"discovered_emails": {"$in": [None, []]}},
             ]}]
-        cur = db.campaign_leads.find(q, {"_id": 0, "lead_id": 1}) \
+        cur = db.campaign_leads.find(
+            {**q, "business_id": FOUNDER_BIN}, {"_id": 0, "lead_id": 1}) \
             .limit(int(max(1, min(500, body.max_leads))))
         target_ids = [d["lead_id"] async for d in cur if d.get("lead_id")]
 
@@ -506,7 +510,7 @@ async def list_campaign_leads(
             ]
         }
     cur = db.campaign_leads.find(
-        query,
+        {**query, "business_id": FOUNDER_BIN},
         {
             "_id": 0, "lead_id": 1, "business_name": 1,
             "website": 1, "website_url": 1,

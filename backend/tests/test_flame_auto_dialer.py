@@ -68,7 +68,8 @@ def test_below_tier_skips():
 def test_blocked_gate_when_accurate_scout_says_no():
     db = FakeDB()
     db.campaign_leads.docs.append({
-        "lead_id": "l1", "phone": "+16135551234", "business_name": "GatedCo",
+        "lead_id": "l1", "business_id": "AUR-FNDR-001",
+        "phone": "+16135551234", "business_name": "GatedCo",
         "verification": {"channel_gating": {"call": False}}, "dnc": False,
     })
     viewer = {"session_id": "s2", "flame_score": 150, "flame_tier": "INFERNO", "slug": "gated"}
@@ -79,7 +80,8 @@ def test_blocked_gate_when_accurate_scout_says_no():
 def test_blocked_dnc():
     db = FakeDB()
     db.campaign_leads.docs.append({
-        "lead_id": "l2", "phone": "+16135551234", "business_name": "DNCCo",
+        "lead_id": "l2", "business_id": "AUR-FNDR-001",
+        "phone": "+16135551234", "business_name": "DNCCo",
         "verification": {"channel_gating": {"call": True}}, "dnc": True,
     })
     viewer = {"session_id": "s3", "flame_score": 150, "flame_tier": "INFERNO"}
@@ -90,7 +92,7 @@ def test_blocked_dnc():
 def test_no_phone_on_file():
     db = FakeDB()
     db.campaign_leads.docs.append({
-        "lead_id": "l3", "business_name": "NoPhoneCo",
+        "lead_id": "l3", "business_id": "AUR-FNDR-001", "business_name": "NoPhoneCo",
         "verification": {"channel_gating": {"call": True}}, "dnc": False, "phone": "",
     })
     viewer = {"session_id": "s4", "flame_score": 150, "flame_tier": "INFERNO"}

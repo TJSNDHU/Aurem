@@ -27,6 +27,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -58,6 +60,7 @@ def _next_monday_9am() -> datetime:
 async def _pick_leads(db, count: int, city: Optional[str]) -> List[Dict[str, Any]]:
     """Top N unblasted leads, DND-safe, sorted by newest."""
     q: Dict[str, Any] = {
+        "business_id": FOUNDER_BIN,
         "status": {"$nin": ["do_not_contact", "blasted", "bounced",
                                 "unsubscribed"]},
         "armed_for_campaign": {"$in": [None, "", False]},
@@ -171,7 +174,7 @@ async def arm_outreach(db, founder: str = "tj", *,
 
     # Mark those leads so we don't double-arm them in parallel campaigns.
     await db.campaign_leads.update_many(
-        {"lead_id": {"$in": lead_ids}},
+        {"lead_id": {"$in": lead_ids}, "business_id": FOUNDER_BIN},
         {"$set": {"armed_for_campaign": campaign_id,
                    "armed_at": now_iso}},
     )
@@ -207,7 +210,8 @@ async def cancel_latest_armed(db, founder: str = "tj") -> Dict[str, Any]:
     )
     # Release the arm locks on leads
     await db.campaign_leads.update_many(
-        {"armed_for_campaign": target["campaign_id"]},
+        {"armed_for_campaign": target["campaign_id"],
+         "business_id": FOUNDER_BIN},
         {"$set": {"armed_for_campaign": None},
           "$unset": {"armed_at": ""}},
     )
@@ -226,7 +230,7 @@ async def _fire_one_lead(db, campaign: Dict[str, Any],
     Now both paths go through `services.casl_gate.is_blocked_by_casl`
     so the rule is enforced everywhere (fail-closed on errors)."""
     lead = await db.campaign_leads.find_one(
-        {"lead_id": lead_id}, {"_id": 0})
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         return {"ok": False, "error": "lead_gone"}
     # ── CASL gate ──
@@ -238,7 +242,7 @@ async def _fire_one_lead(db, campaign: Dict[str, Any],
         if casl.get("blocked"):
             # Mark the lead so we don't keep retrying.
             await db.campaign_leads.update_one(
-                {"lead_id": lead_id},
+                {"lead_id": lead_id, "business_id": FOUNDER_BIN},
                 {"$set": {
                     "status":             "do_not_contact",
                     "casl_blocked_at":    datetime.now(timezone.utc).isoformat(),

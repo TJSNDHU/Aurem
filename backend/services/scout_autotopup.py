@@ -34,6 +34,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # ── Tunables (override via env) ───────────────────────────────────────
@@ -69,6 +71,7 @@ async def count_eligible(db) -> int:
     """Count leads that pass the SAME filter the auto-blast runner uses.
     If this number is < FLOOR_LEADS, we need a topup."""
     return await db.campaign_leads.count_documents({
+        "business_id":   FOUNDER_BIN,
         "last_blast_at": {"$exists": False},
         "noise_flag":    {"$ne": True},
         "source":        {"$nin": list(_INTERNAL_TEST_SOURCES)},
@@ -115,7 +118,7 @@ async def _persist_lead(db, lead: Dict[str, Any]) -> bool:
     # Idempotency: don't overwrite an existing lead that may have been
     # touched already (last_blast_at, status, etc.).
     existing = await db.campaign_leads.find_one(
-        {"lead_id": lead_id}, {"_id": 1},
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 1},
     )
     if existing:
         return False
@@ -128,7 +131,8 @@ async def _persist_lead(db, lead: Dict[str, Any]) -> bool:
         "discovered_via": "scout_autotopup",
     }
     await db.campaign_leads.update_one(
-        {"lead_id": lead_id}, {"$setOnInsert": doc}, upsert=True,
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN},
+        {"$setOnInsert": {**doc, "business_id": FOUNDER_BIN}}, upsert=True,
     )
     return True
 

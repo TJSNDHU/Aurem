@@ -72,7 +72,8 @@ async def get_bin_data(db, bin_id: str) -> Dict:
         {**t_filter, "status": {"$in": ["active", "running"]}}
     )
 
-    # 3. Leads in pipeline
+    # 3. Leads in pipeline — t_filter carries the BIN scope
+    # (tenant_id == business_id for BIN-keyed rows)
     leads_pipeline = await db.campaign_leads.count_documents(
         {**t_filter, "status": {"$nin": ["closed", "converted", "rejected"]}}
     )

@@ -22,6 +22,8 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/report", tags=["AUREM Public Report"])
 
@@ -391,7 +393,8 @@ async def get_public_report(slug: str, request: Request):
     if db is None:
         raise HTTPException(503, "Database unavailable")
 
-    lead = await db.campaign_leads.find_one({"lead_id": slug}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": slug, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         # Fallback: legacy outreach emails embed slug = _slugify(business_name)
         # when lead_id was missing at send-time. Try matching by the slugified
@@ -400,7 +403,8 @@ async def get_public_report(slug: str, request: Request):
             import re as _re
             pat = "^" + _re.escape(slug).replace(r"\-", "[ \\-]+") + "$"
             lead = await db.campaign_leads.find_one(
-                {"$expr": {
+                {"business_id": FOUNDER_BIN,
+                 "$expr": {
                     "$regexMatch": {
                         "input": {"$toLower": {"$ifNull": ["$business_name", ""]}},
                         "regex": pat.replace(" ", "[ \\-]+"),
@@ -416,7 +420,8 @@ async def get_public_report(slug: str, request: Request):
             name_guess = slug.replace("-", " ")
             try:
                 lead = await db.campaign_leads.find_one(
-                    {"business_name": {"$regex": f"^{name_guess}$", "$options": "i"}},
+                    {"business_name": {"$regex": f"^{name_guess}$", "$options": "i"},
+                     "business_id": FOUNDER_BIN},
                     {"_id": 0},
                 )
             except Exception:
@@ -529,14 +534,16 @@ async def log_report_visit(slug: str, event: VisitEvent, request: Request):
     db = _get_db()
     if db is None:
         return {"logged": False, "reason": "no_db"}
-    lead = await db.campaign_leads.find_one({"lead_id": slug}, {"lead_id": 1, "outreach_history": 1})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": slug, "business_id": FOUNDER_BIN},
+        {"lead_id": 1, "outreach_history": 1})
     if not lead:
         raise HTTPException(404, "Lead not found")
 
     now = datetime.now(timezone.utc).isoformat()
     client_ip = request.client.host if request.client else "unknown"
     await db.campaign_leads.update_one(
-        {"lead_id": slug},
+        {"lead_id": slug, "business_id": FOUNDER_BIN},
         {
             "$push": {
                 "outreach_history": {
@@ -564,7 +571,8 @@ async def report_engaged(slug: str, event: VisitEvent):
     db = _get_db()
     if db is None:
         return {"sent": False, "reason": "no_db"}
-    lead = await db.campaign_leads.find_one({"lead_id": slug}, {"_id": 0})
+    lead = await db.campaign_leads.find_one(
+        {"lead_id": slug, "business_id": FOUNDER_BIN}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Lead not found")
 
@@ -604,7 +612,7 @@ async def report_engaged(slug: str, event: VisitEvent):
         ok = resp.status_code == 200
         iso = now.isoformat()
         await db.campaign_leads.update_one(
-            {"lead_id": slug},
+            {"lead_id": slug, "business_id": FOUNDER_BIN},
             {
                 "$push": {
                     "outreach_history": {

@@ -30,6 +30,8 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 UPSELL_DELAY_HOURS = int(os.environ.get("UPSELL_DELAY_HOURS", "2"))
@@ -96,7 +98,7 @@ async def _site_recipient(db, site: Dict[str, Any]) -> Dict[str, str]:
     lead_id = site.get("lead_id")
     if (not email or not phone) and lead_id:
         lead = await db.campaign_leads.find_one(
-            {"lead_id": lead_id},
+            {"lead_id": lead_id, "business_id": FOUNDER_BIN},
             {"_id": 0, "email": 1, "phone": 1},
         ) or {}
         email = email or (lead.get("email") or "")

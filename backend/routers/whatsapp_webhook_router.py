@@ -25,6 +25,8 @@ from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/whatsapp", tags=["AUREM WhatsApp"])
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 _db = None
@@ -160,7 +162,8 @@ async def receive_webhook(request: Request):
                         continue
                     # Find the lead by phone (matches both +E.164 and plain)
                     lead = await db.campaign_leads.find_one(
-                        {"$or": [{"phone": from_number}, {"phone": f"+{from_number}"}]},
+                        {"business_id": FOUNDER_BIN,
+                         "$or": [{"phone": from_number}, {"phone": f"+{from_number}"}]},
                         {"_id": 0, "lead_id": 1},
                     )
                     if not lead or not lead.get("lead_id"):
@@ -179,7 +182,8 @@ async def receive_webhook(request: Request):
                         if not to_number:
                             continue
                         lead = await db.campaign_leads.find_one(
-                            {"$or": [{"phone": to_number}, {"phone": f"+{to_number}"}]},
+                            {"business_id": FOUNDER_BIN,
+                             "$or": [{"phone": to_number}, {"phone": f"+{to_number}"}]},
                             {"_id": 0, "lead_id": 1},
                         )
                         if lead and lead.get("lead_id"):

@@ -16,6 +16,8 @@ import logging
 from utils.fix_enrichment import enrich_issues_with_fix_status, enrich_scan_result_issues, build_confirmed_resolved
 
 router = APIRouter()
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 class ManualEnrichment(BaseModel):
@@ -1293,7 +1295,9 @@ async def save_scan_to_history(body: SaveScanRequest, authorization: str = Heade
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        await db.scan_history.insert_one(doc)
+        # doc is user-scoped; business_id mirrors user_id-keyed isolation
+        await db.scan_history.insert_one(
+            {**doc, "business_id": doc.get("business_id") or doc.get("user_id")})
 
         return {"scan_id": scan_id, "success": True}
 
@@ -1337,7 +1341,7 @@ async def get_scan_detail(scan_id: str):
     try:
         from server import db
 
-        doc = await db.scan_history.find_one(
+        doc = await db.scan_history.find_one(  # tenant_scope_guard: admin_cross_tenant — scan_id is an unguessable share token (public share feature)
             {"scan_id": scan_id}, {"_id": 0}
         )
         if not doc:

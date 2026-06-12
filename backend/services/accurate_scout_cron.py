@@ -16,6 +16,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Dict
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Re-verify any lead whose last check was more than this many days ago
@@ -85,7 +87,9 @@ async def run_reverification_cycle() -> Dict[str, int]:
         ]
     }
 
-    cursor = db.campaign_leads.find(query, {"_id": 0, "lead_id": 1, "business_name": 1,
+    cursor = db.campaign_leads.find(
+        {**query, "business_id": FOUNDER_BIN},
+        {"_id": 0, "lead_id": 1, "business_name": 1,
                                              "city": 1, "address": 1, "website_url": 1,
                                              "verification": 1}).limit(MAX_LEADS_PER_RUN)
     leads = await cursor.to_list(MAX_LEADS_PER_RUN)

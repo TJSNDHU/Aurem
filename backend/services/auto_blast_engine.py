@@ -26,6 +26,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # iter 324c — internal/test traffic that must NEVER hit the production blaster.
@@ -121,7 +123,8 @@ async def _auto_verify_lead(db, lead: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"[auto-blast] verify failed for {lead_id}: {e}")
 
-    fresh = await db.campaign_leads.find_one({"lead_id": lead_id}, {"_id": 0})
+    fresh = await db.campaign_leads.find_one(
+        {"lead_id": lead_id, "business_id": FOUNDER_BIN}, {"_id": 0})
     return fresh or lead
 
 
@@ -267,7 +270,8 @@ async def _eligible_leads(db, limit: int) -> List[Dict[str, Any]]:
     # leads in the queue. 50× now matches diagnostic scan depth.
     # iter 282aa — Sort prefers Yelp Fusion leads (real SMB phones) first;
     # within source, newest-created comes first.
-    async for lead in db.campaign_leads.find(q, {"_id": 0}).sort([
+    async for lead in db.campaign_leads.find(
+            {**q, "business_id": FOUNDER_BIN}, {"_id": 0}).sort([
         ("source", -1),       # "yelp_fusion" > "osm_overpass" > "google_places" alphabetically; -1 puts yelp_fusion first
         ("created_at", -1),
     ]).limit(limit * 50):
@@ -340,10 +344,11 @@ async def diagnose_blocker() -> Dict[str, Any]:
     health = await db.ora_campaign_health.find_one({"_id": "global"}, {"_id": 0}) or {}
 
     # ── Funnel: count what each filter drops ──────────────────────
-    total = await db.campaign_leads.count_documents({})
+    total = await db.campaign_leads.count_documents({"business_id": FOUNDER_BIN})
     never_blasted = await db.campaign_leads.count_documents(
-        {"last_blast_at": {"$exists": False}})
+        {"business_id": FOUNDER_BIN, "last_blast_at": {"$exists": False}})
     queued_with_contact = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_blast_at": {"$exists": False},
         "$or": [
             {"email": {"$nin": ["", None]}},
@@ -351,6 +356,7 @@ async def diagnose_blocker() -> Dict[str, Any]:
         ],
     })
     queued_status_ok = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_blast_at": {"$exists": False},
         "$or": [
             {"status": {"$nin": ["signed_up", "not_interested", "unsubscribed"]}},
@@ -365,6 +371,7 @@ async def diagnose_blocker() -> Dict[str, Any]:
         ],
     })
     queued_not_noise = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_blast_at": {"$exists": False},
         "noise_flag": {"$ne": True},
         # iter 323w — funnel must mirror runner: exclude leads that
@@ -390,6 +397,7 @@ async def diagnose_blocker() -> Dict[str, Any]:
 
     # noise_flag count alone (how many got hard-flagged by previous cycles)
     noise_flagged = await db.campaign_leads.count_documents({
+        "business_id": FOUNDER_BIN,
         "last_blast_at": {"$exists": False},
         "noise_flag": True,
     })
@@ -401,7 +409,8 @@ async def diagnose_blocker() -> Dict[str, Any]:
     async def _sample(query, n=3):
         out = []
         async for d in db.campaign_leads.find(
-            query, {"_id": 0, "lead_id": 1, "business_name": 1,
+            {**query, "business_id": FOUNDER_BIN},
+            {"_id": 0, "lead_id": 1, "business_name": 1,
                     "email": 1, "phone": 1, "status": 1, "noise_flag": 1,
                     "noise_reason": 1, "source": 1},
         ).limit(n):
@@ -488,7 +497,8 @@ async def unflag_all_noise() -> Dict[str, Any]:
     if db is None:
         return {"ok": False, "error": "db not wired"}
     r = await db.campaign_leads.update_many(
-        {"last_blast_at": {"$exists": False}, "noise_flag": True},
+        {"business_id": FOUNDER_BIN,
+         "last_blast_at": {"$exists": False}, "noise_flag": True},
         {"$set": {"noise_flag": False,
                   "noise_flag_cleared_at": datetime.now(timezone.utc).isoformat()}},
     )
@@ -529,6 +539,7 @@ async def scrub_aggregator_emails(dry_run: bool = False) -> Dict[str, Any]:
 
     cursor = db.campaign_leads.find(
         {
+            "business_id": FOUNDER_BIN,
             "last_blast_at": {"$exists": False},
             "email": {"$nin": ["", None]},
         },
@@ -551,7 +562,7 @@ async def scrub_aggregator_emails(dry_run: bool = False) -> Dict[str, Any]:
             })
         if not dry_run:
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "email":              "",
                     "email_confidence":   "NONE",
@@ -601,12 +612,13 @@ async def scrub_internal_test_traffic(dry_run: bool = False) -> Dict[str, Any]:
         ],
     }
 
-    matched = await db.campaign_leads.count_documents(q)
+    matched = await db.campaign_leads.count_documents(
+        {**q, "business_id": FOUNDER_BIN})
 
     # Sample for audit
     sample: List[Dict[str, Any]] = []
     async for d in db.campaign_leads.find(
-        q,
+        {**q, "business_id": FOUNDER_BIN},
         {"_id": 0, "lead_id": 1, "business_name": 1, "email": 1, "source": 1},
     ).limit(15):
         sample.append(d)
@@ -614,7 +626,7 @@ async def scrub_internal_test_traffic(dry_run: bool = False) -> Dict[str, Any]:
     modified = 0
     if not dry_run and matched > 0:
         r = await db.campaign_leads.update_many(
-            q,
+            {**q, "business_id": FOUNDER_BIN},
             {"$set": {
                 "noise_flag":         True,
                 "noise_reason":       "internal-test-traffic (iter-324c)",
@@ -663,6 +675,7 @@ async def scrub_listicle_titles(dry_run: bool = False) -> Dict[str, Any]:
 
     cursor = db.campaign_leads.find(
         {
+            "business_id": FOUNDER_BIN,
             "last_blast_at": {"$exists": False},
             "noise_flag":    {"$ne": True},
         },
@@ -683,7 +696,7 @@ async def scrub_listicle_titles(dry_run: bool = False) -> Dict[str, Any]:
             })
         if not dry_run:
             await db.campaign_leads.update_one(
-                {"lead_id": lead["lead_id"]},
+                {"lead_id": lead["lead_id"], "business_id": FOUNDER_BIN},
                 {"$set": {
                     "noise_flag":         True,
                     "noise_reason":       f"listicle-title:{reason} (iter-324e)",
@@ -734,7 +747,8 @@ async def quarantine_burnt_domains_24h(dry_run: bool = False) -> Dict[str, Any]:
     samples: List[Dict[str, Any]] = []
 
     cursor = db.campaign_leads.find(
-        {"created_at": {"$gte": h24.isoformat()},
+        {"business_id": FOUNDER_BIN,
+         "created_at": {"$gte": h24.isoformat()},
          "last_blast_at": {"$exists": True}},
         {"_id": 0, "business_name": 1, "email": 1, "website_url": 1},
     )
@@ -891,11 +905,13 @@ async def run_auto_blast_cycle(force: bool = False) -> Dict[str, Any]:
             note = "no-eligible-leads"
             # Count WHY: this surfaces "scraper is producing contactless leads"
             no_contact_count = await db.campaign_leads.count_documents({
+                "business_id": FOUNDER_BIN,
                 "last_blast_at": {"$exists": False},
                 "email": {"$in": ["", None]},
                 "phone": {"$in": ["", None]},
             })
-            total_queued = await db.campaign_leads.count_documents({"last_blast_at": {"$exists": False}})
+            total_queued = await db.campaign_leads.count_documents(
+                {"business_id": FOUNDER_BIN, "last_blast_at": {"$exists": False}})
             summaries.append({
                 "tenant_id": tenant_id,
                 "processed": 0,

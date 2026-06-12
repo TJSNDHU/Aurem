@@ -142,7 +142,7 @@ async def _backfill_outreach_history(db) -> int:
     Returns count of leads (not entries) touched."""
     fixed = 0
     try:
-        cursor = db.campaign_leads.find(
+        cursor = db.campaign_leads.find(  # tenant_scope_guard: admin_cross_tenant — platform-wide schema normalisation (no data exposure)
             {"outreach_history.0": {"$exists": True}},
             {"_id": 1, "lead_id": 1, "outreach_history": 1},
         )
@@ -165,7 +165,7 @@ async def _backfill_outreach_history(db) -> int:
                 new_history.append(fixed_entry)
             if dirty:
                 try:
-                    await db.campaign_leads.update_one(
+                    await db.campaign_leads.update_one(  # tenant_scope_guard: admin_cross_tenant — keyed by unique _id from the scoped cursor above
                         {"_id": d["_id"]},
                         {"$set": {"outreach_history": new_history}},
                     )

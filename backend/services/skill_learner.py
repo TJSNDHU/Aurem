@@ -18,6 +18,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 SKILLS_DIR = Path("/app/ora_skills")
@@ -84,6 +86,7 @@ async def _collect_signals(db) -> dict:
                 ]}},
             }},
         ]
+        pipeline.insert(0, {"$match": {"business_id": FOUNDER_BIN}})
         async for row in db.campaign_leads.aggregate(pipeline):
             ch = (row["_id"] or {}).get("channel") or "unknown"
             cat = (row["_id"] or {}).get("category") or "unknown"

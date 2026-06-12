@@ -20,6 +20,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 # Status values that count as "we already touched this business"
@@ -137,7 +139,8 @@ async def is_duplicate_lead(db, lead: dict) -> tuple[bool, str]:
     if phone:
         try:
             if await db.campaign_leads.find_one(
-                {"phone_normalized": phone}, projection={"_id": 1},
+                {"phone_normalized": phone, "business_id": FOUNDER_BIN},
+                projection={"_id": 1},
             ):
                 return (True, "phone_match")
         except Exception:
@@ -147,7 +150,8 @@ async def is_duplicate_lead(db, lead: dict) -> tuple[bool, str]:
     if domain:
         try:
             if await db.campaign_leads.find_one(
-                {"website_domain": domain}, projection={"_id": 1},
+                {"website_domain": domain, "business_id": FOUNDER_BIN},
+                projection={"_id": 1},
             ):
                 return (True, "domain_match")
         except Exception:
@@ -157,7 +161,8 @@ async def is_duplicate_lead(db, lead: dict) -> tuple[bool, str]:
     if email:
         try:
             if await db.campaign_leads.find_one(
-                {"email": email}, projection={"_id": 1},
+                {"email": email, "business_id": FOUNDER_BIN},
+                projection={"_id": 1},
             ):
                 return (True, "email_match")
         except Exception:
@@ -167,7 +172,8 @@ async def is_duplicate_lead(db, lead: dict) -> tuple[bool, str]:
     if name and city:
         try:
             cursor = db.campaign_leads.find(
-                {"city": {"$regex": re.escape(city), "$options": "i"}},
+                {"city": {"$regex": re.escape(city), "$options": "i"},
+                 "business_id": FOUNDER_BIN},
                 projection={"_id": 0, "business_name": 1},
             ).limit(200)
             async for existing in cursor:
@@ -270,6 +276,7 @@ async def can_contact_lead(db, lead: dict) -> tuple[bool, str]:
         try:
             cursor = db.campaign_leads.find(
                 {
+                    "business_id": FOUNDER_BIN,
                     "city":   {"$regex": re.escape(city), "$options": "i"},
                     "status": {"$in": list(TOUCHED_STATUSES)},
                 },

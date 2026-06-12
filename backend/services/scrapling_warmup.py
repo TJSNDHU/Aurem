@@ -28,6 +28,8 @@ from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 
+from shared.tenant import FOUNDER_BIN
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,7 @@ async def get_top_domains(db, limit: int = 100) -> List[str]:
     try:
         since = datetime.now(timezone.utc) - timedelta(days=30)
         rows = await db.campaign_leads.find(
-            {"created_at": {"$gte": since},
+            {"created_at": {"$gte": since}, "business_id": FOUNDER_BIN,
              "website": {"$exists": True, "$nin": [None, ""]}},
             {"_id": 0, "website": 1},
         ).limit(5000).to_list(length=5000)

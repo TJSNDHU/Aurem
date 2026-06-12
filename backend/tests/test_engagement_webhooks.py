@@ -94,12 +94,14 @@ def _setup_db(monkeypatch):
     set_db(db)
     # Seed 2 test leads
     db.campaign_leads.docs.append({
-        "lead_id": "wh-email", "email": "target@example.com", "phone": "+16135551111",
+        "lead_id": "wh-email", "business_id": "AUR-FNDR-001",
+        "email": "target@example.com", "phone": "+16135551111",
         "lifecycle_stage": "contacted",
         "verification": {"channel_gating": {"email": True}},
     })
     db.campaign_leads.docs.append({
-        "lead_id": "wh-phone", "email": "p@example.com", "phone": "+16135552222",
+        "lead_id": "wh-phone", "business_id": "AUR-FNDR-001",
+        "email": "p@example.com", "phone": "+16135552222",
         "lifecycle_stage": "contacted",
     })
     return db
