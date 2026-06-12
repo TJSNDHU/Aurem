@@ -11,21 +11,24 @@ import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Globe, Star, Share2, FileText, Gift, CreditCard,
-  MessageSquare, Settings, Home, LogOut,
+  MessageSquare, Settings, Home, LogOut, Activity, Target, CalendarDays,
 } from "lucide-react";
 import { GOLD, INK, PANEL, STROKE, TEXT_HI, TEXT_MD } from "../luxe/tokens";
 import { clearCustomerAuth } from "../../utils/secureTokenStore";
 
 const NAV = [
-  { to: "/my",           label: "Home",      icon: Home, end: true },
-  { to: "/my/website",   label: "Website",   icon: Globe },
-  { to: "/my/reviews",   label: "Reviews",   icon: Star },
-  { to: "/my/social",    label: "Social",    icon: Share2 },
-  { to: "/my/report",    label: "Reports",   icon: FileText },
-  { to: "/my/referrals", label: "Referrals", icon: Gift },
-  { to: "/my/billing",   label: "Billing",   icon: CreditCard },
-  { to: "/my/ora",       label: "Ask ORA",   icon: MessageSquare },
-  { to: "/my/settings",  label: "Settings",  icon: Settings },
+  { to: "/my",             label: "Home",         icon: Home, end: true },
+  { to: "/my/activity",    label: "Activity",     icon: Activity },
+  { to: "/my/website",     label: "Website",      icon: Globe },
+  { to: "/my/leads",       label: "Leads",        icon: Target },
+  { to: "/my/appointments",label: "Appointments", icon: CalendarDays },
+  { to: "/my/reviews",     label: "Reviews",      icon: Star },
+  { to: "/my/social",      label: "Social",       icon: Share2 },
+  { to: "/my/report",      label: "Reports",      icon: FileText },
+  { to: "/my/referrals",   label: "Referrals",    icon: Gift },
+  { to: "/my/billing",     label: "Billing",      icon: CreditCard },
+  { to: "/my/ora",         label: "Ask ORA",      icon: MessageSquare },
+  { to: "/my/settings",    label: "Settings",     icon: Settings },
 ];
 
 export default function CustomerShell() {

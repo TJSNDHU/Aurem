@@ -330,12 +330,22 @@ login overlay):
 
 ```
 /my            Luxe dashboard home (public + auth overlay)
-/my/website    site score, vulnerabilities, "Initiate AUREM Repair", scan schedule
+/my/activity   "What ORA did" — real-time activity feed (scans, outreach, fixes)
+/my/website    site score, vulnerabilities, Council-gated "Initiate AUREM Repair", scan schedule
+/my/leads      pipeline funnel (found→contacted→replied→booked) + leads table
+/my/appointments  upcoming + past bookings
 /my/reviews    Google reviews          /my/social     social status
 /my/report     monthly report          /my/referrals  referral link + rewards
 /my/billing    Stripe + Apple Pay      /my/ora        ORA chat (business context)
 /my/settings   API key + install snippet
 ```
+
+Tier-1 portal endpoints (iter D-84, all BIN-scoped, zero-mock):
+`GET /api/customer/activity` (union feed), `GET /api/customer/leads/funnel` +
+`/leads`, `GET /api/customer/appointments`, and the Council-gated repair flow
+`GET /api/customer/repair/eligibility` → `POST /repair/initiate` →
+`GET /repair/{job_id}` (rate-limited 3/24h, scope-locked, rollback on fail;
+live-applies safe DOM fixes via the pixel on installed sites, emails a plan otherwise).
 
 Six wiring gaps behind these pages were closed in `missing_endpoints_router.py`
 (iter D-83): `GET /api/admin/evolver/status`, `GET /api/admin/system-pulse-live`,
@@ -648,4 +658,4 @@ Commercial use requires written permission.
 
 ---
 
-*Last updated: 2026-06-12 · iter D-83 · 104/104 tests pass*
+*Last updated: 2026-06-12 · iter D-84 · 111/111 tests pass*

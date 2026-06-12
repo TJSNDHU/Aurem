@@ -1,3 +1,26 @@
+## 2026-06-12 — iter D-84 — Customer Portal Tier 1: Activity · Leads · Appointments · Council Repair
+
+Four customer-facing features, all REAL/BIN-scoped/zero-mock (verified against live Mongo).
+
+- **§1 Activity feed** (`/my/activity`, `GET /api/customer/activity`): real union of
+  customer_scans + repair_jobs + campaign_leads (+appointments) — paginated, honest empty-state.
+- **§2 Leads & pipeline** (`/my/leads`, `/api/customer/leads/funnel` + `/leads`):
+  campaign_leads (2541 real docs) grouped by `status`→4 funnel stages. Stage-map corrected
+  to real statuses found in DB (emailed/queued/whatsapp_sent/scanned).
+- **§3 Appointments** (`/my/appointments`, `/api/customer/appointments`): upcoming+past,
+  honest-empty (collection currently empty — no fake rows, per policy).
+- **§4 Council-gated repair** (`CouncilRepairPanel` on `/my/website`): wraps the EXISTING
+  repair primitives — `GET /repair/eligibility` → `POST /repair/initiate` → `GET /repair/{job_id}`.
+  Phases queued→analyzing→council_review→applying→verifying→done. REAL audit
+  (`website_audit_service`), REAL Council (`council_deliberate` CASL+QA), rate-limit 3/24h,
+  scope-locked to caller BIN, rollback on fail. Pixel-installed sites get Council-approved
+  safe DOM fixes (meta/title/viewport) pushed to `pending_pixel_patches` (live-apply);
+  others get the LLM plan + Resend email. No new parallel repair system.
+- New routers `customer_portal_tier1_router.py` + `customer_repair_council_router.py`
+  (bin via shared `_customer_bin` — never trusts client). CustomerShell nav +3 items.
+  5 new wiring-audit CUSTOMER rows. 7 new pytests + lean-prune green. Zero TODO/mock/dead-button.
+
+
 ## 2026-06-12 — iter D-83b — README refresh + self-healing wiring-audit (suggest→confirm)
 
 Sequence a→b→c (user-approved). Completed (a) README + (b) auto-fix probe button.

@@ -263,6 +263,8 @@ ALL_SET_DB_MODULES = [
     "security_audit_router",
     "supply_chain_router",
     "missing_endpoints_router",
+    "customer_portal_tier1_router",
+    "customer_repair_council_router",
     "security_keys_router",
     "security_patterns_router",
     "security_router",

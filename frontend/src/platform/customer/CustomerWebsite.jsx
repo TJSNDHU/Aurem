@@ -16,6 +16,7 @@ import {
   Copy, Download, Code,
 } from 'lucide-react';
 import { getPlatformToken } from '../../utils/secureTokenStore';
+import CouncilRepairPanel from './CouncilRepairPanel';
 
 const API = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -203,6 +204,8 @@ export default function CustomerWebsite() {
 
   return (
     <div data-testid="customer-website" style={{ padding: '16px 0', fontFamily: "'Jost',sans-serif" }}>
+      {/* iter D-84 §4 — Council-gated repair entry point */}
+      <CouncilRepairPanel />
 
       {/* ═════════ 1. TRIAL + SUBSCRIPTION METER ═════════ */}
       <TrialMeterCard trial={trial} subs={mySubs} />

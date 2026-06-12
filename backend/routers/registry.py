@@ -303,6 +303,8 @@ def register_all_routers(app, db):
         ("security_audit_router", "security_audit_router"),
         ("supply_chain_router", "supply_chain_router"),
         ("missing_endpoints_router", "missing_endpoints_router"),
+        ("customer_portal_tier1_router", "customer_portal_tier1_router"),
+        ("customer_repair_council_router", "customer_repair_council_router"),
         ("subscription_router", "subscription_router"),
         ("openfang_router", "openfang_router"),
         ("zdr_router", "zdr_router"),

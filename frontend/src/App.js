@@ -163,6 +163,9 @@ import BrainGraphShare from './pages/BrainGraphShare';
 import { AdminGuard, CustomerGuard, TenantGuard } from './platform/RouteGuards';
 import CustomerShell from './platform/customer/CustomerShell';
 import CustomerWebsite from './platform/customer/CustomerWebsite';
+import CustomerActivity from './platform/customer/CustomerActivity';
+import CustomerLeads from './platform/customer/CustomerLeads';
+import CustomerAppointments from './platform/customer/CustomerAppointments';
 import CustomerReviews from './platform/customer/CustomerReviews';
 import CustomerSocial from './platform/customer/CustomerSocial';
 import CustomerReport from './platform/customer/CustomerReport';
@@ -542,7 +545,10 @@ function AppRouter() {
           (iter D-82c — adopted the previously-orphaned platform/customer/ pages.) */}
       <Route path="/my" element={<LuxeDashboardPreview />} />
       <Route element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
-        <Route path="/my/website"   element={<CustomerWebsite />} />
+        <Route path="/my/activity"     element={<CustomerActivity />} />
+        <Route path="/my/website"      element={<CustomerWebsite />} />
+        <Route path="/my/leads"        element={<CustomerLeads />} />
+        <Route path="/my/appointments" element={<CustomerAppointments />} />
         <Route path="/my/reviews"   element={<CustomerReviews />} />
         <Route path="/my/social"    element={<CustomerSocial />} />
         <Route path="/my/report"    element={<CustomerReport />} />

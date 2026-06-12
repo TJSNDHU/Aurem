@@ -141,6 +141,12 @@ CUSTOMER_CHECKLIST = [
     # iter D-82c — gaps closed by missing_endpoints_router (Batch-2 portal live)
     ("Scan schedule (get/set)",       "/my/website",    "/api/customer/scan-schedule",             "CustomerWebsite.jsx"),
     ("Sentinel fixes log",            "/my",            "/api/sentinel/fixes-log",                 "LuxePages.jsx"),
+    # iter D-84 — customer portal Tier 1
+    ("Activity feed",                 "/my/activity",     "/api/customer/activity",                  "CustomerActivity.jsx"),
+    ("Leads funnel",                  "/my/leads",        "/api/customer/leads/funnel",              "CustomerLeads.jsx"),
+    ("Leads list",                    "/my/leads",        "/api/customer/leads",                     "CustomerLeads.jsx"),
+    ("Appointments",                  "/my/appointments", "/api/customer/appointments",              "CustomerAppointments.jsx"),
+    ("Council repair eligibility",    "/my/website",      "/api/customer/repair/eligibility",        "CouncilRepairPanel.jsx"),
 ]
 
 
