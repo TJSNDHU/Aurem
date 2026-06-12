@@ -11138,3 +11138,9 @@ scheduler will fire on its own.
 - `backend/pillars/sales/worker.py` (attach scheduler — 11 schedulers now)
 - `backend/tests/test_d71e_scout_autotopup.py` (new — 8 tests)
 
+
+## 2026-06 — Deployment unblock (fork session)
+- Fixed production deployment blocker: rewrote corrupted `/app/.gitignore` (200+ duplicated blocks removed) and removed `.env`/`.env.*`/`*.env` entries so the Emergent deploy pipeline can track and inject production env values into `backend/.env` and `frontend/.env`.
+- Removed quotes from `MONGO_URL`/`DB_NAME` in `backend/.env` (deployment_agent WARN).
+- deployment_agent re-scan: no blockers (gitignore_blocks_required_files=false, compilation passed). Backend health 200 post-restart.
+- Remaining P0: tenant scope violations (~305 unscoped queries per boot warning) → then flip AUREM_TENANT_SCOPE_STRICT=true.
