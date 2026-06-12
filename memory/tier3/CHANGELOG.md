@@ -1,3 +1,23 @@
+## 2026-06-12 — iter D-82c — Council-gated MAX autofix (no human) + README refresh
+
+Routed supply-chain remediation through the ORA Council (the same CASL+QA engine
+the ORA CTO / Sentinel stack uses) so safe fixes apply fully autonomously.
+
+- **`run_council_autofix()`** in `services/supply_chain_remediation.py`: every
+  remediable finding → `council_deliberate.deliberate(required=[casl,qa], advisory=[security])`.
+  APPROVED → apply for real; REJECTED → human fallback; secrets/SAST → Council-logged,
+  flagged manual (no safe auto-rewrite). Decisions learned into `ora_brain_thoughts`.
+- **`apply_yarn_upgrade()`** added — real frontend dep upgrade with package.json/yarn.lock
+  backup + frozen-lockfile install validation + rollback.
+- **Default = Council-autofix ON** via `remediate_after_scan()` (toggle
+  `AUREM_SUPPLY_CHAIN_COUNCIL_AUTOFIX=false`). New endpoint `POST /api/admin/supply-chain/autofix`.
+- **Proven live**: 40 pip CVE upgrades auto-applied in one cycle (e.g. 2.10.0→2.13.0),
+  all Council-APPROVED, backend + frontend stayed healthy. requirements.txt re-frozen.
+- **README.md updated**: new "Autonomous Security & Supply-Chain Self-Healing" section
+  (scanners, Council fix-flow, Sentinel relationship, endpoints, 285-finding baseline,
+  honest coverage gaps), TOC + "heals itself" bullet + test table (103/103).
+
+
 ## 2026-06-12 — iter D-82b — Supply-Chain scanner integrated into Sentinel + REAL fix-apply
 
 Wired the new supply-chain sweep into AUREM's existing Sentinel "trust-but-verify"

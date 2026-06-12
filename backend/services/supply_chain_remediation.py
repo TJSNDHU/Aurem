@@ -202,6 +202,64 @@ async def apply_pip_upgrade(name: str, current: str, target: str) -> Dict[str, A
     }
 
 
+FRONTEND_DIR = "/app/frontend"
+PACKAGE_JSON = "/app/frontend/package.json"
+
+
+async def apply_yarn_upgrade(name: str) -> Dict[str, Any]:
+    """REAL frontend dependency upgrade. Backs up package.json + yarn.lock, runs
+    `yarn upgrade <name>`, validates install integrity, rolls back on failure.
+    (Full `yarn build` is too heavy for the loop; install-integrity is the
+    automated signal — a re-scan confirms the CVE is gone.)"""
+    pkg_bak = PACKAGE_JSON + ".scbak"
+    lock_bak = f"{FRONTEND_DIR}/yarn.lock.scbak"
+    try:
+        shutil.copy2(PACKAGE_JSON, pkg_bak)
+        shutil.copy2(f"{FRONTEND_DIR}/yarn.lock", lock_bak)
+    except Exception as e:  # noqa: BLE001
+        return {"success": False, "name": name, "error": f"backup failed: {e}"}
+
+    async def _yarn(*args, timeout=240):
+        proc = await asyncio.create_subprocess_exec(
+            "yarn", *args, cwd=FRONTEND_DIR,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+        )
+        try:
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            return proc.returncode, (out or b"").decode("utf-8", "replace")
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            return -1, "timeout"
+
+    rc, out = await _yarn("upgrade", name)
+    if rc != 0:
+        rc_chk = 0
+    else:
+        rc_chk, _ = await _yarn("install", "--frozen-lockfile", timeout=240)
+
+    def _restore():
+        try:
+            shutil.move(pkg_bak, PACKAGE_JSON)
+            shutil.move(lock_bak, f"{FRONTEND_DIR}/yarn.lock")
+        except Exception:
+            pass
+
+    if rc != 0 or rc_chk != 0:
+        _restore()
+        return {"success": False, "name": name, "error": "yarn upgrade/install failed",
+                "log": out[-400:]}
+    for b in (pkg_bak, lock_bak):
+        try:
+            if os.path.exists(b):
+                os.remove(b)
+        except Exception:
+            pass
+    return {"success": True, "name": name, "kind": "yarn_upgrade", "restart_pending": True}
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # Suggestion writer — feeds Sentinel's repair_suggestions queue
 # ══════════════════════════════════════════════════════════════════════════
@@ -242,6 +300,179 @@ async def _upsert_suggestion(finding: Dict[str, Any], lane: str) -> None:
         {"$setOnInsert": doc},
         upsert=True,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Council gate — autonomous approval (NO human). Mirrors sentinel_repair_loop.
+# ══════════════════════════════════════════════════════════════════════════
+async def _council_vote(finding: Dict[str, Any]) -> Dict[str, Any]:
+    """Run a finding's remediation past the ORA Council (CASL + QA required,
+    security + pricing advisory). Returns {approved, verdict, votes, confidence}.
+    Council unavailable → fail-safe APPROVE (same posture as sentinel loop)."""
+    rem = finding.get("remediation", {})
+    payload = {
+        "category": finding.get("category"),
+        "tool": finding.get("tool"),
+        "severity": finding.get("severity"),
+        "identifier": finding.get("identifier"),
+        "title": finding.get("title"),
+        "remediation_kind": rem.get("kind"),
+        "command": rem.get("command"),
+        "from": rem.get("current"),
+        "to": rem.get("target"),
+    }
+    try:
+        from services.council_deliberate import deliberate
+        result = await deliberate(
+            action=f"supply_chain_autofix:{rem.get('kind')}",
+            agent="supply_chain_remediation",
+            payload=payload,
+            required=["casl", "qa"],
+            advisory=["security"],
+        )
+        verdict = result.get("verdict", "APPROVED")
+        return {"approved": verdict == "APPROVED", "verdict": verdict,
+                "votes": result.get("votes", {}), "confidence": result.get("confidence", 0.0)}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[SCRemediation] council unavailable (failsafe approve): %s", e)
+        return {"approved": True, "verdict": "APPROVED_FAILSAFE", "votes": {}, "confidence": 0.0}
+
+
+async def _record_ora_learning(finding: Dict[str, Any], outcome: str, extra: Dict[str, Any]) -> None:
+    if _db is None:
+        return
+    try:
+        await _db.ora_brain_thoughts.insert_one({
+            "source": "supply_chain_remediation",
+            "kind": "autofix",
+            "outcome": outcome,
+            "identifier": finding.get("identifier"),
+            "remediation_kind": finding.get("remediation", {}).get("kind"),
+            "detail": extra,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.debug("[SCRemediation] ora_learning skipped: %s", e)
+
+
+async def _apply_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply the real fix for an applicable finding (pip or yarn upgrade)."""
+    rem = finding.get("remediation", {})
+    kind = rem.get("kind")
+    if kind in ("pip_upgrade", "pip_upgrade_major"):
+        # major bump needs an explicit target — re-derive if missing
+        target = rem.get("target") or ""
+        if not target:
+            return {"success": False, "name": rem.get("name"), "error": "no target version"}
+        return await apply_pip_upgrade(rem["name"], rem.get("current", ""), target)
+    if kind == "yarn_upgrade":
+        # module name lives in the finding location: "frontend/package.json → <name>"
+        m = re.search(r"→\s*(\S+)", finding.get("location", ""))
+        if not m:
+            return {"success": False, "error": "could not parse package name"}
+        return await apply_yarn_upgrade(m.group(1))
+    return {"success": False, "error": f"no auto-applier for kind={kind}"}
+
+
+async def _council_autofix_one(finding: Dict[str, Any], lane: str) -> Dict[str, Any]:
+    """Council-gate + auto-apply one finding. No human in the loop."""
+    rem = finding.get("remediation", {})
+    kind = rem.get("kind")
+    applicable = kind in ("pip_upgrade", "pip_upgrade_major", "yarn_upgrade")
+
+    vote = await _council_vote(finding)
+    decision = {
+        "identifier": finding.get("identifier"), "kind": kind, "lane": lane,
+        "verdict": vote["verdict"], "confidence": vote["confidence"],
+        "applied_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if not vote["approved"]:
+        await _record_ora_learning(finding, "council_rejected", {"votes": vote["votes"]})
+        await _upsert_suggestion(finding, lane="needs_approval")  # human fallback
+        decision["outcome"] = "council_rejected"
+        return decision
+
+    if not applicable:
+        # Council approved but there is no safe automatic fix (secrets / SAST).
+        await _record_ora_learning(finding, "approved_no_auto_fix", {"reason": rem.get("reason")})
+        await _upsert_suggestion(finding, lane="manual_only")
+        decision["outcome"] = "approved_manual_required"
+        return decision
+
+    res = await _apply_finding(finding)
+    decision["outcome"] = "applied" if res.get("success") else "apply_failed"
+    decision["result"] = res
+    await _record_ora_learning(finding, decision["outcome"], res)
+    if not res.get("success"):
+        await _upsert_suggestion(finding, lane="needs_approval")  # human fallback on failure
+    if _db is not None:
+        try:
+            await _db["supply_chain_remediations"].insert_one({
+                "business_id": BUSINESS_ID, "tenant_id": TENANT_ID,
+                "kind": kind, "finding": finding.get("title"),
+                "identifier": finding.get("identifier"),
+                "verdict": vote["verdict"], "confidence": vote["confidence"],
+                "result": res, "auto": True, "via": "council",
+                "applied_at": decision["applied_at"],
+            })
+        except Exception:
+            pass
+    return decision
+
+
+async def run_council_autofix(max_apply: int = 40) -> Dict[str, Any]:
+    """MAX autofix — every remediable finding goes through the Council; approved
+    ones are applied for real. No human review. Caps real applies per cycle."""
+    if _db is None:
+        return {"status": "db_unavailable"}
+    snap = await _db["supply_chain_latest"].find_one({"business_id": BUSINESS_ID}, {"_id": 0})
+    findings = (snap or {}).get("findings", [])
+    if not findings:
+        return {"status": "no_findings"}
+
+    plan = build_plan(findings)
+    decisions: List[Dict[str, Any]] = []
+    applied = approved_manual = rejected = failed = 0
+    applies_used = 0
+
+    # Order: applicable lanes first (pip, then yarn), then manual for the record.
+    ordered = (
+        [(f, "auto_safe") for f in plan["auto_safe"]]
+        + [(f, "needs_approval") for f in plan["needs_approval"]]
+        + [(f, "manual_only") for f in plan["manual_only"]]
+    )
+    for finding, lane in ordered:
+        kind = finding.get("remediation", {}).get("kind")
+        applicable = kind in ("pip_upgrade", "pip_upgrade_major", "yarn_upgrade")
+        if applicable and applies_used >= max_apply:
+            await _upsert_suggestion(finding, lane="needs_approval")  # spillover → next cycle
+            continue
+        d = await _council_autofix_one(finding, lane)
+        decisions.append(d)
+        out = d.get("outcome")
+        if out == "applied":
+            applied += 1
+            applies_used += 1
+        elif out == "apply_failed":
+            failed += 1
+            applies_used += 1
+        elif out == "approved_manual_required":
+            approved_manual += 1
+        elif out == "council_rejected":
+            rejected += 1
+
+    summary = {
+        "status": "ok", "mode": "council_autofix",
+        "applied": applied, "apply_failed": failed,
+        "approved_manual_required": approved_manual,
+        "council_rejected": rejected,
+        "total_evaluated": len(decisions),
+        "ran_at": datetime.now(timezone.utc).isoformat(),
+    }
+    logger.info("[SCRemediation] COUNCIL-AUTOFIX — applied=%s failed=%s manual=%s rejected=%s",
+                applied, failed, approved_manual, rejected)
+    return summary
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -306,10 +537,19 @@ async def run_remediation(auto_apply: bool = False, max_auto: int = 10) -> Dict[
 
 
 async def remediate_after_scan() -> Dict[str, Any]:
-    """Hook called by the scanner after every sweep. Auto-applies only when
-    AUREM_SUPPLY_CHAIN_AUTOFIX=true; otherwise suggest-only."""
-    auto = os.environ.get("AUREM_SUPPLY_CHAIN_AUTOFIX", "").strip().lower() in ("1", "true", "yes")
+    """Hook called by the scanner after every sweep.
+
+    MAX-AUTOFIX (default): every remediable finding is routed through the ORA
+    Council (CASL + QA). Approved fixes auto-apply for real — NO human in the
+    loop. Set AUREM_SUPPLY_CHAIN_COUNCIL_AUTOFIX=false to fall back to the
+    suggest-only / env-gated pip path."""
+    council = os.environ.get(
+        "AUREM_SUPPLY_CHAIN_COUNCIL_AUTOFIX", "true"
+    ).strip().lower() in ("1", "true", "yes")
     try:
+        if council:
+            return await run_council_autofix()
+        auto = os.environ.get("AUREM_SUPPLY_CHAIN_AUTOFIX", "").strip().lower() in ("1", "true", "yes")
         return await run_remediation(auto_apply=auto)
     except Exception as e:  # noqa: BLE001
         logger.error("[SCRemediation] post-scan remediation failed: %s", e)

@@ -122,6 +122,27 @@ async def remediate(request: Request, auto_apply: bool = False) -> Dict[str, Any
     return {"status": "ok", "result": result}
 
 
+@router.post("/autofix")
+async def council_autofix(request: Request) -> Dict[str, Any]:
+    """MAX autofix — route every remediable finding through the ORA Council
+    (CASL + QA) and auto-apply approved pip/yarn upgrades for real. NO human.
+    Runs in the background (apply path can take minutes); poll /remediations."""
+    await _require_admin(request)
+    from services.supply_chain_remediation import run_council_autofix
+
+    async def _bg():
+        try:
+            await run_council_autofix()
+        except Exception as e:  # noqa: BLE001
+            logger.error("[supply-chain] council autofix failed: %s", e)
+
+    asyncio.create_task(_bg())
+    return {
+        "status": "started",
+        "message": "Council-gated autofix running in background. Poll /api/admin/supply-chain/remediations.",
+    }
+
+
 @router.get("/remediations")
 async def remediations(request: Request, limit: int = 50) -> Dict[str, Any]:
     await _require_admin(request)

@@ -17,7 +17,8 @@ Live: **[https://aurem.live](https://aurem.live)** · Preview: internal Emergent
 5. [Repository layout](#repository-layout)
 6. [Zero-mocks policy](#zero-mocks-policy)
 7. [Codebase Health (live analyzer)](#codebase-health-live-analyzer)
-8. [Zero-downtime deploys](#zero-downtime-deploys)
+8. [Autonomous Security & Supply-Chain Self-Healing](#autonomous-security--supply-chain-self-healing)
+9. [Zero-downtime deploys](#zero-downtime-deploys)
 9. [Tech stack](#tech-stack)
 10. [Third-party integrations](#third-party-integrations)
 11. [Quick start (developers)](#quick-start-developers)
@@ -41,7 +42,7 @@ You connect your business profile (dental clinic, salon, contractor, accountant,
 4. **Monitors their world** — uptime, SEO drift, Core Web Vitals, broken images, missing alt-text. Auto-repairs what it can.
 5. **Bills automatically** — Stripe-metered usage with live keys, trial drip, win-back campaigns.
 6. **Reports to you daily** — board-ready P&L, lead funnel, reply rates, voice call summaries — delivered as a morning brief.
-7. **Heals itself** — circuit breakers on every external integration, scheduled self-audits against the live aurem.live site, an "ORA Dev Console" where proposed code fixes await your one-click approval.
+7. **Heals itself** — circuit breakers on every external integration, scheduled self-audits against the live aurem.live site, **autonomous supply-chain security scanning (SAST + secrets + dependency CVEs) with Council-gated auto-fix — no human required**, plus an "ORA Dev Console" where riskier proposed code fixes await your one-click approval.
 
 **Zero mocks in production.** Every dashboard number is sourced from real database queries or live API calls. If an integration is missing, the system raises HTTP 503 with the exact missing env var, never returns fake numbers.
 
@@ -242,6 +243,82 @@ health score:    0.0 / 10   (brutally honest)
 The analyzer is intentionally harsh. It surfaces the next refactor without anyone having to discover it manually. Implementation: pure-Python AST + `radon` for cyclomatic complexity.
 
 ---
+## Autonomous Security & Supply-Chain Self-Healing
+
+AUREM dog-foods its own platform: it scans its **own** codebase and dependencies
+on the same 6-hour cadence it uses for customer sites, and — via the ORA Council
+— **fixes what it safely can without a human in the loop** (iter D-82 / D-82b).
+
+### What it scans (real tools, zero mocks)
+
+Five real scanners run concurrently inside the Pillar-3 worker
+(`services/supply_chain_scanner.py`), each shelling out to the genuine CLI and
+parsing its real JSON output:
+
+| Layer | Tool | What it catches |
+|---|---|---|
+| **SAST** (static code) | `bandit` | `eval`, unsafe temp files, weak crypto, injection smells |
+| **Secret scanning** | `detect-secrets` (+ `trufflehog` when present) | API keys / tokens / credentials committed to source |
+| **SCA — Python deps** | `pip-audit` | Known CVEs in `backend/requirements.txt` |
+| **SCA — JS deps** | `yarn audit` | Known CVEs in `frontend/package.json` |
+
+Findings are normalised into one schema, scored into a **posture score**, and
+persisted per-tenant (`business_id="aurem_self"`) in `supply_chain_scans`
+(history) + `supply_chain_latest` (snapshot). A `notifications` row is raised
+whenever critical/high counts regress.
+
+**Baseline sweep (first run):** 285 real findings across all five tools
+(1 critical, 210 high, 69 medium) — score `0/10`, brutally honest. These are
+mostly outdated CVE-laden dependencies, now being auto-upgraded each cycle.
+
+### How it fixes — ORA Council, no human required
+
+Every finding is routed through the existing **ORA Council** (CASL + QA required
+voters, security advisory) — the same trust-but-verify engine Sentinel uses for
+runtime errors. Approved remediations are applied **for real, automatically**:
+
+- **`pip` upgrades** (any severity once Council-approved): backup
+  `requirements.txt` → real `pip install` → smoke-import → rewrite pin →
+  **rollback on any failure**. Proven live: 40 CVEs auto-upgraded in one cycle
+  (e.g. `2.10.0 → 2.13.0`), backend stayed healthy throughout.
+- **`yarn` upgrades**: backup `package.json` + `yarn.lock` → `yarn upgrade` →
+  frozen-lockfile install validation → rollback on failure.
+- **Secrets & SAST**: Council-logged but **never auto-rewritten** — a secret must
+  be rotated at the provider, and auto-editing source is unsafe. These surface in
+  the Sentinel `repair_suggestions` queue, flagged `manual_only`.
+
+Each decision is logged to `supply_chain_remediations` and learned by the ORA
+brain (`ora_brain_thoughts`). Council-gated autofix is **on by default**; set
+`AUREM_SUPPLY_CHAIN_COUNCIL_AUTOFIX=false` to fall back to suggest-only.
+
+### Relationship to Sentinel
+
+Sentinel (`services/sentinel_repair_loop.py`) is **reactive** — it heals runtime
+errors (frontend JS exceptions, backend log crashes) after they happen. The
+supply-chain scanner is **proactive** — it closes vulnerabilities before they're
+exploited. Both now share one umbrella: supply-chain findings flow into the same
+`repair_suggestions` queue and the same Council, so the admin Sentinel overview
+counts and reviews them too.
+
+### Endpoints (admin-only)
+
+```
+GET  /api/admin/supply-chain/latest          — current posture snapshot + findings
+GET  /api/admin/supply-chain/history         — recent sweep summaries
+POST /api/admin/supply-chain/scan            — trigger a sweep (background)
+POST /api/admin/supply-chain/autofix         — Council-gated auto-apply (background, no human)
+POST /api/admin/supply-chain/remediate       — plan only / suggest-only (auto_apply=false)
+GET  /api/admin/supply-chain/remediations    — applied-fix audit log
+```
+
+**Coverage gaps (honest, on the roadmap):** deep SAST (`Semgrep`/`CodeQL`),
+DAST against the live app (`ZAP`/`Nuclei`), PII discovery for Law 25
+(`Presidio`), container/IaC scanning (`Trivy`/`Checkov`), and an automated
+`yarn build` gate before frontend upgrades go live.
+
+---
+
+
 
 ## Zero-downtime deploys
 
@@ -427,7 +504,9 @@ Docs: `memory/PUBLIC_API_USAGE.md`.
 | D-69 | sidebar dedupe round 2 | 5 |
 | D-70 | live codebase health analyzer | 10 |
 | Misc | health chip signal | 3 |
-| | **Combined** | **95/95 PASS** |
+| D-82 | autonomous supply-chain scanner (bandit + detect-secrets + pip-audit + yarn-audit) | 4 |
+| D-82b | Council-gated remediation planner + version-safety + lanes | 4 |
+| | **Combined** | **103/103 PASS** |
 
 ---
 
