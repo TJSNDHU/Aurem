@@ -83,3 +83,6 @@ Thumbs.db
 # Secrets — never commit (iter D-82c)
 .jwt_secret
 *.scbak
+.env
+.env.*
+*.env
