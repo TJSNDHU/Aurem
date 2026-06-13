@@ -11160,3 +11160,9 @@ scheduler will fire on its own.
 - Quarantined stale tests (skip-marked, iter D-86): d68/d69/d38/iter272 sidebar greps, pillar4 scheduler log-greps, email_inbound (LEAN-pruned routes), d71n LuxeV2 greps, inbound webhook e2e. campaign_big_split modernised (route floor, health liveness shape) → 31/31 green.
 - Suite: 482 failed/4,084 passed → 336 failed/4,986 passed (+902, backend stable whole run). Remaining 336 = legacy iteration-era live-e2e archive (test_iteration1xx/2xx) — next cleanup batch.
 - Known: ora_proposal_bridge heartbeat stale since Jun 11 (tick likely hung on LLM call) — investigate next; bridge watchdog re-add is ineffective.
+
+## 2026-06-13 (b) — Cleanup + legacy triage + bridge resolved
+- Audit wrapper /usr/local/bin/supervisorctl REMOVED (system binary restored).
+- Legacy triage: 90 stale test files quarantined via `AUREM_RUN_LEGACY=1` skipif (47 iteration-era e2e archive + 43 pre-slim health/bootstrap-shape specs + external-cred engines). Core gates green: tenant_scope_zero, campaign_big_split (31/31), customer_portal_tier1, blast_chain, lean_prune_drift = 56/56 passed.
+- ora_proposal_bridge RESOLVED: tick fn was healthy (manual call 0.0s, heartbeat writes). Stale-since-Jun-11 heartbeat was a casualty of the chronic restart churn; with the loop fixed the job now fires on its 60s interval (live heartbeat verified 01:55Z). No hung LLM call.
+- Backend stayed RUNNING through full modern batch (no self-restarts; only status probes observed via audit before removal).

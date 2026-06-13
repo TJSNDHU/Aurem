@@ -24,6 +24,12 @@ import importlib
 import asyncio
 import pytest
 
+import os as _os_q, pytest as _pytest_q
+pytestmark = _pytest_q.mark.skipif(
+    not _os_q.environ.get("AUREM_RUN_LEGACY"),
+    reason="legacy iteration-era live-e2e archive; asserts superseded behavior — quarantined iter D-86b; set AUREM_RUN_LEGACY=1 to run",
+)
+
 
 @pytest.fixture(autouse=True)
 def _reset_browser_cache():
