@@ -344,6 +344,36 @@ async def apply_known_fix(fix_name: str, fix_data: dict, error_text: str) -> dic
         
         if fix_type == 'restart_service':
             service = fix_data['service']
+            # iter D-86: only restart when the service is ACTUALLY unhealthy.
+            # Error logs keep "Connection refused" lines from the PREVIOUS
+            # restart for 15 min, so blindly restarting here created an
+            # infinite restart loop (restart → refused-lines → restart ...).
+            if service == 'backend':
+                try:
+                    async with httpx.AsyncClient(timeout=8.0) as _c:
+                        _r = await _c.get('http://localhost:8001/api/health')
+                    if _r.status_code == 200:
+                        return {
+                            'success': True,
+                            'action': "Skipped restart — backend is healthy "
+                                      "(stale error line from a previous restart)",
+                        }
+                except Exception:
+                    pass  # genuinely unreachable → proceed with restart
+            else:
+                try:
+                    _st = subprocess.run(
+                        ['sudo', 'supervisorctl', 'status', service],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    if 'RUNNING' in (_st.stdout or ''):
+                        return {
+                            'success': True,
+                            'action': f"Skipped restart — {service} is RUNNING "
+                                      "(stale error line)",
+                        }
+                except Exception:
+                    pass
             result = subprocess.run(
                 ['sudo', 'supervisorctl', 'restart', service],
                 capture_output=True, text=True, timeout=30
@@ -560,10 +590,23 @@ Return ONLY valid JSON, no other text."""
             
             if auto_apply:
                 if fix.get('fix_type') == 'restart':
-                    subprocess.run(
-                        ['sudo', 'supervisorctl', 'restart', 'backend'],
-                        capture_output=True, timeout=30
-                    )
+                    # iter D-86: never blind-restart a healthy backend —
+                    # recurring external-API errors (Twilio 401 etc.) made
+                    # the AI prescribe "restart" every cycle, a chronic
+                    # self-DoS. Restart only when health is actually down.
+                    _healthy = False
+                    try:
+                        async with httpx.AsyncClient(timeout=8.0) as _c:
+                            _healthy = (await _c.get(
+                                'http://localhost:8001/api/health'
+                            )).status_code == 200
+                    except Exception:
+                        _healthy = False
+                    if not _healthy:
+                        subprocess.run(
+                            ['sudo', 'supervisorctl', 'restart', 'backend'],
+                            capture_output=True, timeout=30
+                        )
                 actions.append({
                     'auto_applied': True,
                     'fix': fix.get('fix_command', ''),

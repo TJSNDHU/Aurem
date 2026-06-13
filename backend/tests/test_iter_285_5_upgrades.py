@@ -8,6 +8,8 @@ Validates:
 """
 from __future__ import annotations
 
+import os
+
 import asyncio
 import time
 from datetime import datetime, timedelta, timezone
@@ -22,7 +24,7 @@ BACKEND_URL = "http://localhost:8001"
 A2A_AUDIT = REPO / "backend" / "routers" / "a2a_audit_router.py"
 
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 def _env():

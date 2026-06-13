@@ -27,7 +27,7 @@ import os
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 TEST_EMAIL = "teji.ss1986@gmail.com"
-TEST_PASSWORD = "<REDACTED>"
+TEST_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")

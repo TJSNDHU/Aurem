@@ -19,7 +19,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 TEST_SITE_ID = "9f9729949b5743"
 TEST_SLUG = "spadina-auto-9f9729"
 

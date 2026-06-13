@@ -69,7 +69,7 @@ class TestShopifyPulseScanner:
         """Get authentication token"""
         response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"}
+            json={"email": "teji.ss1986@gmail.com", "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")}
         )
         if response.status_code == 200:
             return response.json().get("token")
@@ -160,7 +160,7 @@ class TestShopifyCheckoutWebhook:
         """Get authentication token"""
         response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"}
+            json={"email": "teji.ss1986@gmail.com", "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")}
         )
         if response.status_code == 200:
             return response.json().get("token")

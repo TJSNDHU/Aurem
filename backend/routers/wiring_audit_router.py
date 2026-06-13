@@ -64,65 +64,65 @@ ADMIN_CHECKLIST = [
     # ── 1 · BOARDROOM ──────────────────────────────────────────────────
     ("Boardroom KPIs",            "/admin/boardroom",        "/api/admin/financials/hst-summary",        "BoardroomPage.jsx"),
     ("Morning brief history",     "/admin/morning-brief",    "/api/brief/history",                       "MorningBriefMobile.jsx"),
-    ("Founder saves",             "/admin/founder-saves",    "/api/admin/founder-saves",                 "FounderSaves.jsx"),
+    ("Founder saves",             "/admin/founder-saves",    "/api/admin/founder-saves/summary",                 "FounderSaves.jsx"),
     ("Daily log",                 "/admin/daily-log",        "/api/admin/daily-log",                     "AdminDailyLog.jsx"),
 
     # ── 2 · MISSION CONTROL ────────────────────────────────────────────
     ("Mission Control dashboard", "/admin/mission-control",  "/api/admin/mission-control/dashboard",     "AdminMissionControl.jsx"),
     ("Campaign command",          "/admin/campaign-command", "/api/lifecycle/pipeline",                  "CampaignCommandDashboard.jsx"),
-    ("Campaign health",           "/admin/campaign-health",  "/api/campaign-health/summary",             "CampaignHealthPage.jsx"),
-    ("Leads mining",              "/admin/leads-mining",     "/api/scout/status",                        "AdminLeadsMining.jsx"),
-    ("Apollo cost",               "/admin/apollo-cost",      "/api/apollo/cost/summary",                 "AdminApolloCostPage.jsx"),
+    ("Campaign health",           "/admin/campaign-health",  "/api/admin/campaign/health",             "CampaignHealthPage.jsx"),
+    ("Leads mining",              "/admin/leads-mining",     "/api/admin/platform/campaign-leads",       "AdminLeadsMining.jsx"),
+    ("Apollo cost",               "/admin/apollo-cost",      "/api/admin/apollo-cost/summary",                 "AdminApolloCostPage.jsx"),
 
     # ── 3 · CUSTOMERS ──────────────────────────────────────────────────
-    ("Customer health panel",     "/admin/customer-health",  "/api/admin/customer-health",               "CustomerHealthPanel.jsx"),
-    ("Impersonation log",         "/admin/impersonation-log","/api/admin/impersonation-log",             "AdminImpersonationLog.jsx"),
-    ("Plan manager",              "/admin/plans",            "/api/admin/plans",                         "AdminPlanManager.jsx"),
+    ("Customer health panel",     "/admin/customer-health",  "/api/admin/customer-health/bin-detail/AUR-FNDR-001",               "CustomerHealthPanel.jsx"),
+    ("Impersonation log",         "/admin/impersonation-log","/api/admin/customer-360/actions/impersonation-log",             "AdminImpersonationLog.jsx"),
+    ("Plan manager",              "/admin/plans",            "/api/admin/plans/all",                         "AdminPlanManager.jsx"),
 
     # ── 4 · ORA ────────────────────────────────────────────────────────
     ("ORA unified (chat/cockpit)","/admin/ora",              "/api/ora/pipeline/status",                 "OraAdminUnified.jsx"),
     ("Council audit",             "/admin/council-audit",    "/api/admin/council/health",                "CouncilAuditPage.jsx"),
-    ("Brain",                     "/admin/brain",            "/api/brain/status",                        "AdminBrainPage.jsx"),
-    ("Watchdog",                  "/admin/ora-watchdog",     "/api/ora/watchdog/status",                 "OraWatchdogCockpit.jsx"),
+    ("Brain",                     "/admin/brain",            "/api/brain/health",                        "AdminBrainPage.jsx"),
+    ("Watchdog",                  "/admin/ora-watchdog",     "/api/qa/watchdog/status",                 "OraWatchdogCockpit.jsx"),
     ("Skills marketplace",        "/admin/ora-skills",       "/api/admin/ora/skills",                  "SkillsMarketplace.jsx"),
 
     # ── 5 · SENTINEL & SELF-REPAIR ─────────────────────────────────────
-    ("Sentinel diagnostics",      "/admin/sentinel",         "/api/admin/sentinel/status",               "AdminDiagnostics.jsx"),
+    ("Sentinel diagnostics",      "/admin/sentinel",         "/api/admin/sentinel/overview",               "AdminDiagnostics.jsx"),
     ("Self-repair",               "/admin/self-repair",      "/api/admin/autonomous-repair/stats",       "AdminSelfRepair.jsx"),
-    ("Stem fix",                  "/admin/stem-fix",         "/api/stem-fix/status",                     "AdminStemFix.jsx"),
+    ("Stem fix",                  "/admin/stem-fix",         "/api/admin/stem-fix/health",                     "AdminStemFix.jsx"),
     ("Incident ledger",           "/admin/incident-ledger",  "/api/incidents/list",                      "IncidentLedger.jsx"),
-    ("Git commit gate",           "/admin/git-gate",         "/api/git-gate/pending",                    "GitCommitGate.jsx"),
+    ("Git commit gate",           "/admin/git-gate",         "/api/admin/git-gate/summary",                    "GitCommitGate.jsx"),
     ("Vanguard",                  "/admin/vanguard",         "/api/admin/ora/vanguard-status",                     "AdminVanguard.jsx"),
     ("Supply-Chain posture",      "/admin/supply-chain",     "/api/admin/supply-chain/remediations",     "AdminSupplyChain.jsx"),
 
     # ── 6 · SYSTEM HEALTH ──────────────────────────────────────────────
     ("System overview",           "/admin/system-overview",  "/api/admin/system-audit/health",           "SystemOverview.jsx"),
     ("System pulse live",         "/admin/system-pulse-live","/api/admin/system-pulse-live",             "SystemPulseLive.jsx"),
-    ("Codebase health",           "/admin/codebase-health",  "/api/codebase-health/latest",              "AdminCodebaseHealth.jsx"),
-    ("Wiring audit",              "/admin/wiring-audit",     "/api/admin/wiring-audit",                  "AdminWiringAudit.jsx"),
-    ("Site monitor",              "/admin/site-monitor",     "/api/admin/site-monitor/summary",          "AdminSiteMonitor.jsx"),
+    ("Codebase health",           "/admin/codebase-health",  "/api/admin/codebase-health/latest",              "AdminCodebaseHealth.jsx"),
+    ("Wiring audit",              "/admin/wiring-audit",     "/api/admin/wiring-audit/health",                  "AdminWiringAudit.jsx"),
+    ("Site monitor",              "/admin/site-monitor",     "/api/admin/site-monitor/overview",          "AdminSiteMonitor.jsx"),
     ("Pillars map",               "/admin/pillars-map",      "/api/pillars/health",                      "AdminPillarsMap.jsx"),
     ("System audit",              "/admin/system-audit",     "/api/admin/system-audit/health",           "AdminSystemAudit.jsx"),
-    ("Control center",            "/admin/control-center",   "/api/admin/control-center/status",         "AdminControlCenter.jsx"),
+    ("Control center",            "/admin/control-center",   "/api/admin/anomaly/status",         "AdminControlCenter.jsx"),
     ("BugCatch reports",          "/admin/bug-reports",      "/api/admin/bug-reports",                   "AdminBugReports.jsx"),
 
     # ── 7 · REVENUE ────────────────────────────────────────────────────
-    ("Analytics",                 "/admin/analytics",        "/api/owner/analytics/dashboard",           "AnalyticsDashboard.jsx"),
-    ("Sovereignty score",         "/admin/sovereignty-score","/api/admin/sovereignty-score",             "AdminSovereigntyScore.jsx"),
+    ("Analytics",                 "/admin/analytics",        "/api/admin/analytics/insights",           "AnalyticsDashboard.jsx"),
+    ("Sovereignty score",         "/admin/sovereignty-score","/api/admin/sovereignty/score",             "AdminSovereigntyScore.jsx"),
 
     # ── 8 · SECURITY & ACCESS ──────────────────────────────────────────
     ("Security keys",             "/admin/security-keys",    "/api/admin/security-keys",                 "AdminSecurityKeys.jsx"),
     ("API keys",                  "/admin/api-keys",         "/api/aurem-keys/scope-bundles",            "AdminApiKeysPage.jsx"),
     ("Business IDs",              "/admin/business-ids",     "/api/bin-auth/admin/search?q=rst",         "AdminBusinessIds.jsx"),
-    ("SSOT",                      "/admin/ssot",             "/api/admin/ssot/status",                   "AdminSSOT.jsx"),
-    ("Developer signups",         "/admin/developer-signups","/api/admin/developer-signups",             "AdminDeveloperSignups.jsx"),
+    ("SSOT",                      "/admin/ssot",             "/api/admin/ssot/config",                   "AdminSSOT.jsx"),
+    ("Developer signups",         "/admin/developer-signups","/api/admin/developers",             "AdminDeveloperSignups.jsx"),
     ("Integrations",              "/admin/integrations",     "/api/admin/integrations/health",           "AdminIntegrations.jsx"),
 
     # ── 9 · LABS (collapsed) ───────────────────────────────────────────
     ("Evolver",                   "/admin/evolver",          "/api/admin/evolver/status",                "AdminEvolver.jsx"),
-    ("Brain graph",               "/admin/brain-graph",      "/api/brain/graph",                         "AdminBrainGraph.jsx"),
-    ("Browser agent",             "/admin/browser-agent",    "/api/browser-agent/status",                "AdminBrowserAgent.jsx"),
-    ("Design extract",            "/admin/design-extract",   "/api/design-extract/status",               "DesignExtractStudio.jsx"),
+    ("Brain graph",               "/admin/brain-graph",      "/api/graphify/stats",                         "AdminBrainGraph.jsx"),
+    ("Browser agent",             "/admin/browser-agent",    "/api/browser-agent/capabilities",                "AdminBrowserAgent.jsx"),
+    ("Design extract",            "/admin/design-extract",   "/api/admin/design-extract/summary",               "DesignExtractStudio.jsx"),
 ]
 
 CUSTOMER_CHECKLIST = [

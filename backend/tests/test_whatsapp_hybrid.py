@@ -24,7 +24,7 @@ TEST_PHONE = "16134000000"
 
 # Test credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 class TestWhatsAppHybridSetup:

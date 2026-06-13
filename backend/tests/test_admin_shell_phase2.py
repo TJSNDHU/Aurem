@@ -16,7 +16,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials from /app/memory/test_credentials.md
 FOUNDER_EMAIL = "teji.ss1986@gmail.com"
-FOUNDER_PASSWORD = "<REDACTED>"
+FOUNDER_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 class TestAdminAuth:

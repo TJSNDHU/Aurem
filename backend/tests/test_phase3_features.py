@@ -17,7 +17,7 @@ def get_admin_token():
     """Get admin token for authenticated requests"""
     login_resp = requests.post(
         f"{BASE_URL}/api/platform/auth/login",
-        json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"}
+        json={"email": "teji.ss1986@gmail.com", "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")}
     )
     if login_resp.status_code == 200:
         return login_resp.json().get("token", "")

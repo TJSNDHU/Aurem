@@ -19,7 +19,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 REROOTS_EMAIL = "pawandeep19may1985@gmail.com"
 REROOTS_PASSWORD = "ReRoots2026!"
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 TESTBIN_EMAIL = "testbin@aurem.live"
 TESTBIN_PASSWORD = "TempPass123!"
 

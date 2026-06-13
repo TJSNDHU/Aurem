@@ -19,7 +19,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
 # Test credentials from test_credentials.md
 TEST_EMAIL = "teji.ss1986@gmail.com"
-TEST_PASSWORD = "<REDACTED>"
+TEST_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 KNOWN_BIN_ID = "BIN-3bc7b8e7-059-E8D9FB"
 
 

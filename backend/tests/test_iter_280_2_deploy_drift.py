@@ -33,7 +33,7 @@ EXPECTED_KEYS = {
 def _admin_token():
     r = httpx.post(
         f"{API_BASE}/api/auth/login",
-        json={"email": "teji.ss1986@gmail.com", "password": "<REDACTED>"},
+        json={"email": "teji.ss1986@gmail.com", "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")},
         timeout=10,
     )
     r.raise_for_status()

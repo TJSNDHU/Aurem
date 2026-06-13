@@ -20,7 +20,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://ai-platform-preview-
 CLIENT_EMAIL = "futuristic_test@aurem-preview.com"
 CLIENT_PASSWORD = "FutureTest123!"
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 class TestHealthAndPublicEndpoints:

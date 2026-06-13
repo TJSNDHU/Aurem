@@ -21,7 +21,7 @@ if not BASE_URL:
 
 # Test credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 CUSTOMER_EMAIL = "pawandeep19may1985@gmail.com"
 CUSTOMER_PASSWORD = "ReRoots2026!"
 

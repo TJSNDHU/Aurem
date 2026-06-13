@@ -10,6 +10,8 @@ Validates:
 """
 from __future__ import annotations
 
+import os
+
 import asyncio
 import time
 from pathlib import Path
@@ -22,7 +24,7 @@ REPO = Path(__file__).resolve().parents[2]
 BACKEND_URL = "http://localhost:8001"
 
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 def _env():

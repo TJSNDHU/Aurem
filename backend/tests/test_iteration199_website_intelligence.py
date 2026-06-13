@@ -21,7 +21,7 @@ if not BASE_URL:
 
 # Test credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 BIN_USER_EMAIL = "testbin@aurem.live"
 BIN_USER_PASSWORD = "TempPass123!"
 

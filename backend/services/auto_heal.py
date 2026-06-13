@@ -71,6 +71,12 @@ FRONTEND_URL = os.environ.get("SITE_URL", "http://localhost:3000")
 # External URL for response time monitoring (Emergent credits proxy)
 EXTERNAL_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://aurem.live")
 
+# iter D-86 — consecutive backend health-check failures (see check_backend_health)
+_backend_fail_streak = 0
+# iter D-86 — missing-scheduler restart guard (see check_schedulers)
+_sched_fail_streak = 0
+_last_sched_restart_ts = 0.0
+
 # Expected scheduler job names (the 7 background tasks we start)
 EXPECTED_SCHEDULERS = [
     "daily_digest_scheduler",
@@ -136,9 +142,15 @@ async def check_backend_health() -> Dict[str, Any]:
     """
     Check 1: Backend health check
     GET /api/health - if not {"status":"ok"}, restart FastAPI
+
+    iter D-86: requires 3 CONSECUTIVE failures before restarting. A single
+    slow probe (heavy pytest run, hot-reload, wiring-audit) used to make
+    the backend kill itself, which then raced the external aurem-watchdog
+    and left the process stopped.
     """
     check_name = "backend_health"
-    
+    global _backend_fail_streak
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(f"{BACKEND_URL}/api/health")
@@ -146,9 +158,16 @@ async def check_backend_health() -> Dict[str, Any]:
             if response.status_code == 200:
                 data = response.json()
                 if data.get("status") == "ok":
+                    _backend_fail_streak = 0
                     return {"check": check_name, "status": "healthy", "action_taken": None}
             
             # Health check failed - attempt restart
+            _backend_fail_streak += 1
+            if _backend_fail_streak < 3:
+                return {"check": check_name, "status": "degraded",
+                        "action_taken": None,
+                        "note": f"fail streak {_backend_fail_streak}/3 — restart deferred"}
+            _backend_fail_streak = 0
             issue = f"Backend health check failed: status={response.status_code}"
             action = "Attempted supervisorctl restart of backend"
             
@@ -176,6 +195,11 @@ async def check_backend_health() -> Dict[str, Any]:
                 return {"check": check_name, "status": "attempted", "issue": issue, "error": str(restart_error)}
                 
     except httpx.ConnectError:
+        _backend_fail_streak += 1
+        if _backend_fail_streak < 3:
+            return {"check": check_name, "status": "degraded", "action_taken": None,
+                    "note": f"connect fail streak {_backend_fail_streak}/3 — restart deferred"}
+        _backend_fail_streak = 0
         issue = "Backend connection refused - service may be down"
         action = "Attempted supervisorctl restart of backend"
         
@@ -390,9 +414,28 @@ async def check_scheduler_jobs() -> Dict[str, Any]:
         # Some schedulers are missing
         issue = f"Missing schedulers: {', '.join(missing_schedulers)}"
         action = "Attempted backend restart to re-register schedulers"
-        
+
         logger.warning(f"[AUTO_HEAL] {issue}")
-        
+
+        # iter D-86: restart is a LAST resort with streak + cooldown.
+        # Scheduler scans right after a boot legitimately miss late-registering
+        # jobs; blind restarts here created a chronic restart loop (the restart
+        # itself resets the scan, which misses again, which restarts again...).
+        global _sched_fail_streak, _last_sched_restart_ts
+        _sched_fail_streak += 1
+        now_ts = datetime.now(timezone.utc).timestamp()
+        if _sched_fail_streak < 3 or (now_ts - _last_sched_restart_ts) < 1800:
+            return {
+                "check": check_name,
+                "status": "degraded",
+                "issue": issue,
+                "missing_schedulers": missing_schedulers,
+                "action_taken": None,
+                "note": f"streak {_sched_fail_streak}/3, cooldown 30min — restart deferred",
+            }
+        _sched_fail_streak = 0
+        _last_sched_restart_ts = now_ts
+
         # Try to restart backend to re-register schedulers (no sudo in Emergent)
         try:
             result = await _run_supervisor("supervisorctl", "restart", "backend")

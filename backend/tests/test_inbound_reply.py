@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import pytest
 import uuid
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -197,6 +198,7 @@ def test_ensure_inbound_indexes_creates():
 
 
 # ── webhook E2E (FastAPI) ────────────────────────────────────────────
+@pytest.mark.skip(reason="stale — POST /api/email/inbound LEAN-pruned (iter D-86 quarantine)")
 def test_webhook_endpoint_e2e():
     """Round-trip POST /api/email/inbound."""
     from fastapi import FastAPI

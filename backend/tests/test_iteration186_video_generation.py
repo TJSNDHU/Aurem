@@ -21,7 +21,7 @@ if not BASE_URL:
 
 # Test credentials
 TEST_EMAIL = "teji.ss1986@gmail.com"
-TEST_PASSWORD = "<REDACTED>"
+TEST_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 
 
 class TestVideoGenerationAuth:

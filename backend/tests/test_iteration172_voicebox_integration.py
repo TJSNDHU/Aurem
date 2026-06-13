@@ -79,7 +79,7 @@ def auth_token():
         f"{BASE_URL}/api/auth/login",
         json={
             "email": "teji.ss1986@gmail.com",
-            "password": "<REDACTED>"
+            "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")
         }
     )
     assert response.status_code == 200, f"Login failed: {response.text}"
@@ -356,7 +356,7 @@ class TestBackendHealth:
             f"{BASE_URL}/api/auth/login",
             json={
                 "email": "teji.ss1986@gmail.com",
-                "password": "<REDACTED>"
+                "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")
             }
         )
         assert response.status_code == 200, f"Login failed: {response.text}"

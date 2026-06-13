@@ -30,7 +30,7 @@ def customer_jwt(session):
     """Get JWT for customer account (teji.ss1986@gmail.com)"""
     resp = session.post(f"{BASE_URL}/api/auth/login", json={
         "email": "teji.ss1986@gmail.com",
-        "password": "<REDACTED_SEE_test_credentials.md>"
+        "password": os.environ.get("AUREM_ADMIN_PASSWORD", "")
     })
     if resp.status_code == 200:
         data = resp.json()

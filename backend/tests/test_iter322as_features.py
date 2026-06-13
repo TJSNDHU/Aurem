@@ -12,9 +12,9 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://ai-platform-preview-
 
 # Test credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED_SEE_test_credentials.md>"
+ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 CUSTOMER_EMAIL = "teji.ss1986+dogfood@gmail.com"
-CUSTOMER_PASSWORD = "<REDACTED>"
+CUSTOMER_PASSWORD = os.environ.get("AUREM_CUSTOMER_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")

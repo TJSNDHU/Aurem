@@ -29,7 +29,7 @@ def get_cached_auth_token():
         return _cached_token
     
     admin_email = "teji.ss1986@gmail.com"
-    admin_password = "<REDACTED>"
+    admin_password = os.environ.get("AUREM_ADMIN_PASSWORD", "")
     
     # Retry with backoff for rate limiting
     for attempt in range(3):

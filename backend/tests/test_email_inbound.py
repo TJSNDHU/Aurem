@@ -6,6 +6,9 @@ import os
 import pytest
 import httpx
 
+import pytest
+pytestmark = pytest.mark.skip(reason="stale — POST /api/email/inbound + /health were LEAN-pruned; canonical flow lives in email_inbound_router tests — quarantined iter D-86; delete or rewrite when feature re-stabilises")
+
 API_URL = os.environ.get("REACT_APP_BACKEND_URL") or "http://localhost:8001"
 
 

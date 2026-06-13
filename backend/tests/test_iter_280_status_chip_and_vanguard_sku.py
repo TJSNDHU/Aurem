@@ -27,7 +27,7 @@ BACKEND_URL = os.environ.get(
 API = f"{BACKEND_URL.rstrip('/')}/api"
 
 TEST_ADMIN_EMAIL = "teji.ss1986@gmail.com"
-TEST_ADMIN_PASSWORD = "<REDACTED>"
+TEST_ADMIN_PASSWORD = os.environ.get("AUREM_ADMIN_PASSWORD", "")
 TEST_PLATFORM_EMAIL = "futuristic_test@aurem-preview.com"
 TEST_PLATFORM_PASSWORD = "FutureTest123!"
 
