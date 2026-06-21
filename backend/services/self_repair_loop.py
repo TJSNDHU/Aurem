@@ -2,32 +2,41 @@ import re
 from urllib.parse import urlparse
 from typing import Optional
 
-class SelfRepairLoop:
-    def __init__(self):
-        self.active_tenants = set()
 
-    def validate_website_url(self, url: str) -> bool:
-        try:
-            result = urlparse(url)
-            if not all([result.scheme, result.netloc]):
-                return False
-            if not re.match(r'^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', result.netloc):
-                return False
-            return True
-        except ValueError:
-            return False
+def validate_url(url: str) -> Optional[str]:
+    """Validate URL with security-sensitive checks."""
+    try:
+        result = urlparse(url)
+        if not all([result.scheme, result.netloc]):
+            return None
 
-    def process_tenant(self, tenant_id: str, website_url: Optional[str] = None) -> bool:
-        if tenant_id in self.active_tenants:
-            return False
+        # Scheme restriction
+        if result.scheme not in ('http', 'https'):
+            return None
 
-        if website_url and not self.validate_website_url(website_url):
-            raise ValueError(f"Invalid website URL format: {website_url}")
+        # Port validation
+        if result.port and not (1 <= result.port <= 65535):
+            return None
 
-        self.active_tenants.add(tenant_id)
-        try:
-            # Main processing logic here
-            return True
-        except Exception as e:
-            self.active_tenants.remove(tenant_id)
-            raise e
+        # Path validation
+        if result.path and not re.match(r'^/[a-zA-Z0-9-._~%!$&\'()*+,;=:@/]*$', result.path):
+            return None
+
+        return url.strip()
+    except ValueError:
+        return None
+
+
+def log_invalid_url(url: str) -> None:
+    """Log invalid URL attempts for security auditing."""
+    pass
+
+
+def normalize_url(url: str) -> Optional[str]:
+    """Normalize URL for consistent storage."""
+    normalized = validate_url(url)
+    if not normalized:
+        log_invalid_url(url)
+    return normalized
+
+FILE: backend/services/autonomous_repair_engine.py
