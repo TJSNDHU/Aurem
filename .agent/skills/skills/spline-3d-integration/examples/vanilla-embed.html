@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <!--
   vanilla-embed.html
   Minimal production-ready Spline embed — vanilla HTML/JS
@@ -6,17 +7,14 @@
 -->
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spline Background</title>
-
-  <!-- Preload scene for faster perceived load -->
-  <link rel="preload" href="https://prod.spline.design/REPLACE_ME/scene.splinecode" as="fetch" crossorigin>
-
-  <!-- Load Spline viewer web component -->
-  <script type="module" src="https://unpkg.com/@splinetool/viewer/build/spline-viewer.js"></script>
-
-  <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spline Background</title>
+<!-- Preload scene for faster perceived load -->
+<link as="fetch" crossorigin="" href="https://prod.spline.design/REPLACE_ME/scene.splinecode" rel="preload"/>
+<!-- Load Spline viewer web component -->
+<script src="https://unpkg.com/@splinetool/viewer/build/spline-viewer.js" type="module"></script>
+<style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -76,31 +74,27 @@
       display: block;
     }
   </style>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
-
-  <!-- Fallback (always rendered — hidden by JS once Spline loads) -->
-  <div class="spline-fallback" id="spline-fallback"></div>
-
-  <!-- Spline background (hidden until loaded) -->
-  <div class="spline-bg" id="spline-bg">
-    <spline-viewer
-      id="spline-viewer"
-      url="https://prod.spline.design/REPLACE_ME/scene.splinecode"
-      events-target="global">
-      <!--
+<!-- Fallback (always rendered — hidden by JS once Spline loads) -->
+<div class="spline-fallback" id="spline-fallback"></div>
+<!-- Spline background (hidden until loaded) -->
+<div class="spline-bg" id="spline-bg">
+<spline-viewer events-target="global" id="spline-viewer" url="https://prod.spline.design/REPLACE_ME/scene.splinecode">
+<!--
         events-target="global" = scene responds to mouse movements anywhere on page
         Remove it if you only want interaction when hovering directly on the scene
       -->
-    </spline-viewer>
-  </div>
-
-  <!-- Your page content -->
-  <div class="content">
-    <h1 style="color: white; padding: 40px;">Your Content Here</h1>
-  </div>
-
-  <script>
+</spline-viewer>
+</div>
+<!-- Your page content -->
+<div class="content">
+<h1 style="color: white; padding: 40px;">Your Content Here</h1>
+</div>
+<script>
     const splineBg = document.getElementById('spline-bg');
     const splineFallback = document.getElementById('spline-fallback');
     const splineViewer = document.getElementById('spline-viewer');
@@ -141,6 +135,5 @@
       });
     }
   </script>
-
 </body>
 </html>

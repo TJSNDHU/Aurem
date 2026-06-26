@@ -1,68 +1,66 @@
 <!DOCTYPE html>
+
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AUREM Lead Scraper</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>AUREM Lead Scraper</title>
+<link href="styles.css" rel="stylesheet"/>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
-  <div id="app">
-    <!-- Header -->
-    <div class="header">
-      <div class="logo-row">
-        <div class="logo-icon">A</div>
-        <div>
-          <div class="logo-text">AUREM</div>
-          <div class="logo-sub">Lead Scraper</div>
-        </div>
-      </div>
-      <div id="status-dot" class="status-dot"></div>
-    </div>
-
-    <!-- Connection Settings (collapsible) -->
-    <div id="settings-panel" class="settings-panel hidden">
-      <label>AUREM Dashboard URL</label>
-      <input type="text" id="api-url" placeholder="https://your-aurem-instance.com" />
-      <label>Auth Token</label>
-      <input type="password" id="auth-token" placeholder="Paste your JWT token" />
-      <button id="save-settings-btn" class="btn btn-gold">Save Connection</button>
-      <div id="settings-msg" class="settings-msg"></div>
-    </div>
-
-    <!-- Page Info -->
-    <div id="page-info" class="page-info">
-      <div class="page-type-badge" id="page-type">Detecting...</div>
-      <div class="page-url" id="page-url">—</div>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="actions">
-      <button id="scrape-btn" class="btn btn-gold btn-full">
-        <span class="btn-icon">&#9889;</span> Scrape This Page
+<div id="app">
+<!-- Header -->
+<div class="header">
+<div class="logo-row">
+<div class="logo-icon">A</div>
+<div>
+<div class="logo-text">AUREM</div>
+<div class="logo-sub">Lead Scraper</div>
+</div>
+</div>
+<div class="status-dot" id="status-dot"></div>
+</div>
+<!-- Connection Settings (collapsible) -->
+<div class="settings-panel hidden" id="settings-panel">
+<label>AUREM Dashboard URL</label>
+<input id="api-url" placeholder="https://your-aurem-instance.com" type="text"/>
+<label>Auth Token</label>
+<input id="auth-token" placeholder="Paste your JWT token" type="password"/>
+<button class="btn btn-gold" id="save-settings-btn">Save Connection</button>
+<div class="settings-msg" id="settings-msg"></div>
+</div>
+<!-- Page Info -->
+<div class="page-info" id="page-info">
+<div class="page-type-badge" id="page-type">Detecting...</div>
+<div class="page-url" id="page-url">—</div>
+</div>
+<!-- Action Buttons -->
+<div class="actions">
+<button class="btn btn-gold btn-full" id="scrape-btn">
+<span class="btn-icon">⚡</span> Scrape This Page
       </button>
-    </div>
-
-    <!-- Results -->
-    <div id="results" class="results hidden">
-      <div class="results-header">
-        <span id="results-count">0 leads found</span>
-        <div class="results-actions">
-          <button id="copy-btn" class="btn btn-sm" title="Copy all">Copy</button>
-          <button id="csv-btn" class="btn btn-sm" title="Export CSV">CSV</button>
-          <button id="sync-btn" class="btn btn-sm btn-gold" title="Send to AUREM">Sync</button>
-        </div>
-      </div>
-      <div id="leads-list" class="leads-list"></div>
-    </div>
-
-    <!-- Stored Leads Summary -->
-    <div class="stored-bar">
-      <span id="stored-count">0 leads stored locally</span>
-      <button id="settings-toggle" class="btn btn-sm">Settings</button>
-    </div>
-  </div>
-
-  <script src="popup.js"></script>
+</div>
+<!-- Results -->
+<div class="results hidden" id="results">
+<div class="results-header">
+<span id="results-count">0 leads found</span>
+<div class="results-actions">
+<button class="btn btn-sm" id="copy-btn" title="Copy all">Copy</button>
+<button class="btn btn-sm" id="csv-btn" title="Export CSV">CSV</button>
+<button class="btn btn-sm btn-gold" id="sync-btn" title="Send to AUREM">Sync</button>
+</div>
+</div>
+<div class="leads-list" id="leads-list"></div>
+</div>
+<!-- Stored Leads Summary -->
+<div class="stored-bar">
+<span id="stored-count">0 leads stored locally</span>
+<button class="btn btn-sm" id="settings-toggle">Settings</button>
+</div>
+</div>
+<script src="popup.js"></script>
 </body>
 </html>

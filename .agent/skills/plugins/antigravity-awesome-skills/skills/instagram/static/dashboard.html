@@ -1,11 +1,12 @@
 <!DOCTYPE html>
+
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Instagram Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fafafa; color: #262626; }
         .header { background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); color: white; padding: 20px 30px; }
@@ -34,60 +35,58 @@
         .loading { text-align: center; padding: 40px; color: #8e8e8e; }
         @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
     </style>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
-    <div class="header">
-        <h1>Instagram Dashboard</h1>
-        <p id="header-sub">Carregando...</p>
-    </div>
-
-    <div class="container">
-        <div class="stats-grid" id="stats-grid">
-            <div class="stat-card"><div class="label">Posts</div><div class="value" id="s-posts">-</div><div class="sub" id="s-posts-sub"></div></div>
-            <div class="stat-card"><div class="label">Publicados</div><div class="value" id="s-published">-</div></div>
-            <div class="stat-card"><div class="label">Rascunhos</div><div class="value" id="s-drafts">-</div></div>
-            <div class="stat-card"><div class="label">Agendados</div><div class="value" id="s-scheduled">-</div></div>
-            <div class="stat-card"><div class="label">Comentários</div><div class="value" id="s-comments">-</div><div class="sub" id="s-comments-sub"></div></div>
-            <div class="stat-card"><div class="label">Templates</div><div class="value" id="s-templates">-</div></div>
-        </div>
-
-        <div class="charts-grid">
-            <div class="chart-card">
-                <h3>Engajamento por Tipo de Conteúdo</h3>
-                <canvas id="chart-engagement"></canvas>
-            </div>
-            <div class="chart-card">
-                <h3>Melhores Horários para Postar</h3>
-                <canvas id="chart-best-times"></canvas>
-            </div>
-        </div>
-
-        <div class="table-card">
-            <h3>Posts Recentes</h3>
-            <table id="posts-table">
-                <thead>
-                    <tr><th>Tipo</th><th>Caption</th><th>Status</th><th>Data</th><th>Link</th></tr>
-                </thead>
-                <tbody id="posts-body">
-                    <tr><td colspan="5" class="loading">Carregando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="table-card">
-            <h3>Ações Recentes</h3>
-            <table>
-                <thead>
-                    <tr><th>Ação</th><th>Data</th><th>Detalhes</th></tr>
-                </thead>
-                <tbody id="actions-body">
-                    <tr><td colspan="3" class="loading">Carregando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <script>
+<div class="header">
+<h1>Instagram Dashboard</h1>
+<p id="header-sub">Carregando...</p>
+</div>
+<div class="container">
+<div class="stats-grid" id="stats-grid">
+<div class="stat-card"><div class="label">Posts</div><div class="value" id="s-posts">-</div><div class="sub" id="s-posts-sub"></div></div>
+<div class="stat-card"><div class="label">Publicados</div><div class="value" id="s-published">-</div></div>
+<div class="stat-card"><div class="label">Rascunhos</div><div class="value" id="s-drafts">-</div></div>
+<div class="stat-card"><div class="label">Agendados</div><div class="value" id="s-scheduled">-</div></div>
+<div class="stat-card"><div class="label">Comentários</div><div class="value" id="s-comments">-</div><div class="sub" id="s-comments-sub"></div></div>
+<div class="stat-card"><div class="label">Templates</div><div class="value" id="s-templates">-</div></div>
+</div>
+<div class="charts-grid">
+<div class="chart-card">
+<h3>Engajamento por Tipo de Conteúdo</h3>
+<canvas id="chart-engagement"></canvas>
+</div>
+<div class="chart-card">
+<h3>Melhores Horários para Postar</h3>
+<canvas id="chart-best-times"></canvas>
+</div>
+</div>
+<div class="table-card">
+<h3>Posts Recentes</h3>
+<table id="posts-table">
+<thead>
+<tr><th>Tipo</th><th>Caption</th><th>Status</th><th>Data</th><th>Link</th></tr>
+</thead>
+<tbody id="posts-body">
+<tr><td class="loading" colspan="5">Carregando...</td></tr>
+</tbody>
+</table>
+</div>
+<div class="table-card">
+<h3>Ações Recentes</h3>
+<table>
+<thead>
+<tr><th>Ação</th><th>Data</th><th>Detalhes</th></tr>
+</thead>
+<tbody id="actions-body">
+<tr><td class="loading" colspan="3">Carregando...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<script>
         const API = '';
 
         async function fetchJSON(url) {

@@ -1,80 +1,76 @@
 <!DOCTYPE html>
+
 <html>
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"/>
 <title>[AUREM] Site Down: {{site_url}}</title>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body style="margin:0;padding:0;background:#0A0A0A;font-family:'Helvetica Neue',Arial,sans-serif;color:#F2F2F2;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;">
-  <tr>
-    <td align="center" style="padding:40px 16px;">
-      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;background:#0F0F0F;border:1px solid rgba(239,68,68,0.3);border-radius:14px;overflow:hidden;">
-
-        <!-- Red Alert Strip -->
-        <tr><td style="background:#991B1B;padding:14px 32px;text-align:center;">
-          <p style="font-family:'Cinzel',serif;font-size:13px;color:#FECACA;margin:0;letter-spacing:3px;text-transform:uppercase;">⚠ Site Down Alert</p>
-        </td></tr>
-
-        <!-- Brand -->
-        <tr><td align="center" style="padding:28px 32px 8px;">
-          <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#F97316,#EA580C);display:inline-block;line-height:44px;text-align:center;font-size:18px;font-weight:900;color:#0A0A00;">A</div>
-          <div style="font-family:'Cinzel','Trajan Pro',serif;font-size:16px;font-weight:700;letter-spacing:6px;color:#F2F2F2;margin-top:10px;">AUREM</div>
-        </td></tr>
-
-        <!-- Headline -->
-        <tr><td style="padding:24px 32px 8px;">
-          <p style="font-family:'Cinzel',serif;font-size:20px;color:#EF4444;margin:0 0 6px;letter-spacing:1px;">Your site is unreachable</p>
-          <p style="font-size:14px;color:#9A9490;margin:0;line-height:1.6;">ORA detected your monitored endpoint is currently failing health checks.</p>
-        </td></tr>
-
-        <!-- Incident Details -->
-        <tr><td style="padding:20px 32px;">
-          <div style="background:#0A0A0A;border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:20px;">
-            <p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 12px;text-transform:uppercase;">INCIDENT DETAILS</p>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="padding:6px 0;width:100px;"><span style="font-size:12px;color:#6A6070;">URL</span></td>
-                <td style="padding:6px 0;"><a href="{{site_url}}" style="font-family:'Courier New',monospace;font-size:12px;color:#F97316;text-decoration:none;word-break:break-all;">{{site_url}}</a></td>
-              </tr>
-              <tr>
-                <td style="padding:6px 0;"><span style="font-size:12px;color:#6A6070;">Status</span></td>
-                <td style="padding:6px 0;"><span style="font-family:'Courier New',monospace;font-size:12px;color:#FCA5A5;">{{status_code}} — {{status_text}}</span></td>
-              </tr>
-              <tr>
-                <td style="padding:6px 0;"><span style="font-size:12px;color:#6A6070;">Down since</span></td>
-                <td style="padding:6px 0;"><span style="font-size:12px;color:#E8E0D0;">{{down_since}}</span></td>
-              </tr>
-              <tr>
-                <td style="padding:6px 0;"><span style="font-size:12px;color:#6A6070;">Duration</span></td>
-                <td style="padding:6px 0;"><span style="font-family:'Cinzel',serif;font-size:18px;color:#EF4444;font-weight:700;">{{downtime_counter}}</span></td>
-              </tr>
-            </table>
-          </div>
-        </td></tr>
-
-        <!-- Auto-Action Note -->
-        <tr><td style="padding:0 32px 20px;">
-          <p style="font-size:12px;color:#9A9490;margin:0;line-height:1.6;">ORA is retrying every 60 seconds. You'll get a <strong style="color:#22C55E;">RECOVERED</strong> email when the site is back.</p>
-        </td></tr>
-
-        <!-- CTA -->
-        <tr><td align="center" style="padding:8px 32px 32px;">
-          <a href="{{incident_url}}" style="background:#F97316;color:#0A0A00;text-decoration:none;display:inline-block;padding:14px 36px;border-radius:8px;font-weight:700;letter-spacing:1.5px;font-size:13px;text-transform:uppercase;">View Incident Log →</a>
-          <p style="font-size:11px;color:#6A6070;margin:16px 0 0;">Direct link to your AUREM monitor dashboard.</p>
-        </td></tr>
-
-        <!-- Footer -->
-        <tr><td style="background:#050505;border-top:1px solid rgba(239,68,68,0.15);padding:20px 32px;text-align:center;">
-          <p style="font-size:11px;color:#6A6070;margin:0;line-height:1.7;">AUREM · Polaris Built Inc.<br>Mississauga, Ontario, Canada</p>
-          <p style="font-size:10px;color:#5A5060;margin:10px 0 0;">
-            <a href="{{unsubscribe_url}}" style="color:#6A6070;text-decoration:underline;">Unsubscribe</a> ·
+<table cellpadding="0" cellspacing="0" role="presentation" style="background:#0A0A0A;" width="100%">
+<tr>
+<td align="center" style="padding:40px 16px;">
+<table cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background:#0F0F0F;border:1px solid rgba(239,68,68,0.3);border-radius:14px;overflow:hidden;" width="520">
+<!-- Red Alert Strip -->
+<tr><td style="background:#991B1B;padding:14px 32px;text-align:center;">
+<p style="font-family:'Cinzel',serif;font-size:13px;color:#FECACA;margin:0;letter-spacing:3px;text-transform:uppercase;">⚠ Site Down Alert</p>
+</td></tr>
+<!-- Brand -->
+<tr><td align="center" style="padding:28px 32px 8px;">
+<div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#F97316,#EA580C);display:inline-block;line-height:44px;text-align:center;font-size:18px;font-weight:900;color:#0A0A00;">A</div>
+<div style="font-family:'Cinzel','Trajan Pro',serif;font-size:16px;font-weight:700;letter-spacing:6px;color:#F2F2F2;margin-top:10px;">AUREM</div>
+</td></tr>
+<!-- Headline -->
+<tr><td style="padding:24px 32px 8px;">
+<p style="font-family:'Cinzel',serif;font-size:20px;color:#EF4444;margin:0 0 6px;letter-spacing:1px;">Your site is unreachable</p>
+<p style="font-size:14px;color:#9A9490;margin:0;line-height:1.6;">ORA detected your monitored endpoint is currently failing health checks.</p>
+</td></tr>
+<!-- Incident Details -->
+<tr><td style="padding:20px 32px;">
+<div style="background:#0A0A0A;border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:20px;">
+<p style="font-size:10px;font-weight:700;letter-spacing:3px;color:#6A6070;margin:0 0 12px;text-transform:uppercase;">INCIDENT DETAILS</p>
+<table cellpadding="0" cellspacing="0" role="presentation" width="100%">
+<tr>
+<td style="padding:6px 0;width:100px;"><span style="font-size:12px;color:#6A6070;">URL</span></td>
+<td style="padding:6px 0;"><a href="{{site_url}}" style="font-family:'Courier New',monospace;font-size:12px;color:#F97316;text-decoration:none;word-break:break-all;">{{site_url}}</a></td>
+</tr>
+<tr>
+<td style="padding:6px 0;"><span style="font-size:12px;color:#6A6070;">Status</span></td>
+<td style="padding:6px 0;"><span style="font-family:'Courier New',monospace;font-size:12px;color:#FCA5A5;">{{status_code}} — {{status_text}}</span></td>
+</tr>
+<tr>
+<td style="padding:6px 0;"><span style="font-size:12px;color:#6A6070;">Down since</span></td>
+<td style="padding:6px 0;"><span style="font-size:12px;color:#E8E0D0;">{{down_since}}</span></td>
+</tr>
+<tr>
+<td style="padding:6px 0;"><span style="font-size:12px;color:#6A6070;">Duration</span></td>
+<td style="padding:6px 0;"><span style="font-family:'Cinzel',serif;font-size:18px;color:#EF4444;font-weight:700;">{{downtime_counter}}</span></td>
+</tr>
+</table>
+</div>
+</td></tr>
+<!-- Auto-Action Note -->
+<tr><td style="padding:0 32px 20px;">
+<p style="font-size:12px;color:#9A9490;margin:0;line-height:1.6;">ORA is retrying every 60 seconds. You'll get a <strong style="color:#22C55E;">RECOVERED</strong> email when the site is back.</p>
+</td></tr>
+<!-- CTA -->
+<tr><td align="center" style="padding:8px 32px 32px;">
+<a href="{{incident_url}}" style="background:#F97316;color:#0A0A00;text-decoration:none;display:inline-block;padding:14px 36px;border-radius:8px;font-weight:700;letter-spacing:1.5px;font-size:13px;text-transform:uppercase;">View Incident Log →</a>
+<p style="font-size:11px;color:#6A6070;margin:16px 0 0;">Direct link to your AUREM monitor dashboard.</p>
+</td></tr>
+<!-- Footer -->
+<tr><td style="background:#050505;border-top:1px solid rgba(239,68,68,0.15);padding:20px 32px;text-align:center;">
+<p style="font-size:11px;color:#6A6070;margin:0;line-height:1.7;">AUREM · Polaris Built Inc.<br/>Mississauga, Ontario, Canada</p>
+<p style="font-size:10px;color:#5A5060;margin:10px 0 0;">
+<a href="{{unsubscribe_url}}" style="color:#6A6070;text-decoration:underline;">Unsubscribe</a> ·
             <a href="https://aurem.live/my/settings" style="color:#6A6070;text-decoration:underline;">Alert preferences</a>
-          </p>
-        </td></tr>
-
-      </table>
-    </td>
-  </tr>
+</p>
+</td></tr>
+</table>
+</td>
+</tr>
 </table>
 </body>
 </html>

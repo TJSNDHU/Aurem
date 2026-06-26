@@ -1,7 +1,8 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="utf-8"/>
 <title>{{ customer_name }} — AUREM Quarterly Business Review</title>
 <style>
   @page {
@@ -358,50 +359,50 @@
   .outlook .prediction .text { flex: 1; font-size: 9.5pt; line-height: 1.6; }
   .outlook .prediction .text .h { color: #fff; font-weight: 600; margin-bottom: 1.5mm; font-size: 10.5pt; }
 </style>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
-
 <!-- ══════════════════════════════ COVER ══════════════════════════════ -->
 <section class="cover">
-  <div class="cover-confidential">Confidential</div>
-  <div class="cover-mark">A · U · R · E · M</div>
-  <div class="cover-eyebrow">{{ report_type_label }} · {{ report_period_label }}</div>
-  <h1 class="cover-title">
+<div class="cover-confidential">Confidential</div>
+<div class="cover-mark">A · U · R · E · M</div>
+<div class="cover-eyebrow">{{ report_type_label }} · {{ report_period_label }}</div>
+<h1 class="cover-title">
     {{ customer_name }}<br/>
-    <span class="accent">Business Review</span>
-  </h1>
-  <div class="cover-subtitle">
+<span class="accent">Business Review</span>
+</h1>
+<div class="cover-subtitle">
     A comprehensive audit of your AI-assisted infrastructure performance —
     uptime, incidents prevented, AI workforce activity, and return on
     automation. Generated from verified telemetry captured by the AUREM
     Sentinel, Site Monitor, and ORA Command systems.
   </div>
-
-  <div class="cover-meta">
-    <div class="block">
-      <div class="label">Prepared For</div>
-      <div class="value">{{ customer_name }}</div>
-    </div>
-    <div class="block">
-      <div class="label">Period</div>
-      <div class="value">{{ period_start_human }} — {{ period_end_human }}</div>
-    </div>
-    <div class="block">
-      <div class="label">Report ID</div>
-      <div class="value mono">{{ report_id }}</div>
-    </div>
-    <div class="block">
-      <div class="label">Issued</div>
-      <div class="value">{{ issued_at_human }}</div>
-    </div>
-  </div>
+<div class="cover-meta">
+<div class="block">
+<div class="label">Prepared For</div>
+<div class="value">{{ customer_name }}</div>
+</div>
+<div class="block">
+<div class="label">Period</div>
+<div class="value">{{ period_start_human }} — {{ period_end_human }}</div>
+</div>
+<div class="block">
+<div class="label">Report ID</div>
+<div class="value mono">{{ report_id }}</div>
+</div>
+<div class="block">
+<div class="label">Issued</div>
+<div class="value">{{ issued_at_human }}</div>
+</div>
+</div>
 </section>
-
 <!-- ══════════════════════════════ EXEC SUMMARY ══════════════════════════════ -->
 <section class="page">
-  <div class="section-eyebrow">§ 01 · Executive Summary</div>
-  <h1 class="section">The quarter at a glance.</h1>
-  <p class="lede">
+<div class="section-eyebrow">§ 01 · Executive Summary</div>
+<h1 class="section">The quarter at a glance.</h1>
+<p class="lede">
     During this reporting window AUREM's autonomous systems delivered
     <span class="strong">{{ exec.total_actions }}</span> verified actions on
     behalf of {{ customer_name }} — preventing
@@ -410,222 +411,206 @@
     capturing <span class="strong">{{ exec.errors_captured }}</span> client-side
     incidents before they reached your users.
   </p>
-
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-label">Uptime</div>
-      <div class="kpi-value {{ exec.uptime_class }}">{{ exec.uptime_pct }}%</div>
-      <div class="kpi-trend">{{ exec.uptime_trend }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Incidents Resolved</div>
-      <div class="kpi-value positive">{{ exec.incidents_resolved }}</div>
-      <div class="kpi-trend">avg MTTR: {{ exec.avg_mttr_human }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Time Saved</div>
-      <div class="kpi-value positive">{{ exec.hours_saved }}h</div>
-      <div class="kpi-trend up">≈ ${{ exec.dollars_saved }} in labor</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">AI Actions</div>
-      <div class="kpi-value">{{ exec.ai_actions }}</div>
-      <div class="kpi-trend">human time replaced</div>
-    </div>
-  </div>
-
-  <div class="callout">
-    <div class="title">▲ Return on Automation</div>
-    <div class="body">
+<div class="kpi-grid">
+<div class="kpi-card">
+<div class="kpi-label">Uptime</div>
+<div class="kpi-value {{ exec.uptime_class }}">{{ exec.uptime_pct }}%</div>
+<div class="kpi-trend">{{ exec.uptime_trend }}</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Incidents Resolved</div>
+<div class="kpi-value positive">{{ exec.incidents_resolved }}</div>
+<div class="kpi-trend">avg MTTR: {{ exec.avg_mttr_human }}</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Time Saved</div>
+<div class="kpi-value positive">{{ exec.hours_saved }}h</div>
+<div class="kpi-trend up">≈ ${{ exec.dollars_saved }} in labor</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">AI Actions</div>
+<div class="kpi-value">{{ exec.ai_actions }}</div>
+<div class="kpi-trend">human time replaced</div>
+</div>
+</div>
+<div class="callout">
+<div class="title">▲ Return on Automation</div>
+<div class="body">
       Based on verified telemetry, AUREM delivered an estimated
       <strong>${{ exec.dollars_saved }}</strong> in avoided labor + downtime
       costs this {{ period_word }}. Against a platform investment of
       <strong>${{ exec.period_spend }}</strong>, this represents a
       <strong>{{ exec.roi_multiplier }}×</strong> return on investment.
     </div>
-  </div>
+</div>
 </section>
-
 <!-- ══════════════════════════════ UPTIME & RELIABILITY ══════════════════════════════ -->
 <section class="page">
-  <div class="section-eyebrow">§ 02 · Uptime & Reliability</div>
-  <h1 class="section">Site Monitor telemetry.</h1>
-  <p class="lede">
+<div class="section-eyebrow">§ 02 · Uptime &amp; Reliability</div>
+<h1 class="section">Site Monitor telemetry.</h1>
+<p class="lede">
     AUREM pinged {{ uptime.url_count }} of your endpoints every
     {{ uptime.interval_human }} across the reporting window. Every failure
     triggered an incident which is tracked below with MTTR and resolution path.
   </p>
-
-  <div class="uptime-bar">
+<div class="uptime-bar">
     {% for d in uptime.days_strip %}
       <div class="day {{ d.cls }}" title="{{ d.day }} · {{ d.pct }}%"></div>
     {% endfor %}
   </div>
-
-  <table class="data-table">
-    <thead>
-      <tr><th>Endpoint</th><th>Checks</th><th>Uptime</th><th>Avg Latency</th><th>Incidents</th></tr>
-    </thead>
-    <tbody>
+<table class="data-table">
+<thead>
+<tr><th>Endpoint</th><th>Checks</th><th>Uptime</th><th>Avg Latency</th><th>Incidents</th></tr>
+</thead>
+<tbody>
       {% for ep in uptime.endpoints %}
       <tr>
-        <td class="mono" style="max-width:85mm;word-break:break-all;">{{ ep.url }}</td>
-        <td class="num">{{ ep.checks }}</td>
-        <td class="num {{ ep.uptime_cls }}">{{ ep.uptime_pct }}%</td>
-        <td class="num">{{ ep.avg_latency_ms }}ms</td>
-        <td class="num">{{ ep.incidents }}</td>
-      </tr>
+<td class="mono" style="max-width:85mm;word-break:break-all;">{{ ep.url }}</td>
+<td class="num">{{ ep.checks }}</td>
+<td class="num {{ ep.uptime_cls }}">{{ ep.uptime_pct }}%</td>
+<td class="num">{{ ep.avg_latency_ms }}ms</td>
+<td class="num">{{ ep.incidents }}</td>
+</tr>
       {% endfor %}
       {% if not uptime.endpoints %}
-      <tr><td colspan="5" class="muted" style="text-align:center;padding:8mm;">No endpoints monitored during this window.</td></tr>
+      <tr><td class="muted" colspan="5" style="text-align:center;padding:8mm;">No endpoints monitored during this window.</td></tr>
       {% endif %}
     </tbody>
-  </table>
+</table>
 
   {% if uptime.top_incidents %}
   <h3>Top incidents resolved</h3>
-  <table class="data-table">
-    <thead><tr><th>Started</th><th>Endpoint</th><th>Duration</th><th>Status</th></tr></thead>
-    <tbody>
+<table class="data-table">
+<thead><tr><th>Started</th><th>Endpoint</th><th>Duration</th><th>Status</th></tr></thead>
+<tbody>
     {% for inc in uptime.top_incidents %}
       <tr>
-        <td>{{ inc.started_human }}</td>
-        <td class="mono" style="max-width:70mm;word-break:break-all;">{{ inc.url }}</td>
-        <td class="num">{{ inc.duration_human }}</td>
-        <td><span class="badge {{ inc.badge_cls }}">{{ inc.status }}</span></td>
-      </tr>
+<td>{{ inc.started_human }}</td>
+<td class="mono" style="max-width:70mm;word-break:break-all;">{{ inc.url }}</td>
+<td class="num">{{ inc.duration_human }}</td>
+<td><span class="badge {{ inc.badge_cls }}">{{ inc.status }}</span></td>
+</tr>
     {% endfor %}
     </tbody>
-  </table>
+</table>
   {% endif %}
 </section>
-
 <!-- ══════════════════════════════ ERROR INTELLIGENCE — SENTINEL ══════════════════════════════ -->
 <section class="page">
-  <div class="section-eyebrow">§ 03 · Error Intelligence</div>
-  <h1 class="section">The Sentinel wall.</h1>
-  <p class="lede">
+<div class="section-eyebrow">§ 03 · Error Intelligence</div>
+<h1 class="section">The Sentinel wall.</h1>
+<p class="lede">
     The AUREM Sentinel captures every client-side error from your browser
     sessions and classifies them instantly. Silent production bugs that
     typically reach users for hours before manual triage were intercepted and
     — where mechanically safe — auto-healed without human intervention.
   </p>
-
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-label">Errors Captured</div>
-      <div class="kpi-value">{{ sentinel.total_captured }}</div>
-      <div class="kpi-trend">across {{ sentinel.unique_users }} users</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Auto-Healed</div>
-      <div class="kpi-value positive">{{ sentinel.auto_healed }}</div>
-      <div class="kpi-trend up">{{ sentinel.auto_healed_pct }}% zero-touch</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Spikes Detected</div>
-      <div class="kpi-value {{ sentinel.spike_cls }}">{{ sentinel.spikes }}</div>
-      <div class="kpi-trend">early-warning alerts fired</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">AI Diagnoses</div>
-      <div class="kpi-value gold">{{ sentinel.ai_diagnoses }}</div>
-      <div class="kpi-trend">structured suggestions</div>
-    </div>
-  </div>
-
-  <h3>Top error categories</h3>
-  <table class="data-table">
-    <thead><tr><th>Category</th><th>Count</th><th>Affected Users</th><th>Disposition</th></tr></thead>
-    <tbody>
+<div class="kpi-grid">
+<div class="kpi-card">
+<div class="kpi-label">Errors Captured</div>
+<div class="kpi-value">{{ sentinel.total_captured }}</div>
+<div class="kpi-trend">across {{ sentinel.unique_users }} users</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Auto-Healed</div>
+<div class="kpi-value positive">{{ sentinel.auto_healed }}</div>
+<div class="kpi-trend up">{{ sentinel.auto_healed_pct }}% zero-touch</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">Spikes Detected</div>
+<div class="kpi-value {{ sentinel.spike_cls }}">{{ sentinel.spikes }}</div>
+<div class="kpi-trend">early-warning alerts fired</div>
+</div>
+<div class="kpi-card">
+<div class="kpi-label">AI Diagnoses</div>
+<div class="kpi-value gold">{{ sentinel.ai_diagnoses }}</div>
+<div class="kpi-trend">structured suggestions</div>
+</div>
+</div>
+<h3>Top error categories</h3>
+<table class="data-table">
+<thead><tr><th>Category</th><th>Count</th><th>Affected Users</th><th>Disposition</th></tr></thead>
+<tbody>
       {% for t in sentinel.top_types %}
       <tr>
-        <td>{{ t.label }}</td>
-        <td class="num">{{ t.count }}</td>
-        <td class="num">{{ t.unique_users }}</td>
-        <td><span class="badge {{ t.badge_cls }}">{{ t.disposition }}</span></td>
-      </tr>
+<td>{{ t.label }}</td>
+<td class="num">{{ t.count }}</td>
+<td class="num">{{ t.unique_users }}</td>
+<td><span class="badge {{ t.badge_cls }}">{{ t.disposition }}</span></td>
+</tr>
       {% endfor %}
       {% if not sentinel.top_types %}
-      <tr><td colspan="4" class="muted" style="text-align:center;padding:8mm;">No errors captured this period. Clean run.</td></tr>
+      <tr><td class="muted" colspan="4" style="text-align:center;padding:8mm;">No errors captured this period. Clean run.</td></tr>
       {% endif %}
     </tbody>
-  </table>
+</table>
 </section>
-
 <!-- ══════════════════════════════ ORA WORKFORCE ══════════════════════════════ -->
 <section class="page">
-  <div class="section-eyebrow">§ 04 · The ORA Workforce</div>
-  <h1 class="section">Autonomous actions delivered.</h1>
-  <p class="lede">
+<div class="section-eyebrow">§ 04 · The ORA Workforce</div>
+<h1 class="section">Autonomous actions delivered.</h1>
+<p class="lede">
     The ORA command layer operated as a distributed workforce — discovering
     leads, scoring them, triggering outreach, answering inbound voice calls,
     and producing the morning briefing every operating day.
   </p>
-
-  <table class="data-table">
-    <thead>
-      <tr><th>Channel</th><th>Volume</th><th>Est. Human Equivalent</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>Lead discovery hunts</td><td class="num">{{ ora.hunts }}</td><td class="num">{{ ora.hunts_hh }}</td></tr>
-      <tr><td>Leads qualified</td><td class="num">{{ ora.leads }}</td><td class="num">{{ ora.leads_hh }}</td></tr>
-      <tr><td>Voice conversations</td><td class="num">{{ ora.voice_calls }}</td><td class="num">{{ ora.voice_hh }}</td></tr>
-      <tr><td>Morning briefings</td><td class="num">{{ ora.briefs }}</td><td class="num">{{ ora.briefs_hh }}</td></tr>
-      <tr><td>System pulse sweeps</td><td class="num">{{ ora.pulse_sweeps }}</td><td class="num">{{ ora.pulse_hh }}</td></tr>
-    </tbody>
-  </table>
-
-  <div class="callout">
-    <div class="title">⚡ Equivalent human workforce</div>
-    <div class="body">
+<table class="data-table">
+<thead>
+<tr><th>Channel</th><th>Volume</th><th>Est. Human Equivalent</th></tr>
+</thead>
+<tbody>
+<tr><td>Lead discovery hunts</td><td class="num">{{ ora.hunts }}</td><td class="num">{{ ora.hunts_hh }}</td></tr>
+<tr><td>Leads qualified</td><td class="num">{{ ora.leads }}</td><td class="num">{{ ora.leads_hh }}</td></tr>
+<tr><td>Voice conversations</td><td class="num">{{ ora.voice_calls }}</td><td class="num">{{ ora.voice_hh }}</td></tr>
+<tr><td>Morning briefings</td><td class="num">{{ ora.briefs }}</td><td class="num">{{ ora.briefs_hh }}</td></tr>
+<tr><td>System pulse sweeps</td><td class="num">{{ ora.pulse_sweeps }}</td><td class="num">{{ ora.pulse_hh }}</td></tr>
+</tbody>
+</table>
+<div class="callout">
+<div class="title">⚡ Equivalent human workforce</div>
+<div class="body">
       The autonomous actions captured above would have required approximately
       <strong>{{ ora.equivalent_ftes }}</strong> full-time employees at market
       rate (assuming an 8-hour day at ${{ ora.assumed_hourly_rate }}/hr). AUREM
       delivered the same output for <strong>${{ exec.period_spend }}</strong>
       this {{ period_word }}.
     </div>
-  </div>
+</div>
 </section>
-
 <!-- ══════════════════════════════ AI OUTLOOK ══════════════════════════════ -->
 <section class="page">
-  <div class="section-eyebrow">§ 05 · AI Outlook</div>
-  <h1 class="section">Predictive briefing.</h1>
-  <p class="lede">
+<div class="section-eyebrow">§ 05 · AI Outlook</div>
+<h1 class="section">Predictive briefing.</h1>
+<p class="lede">
     The following forward-looking assessment was produced by Claude 4.5 based
     on the full telemetry set above. These are advisory suggestions — not
     operating decisions — and should be reviewed by your operations lead.
   </p>
-
-  <div class="outlook">
-    <h2>Next {{ period_word }} · {{ outlook.horizon_label }}</h2>
+<div class="outlook">
+<h2>Next {{ period_word }} · {{ outlook.horizon_label }}</h2>
     {% for p in outlook.predictions %}
     <div class="prediction">
-      <div class="num">{{ loop.index }}</div>
-      <div class="text">
-        <div class="h">{{ p.title }}</div>
-        <div>{{ p.body }}</div>
-      </div>
-    </div>
+<div class="num">{{ loop.index }}</div>
+<div class="text">
+<div class="h">{{ p.title }}</div>
+<div>{{ p.body }}</div>
+</div>
+</div>
     {% endfor %}
     {% if not outlook.predictions %}
     <div class="prediction"><div class="text"><div class="h">No predictions available</div>
-    <div>Insufficient telemetry to generate forward-looking signal. Report back next period.</div>
-    </div></div>
+<div>Insufficient telemetry to generate forward-looking signal. Report back next period.</div>
+</div></div>
     {% endif %}
   </div>
-
-  <div class="callout dark" style="margin-top:6mm;">
-    <div class="title">◆ Bottom line</div>
-    <div class="body">{{ outlook.bottom_line }}</div>
-  </div>
-
-  <div class="footer-stamp">
-    <div>Verified telemetry · {{ verification.endpoint_count }} endpoints · {{ verification.data_point_count }} data points</div>
-    <div>Issued by AUREM Autonomous Systems</div>
-  </div>
+<div class="callout dark" style="margin-top:6mm;">
+<div class="title">◆ Bottom line</div>
+<div class="body">{{ outlook.bottom_line }}</div>
+</div>
+<div class="footer-stamp">
+<div>Verified telemetry · {{ verification.endpoint_count }} endpoints · {{ verification.data_point_count }} data points</div>
+<div>Issued by AUREM Autonomous Systems</div>
+</div>
 </section>
-
 </body>
 </html>

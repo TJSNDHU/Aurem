@@ -1,10 +1,11 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loki Mode Dashboard</title>
-    <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Loki Mode Dashboard</title>
+<style>
         :root {
             --bg-cream: #FDF6E3;
             --bg-dark: #1a1a2e;
@@ -291,70 +292,69 @@
             }
         }
     </style>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
-    <div class="header">
-        <div class="logo">
-            <div class="logo-icon">L</div>
-            <span class="logo-text">Loki Mode Dashboard</span>
-        </div>
-        <div class="status-bar">
-            <div class="status-item">
-                <div class="status-dot active"></div>
-                <span>Phase: DEVELOPMENT</span>
-            </div>
-            <div class="status-item">
-                <span>v2.18.0</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="section" id="agents-section">
-        <h2 class="section-title">Active Agents</h2>
-        <div class="agents-grid" id="agents-grid">
-            <!-- Agent cards populated by JS -->
-        </div>
-    </div>
-
-    <div class="section" id="queue-section">
-        <h2 class="section-title">Task Queue</h2>
-        <div class="queue-columns" id="queue-columns">
-            <div class="queue-column pending">
-                <div class="queue-header">
-                    <span class="queue-title">Pending</span>
-                    <span class="queue-count" id="pending-count">0</span>
-                </div>
-                <div id="pending-tasks"></div>
-            </div>
-            <div class="queue-column in-progress">
-                <div class="queue-header">
-                    <span class="queue-title">In Progress</span>
-                    <span class="queue-count" id="in-progress-count">0</span>
-                </div>
-                <div id="in-progress-tasks"></div>
-            </div>
-            <div class="queue-column completed">
-                <div class="queue-header">
-                    <span class="queue-title">Completed</span>
-                    <span class="queue-count" id="completed-count">0</span>
-                </div>
-                <div id="completed-tasks"></div>
-            </div>
-            <div class="queue-column failed">
-                <div class="queue-header">
-                    <span class="queue-title">Failed</span>
-                    <span class="queue-count" id="failed-count">0</span>
-                </div>
-                <div id="failed-tasks"></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="last-updated" id="last-updated">
+<div class="header">
+<div class="logo">
+<div class="logo-icon">L</div>
+<span class="logo-text">Loki Mode Dashboard</span>
+</div>
+<div class="status-bar">
+<div class="status-item">
+<div class="status-dot active"></div>
+<span>Phase: DEVELOPMENT</span>
+</div>
+<div class="status-item">
+<span>v2.18.0</span>
+</div>
+</div>
+</div>
+<div class="section" id="agents-section">
+<h2 class="section-title">Active Agents</h2>
+<div class="agents-grid" id="agents-grid">
+<!-- Agent cards populated by JS -->
+</div>
+</div>
+<div class="section" id="queue-section">
+<h2 class="section-title">Task Queue</h2>
+<div class="queue-columns" id="queue-columns">
+<div class="queue-column pending">
+<div class="queue-header">
+<span class="queue-title">Pending</span>
+<span class="queue-count" id="pending-count">0</span>
+</div>
+<div id="pending-tasks"></div>
+</div>
+<div class="queue-column in-progress">
+<div class="queue-header">
+<span class="queue-title">In Progress</span>
+<span class="queue-count" id="in-progress-count">0</span>
+</div>
+<div id="in-progress-tasks"></div>
+</div>
+<div class="queue-column completed">
+<div class="queue-header">
+<span class="queue-title">Completed</span>
+<span class="queue-count" id="completed-count">0</span>
+</div>
+<div id="completed-tasks"></div>
+</div>
+<div class="queue-column failed">
+<div class="queue-header">
+<span class="queue-title">Failed</span>
+<span class="queue-count" id="failed-count">0</span>
+</div>
+<div id="failed-tasks"></div>
+</div>
+</div>
+</div>
+<div class="last-updated" id="last-updated">
         Last updated: --
     </div>
-
-    <script>
+<script>
         // Demo data for screenshots
         const demoAgents = [
             {

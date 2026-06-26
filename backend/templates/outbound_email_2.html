@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Did you see your website report?</title>
 <style>
   body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f0; color: #1a1a1a; }
@@ -23,45 +24,43 @@
   .footer { background: #0a0a0a; padding: 24px; text-align: center; color: #666; font-size: 11px; line-height: 1.6; }
   .footer a { color: #D4AF37; text-decoration: underline; }
 </style>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
 <div class="container">
-  <div class="header">
-    <h1>AUREM</h1>
-    <p>Autonomous AI for Business</p>
-  </div>
-  <div class="body">
-    <p>Hi {{first_name}},</p>
-    <p>Just checking if you had a chance to look at the report I sent for <strong>{{business_name}}</strong>.</p>
-
-    <div class="summary-box">
-      <div class="summary-item"><span class="summary-label">Score</span><span class="summary-value">{{score}}/100</span></div>
-      <div class="summary-item"><span class="summary-label">Issues found</span><span class="summary-value">{{issues_count}}</span></div>
-      <div class="summary-item"><span class="summary-label">Impact on Google ranking</span><span class="summary-value">{{impact}}</span></div>
-    </div>
-
-    <p style="font-size:14px;">One question — what's the biggest challenge in your business right now?</p>
-
-    <p style="font-size:13px; color:#666;">Most of our Mississauga clients tell us it's one of these:</p>
-    <div class="challenge-list">
-      <div class="challenge-item">Not enough new customers</div>
-      <div class="challenge-item">Existing customers not coming back</div>
-      <div class="challenge-item">Too much manual admin work</div>
-      <div class="challenge-item">Website not showing up on Google</div>
-    </div>
-
-    <p style="font-size:14px;"><strong>AUREM handles all four. Automatically.</strong></p>
-
-    <div class="cta-section">
-      <a href="https://aurem.live/pricing" class="cta-button">Book a 15-min Demo</a>
-    </div>
-  </div>
-  <div class="footer">
-    <strong>ORA</strong> — AUREM AI<br>
-    Polaris Built Inc.<br>
-    7221 Sigsbee Dr, Mississauga, ON L4T 3L6<br><br>
-    <a href="{{unsubscribe_link}}">Unsubscribe</a>
-  </div>
+<div class="header">
+<h1>AUREM</h1>
+<p>Autonomous AI for Business</p>
+</div>
+<div class="body">
+<p>Hi {{first_name}},</p>
+<p>Just checking if you had a chance to look at the report I sent for <strong>{{business_name}}</strong>.</p>
+<div class="summary-box">
+<div class="summary-item"><span class="summary-label">Score</span><span class="summary-value">{{score}}/100</span></div>
+<div class="summary-item"><span class="summary-label">Issues found</span><span class="summary-value">{{issues_count}}</span></div>
+<div class="summary-item"><span class="summary-label">Impact on Google ranking</span><span class="summary-value">{{impact}}</span></div>
+</div>
+<p style="font-size:14px;">One question — what's the biggest challenge in your business right now?</p>
+<p style="font-size:13px; color:#666;">Most of our Mississauga clients tell us it's one of these:</p>
+<div class="challenge-list">
+<div class="challenge-item">Not enough new customers</div>
+<div class="challenge-item">Existing customers not coming back</div>
+<div class="challenge-item">Too much manual admin work</div>
+<div class="challenge-item">Website not showing up on Google</div>
+</div>
+<p style="font-size:14px;"><strong>AUREM handles all four. Automatically.</strong></p>
+<div class="cta-section">
+<a class="cta-button" href="https://aurem.live/pricing">Book a 15-min Demo</a>
+</div>
+</div>
+<div class="footer">
+<strong>ORA</strong> — AUREM AI<br/>
+    Polaris Built Inc.<br/>
+    7221 Sigsbee Dr, Mississauga, ON L4T 3L6<br/><br/>
+<a href="{{unsubscribe_link}}">Unsubscribe</a>
+</div>
 </div>
 </body>
 </html>

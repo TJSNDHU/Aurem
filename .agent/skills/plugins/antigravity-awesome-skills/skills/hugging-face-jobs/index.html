@@ -1,10 +1,11 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hf-jobs - Run Workloads on Hugging Face Jobs</title>
-    <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>hf-jobs - Run Workloads on Hugging Face Jobs</title>
+<style>
         * {
             margin: 0;
             padding: 0;
@@ -128,89 +129,82 @@
             font-size: 0.9em;
         }
     </style>
-</head>
+<meta content="website" property="og:type"/><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebPage"
+}</script></head>
 <body>
-    <div class="container">
-        <h1>Agent Skill : hf-jobs</h1>
-        
-        <div class="description">
-            <p><strong>Run any workload on Hugging Face Jobs.</strong></p>
-            <p>Use this skill when you want to run GPU/CPU workloads (batch inference, synthetic data generation, dataset stats, experiments) on Hugging Face Jobs, with correct token handling and result persistence back to the Hub.</p>
-        </div>
-        
-        <div class="metadata">
-            <p><strong>Skill Name:</strong> hf-jobs</p>
-            <p><strong>Main Documentation:</strong> <a href="hf-jobs/SKILL.md">hf-jobs/SKILL.md</a></p>
-            <p><strong>Scripts Directory:</strong> <code>hf-jobs/scripts/</code></p>
-            <p><strong>References Directory:</strong> <code>hf-jobs/references/</code></p>
-        </div>
-        
-        <div class="section">
-            <h2>Overview</h2>
-            <p>This skill focuses on running real workloads via Hugging Face Jobs. It includes ready-to-run UV scripts and guides for authentication (HF tokens), secrets vs env vars, timeouts, hardware selection, and pushing results to the Hub.</p>
-        </div>
-
-        <div class="section">
-            <h2>Core Documentation</h2>
-            <ul class="file-list">
-                <li>
-                    <a href="hf-jobs/SKILL.md">SKILL.md</a>
-                    <div class="file-path">hf-jobs/SKILL.md</div>
-                    <div class="file-description">Complete skill documentation (how to submit jobs, tokens/secrets, timeouts, persistence, and how to use the bundled scripts)</div>
-                </li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>References</h2>
-            <ul class="file-list">
-                <li>
-                    <a href="hf-jobs/references/token_usage.md">token_usage.md</a>
-                    <div class="file-path">hf-jobs/references/token_usage.md</div>
-                    <div class="file-description">Token best practices: secrets vs env, permissions, common errors (401/403), and secure patterns</div>
-                </li>
-                <li>
-                    <a href="hf-jobs/references/hub_saving.md">hub_saving.md</a>
-                    <div class="file-path">hf-jobs/references/hub_saving.md</div>
-                    <div class="file-description">How to persist results: push datasets/models/files to the Hub (ephemeral job filesystem)</div>
-                </li>
-                <li>
-                    <a href="hf-jobs/references/hardware_guide.md">hardware_guide.md</a>
-                    <div class="file-path">hf-jobs/references/hardware_guide.md</div>
-                    <div class="file-description">Flavor selection guidance for CPU/GPU/TPU workloads</div>
-                </li>
-                <li>
-                    <a href="hf-jobs/references/troubleshooting.md">troubleshooting.md</a>
-                    <div class="file-path">hf-jobs/references/troubleshooting.md</div>
-                    <div class="file-description">Common failure modes (timeouts, missing deps, OOM, auth) and fixes</div>
-                </li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>Scripts</h2>
-            <ul class="file-list">
-                <li>
-                    <a href="hf-jobs/scripts/generate-responses.py">generate-responses.py</a>
-                    <div class="file-path">hf-jobs/scripts/generate-responses.py</div>
-                    <div class="file-description">vLLM batch generation: load prompts/messages from a dataset, generate responses, push dataset + card to Hub</div>
-                </li>
-                <li>
-                    <a href="hf-jobs/scripts/cot-self-instruct.py">cot-self-instruct.py</a>
-                    <div class="file-path">hf-jobs/scripts/cot-self-instruct.py</div>
-                    <div class="file-description">CoT Self-Instruct synthetic data generation (reasoning/instruction) + optional filtering, pushes dataset + card</div>
-                </li>
-                <li>
-                    <a href="hf-jobs/scripts/finepdfs-stats.py">finepdfs-stats.py</a>
-                    <div class="file-path">hf-jobs/scripts/finepdfs-stats.py</div>
-                    <div class="file-description">Polars streaming stats over Hub parquet (finepdfs-edu); optional upload of computed stats to a dataset repo</div>
-                </li>
-            </ul>
-        </div>
-    </div>
+<div class="container">
+<h1>Agent Skill : hf-jobs</h1>
+<div class="description">
+<p><strong>Run any workload on Hugging Face Jobs.</strong></p>
+<p>Use this skill when you want to run GPU/CPU workloads (batch inference, synthetic data generation, dataset stats, experiments) on Hugging Face Jobs, with correct token handling and result persistence back to the Hub.</p>
+</div>
+<div class="metadata">
+<p><strong>Skill Name:</strong> hf-jobs</p>
+<p><strong>Main Documentation:</strong> <a href="hf-jobs/SKILL.md">hf-jobs/SKILL.md</a></p>
+<p><strong>Scripts Directory:</strong> <code>hf-jobs/scripts/</code></p>
+<p><strong>References Directory:</strong> <code>hf-jobs/references/</code></p>
+</div>
+<div class="section">
+<h2>Overview</h2>
+<p>This skill focuses on running real workloads via Hugging Face Jobs. It includes ready-to-run UV scripts and guides for authentication (HF tokens), secrets vs env vars, timeouts, hardware selection, and pushing results to the Hub.</p>
+</div>
+<div class="section">
+<h2>Core Documentation</h2>
+<ul class="file-list">
+<li>
+<a href="hf-jobs/SKILL.md">SKILL.md</a>
+<div class="file-path">hf-jobs/SKILL.md</div>
+<div class="file-description">Complete skill documentation (how to submit jobs, tokens/secrets, timeouts, persistence, and how to use the bundled scripts)</div>
+</li>
+</ul>
+</div>
+<div class="section">
+<h2>References</h2>
+<ul class="file-list">
+<li>
+<a href="hf-jobs/references/token_usage.md">token_usage.md</a>
+<div class="file-path">hf-jobs/references/token_usage.md</div>
+<div class="file-description">Token best practices: secrets vs env, permissions, common errors (401/403), and secure patterns</div>
+</li>
+<li>
+<a href="hf-jobs/references/hub_saving.md">hub_saving.md</a>
+<div class="file-path">hf-jobs/references/hub_saving.md</div>
+<div class="file-description">How to persist results: push datasets/models/files to the Hub (ephemeral job filesystem)</div>
+</li>
+<li>
+<a href="hf-jobs/references/hardware_guide.md">hardware_guide.md</a>
+<div class="file-path">hf-jobs/references/hardware_guide.md</div>
+<div class="file-description">Flavor selection guidance for CPU/GPU/TPU workloads</div>
+</li>
+<li>
+<a href="hf-jobs/references/troubleshooting.md">troubleshooting.md</a>
+<div class="file-path">hf-jobs/references/troubleshooting.md</div>
+<div class="file-description">Common failure modes (timeouts, missing deps, OOM, auth) and fixes</div>
+</li>
+</ul>
+</div>
+<div class="section">
+<h2>Scripts</h2>
+<ul class="file-list">
+<li>
+<a href="hf-jobs/scripts/generate-responses.py">generate-responses.py</a>
+<div class="file-path">hf-jobs/scripts/generate-responses.py</div>
+<div class="file-description">vLLM batch generation: load prompts/messages from a dataset, generate responses, push dataset + card to Hub</div>
+</li>
+<li>
+<a href="hf-jobs/scripts/cot-self-instruct.py">cot-self-instruct.py</a>
+<div class="file-path">hf-jobs/scripts/cot-self-instruct.py</div>
+<div class="file-description">CoT Self-Instruct synthetic data generation (reasoning/instruction) + optional filtering, pushes dataset + card</div>
+</li>
+<li>
+<a href="hf-jobs/scripts/finepdfs-stats.py">finepdfs-stats.py</a>
+<div class="file-path">hf-jobs/scripts/finepdfs-stats.py</div>
+<div class="file-description">Polars streaming stats over Hub parquet (finepdfs-edu); optional upload of computed stats to a dataset repo</div>
+</li>
+</ul>
+</div>
+</div>
 </body>
 </html>
-
-
-
-
