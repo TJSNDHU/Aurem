@@ -1,234 +1,199 @@
-# AUREM DEV SKILL: fastapi
-## Context
-This skill is used when ORA helps build,
-debug, or test the AUREM platform itself.
-Stack: FastAPI + React + MongoDB on Emergent.
-## Trigger intent
-User asks to fix, build, debug, test,
-refactor, review, or improve AUREM code.
-Keywords: fix, bug, test, build, refactor,
-review code, write a function, debug this,
-how do I, implement, improve, optimize.
-## Owner Agent
-None — ORA handles dev tasks directly via LLM.
 ---
----
-name: python-fastapi-development
-description: "Python FastAPI backend development with async patterns, SQLAlchemy, Pydantic, authentication, and production API patterns."
-category: granular-workflow-bundle
-risk: safe
-source: personal
-date_added: "2026-02-27"
+name: dev_fastapi
+description: "FastAPI development patterns for the AUREM platform — Motor async MongoDB, Pydantic v2, JWT auth, Emergent deploy"
+risk: low
+source: internal
+date_added: "2026-01-15"
 ---
 
-# Python/FastAPI Development Workflow
+# FastAPI Development Skill — AUREM Platform
 
 ## Overview
 
-Specialized workflow for building production-ready Python backends with FastAPI, featuring async patterns, SQLAlchemy ORM, Pydantic validation, and comprehensive API patterns.
+This skill guides development on the AUREM backend, built with FastAPI + Python 3.11 + Motor (async MongoDB driver) + Pydantic v2. It covers the real patterns used in this repo — not generic FastAPI templates.
 
-## When to Use This Workflow
+## Tech Stack
 
-Use this workflow when:
-- Building new REST APIs with FastAPI
-- Creating async Python backends
-- Implementing database integration with SQLAlchemy
-- Setting up API authentication
-- Developing microservices
-
-## Workflow Phases
-
-### Phase 1: Project Setup
-
-#### Skills to Invoke
-- `app-builder` - Application scaffolding
-- `python-development-python-scaffold` - Python scaffolding
-- `fastapi-templates` - FastAPI templates
-- `uv-package-manager` - Package management
-
-#### Actions
-1. Set up Python environment (uv/poetry)
-2. Create project structure
-3. Configure FastAPI app
-4. Set up logging
-5. Configure environment variables
-
-#### Copy-Paste Prompts
-```
-Use @fastapi-templates to scaffold a new FastAPI project
-```
-
-```
-Use @python-development-python-scaffold to set up Python project structure
-```
-
-### Phase 2: Database Setup
-
-#### Skills to Invoke
-- `prisma-expert` - Prisma ORM (alternative)
-- `database-design` - Schema design
-- `postgresql` - PostgreSQL setup
-- `pydantic-models-py` - Pydantic models
-
-#### Actions
-1. Design database schema
-2. Set up SQLAlchemy models
-3. Create database connection
-4. Configure migrations (Alembic)
-5. Set up session management
-
-#### Copy-Paste Prompts
-```
-Use @database-design to design PostgreSQL schema
-```
-
-```
-Use @pydantic-models-py to create Pydantic models for API
-```
-
-### Phase 3: API Routes
-
-#### Skills to Invoke
-- `fastapi-router-py` - FastAPI routers
-- `api-design-principles` - API design
-- `api-patterns` - API patterns
-
-#### Actions
-1. Design API endpoints
-2. Create API routers
-3. Implement CRUD operations
-4. Add request validation
-5. Configure response models
-
-#### Copy-Paste Prompts
-```
-Use @fastapi-router-py to create API endpoints with CRUD operations
-```
-
-```
-Use @api-design-principles to design RESTful API
-```
-
-### Phase 4: Authentication
-
-#### Skills to Invoke
-- `auth-implementation-patterns` - Authentication
-- `api-security-best-practices` - API security
-
-#### Actions
-1. Choose auth strategy (JWT, OAuth2)
-2. Implement user registration
-3. Set up login endpoints
-4. Create auth middleware
-5. Add password hashing
-
-#### Copy-Paste Prompts
-```
-Use @auth-implementation-patterns to implement JWT authentication
-```
-
-### Phase 5: Error Handling
-
-#### Skills to Invoke
-- `fastapi-pro` - FastAPI patterns
-- `error-handling-patterns` - Error handling
-
-#### Actions
-1. Create custom exceptions
-2. Set up exception handlers
-3. Implement error responses
-4. Add request logging
-5. Configure error tracking
-
-#### Copy-Paste Prompts
-```
-Use @fastapi-pro to implement comprehensive error handling
-```
-
-### Phase 6: Testing
-
-#### Skills to Invoke
-- `python-testing-patterns` - pytest testing
-- `api-testing-observability-api-mock` - API testing
-
-#### Actions
-1. Set up pytest
-2. Create test fixtures
-3. Write unit tests
-4. Implement integration tests
-5. Configure test database
-
-#### Copy-Paste Prompts
-```
-Use @python-testing-patterns to write pytest tests for FastAPI
-```
-
-### Phase 7: Documentation
-
-#### Skills to Invoke
-- `api-documenter` - API documentation
-- `openapi-spec-generation` - OpenAPI specs
-
-#### Actions
-1. Configure OpenAPI schema
-2. Add endpoint documentation
-3. Create usage examples
-4. Set up API versioning
-5. Generate API docs
-
-#### Copy-Paste Prompts
-```
-Use @api-documenter to generate comprehensive API documentation
-```
-
-### Phase 8: Deployment
-
-#### Skills to Invoke
-- `deployment-engineer` - Deployment
-- `docker-expert` - Containerization
-
-#### Actions
-1. Create Dockerfile
-2. Set up docker-compose
-3. Configure production settings
-4. Set up reverse proxy
-5. Deploy to cloud
-
-#### Copy-Paste Prompts
-```
-Use @docker-expert to containerize FastAPI application
-```
-
-## Technology Stack
-
-| Category | Technology |
-|----------|------------|
-| Framework | FastAPI |
+| Component | Technology |
+|---|---|
+| Framework | FastAPI 0.115 |
 | Language | Python 3.11+ |
-| ORM | SQLAlchemy 2.0 |
+| Database | MongoDB (Motor async driver) |
+| ODM | motor.motor_asyncio.AsyncIOMotorClient |
 | Validation | Pydantic v2 |
-| Database | PostgreSQL |
-| Migrations | Alembic |
-| Auth | JWT, OAuth2 |
-| Testing | pytest |
+| Migrations | TTL indexes via registry.py init |
+| Auth | JWT + OAuth2 (python-jose, PyJWT) |
+| Testing | pytest + pytest-asyncio |
+| Deploy | Emergent platform (supervisor-managed hot-reload) |
+| Cache | Redis 7.4 (aioredis) |
+| HTTP Client | httpx (async) |
 
-## Quality Gates
+## Phase 1: Project Structure
 
-- [ ] All tests passing (>80% coverage)
-- [ ] Type checking passes (mypy)
-- [ ] Linting clean (ruff, black)
-- [ ] API documentation complete
-- [ ] Security scan passed
-- [ ] Performance benchmarks met
+```
+backend/
+  routers/          # FastAPI APIRouter modules (426+ files)
+  services/         # Business logic + autonomous systems
+  config.py         # Centralized config via os.environ.get
+  server.py         # App entry, CORS, lifespan, route registration
+  middleware/       # Auth, rate limiting, tenant isolation
+  tests/            # pytest test suite
+```
 
-## Related Workflow Bundles
+## Phase 2: Database Setup (Motor + MongoDB)
 
-- `development` - General development
-- `database` - Database operations
-- `security-audit` - Security testing
-- `api-development` - API patterns
+Use Motor async MongoDB. Never use synchronous PyMongo in route handlers.
 
-## Limitations
-- Use this skill only when the task clearly matches the scope described above.
-- Do not treat the output as a substitute for environment-specific validation, testing, or expert review.
-- Stop and ask for clarification if required inputs, permissions, safety boundaries, or success criteria are missing.
+```python
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+
+_client = AsyncIOMotorClient(os.environ.get("MONGO_URL", ""))
+_db = _client[os.environ.get("DB_NAME", "aurem")]
+```
+
+### Tenant-Scoped Database
+
+Use `TenantScopedDatabase` from `services/scoped_db.py` for multi-tenant isolation. Every query must scope by `FOUNDER_BIN` or tenant ID.
+
+```python
+from services.scoped_db import get_tenant_db
+
+db = await get_tenant_db(founder_bin)
+cursor = db.leads.find(
+    {"founder_bin": founder_bin},
+    {"_id": 0}  # always exclude _id via projection
+)
+```
+
+### TTL Indexes
+
+All time-series collections need TTL indexes. Register them in `registry.py` so they are created on startup:
+
+```python
+await db.collection.create_index(
+    "created_at",
+    expireAfterSeconds=86400  # 24h TTL
+)
+```
+
+### Projection Rules
+
+- Always exclude `_id` in find projections: `{"_id": 0}`
+- Reattach `timezone.utc` to any datetime fields read from MongoDB (MongoDB strips tzinfo)
+- Never return raw `_id` ObjectId to the client
+
+## Phase 3: Pydantic v2 Models
+
+Use Pydantic v2 `BaseModel` with `model_config = ConfigDict(...)`:
+
+```python
+from pydantic import BaseModel, ConfigDict, Field
+
+class LeadCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    business_name: str = Field(..., min_length=1, max_length=200)
+    phone: str | None = None
+    website: str | None = None
+```
+
+## Phase 4: Router Patterns
+
+```python
+from fastapi import APIRouter, Depends, HTTPException, status
+
+router = APIRouter(prefix="/api/v1/leads", tags=["leads"])
+
+@router.get("/{lead_id}")
+async def get_lead(lead_id: str, db=Depends(get_db)):
+    lead = await db.leads.find_one(
+        {"lead_id": lead_id, "founder_bin": founder_bin},
+        {"_id": 0}
+    )
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return lead
+```
+
+## Phase 5: Authentication
+
+- JWT tokens via `python-jose` or `PyJWT`
+- OAuth2 password flow for login
+- Admin check via `is_admin_email()` fallback
+- Token expiry handled by PyJWT default verification
+- Never hardcode secrets — always `os.environ.get("SECRET_KEY")`
+
+## Phase 6: Error Handling
+
+AUREM rule: services must never raise. Catch and log.
+
+```python
+import logging
+logger = logging.getLogger(__name__)
+
+async def process_lead(lead_data: dict) -> dict:
+    try:
+        result = await db.leads.insert_one(lead_data)
+        return {"inserted_id": str(result.inserted_id)}
+    except Exception as exc:
+        logger.error("Failed to insert lead: %s", exc)
+        return {"error": "insert_failed"}
+```
+
+## Phase 7: Environment Variables
+
+- Read via `os.environ.get("KEY", default)` only
+- Never hardcode credentials, tokens, or connection strings
+- Required vars defined in `.env.example`
+- Use `os.environ.get` not `os.getenv` for consistency with existing codebase
+
+## Phase 8: Datetime Handling
+
+- Use `datetime.datetime.now(datetime.timezone.utc)` for all timestamps
+- Never use `datetime.datetime.utcnow()` — deprecated since Python 3.12
+- MongoDB strips timezone info on read — always reattach `timezone.utc`
+
+```python
+from datetime import datetime, timezone
+
+timestamp = datetime.now(timezone.utc)
+```
+
+## Phase 9: Deployment (Emergent Platform)
+
+- Emergent platform manages the process via supervisor
+- Hot-reload on deploy — no full restart needed
+- Health check at `/health` endpoint
+- Graceful shutdown via FastAPI lifespan events
+- Deploy logs filtered for noise (see `server.py` suppression block)
+
+## Phase 10: Testing
+
+- pytest with `pytest-asyncio` for async tests
+- Test files in `backend/tests/`
+- Run: `pytest -q`
+- Security tests in `backend/tests/test_security_*.py`
+
+## AUREM-Specific Rules
+
+1. **Never raise in services** — catch + log + return error dict
+2. **All new collections need TTL** — register in `registry.py`
+3. **MongoDB queries must exclude `_id`** via projection and reattach `timezone.utc`
+4. **Env vars via `os.environ.get` only** — never hardcode
+5. **Run `ruff check` + `pytest -q` after changes**
+6. **Tenant isolation** — every query must scope by `founder_bin`
+7. **No bare `except:`** — always catch specific exceptions
+8. **Type hints required** on all function signatures
+9. **Use `Depends()` for DB injection** in route handlers
+10. **Async/await everywhere** — never block the event loop
+
+## Common Anti-Patterns to Avoid
+
+- Using synchronous PyMongo in async route handlers
+- Returning raw `_id` ObjectId to clients
+- Using `datetime.utcnow()` instead of `datetime.now(timezone.utc)`
+- Hardcoding secrets or connection strings
+- Bare `except:` clauses
+- Missing tenant scope in MongoDB queries
+- Raising exceptions from service-layer code
+- Using `os.getenv` instead of `os.environ.get` (codebase convention)
