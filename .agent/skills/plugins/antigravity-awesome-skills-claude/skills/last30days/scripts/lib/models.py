@@ -25,9 +25,10 @@ def parse_version(model_id: str) -> Optional[Tuple[int, ...]]:
         gpt-5.2 -> (5, 2)
         gpt-5.2.1 -> (5, 2, 1)
     """
-    match = re.search(r'(\d+(?:\.\d+)*)', model_id)
+    match = re.search(r'(\d[\d.]*)', model_id)
     if match:
-        return tuple(int(x) for x in match.group(1).split('.'))
+        version_str = match.group(1).rstrip('.')
+        return tuple(int(x) for x in version_str.split('.'))
     return None
 
 
