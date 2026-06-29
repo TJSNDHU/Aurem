@@ -1,3 +1,6 @@
+import ast
+import operator as _operator
+
 def do_algebra(operator, operand):
     """
     Given two lists operator, and operand. The first list has basic algebra operations, and 
@@ -26,4 +29,20 @@ def do_algebra(operator, operand):
     expression = str(operand[0])
     for i, op in enumerate(operator):
         expression += ' ' + op + ' ' + str(operand[i + 1])
-    return eval(expression)
+    _ops = {
+        ast.Add: _operator.add,
+        ast.Sub: _operator.sub,
+        ast.Mult: _operator.mul,
+        ast.FloorDiv: _operator.floordiv,
+        ast.Pow: _operator.pow,
+    }
+    tree = ast.parse(expression, mode='eval')
+    def _eval(node):
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.BinOp):
+            return _ops[type(node.op)](_eval(node.left), _eval(node.right))
+        raise ValueError("Unsupported expression node")
+    return _eval(tree)
