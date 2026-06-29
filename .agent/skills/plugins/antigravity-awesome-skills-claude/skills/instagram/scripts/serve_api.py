@@ -33,7 +33,7 @@ from config import STATIC_DIR
 from db import Database
 
 try:
-    from fastapi import FastAPI, Query
+    from fastapi import FastAPI, Query, Request
     from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
     import uvicorn
 except ImportError:
@@ -45,6 +45,17 @@ app = FastAPI(
     description="API REST para dados e analytics do Instagram",
     version="1.0.0",
 )
+
+MAX_BODY_SIZE = 1 * 1024 * 1024  # 1 MB
+
+
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+    return await call_next(request)
+
 
 db = Database()
 db.init()
@@ -206,7 +217,10 @@ def webhook_stub():
 
 
 @app.post("/webhook", summary="Webhook receiver (v2)")
-def webhook_receive():
+async def webhook_receive(request: Request):
+    body = await request.body()
+    if len(body) > MAX_BODY_SIZE:
+        return JSONResponse(status_code=413, content={"detail": "Request body too large"})
     return {"status": "ok"}
 
 
