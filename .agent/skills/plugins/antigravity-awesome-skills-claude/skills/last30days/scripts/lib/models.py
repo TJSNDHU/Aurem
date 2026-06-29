@@ -36,7 +36,7 @@ def is_mainline_openai_model(model_id: str) -> bool:
     model_lower = model_id.lower()
 
     # Must be gpt-5 series
-    if not re.match(r'^gpt-5(\.\d+)*$', model_lower):
+    if not re.match(r'^gpt-5(?:\.\d+){0,4}$', model_lower):
         return False
 
     # Exclude variants
