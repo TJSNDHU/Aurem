@@ -3,7 +3,7 @@ Production-ready REST API template using FastAPI.
 Includes pagination, filtering, error handling, and best practices.
 """
 
-from fastapi import FastAPI, HTTPException, Query, Path, Depends, status
+from fastapi import FastAPI, HTTPException, Query, Path, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -94,6 +94,17 @@ async def http_exception_handler(request, exc):
         ).model_dump()
     )
 
+# Body size limit dependency to prevent large-payload DoS
+MAX_BODY_SIZE = 1024 * 1024  # 1 MB
+
+async def limit_body_size(request: Request):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Request body too large"
+        )
+
 # Endpoints
 @app.get("/api/users", response_model=PaginatedResponse, tags=["Users"])
 async def list_users(
@@ -126,7 +137,7 @@ async def list_users(
     )
 
 @app.post("/api/users", response_model=User, status_code=status.HTTP_201_CREATED, tags=["Users"])
-async def create_user(user: UserCreate):
+async def create_user(user: UserCreate, _: None = Depends(limit_body_size)):
     """Create a new user."""
     # Mock implementation
     return User(
