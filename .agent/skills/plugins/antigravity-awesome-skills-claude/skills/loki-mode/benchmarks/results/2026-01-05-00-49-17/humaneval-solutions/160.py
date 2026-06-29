@@ -23,7 +23,15 @@ def do_algebra(operator, operand):
         Operator list has at least one operator, and operand list has at least two operands.
 
     """
-    expression = str(operand[0])
+    import operator as op_module
+    ops = {
+        '+': op_module.add,
+        '-': op_module.sub,
+        '*': op_module.mul,
+        '//': op_module.floordiv,
+        '**': op_module.pow,
+    }
+    result = operand[0]
     for i, op in enumerate(operator):
-        expression += ' ' + op + ' ' + str(operand[i + 1])
-    return eval(expression)
+        result = ops[op](result, operand[i + 1])
+    return result
