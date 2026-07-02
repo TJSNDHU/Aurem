@@ -1,31 +1,41 @@
-import bcrypt
-from typing import Tuple
+"""Authentication utilities for the AUREM backend."""
 
-def verify_password(plain_password: str, hashed_password: str) -> Tuple[bool, str]:
+from functools import wraps
+from flask import request, jsonify
+from werkzeug.exceptions import Unauthorized
+
+def require_auth(f):
     """
-    Securely verifies a plaintext password against a hashed password using bcrypt.
-    
-    Args:
-        plain_password (str): The plaintext password to verify
-        hashed_password (str): The bcrypt hashed password to compare against
-        
+    Decorator that enforces JWT authentication for protected routes.
+
+    Validates the presence and validity of an Authorization header with a Bearer token.
+    Attaches the decoded JWT payload to the request object as `request.user`.
+
     Returns:
-        Tuple[bool, str]: A tuple containing:
-            - bool: True if passwords match, False otherwise
-            - str: Error message if verification fails, empty string otherwise
-            
-    Security Considerations:
-        - Uses constant-time comparison to prevent timing attacks
-        - Handles bcrypt verification errors gracefully
-        - Never leaks information about why verification failed
+        Unauthorized (401): If no token is provided or token is invalid.
+        Forbidden (403): If token is valid but lacks required permissions.
+
+    Example:
+        @app.route('/protected')
+        @require_auth
+        def protected_route():
+            user_id = request.user['userId']
+            return jsonify(message=f"Hello {user_id}")
     """
-    try:
-        if not plain_password or not hashed_password:
-            return False, "Missing password input"
-            
-        return bcrypt.checkpw(
-            plain_password.encode('utf-8'),
-            hashed_password.encode('utf-8')
-        ), ""
-    except Exception as e:
-        return False, f"Password verification failed: {str(e)}"
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            raise Unauthorized('Authorization header is required')
+
+        try:
+            token = auth_header.split(' ')[1]
+            payload = verify_jwt(token)  # Assumes verify_jwt is implemented elsewhere
+            request.user = payload
+        except IndexError:
+            raise Unauthorized('Invalid token format. Expected: Bearer <token>')
+        except Exception as e:
+            raise Unauthorized(f'Invalid token: {str(e)}')
+
+        return f(*args, **kwargs)
+    return decorated_function
