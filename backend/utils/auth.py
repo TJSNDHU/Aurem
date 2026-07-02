@@ -99,6 +99,12 @@ async def get_current_user(request: Request) -> Optional[dict]:
         ``SUPER_ADMIN_PERMISSIONS`` mapping. Returns ``None`` when no
         token is supplied, the token is invalid/expired, or the referenced
         user or active team member cannot be found.
+
+    Raises:
+        This function does not raise exceptions on authentication failure;
+        invalid or expired tokens result in a return value of ``None``.
+        Any unexpected errors during token decoding or database lookup are
+        caught and also result in ``None``.
     """
     db = get_database()
     
