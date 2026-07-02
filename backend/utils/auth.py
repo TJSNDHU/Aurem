@@ -81,7 +81,25 @@ def create_token(user_id: str, is_admin: bool = False, email: str = None) -> str
 
 
 async def get_current_user(request: Request) -> Optional[dict]:
-    """Get current user from JWT token in Authorization header or cookie"""
+    """Resolve and return the currently authenticated user from the request.
+
+    The caller's identity is established from a JWT, which may be supplied
+    either as a ``Bearer`` token in the ``Authorization`` header or as the
+    ``session_token`` cookie. The token is decoded and validated using the
+    application's configured JWT secret and algorithm.
+
+    Args:
+        request: The incoming FastAPI ``Request`` containing the headers
+            and cookies used to locate the authentication token.
+
+    Returns:
+        A dictionary describing the authenticated user when a valid token
+        is present. For team members this includes their role name and
+        permissions; for super admins it includes the full
+        ``SUPER_ADMIN_PERMISSIONS`` mapping. Returns ``None`` when no
+        token is supplied, the token is invalid/expired, or the referenced
+        user or active team member cannot be found.
+    """
     db = get_database()
     
     # Try Authorization header first
