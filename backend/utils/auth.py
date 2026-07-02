@@ -33,13 +33,25 @@ SUPER_ADMIN_PERMISSIONS = {
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt.
+    """Hash a plaintext password using bcrypt with a work factor of 10 rounds.
 
-    iter 324f — rounds=10 (down from default 12). Per OWASP 2024:
-    10 is the minimum for web logins; 12 is overkill at ~200-400ms CPU
-    per call. rounds=10 takes ~50-100ms and stays industry-secure.
-    Old passwords hashed at 12 rounds verify fine because bcrypt stores
-    the rounds value in the hash string itself.
+    Uses bcrypt's adaptive hash with ``rounds=10`` (down from the default
+    12). Per OWASP 2024 guidance, 10 rounds is the minimum recommended
+    for web logins and takes ~50-100ms, while 12 rounds is overkill at
+    ~200-400ms per call. Existing passwords hashed at 12 rounds still
+    verify correctly because bcrypt stores the rounds value in the hash
+    string itself.
+
+    Args:
+        password: The plaintext password to hash.
+
+    Returns:
+        A bcrypt hash string suitable for persistent storage.
+
+    Raises:
+        TypeError: If ``password`` is not a string.
+        ValueError: If ``password`` cannot be encoded as UTF-8 or
+            exceeds bcrypt's 72-byte input limit.
     """
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=10)).decode("utf-8")
 
