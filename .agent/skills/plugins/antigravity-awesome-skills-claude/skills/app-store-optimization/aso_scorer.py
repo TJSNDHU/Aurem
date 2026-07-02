@@ -330,153 +330,62 @@ class ASOScorer:
         """Generate prioritized recommendations based on scores."""
         recommendations = []
 
-        # Metadata recommendations
-        if metadata_score < 60:
-            recommendations.append({
+        recommendations.extend(self._metadata_recommendations(metadata_score))
+        recommendations.extend(self._ratings_recommendations(ratings_score))
+        recommendations.extend(self._keyword_recommendations(keyword_score))
+        recommendations.extend(self._conversion_recommendations(conversion_score))
+
+        return recommendations
+
+    def _metadata_recommendations(self, score: float) -> List[Dict[str, Any]]:
+        """Generate recommendations for metadata quality."""
+        if score < 60:
+            return [{
                 'category': 'metadata_quality',
                 'priority': 'high',
                 'action': 'Optimize app title and description',
                 'details': 'Add more keywords to title, expand description to 1500-2000 characters, improve keyword density to 3-5%',
                 'expected_impact': 'Improve discoverability and ranking potential'
-            })
-        elif metadata_score < 80:
-            recommendations.append({
+            }]
+        elif score < 80:
+            return [{
                 'category': 'metadata_quality',
                 'priority': 'medium',
                 'action': 'Refine metadata for better keyword targeting',
                 'details': 'Test variations of title/subtitle, optimize keyword field for Apple',
                 'expected_impact': 'Incremental ranking improvements'
-            })
+            }]
+        return []
 
-        # Ratings recommendations
-        if ratings_score < 60:
-            recommendations.append({
+    def _ratings_recommendations(self, score: float) -> List[Dict[str, Any]]:
+        """Generate recommendations for ratings and reviews."""
+        if score < 60:
+            return [{
                 'category': 'ratings_reviews',
                 'priority': 'high',
                 'action': 'Improve rating quality and volume',
                 'details': 'Address top user complaints, implement in-app rating prompts, respond to negative reviews',
                 'expected_impact': 'Better conversion rates and trust signals'
-            })
-        elif ratings_score < 80:
-            recommendations.append({
+            }]
+        elif score < 80:
+            return [{
                 'category': 'ratings_reviews',
                 'priority': 'medium',
                 'action': 'Increase rating velocity',
                 'details': 'Optimize timing of rating requests, encourage satisfied users to rate',
                 'expected_impact': 'Sustained rating quality'
-            })
+            }]
+        return []
 
-        # Keyword performance recommendations
-        if keyword_score < 60:
-            recommendations.append({
+    def _keyword_recommendations(self, score: float) -> List[Dict[str, Any]]:
+        """Generate recommendations for keyword performance."""
+        if score < 60:
+            return [{
                 'category': 'keyword_performance',
                 'priority': 'high',
                 'action': 'Improve keyword rankings',
                 'details': 'Target long-tail keywords with lower competition, update metadata with high-potential keywords, build backlinks',
                 'expected_impact': 'Significant improvement in organic visibility'
-            })
-        elif keyword_score < 80:
-            recommendations.append({
-                'category': 'keyword_performance',
-                'priority': 'medium',
-                'action': 'Expand keyword coverage',
-                'details': 'Target additional related keywords, test seasonal keywords, localize for new markets',
-                'expected_impact': 'Broader reach and more discovery opportunities'
-            })
-
-        # Conversion recommendations
-        if conversion_score < 60:
-            recommendations.append({
-                'category': 'conversion_metrics',
-                'priority': 'high',
-                'action': 'Optimize store listing for conversions',
-                'details': 'Improve screenshots and icon, strengthen value proposition in description, add video preview',
-                'expected_impact': 'Higher impression-to-install conversion'
-            })
-        elif conversion_score < 80:
-            recommendations.append({
-                'category': 'conversion_metrics',
-                'priority': 'medium',
-                'action': 'Test visual asset variations',
-                'details': 'A/B test different icon designs and screenshot sequences',
-                'expected_impact': 'Incremental conversion improvements'
-            })
-
-        return recommendations
-
-    def _assess_health_status(self, overall_score: float) -> str:
-        """Assess overall ASO health status."""
-        if overall_score >= 80:
-            return "Excellent - Top-tier ASO performance"
-        elif overall_score >= 65:
-            return "Good - Competitive ASO with room for improvement"
-        elif overall_score >= 50:
-            return "Fair - Needs strategic improvements"
-        else:
-            return "Poor - Requires immediate ASO overhaul"
-
-    def _prioritize_actions(
-        self,
-        recommendations: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Prioritize actions by impact and urgency."""
-        # Sort by priority (high first) and expected impact
-        priority_order = {'high': 0, 'medium': 1, 'low': 2}
-
-        sorted_recommendations = sorted(
-            recommendations,
-            key=lambda x: priority_order[x['priority']]
-        )
-
-        return sorted_recommendations[:3]  # Top 3 priority actions
-
-    def _identify_strengths(self, score_breakdown: Dict[str, Any]) -> List[str]:
-        """Identify areas of strength (scores >= 75)."""
-        strengths = []
-
-        for category, data in score_breakdown.items():
-            if data['score'] >= 75:
-                strengths.append(
-                    f"{category.replace('_', ' ').title()}: {data['score']}/100"
-                )
-
-        return strengths if strengths else ["Focus on building strengths across all areas"]
-
-    def _identify_weaknesses(self, score_breakdown: Dict[str, Any]) -> List[str]:
-        """Identify areas needing improvement (scores < 60)."""
-        weaknesses = []
-
-        for category, data in score_breakdown.items():
-            if data['score'] < 60:
-                weaknesses.append(
-                    f"{category.replace('_', ' ').title()}: {data['score']}/100 - needs improvement"
-                )
-
-        return weaknesses if weaknesses else ["All areas performing adequately"]
-
-
-def calculate_aso_score(
-    metadata: Dict[str, Any],
-    ratings: Dict[str, Any],
-    keyword_performance: Dict[str, Any],
-    conversion: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Convenience function to calculate ASO score.
-
-    Args:
-        metadata: Metadata quality metrics
-        ratings: Ratings data
-        keyword_performance: Keyword ranking data
-        conversion: Conversion metrics
-
-    Returns:
-        Complete ASO score report
-    """
-    scorer = ASOScorer()
-    return scorer.calculate_overall_score(
-        metadata,
-        ratings,
-        keyword_performance,
-        conversion
-    )
+            }]
+        elif score < 80:
+            return
