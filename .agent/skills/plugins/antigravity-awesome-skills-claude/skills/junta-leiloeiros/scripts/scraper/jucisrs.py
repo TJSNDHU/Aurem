@@ -1,7 +1,7 @@
 """
 Scraper JUCISRS — Junta Comercial, Industrial e Servicos do Rio Grande do Sul
 URL: https://sistemas.jucisrs.rs.gov.br/leiloeiros/
-Metodo: httpx POST com verify=False (SSL invalido mas conteudo OK)
+Metodo: httpx POST com verificacao SSL configuravel via variavel de ambiente
 Mecanismo real descoberto em 2026-02-25:
   - GET  https://sistemas.jucisrs.rs.gov.br/leiloeiros/
          -> retorna formulario de busca PHP/Bootstrap
@@ -15,12 +15,16 @@ Nota: Antigo dominio jucers.rs.gov.br foi aposentado. Junta renomeada para JUCIS
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import List
 
 from .base_scraper import AbstractJuntaScraper, Leiloeiro
 
 logger = logging.getLogger(__name__)
+
+# TODO: Set JUCISRS_SSL_VERIFY=false in env if the certificate is self-signed/invalid
+_VERIFY_SSL = os.environ.get("JUCISRS_SSL_VERIFY", "true").lower() not in ("false", "0", "no")
 
 # Regex para extrair dados do formato plano JUCISRS
 RE_MATRICULA_NOME = re.compile(r"(\d+)\s*-\s*(.+)")
@@ -177,7 +181,7 @@ class JucisrsScraper(AbstractJuntaScraper):
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,  # Cert autoassinado/invalido
+                verify=_VERIFY_SSL,
                 follow_redirects=True,
                 timeout=60.0,
             ) as client:
@@ -214,7 +218,7 @@ class JucisrsScraper(AbstractJuntaScraper):
 
     async def _fetch_get_all(self) -> List[dict]:
         """
-        Fallback: GET simples na URL principal com verify=False.
+        Fallback: GET simples na URL principal com verify=_VERIFY_SSL.
         Pode retornar formulario ou lista parcial.
         """
         import httpx
@@ -223,7 +227,7 @@ class JucisrsScraper(AbstractJuntaScraper):
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,
+                verify=_VERIFY_SSL,
                 follow_redirects=True,
                 timeout=30.0,
             ) as client:
@@ -257,43 +261,4 @@ class JucisrsScraper(AbstractJuntaScraper):
                 )
                 page = await ctx.new_page()
                 try:
-                    await page.goto(url, timeout=60000, wait_until="networkidle")
-                    # Submeter o formulario com "Todos"
-                    try:
-                        await page.fill("input[name='Nome']", "Todos")
-                        await page.click("button[type='submit'], input[type='submit']")
-                        await page.wait_for_load_state("networkidle", timeout=30000)
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-                html = await page.content()
-                await browser.close()
-                return self._parse_plain_html(html)
-        except Exception as exc:
-            logger.error("[RS] Playwright SSL bypass falhou: %s", exc)
-            return []
-
-    async def parse_leiloeiros(self) -> List[Leiloeiro]:
-        # Estrategia 1: POST direto (mais eficiente, retorna todos de uma vez)
-        records = await self._fetch_post()
-
-        if not records:
-            # Estrategia 2: GET simples
-            logger.info("[RS] POST falhou, tentando GET simples")
-            records = await self._fetch_get_all()
-
-        if not records:
-            # Estrategia 3: Playwright com SSL bypass e submissao de formulario
-            logger.info("[RS] GET falhou, tentando Playwright com SSL bypass")
-            records = await self._playwright_ssl_bypass(self.url)
-
-        if not records:
-            # Estrategia 4: Pagina informativa (pode ter lista estatica)
-            logger.info("[RS] Tentando pagina informativa: %s", self.url_fallback)
-            soup = await self.fetch_page(url=self.url_fallback)
-            if soup:
-                records = self._parse_plain_html(str(soup))
-
-        logger.info("[RS] Total de registros encontrados: %d", len(records))
-        return [self.make_leiloeiro(**r) for r in records if r.get("nome")]
+                    await
