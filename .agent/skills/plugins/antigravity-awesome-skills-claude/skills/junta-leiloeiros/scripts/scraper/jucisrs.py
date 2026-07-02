@@ -1,7 +1,7 @@
 """
 Scraper JUCISRS — Junta Comercial, Industrial e Servicos do Rio Grande do Sul
 URL: https://sistemas.jucisrs.rs.gov.br/leiloeiros/
-Metodo: httpx POST com verify=False (SSL invalido mas conteudo OK)
+Metodo: httpx POST (SSL verificado)
 Mecanismo real descoberto em 2026-02-25:
   - GET  https://sistemas.jucisrs.rs.gov.br/leiloeiros/
          -> retorna formulario de busca PHP/Bootstrap
@@ -177,7 +177,6 @@ class JucisrsScraper(AbstractJuntaScraper):
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,  # Cert autoassinado/invalido
                 follow_redirects=True,
                 timeout=60.0,
             ) as client:
@@ -214,7 +213,7 @@ class JucisrsScraper(AbstractJuntaScraper):
 
     async def _fetch_get_all(self) -> List[dict]:
         """
-        Fallback: GET simples na URL principal com verify=False.
+        Fallback: GET simples na URL principal.
         Pode retornar formulario ou lista parcial.
         """
         import httpx
@@ -223,7 +222,6 @@ class JucisrsScraper(AbstractJuntaScraper):
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,
                 follow_redirects=True,
                 timeout=30.0,
             ) as client:
