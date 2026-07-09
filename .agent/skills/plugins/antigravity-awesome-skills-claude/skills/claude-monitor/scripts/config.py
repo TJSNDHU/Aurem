@@ -1,3 +1,5 @@
+import os
+
 """
 Configurações e thresholds para o Claude Monitor.
 """
@@ -38,7 +40,8 @@ BROWSER_NAMES = ["chrome", "msedge", "firefox", "brave", "opera", "vivaldi"]
 CLAUDE_NAMES = ["claude"]
 
 # Endpoint para teste de latência
-API_ENDPOINT = "api.anthropic.com"
+# TODO: Set ANTHROPIC_API_ENDPOINT in .env
+API_ENDPOINT = os.environ.get("ANTHROPIC_API_ENDPOINT", "api.anthropic.com")
 
 # Monitor defaults
 MONITOR_DEFAULTS = {
