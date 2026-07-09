@@ -28,7 +28,14 @@ def do_algebra(operator, operand):
         Operator list has at least one operator, and operand list has at least two operands.
 
     """
-    expression = str(operand[0])
+    ops = {
+        '+': lambda a, b: a + b,
+        '-': lambda a, b: a - b,
+        '*': lambda a, b: a * b,
+        '//': lambda a, b: a // b,
+        '**': lambda a, b: a ** b,
+    }
+    result = operand[0]
     for i, op in enumerate(operator):
-        expression += op + str(operand[i + 1])
-    return eval(expression)
+        result = ops[op](result, operand[i + 1])
+    return result
