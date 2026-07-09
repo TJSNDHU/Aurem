@@ -1,3 +1,6 @@
+import ast
+
+
 def do_algebra(operator, operand):
     """
     Given two lists operator, and operand. The first list has basic algebra operations, and 
@@ -26,4 +29,28 @@ def do_algebra(operator, operand):
     expression = str(operand[0])
     for i, op in enumerate(operator):
         expression += ' ' + op + ' ' + str(operand[i + 1])
-    return eval(expression)
+    return _safe_eval(ast.parse(expression, mode='eval'))
+
+
+def _safe_eval(node):
+    if isinstance(node, ast.Expression):
+        return _safe_eval(node.body)
+    if isinstance(node, ast.BinOp):
+        left = _safe_eval(node.left)
+        right = _safe_eval(node.right)
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.FloorDiv):
+            return left // right
+        if isinstance(node.op, ast.Pow):
+            return left ** right
+        raise ValueError("Unsupported operation")
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Num):
+        return node.n
+    raise ValueError("Unsupported expression")
