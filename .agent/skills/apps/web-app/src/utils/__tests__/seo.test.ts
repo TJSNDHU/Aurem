@@ -125,7 +125,9 @@ describe('SEO helpers', () => {
   });
 
   it('setPageMeta updates the same meta tags on repeated invocations', () => {
-    document.head.innerHTML = '';
+    while (document.head.firstChild) {
+      document.head.removeChild(document.head.firstChild);
+    }
 
     setPageMeta(buildHomeMeta(10));
     setPageMeta(buildSkillMeta({
