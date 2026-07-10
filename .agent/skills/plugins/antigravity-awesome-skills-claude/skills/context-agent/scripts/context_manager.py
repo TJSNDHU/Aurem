@@ -82,13 +82,64 @@ def cmd_init(args):
     print(f"  Registro de projetos: {PROJECT_REGISTRY_PATH}")
 
 
+def _resolve_session_path(args):
+    """Encontra o arquivo de sessão a partir dos argumentos."""
+    if args.session:
+        return Path(args.session)
+    return get_latest_session_file()
+
+
+def _build_search_sections(summary):
+    """Constrói o dicionário de seções para indexação de busca."""
+    return {
+        "topics": "\n".join(summary.topics),
+        "decisions": "\n".join(summary.decisions),
+        "tasks_completed": "\n".join(summary.tasks_completed),
+        "tasks_pending": "\n".join(
+            t.description if hasattr(t, 'description') else str(t)
+            for t in summary.tasks_pending
+        ),
+        "files_modified": "\n".join(f["path"] for f in summary.files_modified),
+        "key_findings": "\n".join(summary.key_findings),
+        "errors": "\n".join(e["error"] for e in summary.errors_resolved),
+    }
+
+
+def _update_projects(summary, session_number):
+    """Atualiza o registro de projetos com base na sessão."""
+    projects = load_registry()
+    for pname in summary.projects_touched:
+        projects = update_project(
+            projects, pname,
+            last_touched=summary.date,
+            last_session=session_number,
+            status="active",
+        )
+    save_registry(projects)
+    return projects
+
+
+def _index_session_for_search(session_number, summary):
+    """Indexa a sessão no banco de busca."""
+    init_search_db()
+    sections = _build_search_sections(summary)
+    index_session(session_number, summary.date, sections)
+    print("  Índice de busca atualizado")
+
+
+def _print_save_summary(session_number, summary):
+    """Exibe o resumo final do salvamento."""
+    print(f"\nContexto da sessão {session_number:03d} salvo com sucesso!")
+    print(f"  Tópicos: {len(summary.topics)}")
+    print(f"  Decisões: {len(summary.decisions)}")
+    print(f"  Tarefas completadas: {len(summary.tasks_completed)}")
+    print(f"  Tarefas pendentes: {len(summary.tasks_pending)}")
+    print(f"  Arquivos modificados: {len(summary.files_modified)}")
+
+
 def cmd_save(args):
     """Salva contexto da sessão atual."""
-    # Encontrar arquivo de sessão
-    if args.session:
-        session_path = Path(args.session)
-    else:
-        session_path = get_latest_session_file()
+    session_path = _resolve_session_path(args)
 
     if not session_path or not session_path.exists():
         print("Nenhum arquivo de sessão encontrado.")
@@ -114,23 +165,14 @@ def cmd_save(args):
     # 3. Detectar projetos tocados
     files_mod = extract_files_modified(entries)
     tool_calls = extract_tool_calls(entries)
-    projects_touched = detect_projects_from_session(files_mod, tool_calls)
-    summary.projects_touched = projects_touched
+    summary.projects_touched = detect_projects_from_session(files_mod, tool_calls)
 
     # 4. Salvar resumo da sessão
     path = save_session_summary(summary)
     print(f"  Resumo salvo: {path}")
 
     # 5. Atualizar registro de projetos
-    projects = load_registry()
-    for pname in projects_touched:
-        projects = update_project(
-            projects, pname,
-            last_touched=summary.date,
-            last_session=session_number,
-            status="active",
-        )
-    save_registry(projects)
+    projects = _update_projects(summary, session_number)
 
     # 6. Atualizar contexto ativo
     ctx = load_active_context()
@@ -142,28 +184,9 @@ def cmd_save(args):
     print("  MEMORY.md sincronizado")
 
     # 8. Indexar para busca
-    init_search_db()
-    sections = {
-        "topics": "\n".join(summary.topics),
-        "decisions": "\n".join(summary.decisions),
-        "tasks_completed": "\n".join(summary.tasks_completed),
-        "tasks_pending": "\n".join(
-            t.description if hasattr(t, 'description') else str(t)
-            for t in summary.tasks_pending
-        ),
-        "files_modified": "\n".join(f["path"] for f in summary.files_modified),
-        "key_findings": "\n".join(summary.key_findings),
-        "errors": "\n".join(e["error"] for e in summary.errors_resolved),
-    }
-    index_session(session_number, summary.date, sections)
-    print("  Índice de busca atualizado")
+    _index_session_for_search(session_number, summary)
 
-    print(f"\nContexto da sessão {session_number:03d} salvo com sucesso!")
-    print(f"  Tópicos: {len(summary.topics)}")
-    print(f"  Decisões: {len(summary.decisions)}")
-    print(f"  Tarefas completadas: {len(summary.tasks_completed)}")
-    print(f"  Tarefas pendentes: {len(summary.tasks_pending)}")
-    print(f"  Arquivos modificados: {len(summary.files_modified)}")
+    _print_save_summary(session_number, summary)
 
 
 def cmd_load(args):
