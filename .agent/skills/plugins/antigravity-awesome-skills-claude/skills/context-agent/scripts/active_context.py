@@ -111,6 +111,103 @@ def update_active_context(ctx: ActiveContext, summary: SessionSummary) -> Active
     return ctx
 
 
+def _build_projects_section(projects: list[ProjectInfo]) -> list[str]:
+    """Constrói as linhas da seção de projetos ativos."""
+    if not projects:
+        return []
+    lines = [
+        "## Projetos Ativos",
+        "| Projeto | Status | Última Sessão | Próxima Ação |",
+        "|---------|--------|---------------|--------------|",
+    ]
+    for p in projects:
+        session_ref = f"session-{p.last_session:03d}" if p.last_session else "—"
+        action = p.next_actions[0] if p.next_actions else "—"
+        lines.append(f"| {p.name} | {p.status} | {session_ref} | {action} |")
+    lines.append("")
+    return lines
+
+
+def _build_tasks_section(ctx: ActiveContext) -> list[str]:
+    """Constrói as linhas da seção de tarefas pendentes."""
+    if not ctx.pending_tasks:
+        return []
+    lines = ["## Tarefas Pendentes"]
+    high = [t for t in ctx.pending_tasks if t.priority == "high"]
+    medium = [t for t in ctx.pending_tasks if t.priority == "medium"]
+    low = [t for t in ctx.pending_tasks if t.priority == "low"]
+
+    if high:
+        lines.append("### Alta Prioridade")
+        for t in high:
+            src = f" (desde session-{t.source_session:03d})" if t.source_session else ""
+            lines.append(f"- [ ] {t.description}{src}")
+    if medium:
+        lines.append("### Média Prioridade")
+        for t in medium:
+            src = f" (desde session-{t.source_session:03d})" if t.source_session else ""
+            lines.append(f"- [ ] {t.description}{src}")
+    if low:
+        lines.append("### Baixa Prioridade")
+        for t in low[:5]:  # Limitar para economizar espaço
+            lines.append(f"- [ ] {t.description}")
+    lines.append("")
+    return lines
+
+
+def _build_decisions_section(ctx: ActiveContext) -> list[str]:
+    """Constrói as linhas da seção de decisões recentes."""
+    if not ctx.recent_decisions:
+        return []
+    lines = ["## Decisões Recentes"]
+    for d in ctx.recent_decisions[-10:]:
+        lines.append(f"- {d}")
+    lines.append("")
+    return lines
+
+
+def _build_blockers_section(ctx: ActiveContext) -> list[str]:
+    """Constrói as linhas da seção de bloqueadores ativos."""
+    lines = ["## Bloqueadores Ativos"]
+    if ctx.active_blockers:
+        for b in ctx.active_blockers[:5]:
+            lines.append(f"- {b}")
+    else:
+        lines.append("- Nenhum")
+    lines.append("")
+    return lines
+
+
+def _build_conventions_section(ctx: ActiveContext) -> list[str]:
+    """Constrói as linhas da seção de convenções estabelecidas."""
+    if not ctx.conventions:
+        return []
+    lines = ["## Convenções Estabelecidas"]
+    for c in ctx.conventions:
+        lines.append(f"- {c}")
+    lines.append("")
+    return lines
+
+
+def _build_sessions_section(ctx: ActiveContext) -> list[str]:
+    """Constrói as linhas da seção de últimas sessões."""
+    if not ctx.recent_sessions:
+        return []
+    lines = ["## Últimas Sessões"]
+    for s in ctx.recent_sessions:
+        lines.append(f"- {s}")
+    lines.append("")
+    return lines
+
+
+def _enforce_line_limit(lines: list[str]) -> list[str]:
+    """Trunca as linhas para respeitar o limite máximo."""
+    if len(lines) > MAX_ACTIVE_CONTEXT_LINES:
+        lines = lines[:MAX_ACTIVE_CONTEXT_LINES - 1]
+        lines.append("*[Contexto truncado — execute `python context_manager.py maintain` para otimizar]*")
+    return lines
+
+
 def save_active_context(ctx: ActiveContext, projects: list[ProjectInfo] = None):
     """Salva ACTIVE_CONTEXT.md respeitando limite de linhas."""
     ACTIVE_CONTEXT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -121,74 +218,14 @@ def save_active_context(ctx: ActiveContext, projects: list[ProjectInfo] = None):
         "",
     ]
 
-    # Projetos ativos
-    if projects:
-        lines.append("## Projetos Ativos")
-        lines.append("| Projeto | Status | Última Sessão | Próxima Ação |")
-        lines.append("|---------|--------|---------------|--------------|")
-        for p in projects:
-            session_ref = f"session-{p.last_session:03d}" if p.last_session else "—"
-            action = p.next_actions[0] if p.next_actions else "—"
-            lines.append(f"| {p.name} | {p.status} | {session_ref} | {action} |")
-        lines.append("")
+    lines.extend(_build_projects_section(projects))
+    lines.extend(_build_tasks_section(ctx))
+    lines.extend(_build_decisions_section(ctx))
+    lines.extend(_build_blockers_section(ctx))
+    lines.extend(_build_conventions_section(ctx))
+    lines.extend(_build_sessions_section(ctx))
 
-    # Tarefas pendentes
-    if ctx.pending_tasks:
-        lines.append("## Tarefas Pendentes")
-        high = [t for t in ctx.pending_tasks if t.priority == "high"]
-        medium = [t for t in ctx.pending_tasks if t.priority == "medium"]
-        low = [t for t in ctx.pending_tasks if t.priority == "low"]
-
-        if high:
-            lines.append("### Alta Prioridade")
-            for t in high:
-                src = f" (desde session-{t.source_session:03d})" if t.source_session else ""
-                lines.append(f"- [ ] {t.description}{src}")
-        if medium:
-            lines.append("### Média Prioridade")
-            for t in medium:
-                src = f" (desde session-{t.source_session:03d})" if t.source_session else ""
-                lines.append(f"- [ ] {t.description}{src}")
-        if low:
-            lines.append("### Baixa Prioridade")
-            for t in low[:5]:  # Limitar para economizar espaço
-                lines.append(f"- [ ] {t.description}")
-        lines.append("")
-
-    # Decisões recentes
-    if ctx.recent_decisions:
-        lines.append("## Decisões Recentes")
-        for d in ctx.recent_decisions[-10:]:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    # Bloqueadores
-    lines.append("## Bloqueadores Ativos")
-    if ctx.active_blockers:
-        for b in ctx.active_blockers[:5]:
-            lines.append(f"- {b}")
-    else:
-        lines.append("- Nenhum")
-    lines.append("")
-
-    # Convenções
-    if ctx.conventions:
-        lines.append("## Convenções Estabelecidas")
-        for c in ctx.conventions:
-            lines.append(f"- {c}")
-        lines.append("")
-
-    # Últimas sessões
-    if ctx.recent_sessions:
-        lines.append("## Últimas Sessões")
-        for s in ctx.recent_sessions:
-            lines.append(f"- {s}")
-        lines.append("")
-
-    # Garantir limite de linhas
-    if len(lines) > MAX_ACTIVE_CONTEXT_LINES:
-        lines = lines[:MAX_ACTIVE_CONTEXT_LINES - 1]
-        lines.append("*[Contexto truncado — execute `python context_manager.py maintain` para otimizar]*")
+    lines = _enforce_line_limit(lines)
 
     ACTIVE_CONTEXT_PATH.write_text("\n".join(lines), encoding="utf-8")
 
