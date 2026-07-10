@@ -76,17 +76,8 @@ def take_snapshot():
     }
 
 
-def analyze_snapshots(snapshots, alert_cpu, alert_ram):
-    """Analisa os snapshots coletados e gera relatório."""
-    if not snapshots:
-        return {"error": "Nenhum snapshot coletado"}
-
-    n = len(snapshots)
-    cpu_values = [s["cpu_percent"] for s in snapshots]
-    ram_values = [s["ram_percent"] for s in snapshots]
-    browser_ram_values = [s["browser_ram_gb"] for s in snapshots]
-
-    # Alertas
+def _collect_alerts(snapshots, alert_cpu, alert_ram):
+    """Coleta alertas de CPU e RAM dos snapshots."""
     alerts = []
     for s in snapshots:
         if s["cpu_percent"] >= alert_cpu:
@@ -103,8 +94,11 @@ def analyze_snapshots(snapshots, alert_cpu, alert_ram):
                 "value": s["ram_percent"],
                 "threshold": alert_ram,
             })
+    return alerts
 
-    # Tendência (compara primeira metade com segunda metade)
+
+def _compute_trend(cpu_values, ram_values, n):
+    """Calcula a tendência comparando a primeira metade com a segunda metade."""
     mid = n // 2
     if mid > 0:
         cpu_first = sum(cpu_values[:mid]) / mid
@@ -126,8 +120,12 @@ def analyze_snapshots(snapshots, alert_cpu, alert_ram):
         cpu_diff = 0
         ram_diff = 0
 
-    # Resumo
-    report = {
+    return trend, cpu_diff, ram_diff
+
+
+def _build_report_summary(snapshots, cpu_values, ram_values, browser_ram_values, n):
+    """Constrói o resumo do relatório a partir dos snapshots."""
+    return {
         "samples": n,
         "duration_seconds": round(
             (datetime.fromisoformat(snapshots[-1]["timestamp"]) -
@@ -148,33 +146,60 @@ def analyze_snapshots(snapshots, alert_cpu, alert_ram):
             "max_ram_gb": round(max(browser_ram_values), 1),
             "avg_processes": round(sum(s["browser_processes"] for s in snapshots) / n, 0),
         },
-        "trend": trend,
-        "trend_detail": {
-            "cpu_change": round(cpu_diff, 1),
-            "ram_change": round(ram_diff, 1),
-        },
-        "alerts_count": len(alerts),
-        "alerts": alerts[:20],  # Máximo 20 alertas no relatório
     }
 
-    # Recomendação final
+
+def _generate_recommendation(report, alerts, n, alert_cpu, trend, cpu_diff, ram_diff):
+    """Gera a recomendação final com base no relatório."""
     if report["cpu"]["avg"] > alert_cpu:
-        report["recommendation"] = (
+        return (
             f"CPU consistentemente alta (media {report['cpu']['avg']}%). "
             f"Fechar aplicativos pesados e abas de browser desnecessarias."
         )
     elif len(alerts) > n * 0.3:
-        report["recommendation"] = (
+        return (
             f"Alertas frequentes ({len(alerts)} de {n} amostras). "
             f"Sistema sob pressao intermitente. Reduzir carga."
         )
     elif trend == "piorando":
-        report["recommendation"] = (
+        return (
             f"Tendencia de piora detectada (CPU {'+' if cpu_diff > 0 else ''}{cpu_diff:.0f}%, "
             f"RAM {'+' if ram_diff > 0 else ''}{ram_diff:.0f}%). Monitorar."
         )
     else:
-        report["recommendation"] = "Sistema estavel durante o monitoramento."
+        return "Sistema estavel durante o monitoramento."
+
+
+def analyze_snapshots(snapshots, alert_cpu, alert_ram):
+    """Analisa os snapshots coletados e gera relatório."""
+    if not snapshots:
+        return {"error": "Nenhum snapshot coletado"}
+
+    n = len(snapshots)
+    cpu_values = [s["cpu_percent"] for s in snapshots]
+    ram_values = [s["ram_percent"] for s in snapshots]
+    browser_ram_values = [s["browser_ram_gb"] for s in snapshots]
+
+    # Alertas
+    alerts = _collect_alerts(snapshots, alert_cpu, alert_ram)
+
+    # Tendência (compara primeira metade com segunda metade)
+    trend, cpu_diff, ram_diff = _compute_trend(cpu_values, ram_values, n)
+
+    # Resumo
+    report = _build_report_summary(snapshots, cpu_values, ram_values, browser_ram_values, n)
+    report["trend"] = trend
+    report["trend_detail"] = {
+        "cpu_change": round(cpu_diff, 1),
+        "ram_change": round(ram_diff, 1),
+    }
+    report["alerts_count"] = len(alerts)
+    report["alerts"] = alerts[:20]  # Máximo 20 alertas no relatório
+
+    # Recomendação final
+    report["recommendation"] = _generate_recommendation(
+        report, alerts, n, alert_cpu, trend, cpu_diff, ram_diff
+    )
 
     return report
 
