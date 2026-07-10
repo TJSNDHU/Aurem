@@ -61,74 +61,96 @@ class MetadataOptimizer:
 
         title_options = []
 
-        # Option 1: Brand name only
         if include_brand:
-            option1 = app_name[:max_length]
-            title_options.append({
-                'title': option1,
-                'length': len(option1),
-                'remaining_chars': max_length - len(option1),
-                'keywords_included': [],
-                'strategy': 'brand_only',
-                'pros': ['Maximum brand recognition', 'Clean and simple'],
-                'cons': ['No keyword targeting', 'Lower discoverability']
-            })
+            option = self._build_brand_only_option(app_name, max_length)
+            if option:
+                title_options.append(option)
 
-        # Option 2: Brand + Primary Keyword
         if target_keywords:
-            primary_keyword = target_keywords[0]
-            option2 = self._build_title_with_keywords(
-                app_name,
-                [primary_keyword],
-                max_length
-            )
-            if option2:
-                title_options.append({
-                    'title': option2,
-                    'length': len(option2),
-                    'remaining_chars': max_length - len(option2),
-                    'keywords_included': [primary_keyword],
-                    'strategy': 'brand_plus_primary',
-                    'pros': ['Targets main keyword', 'Maintains brand identity'],
-                    'cons': ['Limited keyword coverage']
-                })
+            option = self._build_brand_plus_primary_option(app_name, target_keywords, max_length)
+            if option:
+                title_options.append(option)
 
-        # Option 3: Brand + Multiple Keywords (if space allows)
         if len(target_keywords) > 1:
-            option3 = self._build_title_with_keywords(
-                app_name,
-                target_keywords[:2],
-                max_length
-            )
-            if option3:
-                title_options.append({
-                    'title': option3,
-                    'length': len(option3),
-                    'remaining_chars': max_length - len(option3),
-                    'keywords_included': target_keywords[:2],
-                    'strategy': 'brand_plus_multiple',
-                    'pros': ['Multiple keyword targets', 'Better discoverability'],
-                    'cons': ['May feel cluttered', 'Less brand focus']
-                })
+            option = self._build_brand_plus_multiple_option(app_name, target_keywords, max_length)
+            if option:
+                title_options.append(option)
 
-        # Option 4: Keyword-first approach (for new apps)
         if target_keywords and not include_brand:
-            option4 = " ".join(target_keywords[:2])[:max_length]
-            title_options.append({
-                'title': option4,
-                'length': len(option4),
-                'remaining_chars': max_length - len(option4),
-                'keywords_included': target_keywords[:2],
-                'strategy': 'keyword_first',
-                'pros': ['Maximum SEO benefit', 'Clear functionality'],
-                'cons': ['No brand recognition', 'Generic appearance']
-            })
+            option = self._build_keyword_first_option(target_keywords, max_length)
+            if option:
+                title_options.append(option)
 
         return {
             'platform': self.platform,
             'max_length': max_length,
             'options': title_options,
             'recommendation': self._recommend_title_option(title_options)
+        }
+
+    def _build_brand_only_option(self, app_name: str, max_length: int) -> Optional[Dict[str, Any]]:
+        """Build the brand-only title option."""
+        option1 = app_name[:max_length]
+        return {
+            'title': option1,
+            'length': len(option1),
+            'remaining_chars': max_length - len(option1),
+            'keywords_included': [],
+            'strategy': 'brand_only',
+            'pros': ['Maximum brand recognition', 'Clean and simple'],
+            'cons': ['No keyword targeting', 'Lower discoverability']
+        }
+
+    def _build_brand_plus_primary_option(
+        self, app_name: str, target_keywords: List[str], max_length: int
+    ) -> Optional[Dict[str, Any]]:
+        """Build the brand + primary keyword title option."""
+        primary_keyword = target_keywords[0]
+        option2 = self._build_title_with_keywords(app_name, [primary_keyword], max_length)
+        if not option2:
+            return None
+        return {
+            'title': option2,
+            'length': len(option2),
+            'remaining_chars': max_length - len(option2),
+            'keywords_included': [primary_keyword],
+            'strategy': 'brand_plus_primary',
+            'pros': ['Targets main keyword', 'Maintains brand identity'],
+            'cons': ['Limited keyword coverage']
+        }
+
+    def _build_brand_plus_multiple_option(
+        self, app_name: str, target_keywords: List[str], max_length: int
+    ) -> Optional[Dict[str, Any]]:
+        """Build the brand + multiple keywords title option."""
+        keywords = target_keywords[:2]
+        option3 = self._build_title_with_keywords(app_name, keywords, max_length)
+        if not option3:
+            return None
+        return {
+            'title': option3,
+            'length': len(option3),
+            'remaining_chars': max_length - len(option3),
+            'keywords_included': keywords,
+            'strategy': 'brand_plus_multiple',
+            'pros': ['Multiple keyword targets', 'Better discoverability'],
+            'cons': ['May feel cluttered', 'Less brand focus']
+        }
+
+    def _build_keyword_first_option(
+        self, target_keywords: List[str], max_length: int
+    ) -> Optional[Dict[str, Any]]:
+        """Build the keyword-first title option for new apps."""
+        keywords = target_keywords[:2]
+        option4 = " ".join(keywords)[:max_length]
+        return {
+            'title': option4,
+            'length': len(option4),
+            'remaining_chars': max_length - len(option4),
+            'keywords_included': keywords,
+            'strategy': 'keyword_first',
+            'pros': ['Maximum SEO benefit', 'Clear functionality'],
+            'cons': ['No brand recognition', 'Generic appearance']
         }
 
     def optimize_description(
@@ -438,144 +460,4 @@ class MetadataOptimizer:
 
         return {
             'full_description': full_description,
-            'length': len(full_description),
-            'remaining_chars': max_length - len(full_description),
-            'keyword_analysis': density,
-            'structure': {
-                'has_hook': True,
-                'has_features': len(features) > 0,
-                'has_benefits': True,
-                'has_cta': True
-            }
-        }
-
-    def _remove_plural_duplicates(self, keywords: List[str]) -> List[str]:
-        """Remove plural forms if singular exists."""
-        deduplicated = []
-        singular_set = set()
-
-        for keyword in keywords:
-            if keyword.endswith('s') and len(keyword) > 1:
-                singular = keyword[:-1]
-                if singular not in singular_set:
-                    deduplicated.append(singular)
-                    singular_set.add(singular)
-            else:
-                if keyword not in singular_set:
-                    deduplicated.append(keyword)
-                    singular_set.add(keyword)
-
-        return deduplicated
-
-    def _build_keyword_field(self, keywords: List[str], max_length: int) -> str:
-        """Build comma-separated keyword field within character limit."""
-        keyword_field = ""
-
-        for keyword in keywords:
-            test_field = f"{keyword_field},{keyword}" if keyword_field else keyword
-            if len(test_field) <= max_length:
-                keyword_field = test_field
-            else:
-                break
-
-        return keyword_field
-
-    def _calculate_coverage(self, keywords: List[str], text: str) -> Dict[str, int]:
-        """Calculate how many keywords are covered in text."""
-        text_lower = text.lower()
-        coverage = {}
-
-        for keyword in keywords:
-            coverage[keyword] = text_lower.count(keyword.lower())
-
-        return coverage
-
-    def _assess_density(self, density: float) -> str:
-        """Assess individual keyword density."""
-        if density < 0.5:
-            return "too_low"
-        elif density <= 2.5:
-            return "optimal"
-        else:
-            return "too_high"
-
-    def _assess_overall_density(self, density: float) -> str:
-        """Assess overall keyword density."""
-        if density < 2:
-            return "Under-optimized: Consider adding more keyword variations"
-        elif density <= 5:
-            return "Optimal: Good keyword integration without stuffing"
-        elif density <= 8:
-            return "High: Approaching keyword stuffing - reduce keyword usage"
-        else:
-            return "Too High: Keyword stuffing detected - rewrite for natural flow"
-
-    def _generate_density_recommendations(
-        self,
-        keyword_densities: Dict[str, Dict[str, Any]]
-    ) -> List[str]:
-        """Generate recommendations based on keyword density analysis."""
-        recommendations = []
-
-        for keyword, data in keyword_densities.items():
-            if data['status'] == 'too_low':
-                recommendations.append(
-                    f"Increase usage of '{keyword}' - currently only {data['occurrences']} times"
-                )
-            elif data['status'] == 'too_high':
-                recommendations.append(
-                    f"Reduce usage of '{keyword}' - appears {data['occurrences']} times (keyword stuffing risk)"
-                )
-
-        if not recommendations:
-            recommendations.append("Keyword density is well-balanced")
-
-        return recommendations
-
-    def _recommend_title_option(self, options: List[Dict[str, Any]]) -> str:
-        """Recommend best title option based on strategy."""
-        if not options:
-            return "No valid options available"
-
-        # Prefer brand_plus_primary for established apps
-        for option in options:
-            if option['strategy'] == 'brand_plus_primary':
-                return f"Recommended: '{option['title']}' (Balance of brand and SEO)"
-
-        # Fallback to first option
-        return f"Recommended: '{options[0]['title']}' ({options[0]['strategy']})"
-
-
-def optimize_app_metadata(
-    platform: str,
-    app_info: Dict[str, Any],
-    target_keywords: List[str]
-) -> Dict[str, Any]:
-    """
-    Convenience function to optimize all metadata fields.
-
-    Args:
-        platform: 'apple' or 'google'
-        app_info: App information dictionary
-        target_keywords: Target keywords list
-
-    Returns:
-        Complete metadata optimization package
-    """
-    optimizer = MetadataOptimizer(platform)
-
-    return {
-        'platform': platform,
-        'title': optimizer.optimize_title(
-            app_info['name'],
-            target_keywords
-        ),
-        'description': optimizer.optimize_description(
-            app_info,
-            target_keywords,
-            'full'
-        ),
-        'keyword_field': optimizer.optimize_keyword_field(
-            target_keywords
-        ) if platform == 'apple' else None
-    }
+            'length': len(full_description
