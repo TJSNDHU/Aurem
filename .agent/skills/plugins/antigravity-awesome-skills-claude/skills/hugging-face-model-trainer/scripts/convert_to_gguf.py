@@ -108,10 +108,17 @@ if not check_system_dependencies():
     sys.exit(1)
 
 # Configuration from environment variables
-ADAPTER_MODEL = os.environ.get("ADAPTER_MODEL", "evalstate/qwen-capybara-medium")
-BASE_MODEL = os.environ.get("BASE_MODEL", "Qwen/Qwen2.5-0.5B")
-OUTPUT_REPO = os.environ.get("OUTPUT_REPO", "evalstate/qwen-capybara-medium-gguf")
-username = os.environ.get("HF_USERNAME", ADAPTER_MODEL.split('/')[0])
+# TODO: Set ADAPTER_MODEL in your .env file (e.g., "username/my-finetuned-model")
+ADAPTER_MODEL = os.environ.get("ADAPTER_MODEL", "")
+# TODO: Set BASE_MODEL in your .env file (e.g., "Qwen/Qwen2.5-0.5B")
+BASE_MODEL = os.environ.get("BASE_MODEL", "")
+# TODO: Set OUTPUT_REPO in your .env file (e.g., "username/my-model-gguf")
+OUTPUT_REPO = os.environ.get("OUTPUT_REPO", "")
+username = os.environ.get("HF_USERNAME", ADAPTER_MODEL.split('/')[0] if ADAPTER_MODEL else "")
+
+if not ADAPTER_MODEL or not BASE_MODEL or not OUTPUT_REPO:
+    print("❌ Missing required environment variables. Please set ADAPTER_MODEL, BASE_MODEL, and OUTPUT_REPO in your .env file.")
+    sys.exit(1)
 
 print(f"\n📦 Configuration:")
 print(f"   Base model: {BASE_MODEL}")
@@ -386,39 +393,4 @@ Inherits the license from the base model: {BASE_MODEL}
 
 ## Citation
 
-```bibtex
-@misc{{{OUTPUT_REPO.split('/')[-1].replace('-', '_')},
-  author = {{{username}}},
-  title = {{{OUTPUT_REPO.split('/')[-1]}}},
-  year = {{2025}},
-  publisher = {{Hugging Face}},
-  url = {{https://huggingface.co/{OUTPUT_REPO}}}
-}}
 ```
-
----
-
-*Converted to GGUF format using llama.cpp*
-"""
-
-try:
-    api.upload_file(
-        path_or_fileobj=readme_content.encode(),
-        path_in_repo="README.md",
-        repo_id=OUTPUT_REPO,
-    )
-    print("   ✅ README uploaded")
-except Exception as e:
-    print(f"   ❌ README upload failed: {e}")
-
-print("\n" + "=" * 60)
-print("✅ GGUF Conversion Complete!")
-print(f"📦 Repository: https://huggingface.co/{OUTPUT_REPO}")
-print(f"\n📥 Download with:")
-print(f"   hf download {OUTPUT_REPO} {model_name}-q4_k_m.gguf")
-print(f"\n🚀 Use with Ollama:")
-print("   1. Download the GGUF file")
-print(f"   2. Create Modelfile: FROM ./{model_name}-q4_k_m.gguf")
-print("   3. ollama create my-model -f Modelfile")
-print("   4. ollama run my-model")
-print("=" * 60)
