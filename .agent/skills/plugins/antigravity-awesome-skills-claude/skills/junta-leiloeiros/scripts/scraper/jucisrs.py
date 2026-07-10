@@ -177,7 +177,6 @@ class JucisrsScraper(AbstractJuntaScraper):
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,  # Cert autoassinado/invalido
                 follow_redirects=True,
                 timeout=60.0,
             ) as client:
@@ -223,7 +222,6 @@ class JucisrsScraper(AbstractJuntaScraper):
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,
                 follow_redirects=True,
                 timeout=30.0,
             ) as client:
