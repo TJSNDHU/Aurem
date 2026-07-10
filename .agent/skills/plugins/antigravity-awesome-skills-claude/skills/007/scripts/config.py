@@ -50,9 +50,12 @@ SCORE_HISTORY_PATH = DATA_DIR / "score_history.json"
 # Ensure required directories exist (safe to call repeatedly)
 # ---------------------------------------------------------------------------
 
+_REQUIRED_DIRECTORIES = (DATA_DIR, REPORTS_DIR, PLAYBOOKS_DIR)
+
+
 def ensure_directories() -> None:
     """Create data directories if they do not already exist."""
-    for directory in (DATA_DIR, REPORTS_DIR, PLAYBOOKS_DIR):
+    for directory in _REQUIRED_DIRECTORIES:
         directory.mkdir(parents=True, exist_ok=True)
 
 
@@ -341,132 +344,3 @@ LIMITS = {
     "max_file_size_bytes": 5 * 1024 * 1024,   # 5 MB -- skip larger files
     "max_files_per_scan":  10_000,              # Safety cap
     "max_findings_per_file": 200,               # Truncate findings beyond this
-    "max_report_findings":  1_000,              # Total findings cap per report
-}
-
-
-# ---------------------------------------------------------------------------
-# Logging Configuration
-# ---------------------------------------------------------------------------
-
-LOG_FORMAT = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
-LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
-
-def setup_logging(name: str = "007", level: int = logging.INFO) -> logging.Logger:
-    """Configure and return a logger for 007 scripts.
-
-    The logger writes to stderr (console). Audit events are written
-    separately to AUDIT_LOG_PATH via ``log_audit_event()``.
-
-    Args:
-        name:  Logger name (appears in log lines).
-        level: Logging level (default INFO).
-
-    Returns:
-        Configured ``logging.Logger`` instance.
-    """
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
-        logger.addHandler(handler)
-    logger.setLevel(level)
-    return logger
-
-
-# ---------------------------------------------------------------------------
-# Audit Log Utilities
-# ---------------------------------------------------------------------------
-
-def get_timestamp() -> str:
-    """Return current UTC timestamp in ISO 8601 format.
-
-    Example:
-        '2026-02-26T14:30:00Z'
-    """
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def log_audit_event(
-    action: str,
-    target: str,
-    result: str,
-    details: dict | None = None,
-) -> None:
-    """Append an audit event to the JSON audit log.
-
-    Each event is a JSON object on its own line (JSON Lines format) so the
-    file can be appended to atomically without reading the whole log.
-
-    Args:
-        action:  What was done (e.g. 'quick_scan', 'full_audit', 'score').
-        target:  Path or identifier of what was scanned/audited.
-        result:  Outcome summary (e.g. 'approved', 'blocked', '3 findings').
-        details: Optional dict with extra context.
-    """
-    ensure_directories()
-    event = {
-        "timestamp": get_timestamp(),
-        "action": action,
-        "target": str(target),
-        "result": result,
-    }
-    if details:
-        event["details"] = details
-
-    with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(event, ensure_ascii=False) + "\n")
-
-
-# ---------------------------------------------------------------------------
-# Score Calculation Helpers
-# ---------------------------------------------------------------------------
-
-def calculate_weighted_score(domain_scores: dict[str, float]) -> float:
-    """Compute the weighted final security score.
-
-    Args:
-        domain_scores: Mapping of domain key -> score (0-100).
-                       Keys must be from SCORING_WEIGHTS.
-                       Missing domains are treated as 0.
-
-    Returns:
-        Weighted score between 0.0 and 100.0.
-    """
-    total = 0.0
-    for domain, weight in SCORING_WEIGHTS.items():
-        score = domain_scores.get(domain, 0.0)
-        total += score * weight
-    return round(total, 2)
-
-
-# ---------------------------------------------------------------------------
-# Module Self-Test
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    # Quick sanity check when run directly
-    print(f"BASE_DIR:       {BASE_DIR}")
-    print(f"DATA_DIR:       {DATA_DIR}")
-    print(f"REPORTS_DIR:    {REPORTS_DIR}")
-    print(f"AUDIT_LOG_PATH: {AUDIT_LOG_PATH}")
-    print()
-
-    # Verify scoring weights sum to 1.0
-    total_weight = sum(SCORING_WEIGHTS.values())
-    assert abs(total_weight - 1.0) < 1e-9, f"Weights sum to {total_weight}, expected 1.0"
-    print(f"Scoring weights sum: {total_weight} [OK]")
-
-    # Verify all patterns compile successfully (they already are, but double-check)
-    print(f"Secret patterns loaded:    {len(SECRET_PATTERNS)}")
-    print(f"Dangerous patterns loaded: {len(DANGEROUS_PATTERNS)}")
-
-    # Test verdict thresholds
-    for test_score in (95, 75, 55, 30):
-        v = get_verdict(test_score)
-        print(f"Score {test_score}: {v['emoji']} {v['label']}")
-
-    # Test timestamp
-    print(f"Timestamp: {get_timestamp()}")
-
-    print("\n007 config.py -- all checks passed.")
