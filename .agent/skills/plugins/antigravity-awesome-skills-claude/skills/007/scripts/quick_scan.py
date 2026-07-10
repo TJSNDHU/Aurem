@@ -357,17 +357,11 @@ def build_json_report(
 
 
 # ---------------------------------------------------------------------------
-# Main entry point
+# Scan orchestration helpers
 # ---------------------------------------------------------------------------
 
-def run_scan(target_path: str, output_format: str = "text", verbose: bool = False) -> dict:
-    """Execute the quick scan and return the JSON-style report dict.
-
-    Also prints the report to stdout in the requested format.
-    """
-    logger = setup_logging("007-quick-scan")
-    ensure_directories()
-
+def _validate_target(target_path: str, logger) -> Path:
+    """Resolve and validate the target path, exiting on error."""
     target = Path(target_path).resolve()
     if not target.exists():
         logger.error("Target path does not exist: %s", target)
@@ -375,16 +369,11 @@ def run_scan(target_path: str, output_format: str = "text", verbose: bool = Fals
     if not target.is_dir():
         logger.error("Target is not a directory: %s", target)
         sys.exit(1)
+    return target
 
-    logger.info("Starting quick scan of %s", target)
-    start_time = time.time()
 
-    # Collect files
-    files = collect_files(target, logger)
-    total_files = len(files)
-    logger.info("Collected %d scannable files", total_files)
-
-    # Scan each file
+def _scan_all_files(files: list[Path], logger, verbose: bool) -> list[dict]:
+    """Scan every collected file, respecting the max-report-findings limit."""
     all_findings: list[dict] = []
     max_report_findings = LIMITS["max_report_findings"]
 
@@ -398,6 +387,60 @@ def run_scan(target_path: str, output_format: str = "text", verbose: bool = Fals
         file_findings = scan_file(fpath, verbose=verbose, logger=logger)
         remaining = max_report_findings - len(all_findings)
         all_findings.extend(file_findings[:remaining])
+
+    return all_findings
+
+
+def _emit_report(
+    report: dict,
+    output_format: str,
+    target: str,
+    total_files: int,
+    findings: list[dict],
+    severity_counts: dict[str, int],
+    score: int,
+    verdict: dict,
+    elapsed: float,
+) -> None:
+    """Print the report to stdout in the requested format."""
+    if output_format == "json":
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(format_text_report(
+            target=target,
+            total_files=total_files,
+            findings=findings,
+            severity_counts=severity_counts,
+            score=score,
+            verdict=verdict,
+            elapsed=elapsed,
+        ))
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def run_scan(target_path: str, output_format: str = "text", verbose: bool = False) -> dict:
+    """Execute the quick scan and return the JSON-style report dict.
+
+    Also prints the report to stdout in the requested format.
+    """
+    logger = setup_logging("007-quick-scan")
+    ensure_directories()
+
+    target = _validate_target(target_path, logger)
+
+    logger.info("Starting quick scan of %s", target)
+    start_time = time.time()
+
+    # Collect files
+    files = collect_files(target, logger)
+    total_files = len(files)
+    logger.info("Collected %d scannable files", total_files)
+
+    # Scan each file
+    all_findings = _scan_all_files(files, logger, verbose)
 
     elapsed = time.time() - start_time
     logger.info(
@@ -434,18 +477,17 @@ def run_scan(target_path: str, output_format: str = "text", verbose: bool = Fals
     )
 
     # Output
-    if output_format == "json":
-        print(json.dumps(report, indent=2, ensure_ascii=False))
-    else:
-        print(format_text_report(
-            target=str(target),
-            total_files=total_files,
-            findings=all_findings,
-            severity_counts=severity_counts,
-            score=score,
-            verdict=verdict,
-            elapsed=elapsed,
-        ))
+    _emit_report(
+        report=report,
+        output_format=output_format,
+        target=str(target),
+        total_files=total_files,
+        findings=all_findings,
+        severity_counts=severity_counts,
+        score=score,
+        verdict=verdict,
+        elapsed=elapsed,
+    )
 
     return report
 
@@ -466,16 +508,3 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--output",
-        choices=["text", "json"],
-        default="text",
-        help="Output format: 'text' (default) or 'json'.",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Enable verbose logging (debug-level messages).",
-    )
-
-    args = parser.parse_args()
-    run_scan(target_path=args.target, output_format=args.output, verbose=args.verbose)
