@@ -109,126 +109,144 @@ def classify_pattern(skills: list[dict], query: str) -> str:
     return "parallel"
 
 
-def generate_plan(skills: list[dict], query: str, pattern: str) -> dict:
-    """Generate an execution plan based on the pattern."""
-
-    if pattern == "single":
-        skill = skills[0]
-        return {
-            "pattern": "single",
-            "description": f"Use '{skill['name']}' to handle the entire request.",
-            "steps": [
-                {
-                    "order": 1,
-                    "skill": skill["name"],
-                    "skill_md": skill.get("skill_md", skill.get("location", "")),
-                    "action": f"Load SKILL.md and follow its workflow for: {query}",
-                    "input": "user_query",
-                    "output": "result",
-                }
-            ],
-            "data_flow": "user_query -> result",
-        }
-
-    elif pattern == "sequential":
-        # Order: producers first, then consumers
-        producers = [s for s in skills if get_skill_role(s) in ("producer", "hybrid")]
-        consumers = [s for s in skills if get_skill_role(s) == "consumer"]
-
-        # If no clear producers, use score order
-        if not producers:
-            producers = [skills[0]]
-            consumers = skills[1:]
-
-        ordered = producers + consumers
-        steps = []
-        for i, skill in enumerate(ordered):
-            role = get_skill_role(skill)
-            if i == 0:
-                input_src = "user_query"
-                action = f"Extract/collect data: {query}"
-            else:
-                prev = ordered[i - 1]["name"]
-                input_src = f"{prev}.output"
-                if role == "consumer":
-                    action = f"Process/deliver data from {prev}"
-                else:
-                    action = f"Continue processing with data from {prev}"
-
-            steps.append({
-                "order": i + 1,
-                "skill": skill["name"],
-                "skill_md": skill.get("skill_md", skill.get("location", "")),
-                "action": action,
-                "input": input_src,
-                "output": f"{skill['name']}.output",
-                "role": role,
-            })
-
-        flow_parts = [s["skill"] for s in steps]
-        data_flow = " -> ".join(["user_query"] + flow_parts + ["result"])
-
-        return {
-            "pattern": "sequential",
-            "description": f"Pipeline: {' -> '.join(flow_parts)}",
-            "steps": steps,
-            "data_flow": data_flow,
-        }
-
-    elif pattern == "parallel":
-        steps = []
-        for i, skill in enumerate(skills):
-            steps.append({
-                "order": 1,  # All run at the same "order" level
-                "skill": skill["name"],
-                "skill_md": skill.get("skill_md", skill.get("location", "")),
-                "action": f"Handle independently: aspect of '{query}' related to {', '.join(skill.get('capabilities', []))}",
-                "input": "user_query",
-                "output": f"{skill['name']}.output",
-            })
-
-        return {
-            "pattern": "parallel",
-            "description": f"Execute {len(skills)} skills in parallel, each handling their domain.",
-            "steps": steps,
-            "data_flow": "user_query -> [parallel] -> aggregated_result",
-            "aggregation": "Combine results from all skills into a unified response.",
-        }
-
-    elif pattern == "primary_support":
-        primary = skills[0]  # Highest score
-        support = skills[1:]
-
-        steps = [
+def _plan_single(skills: list[dict], query: str) -> dict:
+    """Generate a plan for the 'single' pattern."""
+    skill = skills[0]
+    return {
+        "pattern": "single",
+        "description": f"Use '{skill['name']}' to handle the entire request.",
+        "steps": [
             {
                 "order": 1,
-                "skill": primary["name"],
-                "skill_md": primary.get("skill_md", primary.get("location", "")),
-                "action": f"Primary: handle main request: {query}",
-                "input": "user_query",
-                "output": f"{primary['name']}.output",
-                "role": "primary",
-            }
-        ]
-
-        for i, skill in enumerate(support):
-            steps.append({
-                "order": 2,
                 "skill": skill["name"],
                 "skill_md": skill.get("skill_md", skill.get("location", "")),
-                "action": f"Support: provide {', '.join(skill.get('capabilities', []))} data if needed",
+                "action": f"Load SKILL.md and follow its workflow for: {query}",
                 "input": "user_query",
-                "output": f"{skill['name']}.output",
-                "role": "support",
-            })
+                "output": "result",
+            }
+        ],
+        "data_flow": "user_query -> result",
+    }
 
-        return {
-            "pattern": "primary_support",
-            "description": f"Primary: '{primary['name']}'. Support: {', '.join(s['name'] for s in support)}.",
-            "steps": steps,
-            "data_flow": f"user_query -> {primary['name']} (primary) + support skills as needed -> result",
+
+def _plan_sequential(skills: list[dict], query: str) -> dict:
+    """Generate a plan for the 'sequential' pattern."""
+    # Order: producers first, then consumers
+    producers = [s for s in skills if get_skill_role(s) in ("producer", "hybrid")]
+    consumers = [s for s in skills if get_skill_role(s) == "consumer"]
+
+    # If no clear producers, use score order
+    if not producers:
+        producers = [skills[0]]
+        consumers = skills[1:]
+
+    ordered = producers + consumers
+    steps = []
+    for i, skill in enumerate(ordered):
+        role = get_skill_role(skill)
+        if i == 0:
+            input_src = "user_query"
+            action = f"Extract/collect data: {query}"
+        else:
+            prev = ordered[i - 1]["name"]
+            input_src = f"{prev}.output"
+            if role == "consumer":
+                action = f"Process/deliver data from {prev}"
+            else:
+                action = f"Continue processing with data from {prev}"
+
+        steps.append({
+            "order": i + 1,
+            "skill": skill["name"],
+            "skill_md": skill.get("skill_md", skill.get("location", "")),
+            "action": action,
+            "input": input_src,
+            "output": f"{skill['name']}.output",
+            "role": role,
+        })
+
+    flow_parts = [s["skill"] for s in steps]
+    data_flow = " -> ".join(["user_query"] + flow_parts + ["result"])
+
+    return {
+        "pattern": "sequential",
+        "description": f"Pipeline: {' -> '.join(flow_parts)}",
+        "steps": steps,
+        "data_flow": data_flow,
+    }
+
+
+def _plan_parallel(skills: list[dict], query: str) -> dict:
+    """Generate a plan for the 'parallel' pattern."""
+    steps = []
+    for i, skill in enumerate(skills):
+        steps.append({
+            "order": 1,  # All run at the same "order" level
+            "skill": skill["name"],
+            "skill_md": skill.get("skill_md", skill.get("location", "")),
+            "action": f"Handle independently: aspect of '{query}' related to {', '.join(skill.get('capabilities', []))}",
+            "input": "user_query",
+            "output": f"{skill['name']}.output",
+        })
+
+    return {
+        "pattern": "parallel",
+        "description": f"Execute {len(skills)} skills in parallel, each handling their domain.",
+        "steps": steps,
+        "data_flow": "user_query -> [parallel] -> aggregated_result",
+        "aggregation": "Combine results from all skills into a unified response.",
+    }
+
+
+def _plan_primary_support(skills: list[dict], query: str) -> dict:
+    """Generate a plan for the 'primary_support' pattern."""
+    primary = skills[0]  # Highest score
+    support = skills[1:]
+
+    steps = [
+        {
+            "order": 1,
+            "skill": primary["name"],
+            "skill_md": primary.get("skill_md", primary.get("location", "")),
+            "action": f"Primary: handle main request: {query}",
+            "input": "user_query",
+            "output": f"{primary['name']}.output",
+            "role": "primary",
         }
+    ]
 
+    for i, skill in enumerate(support):
+        steps.append({
+            "order": 2,
+            "skill": skill["name"],
+            "skill_md": skill.get("skill_md", skill.get("location", "")),
+            "action": f"Support: provide {', '.join(skill.get('capabilities', []))} data if needed",
+            "input": "user_query",
+            "output": f"{skill['name']}.output",
+            "role": "support",
+        })
+
+    return {
+        "pattern": "primary_support",
+        "description": f"Primary: '{primary['name']}'. Support: {', '.join(s['name'] for s in support)}.",
+        "steps": steps,
+        "data_flow": f"user_query -> {primary['name']} (primary) + support skills as needed -> result",
+    }
+
+
+_PATTERN_DISPATCH = {
+    "single": _plan_single,
+    "sequential": _plan_sequential,
+    "parallel": _plan_parallel,
+    "primary_support": _plan_primary_support,
+}
+
+
+def generate_plan(skills: list[dict], query: str, pattern: str) -> dict:
+    """Generate an execution plan based on the pattern."""
+    handler = _PATTERN_DISPATCH.get(pattern)
+    if handler is not None:
+        return handler(skills, query)
     return {"pattern": "unknown", "steps": [], "data_flow": ""}
 
 
