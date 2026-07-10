@@ -358,17 +358,4 @@ def _create_line_tracking_parser():
     def set_content_handler(dom_handler):
         def startElementNS(name, tagName, attrs):
             orig_start_cb(name, tagName, attrs)
-            cur_elem = dom_handler.elementStack[-1]
-            cur_elem.parse_position = (
-                parser._parser.CurrentLineNumber,  # type: ignore
-                parser._parser.CurrentColumnNumber,  # type: ignore
-            )
-
-        orig_start_cb = dom_handler.startElementNS
-        dom_handler.startElementNS = startElementNS
-        orig_set_content_handler(dom_handler)
-
-    parser = defusedxml.sax.make_parser()
-    orig_set_content_handler = parser.setContentHandler
-    parser.setContentHandler = set_content_handler  # type: ignore
-    return parser
+            cur_elem = dom
