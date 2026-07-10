@@ -242,183 +242,103 @@ def humanize_prompt(
 
 
 # =============================================================================
+# ANALISADOR INTELIGENTE DE PROMPT — Helpers
+# =============================================================================
+
+_EDU_KEYWORDS = [
+    "aula", "curso", "tutorial", "ensino", "treino", "explicar",
+    "demonstrar", "passo", "step", "educacao", "teach", "learn",
+    "lesson", "workshop", "apresentacao", "presentation", "slide",
+    "infografico", "diagram", "how-to", "how to", "como fazer",
+    "aprenda", "aprender", "classe", "class", "professor", "teacher",
+    "aluno", "student", "quadro", "whiteboard", "lousa",
+]
+
+_FORMAT_HINTS = {
+    "stories": ["stories", "story", "reels", "reel", "tiktok", "vertical", "shorts"],
+    "widescreen": ["banner", "thumbnail", "youtube", "desktop", "panorama",
+                   "landscape", "wide", "widescreen", "tv", "cinematico"],
+    "ultrawide": ["ultrawide", "panoramico", "cinematico ultra", "21:9"],
+    "portrait-45": ["retrato", "portrait", "instagram portrait", "vertical photo"],
+    "portrait-23": ["pinterest", "pin", "poster", "cartaz"],
+    "portrait-34": ["3:4", "card", "cartao"],
+    "square": ["feed", "post", "quadrado", "square", "instagram", "perfil", "profile"],
+}
+
+_LIGHTING_HINTS = {
+    "morning": ["manha", "morning", "amanhecer", "sunrise", "cafe da manha",
+                "breakfast", "early morning"],
+    "golden-hour": ["por do sol", "sunset", "golden hour", "entardecer",
+                    "dourado", "golden", "magic hour"],
+    "night": ["noite", "night", "balada", "bar", "restaurante a noite",
+              "neon", "club", "evening"],
+    "overcast": ["nublado", "overcast", "cloudy", "chuva", "rain", "dia cinza"],
+    "indoor": ["escritorio", "office", "casa", "home", "indoor", "sala",
+               "quarto", "cozinha", "kitchen", "bedroom", "living room"],
+    "midday": ["meio dia", "midday", "noon", "sol forte", "praia", "beach"],
+    "blue-hour": ["hora azul", "blue hour", "twilight", "crepusculo"],
+    "shade": ["sombra", "shade", "under tree", "debaixo", "coberto"],
+}
+
+
+def _detect_mode(prompt_lower: str) -> str:
+    """Detecta o modo (educacional/influencer) baseado no prompt."""
+    return "educacional" if any(kw in prompt_lower for kw in _EDU_KEYWORDS) else "influencer"
+
+
+def _detect_format(prompt_lower: str) -> str:
+    """Detecta o formato ideal baseado no prompt."""
+    for fmt, keywords in _FORMAT_HINTS.items():
+        if any(kw in prompt_lower for kw in keywords):
+            return fmt
+    return "square"
+
+
+def _detect_lighting(prompt_lower: str) -> str | None:
+    """Detecta a iluminacao ideal baseada no prompt."""
+    for light, keywords in _LIGHTING_HINTS.items():
+        if any(kw in prompt_lower for kw in keywords):
+            return light
+    return None
+
+
+def _detect_humanization(prompt_lower: str) -> str:
+    """Detecta o nivel de humanizacao ideal baseado no prompt."""
+    if any(kw in prompt_lower for kw in ["ultra real", "super real", "celular velho",
+                                          "raw", "sem filtro", "amateur", "amador"]):
+        return "ultra"
+    if any(kw in prompt_lower for kw in ["editorial", "revista", "magazine", "vogue"]):
+        return "editorial"
+    if any(kw in prompt_lower for kw in ["polido", "polished", "limpo", "clean",
+                                          "profissional", "professional"]):
+        return "polished"
+    return "natural"
+
+
+def _detect_model(prompt_lower: str) -> str:
+    """Detecta o modelo ideal baseado no prompt."""
+    if any(kw in prompt_lower for kw in ["texto", "text", "logo", "titulo", "title",
+                                          "4k", "ultra qualidade", "referencia"]):
+        return "gemini-pro-image"
+    if any(kw in prompt_lower for kw in ["rapido", "fast", "batch", "lote", "volume"]):
+        return "imagen-4-fast"
+    return "imagen-4"
+
+
+def _detect_resolution(prompt_lower: str) -> str:
+    """Detecta a resolucao ideal baseada no prompt."""
+    if any(kw in prompt_lower for kw in ["4k", "ultra hd", "altissima qualidade"]):
+        return "4K"
+    if any(kw in prompt_lower for kw in ["2k", "alta qualidade", "hd", "impressao", "print"]):
+        return "2K"
+    return "1K"
+
+
+# =============================================================================
 # ANALISADOR INTELIGENTE DE PROMPT
 # =============================================================================
 
 def analyze_prompt(user_prompt: str) -> dict:
     """
     Analisa o prompt do usuario e sugere configuracoes ideais para cada parametro.
-    Retorna um dict completo com todas as sugestoes.
-    """
-    prompt_lower = user_prompt.lower()
-
-    # ---- Detectar modo ----
-    edu_keywords = [
-        "aula", "curso", "tutorial", "ensino", "treino", "explicar",
-        "demonstrar", "passo", "step", "educacao", "teach", "learn",
-        "lesson", "workshop", "apresentacao", "presentation", "slide",
-        "infografico", "diagram", "how-to", "how to", "como fazer",
-        "aprenda", "aprender", "classe", "class", "professor", "teacher",
-        "aluno", "student", "quadro", "whiteboard", "lousa",
-    ]
-    mode = "educacional" if any(kw in prompt_lower for kw in edu_keywords) else "influencer"
-
-    # ---- Detectar formato ----
-    format_hints = {
-        "stories": ["stories", "story", "reels", "reel", "tiktok", "vertical", "shorts"],
-        "widescreen": ["banner", "thumbnail", "youtube", "desktop", "panorama",
-                       "landscape", "wide", "widescreen", "tv", "cinematico"],
-        "ultrawide": ["ultrawide", "panoramico", "cinematico ultra", "21:9"],
-        "portrait-45": ["retrato", "portrait", "instagram portrait", "vertical photo"],
-        "portrait-23": ["pinterest", "pin", "poster", "cartaz"],
-        "portrait-34": ["3:4", "card", "cartao"],
-        "square": ["feed", "post", "quadrado", "square", "instagram", "perfil", "profile"],
-    }
-
-    detected_format = "square"
-    for fmt, keywords in format_hints.items():
-        if any(kw in prompt_lower for kw in keywords):
-            detected_format = fmt
-            break
-
-    # ---- Detectar iluminacao ----
-    lighting_hints = {
-        "morning": ["manha", "morning", "amanhecer", "sunrise", "cafe da manha",
-                    "breakfast", "early morning"],
-        "golden-hour": ["por do sol", "sunset", "golden hour", "entardecer",
-                        "dourado", "golden", "magic hour"],
-        "night": ["noite", "night", "balada", "bar", "restaurante a noite",
-                  "neon", "club", "evening"],
-        "overcast": ["nublado", "overcast", "cloudy", "chuva", "rain", "dia cinza"],
-        "indoor": ["escritorio", "office", "casa", "home", "indoor", "sala",
-                   "quarto", "cozinha", "kitchen", "bedroom", "living room"],
-        "midday": ["meio dia", "midday", "noon", "sol forte", "praia", "beach"],
-        "blue-hour": ["hora azul", "blue hour", "twilight", "crepusculo"],
-        "shade": ["sombra", "shade", "under tree", "debaixo", "coberto"],
-    }
-
-    detected_lighting = None
-    for light, keywords in lighting_hints.items():
-        if any(kw in prompt_lower for kw in keywords):
-            detected_lighting = light
-            break
-
-    # ---- Detectar humanizacao ----
-    humanization = "natural"
-    if any(kw in prompt_lower for kw in ["ultra real", "super real", "celular velho",
-                                          "raw", "sem filtro", "amateur", "amador"]):
-        humanization = "ultra"
-    elif any(kw in prompt_lower for kw in ["editorial", "revista", "magazine", "vogue"]):
-        humanization = "editorial"
-    elif any(kw in prompt_lower for kw in ["polido", "polished", "limpo", "clean",
-                                            "profissional", "professional"]):
-        humanization = "polished"
-
-    # ---- Detectar shot type ----
-    shot_type = _detect_shot_type(user_prompt)
-
-    # ---- Detectar modelo ideal ----
-    model = "imagen-4"  # default
-    if any(kw in prompt_lower for kw in ["texto", "text", "logo", "titulo", "title",
-                                          "4k", "ultra qualidade", "referencia"]):
-        model = "gemini-pro-image"
-    elif any(kw in prompt_lower for kw in ["rapido", "fast", "batch", "lote", "volume"]):
-        model = "imagen-4-fast"
-
-    # ---- Detectar resolucao ideal ----
-    resolution = "1K"
-    if any(kw in prompt_lower for kw in ["4k", "ultra hd", "altissima qualidade"]):
-        resolution = "4K"
-    elif any(kw in prompt_lower for kw in ["2k", "alta qualidade", "hd", "impressao", "print"]):
-        resolution = "2K"
-
-    return {
-        "mode": mode,
-        "format": detected_format,
-        "humanization": humanization,
-        "lighting": detected_lighting,
-        "shot_type": shot_type,
-        "model": model,
-        "resolution": resolution,
-        "analysis": {
-            "is_educational": mode == "educacional",
-            "format_reason": f"Detected '{detected_format}' from keywords",
-            "lighting_reason": f"{'Auto' if not detected_lighting else detected_lighting}",
-            "model_reason": f"{'Default balanced' if model == 'imagen-4' else model}",
-        },
-    }
-
-
-# =============================================================================
-# HELPER: Resolver aliases de formato
-# =============================================================================
-
-def resolve_format(user_input: str) -> str:
-    """Resolve alias de formato para o nome canonico."""
-    return FORMAT_ALIASES.get(user_input.lower().strip(), user_input)
-
-
-# =============================================================================
-# CLI
-# =============================================================================
-
-def main():
-    parser = argparse.ArgumentParser(description="Motor de humanizacao de prompts para imagens")
-    parser.add_argument("--prompt", required=True, help="Prompt do usuario")
-    parser.add_argument("--mode", default=DEFAULT_MODE, choices=list(MODES.keys()))
-    parser.add_argument("--humanization", default=DEFAULT_HUMANIZATION,
-                       choices=list(HUMANIZATION_LEVELS.keys()))
-    parser.add_argument("--lighting", default=None,
-                       choices=list(LIGHTING_OPTIONS.keys()))
-    parser.add_argument("--shot-type", default=None,
-                       choices=list(SHOT_TYPES.keys()))
-    parser.add_argument("--analyze", action="store_true",
-                       help="Analisa prompt e sugere configuracoes")
-    parser.add_argument("--json", action="store_true")
-
-    args = parser.parse_args()
-
-    if args.analyze:
-        analysis = analyze_prompt(args.prompt)
-        if args.json:
-            print(json.dumps(analysis, indent=2, ensure_ascii=False))
-        else:
-            print(f"Modo sugerido:         {analysis['mode']}")
-            print(f"Formato sugerido:      {analysis['format']}")
-            print(f"Humanizacao sugerida:  {analysis['humanization']}")
-            print(f"Iluminacao sugerida:   {analysis['lighting'] or 'auto'}")
-            print(f"Enquadramento:         {analysis['shot_type']}")
-            print(f"Modelo sugerido:       {analysis['model']}")
-            print(f"Resolucao sugerida:    {analysis['resolution']}")
-        return
-
-    humanized = humanize_prompt(
-        user_prompt=args.prompt,
-        mode=args.mode,
-        humanization=args.humanization,
-        lighting=args.lighting,
-        shot_type=args.shot_type,
-    )
-
-    if args.json:
-        result = {
-            "original_prompt": args.prompt,
-            "humanized_prompt": humanized,
-            "char_count": len(humanized),
-            "estimated_tokens": len(humanized) // 4,
-            "settings": {
-                "mode": args.mode,
-                "humanization": args.humanization,
-                "lighting": args.lighting,
-                "shot_type": args.shot_type,
-            },
-            "timestamp": datetime.now().isoformat(),
-        }
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-    else:
-        print(humanized)
-        print(f"\n--- {len(humanized)} chars | ~{len(humanized)//4} tokens ---")
-
-
-if __name__ == "__main__":
-    main()
+    Retorna
