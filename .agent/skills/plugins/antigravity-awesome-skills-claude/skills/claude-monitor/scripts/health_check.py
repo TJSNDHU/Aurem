@@ -198,21 +198,10 @@ def check_top_processes(n=10):
     return procs[:n]
 
 
-def diagnose(results):
-    """Analisa os resultados e gera diagnóstico."""
-    issues = []
-    suggestions = []
+def _diagnose_cpu(cpu, issues, suggestions):
+    """Analisa CPU e atualiza issues/suggestions. Retorna (bottleneck, severity)."""
     bottleneck = "ok"
     severity = "ok"
-
-    cpu = results["cpu"]
-    ram = results["ram"]
-    browsers = results["browsers"]
-    disk = results["disk"]
-    network = results.get("network", {})
-    claude = results["claude"]
-
-    # CPU
     if cpu["status"] == "critical":
         issues.append(f"CPU a {cpu['percent']}% (CRITICO)")
         suggestions.append("Fechar aplicativos pesados ou abas de browser desnecessarias")
@@ -222,11 +211,15 @@ def diagnose(results):
     elif cpu["status"] == "warning":
         issues.append(f"CPU a {cpu['percent']}% (elevada)")
         suggestions.append("Considerar fechar algumas abas de browser")
-        if severity != "critical":
-            bottleneck = "cpu"
-            severity = "warning"
+        bottleneck = "cpu"
+        severity = "warning"
+    return bottleneck, severity
 
-    # RAM
+
+def _diagnose_ram(ram, issues, suggestions, current_severity):
+    """Analisa RAM e atualiza issues/suggestions. Retorna (bottleneck, severity)."""
+    bottleneck = "ok"
+    severity = current_severity
     if ram["status"] == "critical":
         issues.append(f"RAM a {ram['percent']}% ({ram['used_gb']} de {ram['total_gb']} GB)")
         suggestions.append("Fechar browsers ou aplicativos para liberar memoria")
@@ -235,8 +228,13 @@ def diagnose(results):
             severity = "critical"
     elif ram["status"] == "warning":
         issues.append(f"RAM a {ram['percent']}% (monitorar)")
+    return bottleneck, severity
 
-    # Browsers
+
+def _diagnose_browsers(browsers, issues, suggestions, current_bottleneck, current_severity):
+    """Analisa browsers e atualiza issues/suggestions. Retorna (bottleneck, severity)."""
+    bottleneck = current_bottleneck
+    severity = current_severity
     if browsers["ram_status"] == "critical":
         issues.append(f"Browsers consumindo {browsers['total_ram_gb']} GB ({browsers['total_processes']} processos)")
         suggestions.append("Fechar abas desnecessarias nos browsers")
@@ -250,8 +248,13 @@ def diagnose(results):
                 severity = "warning"
     elif browsers["ram_status"] == "warning":
         issues.append(f"Browsers usando {browsers['total_ram_gb']} GB (moderado)")
+    return bottleneck, severity
 
-    # Disco
+
+def _diagnose_disk(disk, issues, suggestions, current_bottleneck, current_severity):
+    """Analisa disco e atualiza issues/suggestions. Retorna (bottleneck, severity)."""
+    bottleneck = current_bottleneck
+    severity = current_severity
     if disk["status"] == "critical":
         issues.append(f"Disco quase cheio: apenas {disk['free_gb']:.0f} GB livres ({disk['free_percent']}%)")
         suggestions.append("Limpar arquivos temporarios, cache e lixeira")
@@ -261,8 +264,13 @@ def diagnose(results):
             severity = "warning"
     elif disk["status"] == "warning":
         issues.append(f"Disco com {disk['free_gb']:.0f} GB livres ({disk['free_percent']}%)")
+    return bottleneck, severity
 
-    # Rede
+
+def _diagnose_network(network, issues, suggestions, current_bottleneck, current_severity):
+    """Analisa rede e atualiza issues/suggestions. Retorna (bottleneck, severity)."""
+    bottleneck = current_bottleneck
+    severity = current_severity
     if network.get("status") == "critical":
         if not network.get("reachable"):
             issues.append("API do Claude INACESSIVEL")
@@ -276,19 +284,18 @@ def diagnose(results):
             if bottleneck == "ok":
                 bottleneck = "network"
                 severity = "warning"
+    return bottleneck, severity
 
-    # Claude Code RAM
+
+def _diagnose_claude(claude, issues, suggestions):
+    """Analisa processos do Claude Code e atualiza issues/suggestions."""
     if claude["total_ram_gb"] > 8:
         issues.append(f"Claude Code usando {claude['total_ram_gb']} GB ({claude['count']} processos)")
         suggestions.append("Considerar fechar sessoes de conversa antigas no Claude Code")
 
-    # Tudo ok
-    if not issues:
-        issues.append("Sistema saudavel, sem gargalos detectados")
-        suggestions.append("A lentidao pode ser temporaria (pico na API do Claude)")
-        suggestions.append("Tente trocar de sessao novamente em alguns segundos")
 
-    # Gerar resumo em PT-BR
+def _build_summary(severity, bottleneck, issues, suggestions, cpu, ram, browsers, claude, disk, network):
+    """Gera o resumo em PT-BR a partir do diagnóstico."""
     summary_lines = ["## Diagnostico de Performance\n"]
 
     status_emoji = {"critical": "[!!!]", "warning": "[!]", "ok": "[OK]"}
@@ -316,12 +323,59 @@ def diagnose(results):
     if network.get("latency_ms"):
         summary_lines.append(f"- Latencia API: {network['latency_ms']}ms")
 
+    return "\n".join(summary_lines)
+
+
+def diagnose(results):
+    """Analisa os resultados e gera diagnóstico."""
+    issues = []
+    suggestions = []
+    bottleneck = "ok"
+    severity = "ok"
+
+    cpu = results["cpu"]
+    ram = results["ram"]
+    browsers = results["browsers"]
+    disk = results["disk"]
+    network = results.get("network", {})
+    claude = results["claude"]
+
+    # CPU
+    bn, sev = _diagnose_cpu(cpu, issues, suggestions)
+    if sev == "critical" or (severity != "critical" and bn != "ok"):
+        bottleneck, severity = bn, sev
+
+    # RAM
+    bn, sev = _diagnose_ram(ram, issues, suggestions, severity)
+    if bn != "ok":
+        bottleneck, severity = bn, sev
+
+    # Browsers
+    bottleneck, severity = _diagnose_browsers(browsers, issues, suggestions, bottleneck, severity)
+
+    # Disco
+    bottleneck, severity = _diagnose_disk(disk, issues, suggestions, bottleneck, severity)
+
+    # Rede
+    bottleneck, severity = _diagnose_network(network, issues, suggestions, bottleneck, severity)
+
+    # Claude Code RAM
+    _diagnose_claude(claude, issues, suggestions)
+
+    # Tudo ok
+    if not issues:
+        issues.append("Sistema saudavel, sem gargalos detectados")
+        suggestions.append("A lentidao pode ser temporaria (pico na API do Claude)")
+        suggestions.append("Tente trocar de sessao novamente em alguns segundos")
+
+    summary = _build_summary(severity, bottleneck, issues, suggestions, cpu, ram, browsers, claude, disk, network)
+
     return {
         "bottleneck": bottleneck,
         "severity": severity,
         "issues": issues,
         "suggestions": suggestions,
-        "summary": "\n".join(summary_lines),
+        "summary": summary,
     }
 
 
@@ -333,30 +387,3 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output em JSON puro")
     parser.add_argument("--quick", action="store_true", help="Pula teste de rede")
     args = parser.parse_args()
-
-    results = {}
-
-    # Coleta dados
-    results["timestamp"] = datetime.now().isoformat()
-    results["cpu"] = check_cpu()
-    results["ram"] = check_ram()
-    results["browsers"] = check_browsers(detail=args.browsers_detail)
-    results["claude"] = check_claude_processes()
-    results["disk"] = check_disk()
-    results["top_processes"] = check_top_processes(15)
-
-    if not args.quick:
-        results["network"] = check_network()
-
-    # Diagnóstico
-    results["diagnosis"] = diagnose(results)
-
-    if args.json:
-        print(json.dumps(results, indent=2, ensure_ascii=False))
-    else:
-        print(results["diagnosis"]["summary"])
-        print(f"\n(Para output completo em JSON, use: python health_check.py --json)")
-
-
-if __name__ == "__main__":
-    main()
