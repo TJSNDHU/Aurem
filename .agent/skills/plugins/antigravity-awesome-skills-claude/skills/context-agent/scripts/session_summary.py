@@ -233,6 +233,60 @@ def _extract_findings(assistant_messages: list[str]) -> list[str]:
     return list(dict.fromkeys(findings))[:5]
 
 
+def _append_section(lines: list[str], title: str, items: list[str], bullet: str = "-") -> None:
+    """Adiciona uma seção ao markdown se houver itens."""
+    if not items:
+        return
+    lines.append(f"## {title}")
+    for item in items:
+        lines.append(f"{bullet} {item}")
+    lines.append("")
+
+
+def _append_pending_tasks_section(lines: list[str], tasks: list) -> None:
+    """Adiciona a seção de tarefas pendentes."""
+    if not tasks:
+        return
+    lines.append("## Tarefas Pendentes")
+    for t in tasks:
+        if isinstance(t, PendingTask):
+            lines.append(f"- [ ] {t.description} (prioridade: {t.priority})")
+        else:
+            lines.append(f"- [ ] {t}")
+    lines.append("")
+
+
+def _append_files_section(lines: list[str], files: list[dict]) -> None:
+    """Adiciona a seção de arquivos modificados."""
+    if not files:
+        return
+    lines.append("## Arquivos Modificados")
+    for f in files:
+        lines.append(f"- `{f['path']}` — {f['action']}")
+    lines.append("")
+
+
+def _append_errors_section(lines: list[str], errors: list[dict]) -> None:
+    """Adiciona a seção de erros resolvidos."""
+    if not errors:
+        return
+    lines.append("## Erros Resolvidos")
+    for e in errors:
+        lines.append(f"- {e['error']}")
+    lines.append("")
+
+
+def _append_metrics(lines: list[str], summary: SessionSummary) -> None:
+    """Adiciona a seção de métricas."""
+    lines.append("## Métricas")
+    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
+    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
+    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
+    lines.append(f"- Mensagens: {summary.message_count}")
+    lines.append(f"- Tool calls: {summary.tool_call_count}")
+    lines.append("")
+
+
 def save_session_summary(summary: SessionSummary):
     """Salva resumo como arquivo markdown."""
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,70 +298,16 @@ def save_session_summary(summary: SessionSummary):
         "",
     ]
 
-    if summary.topics:
-        lines.append("## Tópicos")
-        for t in summary.topics:
-            lines.append(f"- {t}")
-        lines.append("")
-
-    if summary.decisions:
-        lines.append("## Decisões")
-        for d in summary.decisions:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    if summary.tasks_completed:
-        lines.append("## Tarefas Concluídas")
-        for t in summary.tasks_completed:
-            lines.append(f"- [x] {t}")
-        lines.append("")
-
-    if summary.tasks_pending:
-        lines.append("## Tarefas Pendentes")
-        for t in summary.tasks_pending:
-            if isinstance(t, PendingTask):
-                lines.append(f"- [ ] {t.description} (prioridade: {t.priority})")
-            else:
-                lines.append(f"- [ ] {t}")
-        lines.append("")
-
-    if summary.files_modified:
-        lines.append("## Arquivos Modificados")
-        for f in summary.files_modified:
-            lines.append(f"- `{f['path']}` — {f['action']}")
-        lines.append("")
-
-    if summary.key_findings:
-        lines.append("## Descobertas")
-        for f in summary.key_findings:
-            lines.append(f"- {f}")
-        lines.append("")
-
-    if summary.errors_resolved:
-        lines.append("## Erros Resolvidos")
-        for e in summary.errors_resolved:
-            lines.append(f"- {e['error']}")
-        lines.append("")
-
-    if summary.open_questions:
-        lines.append("## Questões em Aberto")
-        for q in summary.open_questions:
-            lines.append(f"- {q}")
-        lines.append("")
-
-    if summary.technical_debt:
-        lines.append("## Dívida Técnica")
-        for d in summary.technical_debt:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    lines.append("## Métricas")
-    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
-    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
-    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
-    lines.append(f"- Mensagens: {summary.message_count}")
-    lines.append(f"- Tool calls: {summary.tool_call_count}")
-    lines.append("")
+    _append_section(lines, "Tópicos", summary.topics)
+    _append_section(lines, "Decisões", summary.decisions)
+    _append_section(lines, "Tarefas Concluídas", [f"[x] {t}" for t in summary.tasks_completed])
+    _append_pending_tasks_section(lines, summary.tasks_pending)
+    _append_files_section(lines, summary.files_modified)
+    _append_section(lines, "Descobertas", summary.key_findings)
+    _append_errors_section(lines, summary.errors_resolved)
+    _append_section(lines, "Questões em Aberto", summary.open_questions)
+    _append_section(lines, "Dívida Técnica", summary.technical_debt)
+    _append_metrics(lines, summary)
 
     # Link para sessão anterior
     if summary.session_number > 1:
