@@ -169,7 +169,8 @@ def run_lighteval_accelerate(
         sys.exit(exc.returncode)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the lighteval CLI."""
     parser = argparse.ArgumentParser(
         description="Run lighteval evaluations with vLLM or accelerate backend on custom HuggingFace models",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -262,9 +263,11 @@ Task format:
         default=None,
         help="System prompt for chat models",
     )
+    return parser
 
-    args = parser.parse_args()
 
+def dispatch_backend(args: argparse.Namespace) -> None:
+    """Dispatch to the appropriate backend based on parsed arguments."""
     if args.backend == "vllm":
         run_lighteval_vllm(
             model_id=args.model,
@@ -291,6 +294,12 @@ Task format:
             use_chat_template=args.use_chat_template,
             system_prompt=args.system_prompt,
         )
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+    dispatch_backend(args)
 
 
 if __name__ == "__main__":
