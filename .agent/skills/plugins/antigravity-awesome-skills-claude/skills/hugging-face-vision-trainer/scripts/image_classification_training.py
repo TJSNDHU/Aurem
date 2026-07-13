@@ -164,14 +164,18 @@ def build_transforms(image_processor, is_training: bool):
         ])
 
 
-def main():
+def parse_arguments():
+    """Parse command-line or JSON file arguments."""
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    return model_args, data_args, training_args
 
-    # --- Hub authentication ---
+
+def setup_hub_auth(training_args):
+    """Authenticate with the Hugging Face Hub if a token is available."""
     from huggingface_hub import login
     hf_token = os.environ.get("HF_TOKEN") or os.environ.get("hfjob")
     if hf_token:
@@ -181,10 +185,9 @@ def main():
     elif training_args.push_to_hub:
         logger.warning("HF_TOKEN not found in environment. Hub push will likely fail.")
 
-    # --- Trackio ---
-    trackio.init(project=training_args.output_dir, name=training_args.run_name)
 
-    # --- Logging ---
+def setup_logging(training_args):
+    """Configure logging verbosity and format."""
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
@@ -206,6 +209,9 @@ def main():
     )
     logger.info(f"Training/evaluation parameters {training_args}")
 
+
+def load_and_prepare_dataset(data_args, model_args, training_args):
+    """Load dataset, resolve labels, remap strings, split, and truncate."""
     # --- Load dataset ---
     dataset = load_dataset(
         data_args.dataset_name,
@@ -271,113 +277,11 @@ def main():
         dataset["validation"] = dataset["validation"].select(range(max_eval))
         logger.info(f"Truncated validation set to {max_eval} samples")
 
-    # --- Load model & image processor ---
+    return dataset, label_col, num_labels, label2id, id2label
+
+
+def load_model_and_processor(model_args, num_labels, label2id, id2label):
+    """Load model config, model, and image processor from the Hub."""
     common_pretrained_args = {
         "cache_dir": model_args.cache_dir,
         "revision": model_args.model_revision,
-        "token": model_args.token,
-        "trust_remote_code": model_args.trust_remote_code,
-    }
-
-    config = AutoConfig.from_pretrained(
-        model_args.config_name or model_args.model_name_or_path,
-        num_labels=num_labels,
-        label2id=label2id,
-        id2label=id2label,
-        **common_pretrained_args,
-    )
-
-    model = AutoModelForImageClassification.from_pretrained(
-        model_args.model_name_or_path,
-        config=config,
-        ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-        **common_pretrained_args,
-    )
-
-    image_processor = AutoImageProcessor.from_pretrained(
-        model_args.image_processor_name or model_args.model_name_or_path,
-        **common_pretrained_args,
-    )
-
-    # --- Build transforms ---
-    train_transforms = build_transforms(image_processor, is_training=True)
-    val_transforms = build_transforms(image_processor, is_training=False)
-
-    image_col = data_args.image_column_name
-
-    def preprocess_train(examples):
-        return {
-            "pixel_values": [train_transforms(img.convert("RGB")) for img in examples[image_col]],
-            "labels": examples[label_col],
-        }
-
-    def preprocess_val(examples):
-        return {
-            "pixel_values": [val_transforms(img.convert("RGB")) for img in examples[image_col]],
-            "labels": examples[label_col],
-        }
-
-    dataset["train"].set_transform(preprocess_train)
-    if "validation" in dataset:
-        dataset["validation"].set_transform(preprocess_val)
-    if "test" in dataset:
-        dataset["test"].set_transform(preprocess_val)
-
-    # --- Metrics ---
-    accuracy_metric = evaluate.load("accuracy")
-
-    def compute_metrics(eval_pred: EvalPrediction):
-        predictions = np.argmax(eval_pred.predictions, axis=1)
-        return accuracy_metric.compute(predictions=predictions, references=eval_pred.label_ids)
-
-    # --- Trainer ---
-    eval_dataset = None
-    if training_args.do_eval:
-        if "validation" in dataset:
-            eval_dataset = dataset["validation"]
-        elif "test" in dataset:
-            eval_dataset = dataset["test"]
-
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=dataset["train"] if training_args.do_train else None,
-        eval_dataset=eval_dataset,
-        processing_class=image_processor,
-        data_collator=DefaultDataCollator(),
-        compute_metrics=compute_metrics,
-    )
-
-    # --- Train ---
-    if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model()
-        trainer.log_metrics("train", train_result.metrics)
-        trainer.save_metrics("train", train_result.metrics)
-        trainer.save_state()
-
-    # --- Evaluate ---
-    if training_args.do_eval:
-        test_dataset = dataset.get("test", dataset.get("validation"))
-        test_prefix = "test" if "test" in dataset else "eval"
-        if test_dataset is not None:
-            metrics = trainer.evaluate(eval_dataset=test_dataset, metric_key_prefix=test_prefix)
-            trainer.log_metrics(test_prefix, metrics)
-            trainer.save_metrics(test_prefix, metrics)
-
-    trackio.finish()
-
-    # --- Push to Hub ---
-    kwargs = {
-        "finetuned_from": model_args.model_name_or_path,
-        "dataset": data_args.dataset_name,
-        "tags": ["image-classification", "vision"],
-    }
-    if training_args.push_to_hub:
-        trainer.push_to_hub(**kwargs)
-    else:
-        trainer.create_model_card(**kwargs)
-
-
-if __name__ == "__main__":
-    main()
