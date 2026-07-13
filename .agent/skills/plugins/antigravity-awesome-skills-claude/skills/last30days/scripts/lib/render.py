@@ -233,6 +233,115 @@ def render_context_snippet(report: schema.Report) -> str:
     return "\n".join(lines)
 
 
+def _render_full_report_header(report: schema.Report) -> List[str]:
+    """Render the title and metadata header for the full report."""
+    lines = []
+    lines.append(f"# {report.topic} - Last 30 Days Research Report")
+    lines.append("")
+    lines.append(f"**Generated:** {report.generated_at}")
+    lines.append(f"**Date Range:** {report.range_from} to {report.range_to}")
+    lines.append(f"**Mode:** {report.mode}")
+    lines.append("")
+    lines.append("## Models Used")
+    lines.append("")
+    if report.openai_model_used:
+        lines.append(f"- **OpenAI:** {report.openai_model_used}")
+    if report.xai_model_used:
+        lines.append(f"- **xAI:** {report.xai_model_used}")
+    lines.append("")
+    return lines
+
+
+def _render_full_report_reddit(report: schema.Report) -> List[str]:
+    """Render the Reddit section of the full report."""
+    lines = []
+    if not report.reddit:
+        return lines
+    lines.append("## Reddit Threads")
+    lines.append("")
+    for item in report.reddit:
+        lines.append(f"### {item.id}: {item.title}")
+        lines.append("")
+        lines.append(f"- **Subreddit:** r/{item.subreddit}")
+        lines.append(f"- **URL:** {item.url}")
+        lines.append(f"- **Date:** {item.date or 'Unknown'} (confidence: {item.date_confidence})")
+        lines.append(f"- **Score:** {item.score}/100")
+        lines.append(f"- **Relevance:** {item.why_relevant}")
+
+        if item.engagement:
+            eng = item.engagement
+            lines.append(f"- **Engagement:** {eng.score or '?'} points, {eng.num_comments or '?'} comments")
+
+        if item.comment_insights:
+            lines.append("")
+            lines.append("**Key Insights from Comments:**")
+            for insight in item.comment_insights:
+                lines.append(f"- {insight}")
+
+        lines.append("")
+    return lines
+
+
+def _render_full_report_x(report: schema.Report) -> List[str]:
+    """Render the X posts section of the full report."""
+    lines = []
+    if not report.x:
+        return lines
+    lines.append("## X Posts")
+    lines.append("")
+    for item in report.x:
+        lines.append(f"### {item.id}: @{item.author_handle}")
+        lines.append("")
+        lines.append(f"- **URL:** {item.url}")
+        lines.append(f"- **Date:** {item.date or 'Unknown'} (confidence: {item.date_confidence})")
+        lines.append(f"- **Score:** {item.score}/100")
+        lines.append(f"- **Relevance:** {item.why_relevant}")
+
+        if item.engagement:
+            eng = item.engagement
+            lines.append(f"- **Engagement:** {eng.likes or '?'} likes, {eng.reposts or '?'} reposts")
+
+        lines.append("")
+        lines.append(f"> {item.text}")
+        lines.append("")
+    return lines
+
+
+def _render_full_report_web(report: schema.Report) -> List[str]:
+    """Render the Web results section of the full report."""
+    lines = []
+    if not report.web:
+        return lines
+    lines.append("## Web Results")
+    lines.append("")
+    for item in report.web:
+        lines.append(f"### {item.id}: {item.title}")
+        lines.append("")
+        lines.append(f"- **Source:** {item.source_domain}")
+        lines.append(f"- **URL:** {item.url}")
+        lines.append(f"- **Date:** {item.date or 'Unknown'} (confidence: {item.date_confidence})")
+        lines.append(f"- **Score:** {item.score}/100")
+        lines.append(f"- **Relevance:** {item.why_relevant}")
+        lines.append("")
+        lines.append(f"> {item.snippet}")
+        lines.append("")
+    return lines
+
+
+def _render_full_report_placeholders() -> List[str]:
+    """Render the placeholder sections for Claude synthesis."""
+    lines = []
+    lines.append("## Best Practices")
+    lines.append("")
+    lines.append("*To be synthesized by Claude*")
+    lines.append("")
+    lines.append("## Prompt Pack")
+    lines.append("")
+    lines.append("*To be synthesized by Claude*")
+    lines.append("")
+    return lines
+
+
 def render_full_report(report: schema.Report) -> str:
     """Render full markdown report.
 
@@ -243,96 +352,11 @@ def render_full_report(report: schema.Report) -> str:
         Full report markdown
     """
     lines = []
-
-    # Title
-    lines.append(f"# {report.topic} - Last 30 Days Research Report")
-    lines.append("")
-    lines.append(f"**Generated:** {report.generated_at}")
-    lines.append(f"**Date Range:** {report.range_from} to {report.range_to}")
-    lines.append(f"**Mode:** {report.mode}")
-    lines.append("")
-
-    # Models
-    lines.append("## Models Used")
-    lines.append("")
-    if report.openai_model_used:
-        lines.append(f"- **OpenAI:** {report.openai_model_used}")
-    if report.xai_model_used:
-        lines.append(f"- **xAI:** {report.xai_model_used}")
-    lines.append("")
-
-    # Reddit section
-    if report.reddit:
-        lines.append("## Reddit Threads")
-        lines.append("")
-        for item in report.reddit:
-            lines.append(f"### {item.id}: {item.title}")
-            lines.append("")
-            lines.append(f"- **Subreddit:** r/{item.subreddit}")
-            lines.append(f"- **URL:** {item.url}")
-            lines.append(f"- **Date:** {item.date or 'Unknown'} (confidence: {item.date_confidence})")
-            lines.append(f"- **Score:** {item.score}/100")
-            lines.append(f"- **Relevance:** {item.why_relevant}")
-
-            if item.engagement:
-                eng = item.engagement
-                lines.append(f"- **Engagement:** {eng.score or '?'} points, {eng.num_comments or '?'} comments")
-
-            if item.comment_insights:
-                lines.append("")
-                lines.append("**Key Insights from Comments:**")
-                for insight in item.comment_insights:
-                    lines.append(f"- {insight}")
-
-            lines.append("")
-
-    # X section
-    if report.x:
-        lines.append("## X Posts")
-        lines.append("")
-        for item in report.x:
-            lines.append(f"### {item.id}: @{item.author_handle}")
-            lines.append("")
-            lines.append(f"- **URL:** {item.url}")
-            lines.append(f"- **Date:** {item.date or 'Unknown'} (confidence: {item.date_confidence})")
-            lines.append(f"- **Score:** {item.score}/100")
-            lines.append(f"- **Relevance:** {item.why_relevant}")
-
-            if item.engagement:
-                eng = item.engagement
-                lines.append(f"- **Engagement:** {eng.likes or '?'} likes, {eng.reposts or '?'} reposts")
-
-            lines.append("")
-            lines.append(f"> {item.text}")
-            lines.append("")
-
-    # Web section
-    if report.web:
-        lines.append("## Web Results")
-        lines.append("")
-        for item in report.web:
-            lines.append(f"### {item.id}: {item.title}")
-            lines.append("")
-            lines.append(f"- **Source:** {item.source_domain}")
-            lines.append(f"- **URL:** {item.url}")
-            lines.append(f"- **Date:** {item.date or 'Unknown'} (confidence: {item.date_confidence})")
-            lines.append(f"- **Score:** {item.score}/100")
-            lines.append(f"- **Relevance:** {item.why_relevant}")
-            lines.append("")
-            lines.append(f"> {item.snippet}")
-            lines.append("")
-
-    # Placeholders for Claude synthesis
-    lines.append("## Best Practices")
-    lines.append("")
-    lines.append("*To be synthesized by Claude*")
-    lines.append("")
-
-    lines.append("## Prompt Pack")
-    lines.append("")
-    lines.append("*To be synthesized by Claude*")
-    lines.append("")
-
+    lines.extend(_render_full_report_header(report))
+    lines.extend(_render_full_report_reddit(report))
+    lines.extend(_render_full_report_x(report))
+    lines.extend(_render_full_report_web(report))
+    lines.extend(_render_full_report_placeholders())
     return "\n".join(lines)
 
 
