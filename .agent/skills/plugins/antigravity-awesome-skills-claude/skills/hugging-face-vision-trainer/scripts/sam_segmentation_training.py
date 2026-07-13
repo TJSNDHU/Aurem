@@ -226,10 +226,10 @@ class ModelArguments:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Helper functions extracted from main()
 # ---------------------------------------------------------------------------
 
-def main():
+def parse_arguments():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     parser.set_defaults(per_device_train_batch_size=4, num_train_epochs=30)
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -238,7 +238,10 @@ def main():
         )
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    return model_args, data_args, training_args
 
+
+def setup_hf_login(training_args):
     from huggingface_hub import login
     hf_token = os.environ.get("HF_TOKEN") or os.environ.get("hfjob")
     if hf_token:
@@ -248,8 +251,8 @@ def main():
     elif training_args.push_to_hub:
         logger.warning("HF_TOKEN not found in environment. Hub push will likely fail.")
 
-    trackio.init(project=training_args.output_dir, name=training_args.run_name)
 
+def setup_logging(training_args):
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
@@ -266,7 +269,8 @@ def main():
 
     logger.info(f"Training/evaluation parameters {training_args}")
 
-    # ---- Load dataset ----
+
+def load_and_prepare_dataset(data_args, model_args, training_args):
     dataset = load_dataset(
         data_args.dataset_name,
         data_args.dataset_config_name,
@@ -300,7 +304,10 @@ def main():
         dataset[eval_key] = dataset[eval_key].select(range(n))
         logger.info(f"Truncated eval set to {n} samples")
 
-    # ---- Detect model family (SAM vs SAM2) and load processor/model ----
+    return dataset, eval_key
+
+
+def load_model_and_processor(model_args):
     model_id = model_args.model_name_or_path.lower()
     is_sam2 = "sam2" in model_id
 
@@ -326,7 +333,10 @@ def main():
     total = sum(p.numel() for p in model.parameters())
     logger.info(f"Trainable params: {trainable:,} / {total:,} ({100 * trainable / total:.1f}%)")
 
-    # ---- Build datasets ----
+    return model, processor
+
+
+def build_datasets(dataset, eval_key, data_args, processor):
     prompt_col = data_args.prompt_column_name if data_args.prompt_column_name else None
     ds_kwargs = dict(
         processor=processor,
@@ -343,16 +353,10 @@ def main():
     if eval_key in dataset:
         eval_dataset = SAMSegmentationDataset(dataset=dataset[eval_key], **ds_kwargs)
 
-    # ---- Train ----
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
-        data_collator=collate_fn,
-        compute_loss_func=compute_loss,
-    )
+    return train_dataset, eval_dataset
 
+
+def run_training_and_eval(trainer, training_args, eval_dataset):
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
         trainer.save_model()
@@ -365,6 +369,8 @@ def main():
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
 
+
+def finalize_and_push(trainer, model_args, data_args, training_args):
     trackio.finish()
 
     kwargs = {
@@ -376,6 +382,39 @@ def main():
         trainer.push_to_hub(**kwargs)
     else:
         trainer.create_model_card(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    model_args, data_args, training_args = parse_arguments()
+
+    setup_hf_login(training_args)
+
+    trackio.init(project=training_args.output_dir, name=training_args.run_name)
+
+    setup_logging(training_args)
+
+    dataset, eval_key = load_and_prepare_dataset(data_args, model_args, training_args)
+
+    model, processor = load_model_and_processor(model_args)
+
+    train_dataset, eval_dataset = build_datasets(dataset, eval_key, data_args, processor)
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        data_collator=collate_fn,
+        compute_loss_func=compute_loss,
+    )
+
+    run_training_and_eval(trainer, training_args, eval_dataset)
+
+    finalize_and_push(trainer, model_args, data_args, training_args)
 
 
 if __name__ == "__main__":
