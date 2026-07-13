@@ -174,7 +174,8 @@ def run_inspect_hf(
         sys.exit(exc.returncode)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for the CLI."""
     parser = argparse.ArgumentParser(
         description="Run inspect-ai evaluations with vLLM or HuggingFace Transformers on custom models",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -273,8 +274,11 @@ Available tasks (from inspect-evals):
         help="Logging level (default: info)",
     )
 
-    args = parser.parse_args()
+    return parser
 
+
+def dispatch_backend(args: argparse.Namespace) -> None:
+    """Dispatch to the appropriate backend based on parsed arguments."""
     if args.backend == "vllm":
         run_inspect_vllm(
             model_id=args.model,
@@ -300,6 +304,12 @@ Available tasks (from inspect-evals):
             trust_remote_code=args.trust_remote_code,
             log_level=args.log_level,
         )
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+    dispatch_backend(args)
 
 
 if __name__ == "__main__":
