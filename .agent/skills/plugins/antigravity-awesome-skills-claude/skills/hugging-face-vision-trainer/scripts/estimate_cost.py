@@ -133,23 +133,21 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-
-    model_params = extract_model_params(args.model)
-    print(f"Model: {args.model} (~{model_params:.1f}M parameters)")
-
+def resolve_dataset_size(args) -> int:
+    """Determine the dataset size from args or known datasets."""
     if args.dataset_size:
-        dataset_size = args.dataset_size
-    elif args.dataset and args.dataset in KNOWN_DATASETS:
-        dataset_size = KNOWN_DATASETS[args.dataset]
-    elif args.dataset:
+        return args.dataset_size
+    if args.dataset and args.dataset in KNOWN_DATASETS:
+        return KNOWN_DATASETS[args.dataset]
+    if args.dataset:
         print(f"Unknown dataset '{args.dataset}', defaulting to 1000 images.")
         print(f"Use --dataset-size to specify the exact count.")
-        dataset_size = 1000
-    else:
-        dataset_size = 1000
+    return 1000
 
+
+def print_config(args, model_params: float, dataset_size: int):
+    """Print the resolved configuration."""
+    print(f"Model: {args.model} (~{model_params:.1f}M parameters)")
     print(f"Dataset: {args.dataset or 'custom'} (~{dataset_size} images)")
     print(f"Epochs: {args.epochs}")
     print(f"Image size: {args.image_size}px")
@@ -157,17 +155,9 @@ def main():
     print(f"Hardware: {args.hardware} (${HARDWARE_COSTS[args.hardware]:.2f}/hr)")
     print()
 
-    estimated_hours = estimate_training_time(
-        model_params, dataset_size, args.epochs, args.image_size, args.batch_size, args.hardware
-    )
-    estimated_cost = estimated_hours * HARDWARE_COSTS[args.hardware]
-    recommended_timeout = estimated_hours * 1.3  # 30% buffer
 
-    print(f"Estimated training time: {estimated_hours:.1f} hours")
-    print(f"Estimated cost: ${estimated_cost:.2f}")
-    print(f"Recommended timeout: {recommended_timeout:.1f}h (with 30% buffer)")
-    print()
-
+def print_warnings(estimated_hours: float, model_params: float, args):
+    """Print warnings about long training times or large models on small hardware."""
     if estimated_hours > 6:
         print("Warning: Long training time. Consider:")
         print("   - Reducing epochs or image size")
@@ -182,6 +172,9 @@ def main():
         print("   - Upgrade to l4x1 or a10g-small")
         print()
 
+
+def print_job_config(args, recommended_timeout: float):
+    """Print example job configurations for MCP tool and Python API."""
     timeout_str = f"{recommended_timeout:.0f}h"
     timeout_secs = int(recommended_timeout * 3600)
     print(f"Example job configuration (MCP tool):")
@@ -211,6 +204,29 @@ api.run_uv_job(
     secrets={{"HF_TOKEN": get_token()}},
 )
 """)
+
+
+def main():
+    args = parse_args()
+
+    model_params = extract_model_params(args.model)
+    dataset_size = resolve_dataset_size(args)
+
+    print_config(args, model_params, dataset_size)
+
+    estimated_hours = estimate_training_time(
+        model_params, dataset_size, args.epochs, args.image_size, args.batch_size, args.hardware
+    )
+    estimated_cost = estimated_hours * HARDWARE_COSTS[args.hardware]
+    recommended_timeout = estimated_hours * 1.3  # 30% buffer
+
+    print(f"Estimated training time: {estimated_hours:.1f} hours")
+    print(f"Estimated cost: ${estimated_cost:.2f}")
+    print(f"Recommended timeout: {recommended_timeout:.1f}h (with 30% buffer)")
+    print()
+
+    print_warnings(estimated_hours, model_params, args)
+    print_job_config(args, recommended_timeout)
 
 
 if __name__ == "__main__":
