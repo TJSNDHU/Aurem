@@ -164,37 +164,33 @@ async def _do_publish_photo(
     }
 
 
-async def publish_video(
+async def _create_video_draft(
     api: InstagramAPI,
     video: str,
-    caption: Optional[str] = None,
-    media_type: str = "VIDEO",
-    cover_url: Optional[str] = None,
-    as_draft: bool = False,
+    video_url: str,
+    caption: Optional[str],
+    media_type: str,
 ) -> dict:
-    """Publica vídeo, reel ou story de vídeo."""
-    video_url = await upload_if_local(api, video)
+    """Cria um rascunho de vídeo."""
+    post_id = db.insert_post({
+        "account_id": api.account_id,
+        "media_type": media_type.upper(),
+        "media_url": video_url,
+        "local_path": video if _is_local_file(video) else None,
+        "caption": caption,
+        "status": "draft",
+    })
+    return {"status": "draft", "post_id": post_id}
 
-    if as_draft:
-        post_id = db.insert_post({
-            "account_id": api.account_id,
-            "media_type": media_type.upper(),
-            "media_url": video_url,
-            "local_path": video if _is_local_file(video) else None,
-            "caption": caption,
-            "status": "draft",
-        })
-        return {"status": "draft", "post_id": post_id}
 
-    action_name = f"publish_{media_type.lower()}"
-    if gov.requires_confirmation(action_name):
-        return gov.create_confirmation_request(
-            action_name,
-            {"caption": caption, "video": video, "type": media_type},
-            api.account_id,
-        )
-
-    # Step 1: Container
+async def _create_video_container(
+    api: InstagramAPI,
+    video_url: str,
+    caption: Optional[str],
+    media_type: str,
+    cover_url: Optional[str],
+) -> tuple:
+    """Cria o container de mídia para vídeo e retorna (container_id, post_id)."""
     ig_type = {"VIDEO": "VIDEO", "REEL": "REELS", "STORY": "STORIES"}[media_type.upper()]
     container = await api.create_media_container(
         media_type=ig_type,
@@ -212,8 +208,15 @@ async def publish_video(
         "status": "container_created",
         "ig_container_id": container_id,
     })
+    return container_id, post_id
 
-    # Aguardar processamento do vídeo
+
+async def _wait_for_video_processing(
+    api: InstagramAPI,
+    container_id: str,
+    post_id: int,
+) -> Optional[dict]:
+    """Aguarda o processamento do vídeo. Retorna None se OK, ou dict de erro."""
     print("Aguardando processamento do vídeo...")
     for _ in range(60):  # max 5 min (60 * 5s)
         status = await api.check_container_status(container_id)
@@ -225,8 +228,18 @@ async def publish_video(
             db.update_post_status(post_id, "failed", error_msg=error_msg)
             return {"status": "failed", "error": error_msg}
         await asyncio.sleep(5)
+    return None
 
-    # Step 2: Publicar
+
+async def _finalize_video_publish(
+    api: InstagramAPI,
+    container_id: str,
+    post_id: int,
+    action_name: str,
+    caption: Optional[str],
+    media_type: str,
+) -> dict:
+    """Publica o vídeo e atualiza o banco."""
     result = await api.publish_media(container_id)
     ig_media_id = result.get("id")
     details = await api.get_media_details(ig_media_id)
@@ -247,6 +260,41 @@ async def publish_video(
     )
 
     return {"status": "published", "ig_media_id": ig_media_id, "permalink": permalink}
+
+
+async def publish_video(
+    api: InstagramAPI,
+    video: str,
+    caption: Optional[str] = None,
+    media_type: str = "VIDEO",
+    cover_url: Optional[str] = None,
+    as_draft: bool = False,
+) -> dict:
+    """Publica vídeo, reel ou story de vídeo."""
+    video_url = await upload_if_local(api, video)
+
+    if as_draft:
+        return await _create_video_draft(api, video, video_url, caption, media_type)
+
+    action_name = f"publish_{media_type.lower()}"
+    if gov.requires_confirmation(action_name):
+        return gov.create_confirmation_request(
+            action_name,
+            {"caption": caption, "video": video, "type": media_type},
+            api.account_id,
+        )
+
+    container_id, post_id = await _create_video_container(
+        api, video_url, caption, media_type, cover_url,
+    )
+
+    error = await _wait_for_video_processing(api, container_id, post_id)
+    if error:
+        return error
+
+    return await _finalize_video_publish(
+        api, container_id, post_id, action_name, caption, media_type,
+    )
 
 
 async def publish_carousel(
@@ -404,46 +452,4 @@ async def run(args) -> None:
         elif media_type in ("VIDEO", "REEL", "STORY"):
             media = args.video or args.image
             if not media:
-                print("ERRO: --video ou --image é obrigatório")
-                return
-            result = await publish_video(api, media, caption, media_type=media_type, as_draft=args.draft)
-        elif media_type == "CAROUSEL":
-            if not args.images or len(args.images) < 2:
-                print("ERRO: --images precisa de 2-10 arquivos")
-                return
-            result = await publish_carousel(api, args.images, caption, as_draft=args.draft)
-        else:
-            result = {"status": "error", "message": f"Tipo desconhecido: {args.type}"}
-
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-
-    finally:
-        await api.close()
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Publicar no Instagram")
-    parser.add_argument("--type", choices=["photo", "video", "reel", "story", "carousel"],
-                        help="Tipo de conteúdo")
-    parser.add_argument("--image", help="Caminho da imagem ou URL")
-    parser.add_argument("--video", help="Caminho do vídeo ou URL")
-    parser.add_argument("--images", nargs="+", help="Imagens do carrossel")
-    parser.add_argument("--caption", help="Legenda do post")
-    parser.add_argument("--draft", action="store_true", help="Criar como rascunho")
-    parser.add_argument("--approve", action="store_true", help="Aprovar rascunho")
-    parser.add_argument("--id", type=int, help="ID do post (para --approve)")
-    parser.add_argument("--template", help="Nome do template a usar")
-    parser.add_argument("--vars", nargs="+", help="Variáveis do template (key=value)")
-    parser.add_argument("--confirm", help="Confirmar ação (yes/no)")
-    parser.add_argument("--confirm-action", dest="confirm_action", help="Ação a confirmar")
-    parser.add_argument("--action-id", help="ID da ação a confirmar")
-    args = parser.parse_args()
-
-    if not args.approve and not args.confirm and not args.type:
-        parser.error("--type é obrigatório para publicação")
-
-    asyncio.run(run(args))
-
-
-if __name__ == "__main__":
-    main()
+                print("ERRO: --video ou --image
