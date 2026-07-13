@@ -91,33 +91,32 @@ def validate_prisma_schema(file_path: Path) -> list:
     return issues
 
 
-def main():
-    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
-    
+def print_header(project_path: Path):
+    """Print the script header."""
     print(f"\n{'='*60}")
     print(f"[SCHEMA VALIDATOR] Database Schema Validation")
     print(f"{'='*60}")
     print(f"Project: {project_path}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-"*60)
-    
-    # Find schema files
-    schemas = find_schema_files(project_path)
-    print(f"Found {len(schemas)} schema files")
-    
-    if not schemas:
-        output = {
-            "script": "schema_validator",
-            "project": str(project_path),
-            "schemas_checked": 0,
-            "issues_found": 0,
-            "passed": True,
-            "message": "No schema files found"
-        }
-        print(json.dumps(output, indent=2))
-        sys.exit(0)
-    
-    # Validate each schema
+
+
+def print_no_schemas_output(project_path: Path):
+    """Print output when no schema files are found and exit."""
+    output = {
+        "script": "schema_validator",
+        "project": str(project_path),
+        "schemas_checked": 0,
+        "issues_found": 0,
+        "passed": True,
+        "message": "No schema files found"
+    }
+    print(json.dumps(output, indent=2))
+    sys.exit(0)
+
+
+def validate_schemas(schemas) -> list:
+    """Validate each schema file and return collected issues."""
     all_issues = []
     
     for schema_type, file_path in schemas:
@@ -135,7 +134,11 @@ def main():
                 "issues": issues
             })
     
-    # Summary
+    return all_issues
+
+
+def print_issues(all_issues: list):
+    """Print schema issues summary."""
     print("\n" + "="*60)
     print("SCHEMA ISSUES")
     print("="*60)
@@ -149,12 +152,15 @@ def main():
                 print(f"  ... and {len(item['issues']) - 5} more issues")
     else:
         print("No schema issues found!")
-    
+
+
+def build_output(project_path: Path, schemas: list, all_issues: list) -> dict:
+    """Build the final output dictionary."""
     total_issues = sum(len(item["issues"]) for item in all_issues)
     # Schema issues are warnings, not failures
     passed = True
     
-    output = {
+    return {
         "script": "schema_validator",
         "project": str(project_path),
         "schemas_checked": len(schemas),
@@ -162,7 +168,27 @@ def main():
         "passed": passed,
         "issues": all_issues
     }
+
+
+def main():
+    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
     
+    print_header(project_path)
+    
+    # Find schema files
+    schemas = find_schema_files(project_path)
+    print(f"Found {len(schemas)} schema files")
+    
+    if not schemas:
+        print_no_schemas_output(project_path)
+    
+    # Validate each schema
+    all_issues = validate_schemas(schemas)
+    
+    # Summary
+    print_issues(all_issues)
+    
+    output = build_output(project_path, schemas, all_issues)
     print("\n" + json.dumps(output, indent=2))
     
     sys.exit(0)
