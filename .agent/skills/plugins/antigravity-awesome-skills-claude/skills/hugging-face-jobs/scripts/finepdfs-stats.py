@@ -271,7 +271,8 @@ uv run https://huggingface.co/datasets/uv-scripts/dataset-stats/raw/main/finepdf
 """
 
 
-def main():
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Analyze educational quality trends across CommonCrawl dumps",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -341,29 +342,28 @@ def main():
         help="Make the output dataset private",
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    # Check for high-performance mode
-    if os.environ.get("HF_XET_HIGH_PERFORMANCE"):
-        logger.info("High-performance mode enabled (HF_XET_HIGH_PERFORMANCE=1)")
 
-    # List languages mode
-    if args.list_languages:
-        print(f"Available language+script codes for {args.source_dataset}:\n")
-        print("Common languages:")
-        for code, name in COMMON_LANGUAGES.items():
-            print(f"  {code:12} - {name}")
-        print("\nFetching full list from HF Hub...")
-        all_langs = list_available_languages(args.source_dataset)
-        print(f"\nAll available ({len(all_langs)} total):")
-        for lang in all_langs[:30]:  # Show first 30
-            name = COMMON_LANGUAGES.get(lang, "")
-            print(f"  {lang:12} {name}")
-        if len(all_langs) > 30:
-            print(f"  ... and {len(all_langs) - 30} more")
-        sys.exit(0)
+def handle_list_languages(args: argparse.Namespace) -> None:
+    """List available languages and exit."""
+    print(f"Available language+script codes for {args.source_dataset}:\n")
+    print("Common languages:")
+    for code, name in COMMON_LANGUAGES.items():
+        print(f"  {code:12} - {name}")
+    print("\nFetching full list from HF Hub...")
+    all_langs = list_available_languages(args.source_dataset)
+    print(f"\nAll available ({len(all_langs)} total):")
+    for lang in all_langs[:30]:  # Show first 30
+        name = COMMON_LANGUAGES.get(lang, "")
+        print(f"  {lang:12} {name}")
+    if len(all_langs) > 30:
+        print(f"  ... and {len(all_langs) - 30} more")
+    sys.exit(0)
 
-    # Build the parquet path
+
+def build_source_path(args: argparse.Namespace) -> tuple[str, str]:
+    """Build the parquet source path and scope description."""
     if args.all_languages:
         source_path = f"hf://datasets/{args.source_dataset}/data/*/train/*.parquet"
         scope_desc = "all languages"
@@ -372,64 +372,41 @@ def main():
             f"hf://datasets/{args.source_dataset}/data/{args.lang}/train/*.parquet"
         )
         scope_desc = f"{args.lang} ({COMMON_LANGUAGES.get(args.lang, 'unknown')})"
+    return source_path, scope_desc
 
-    logger.info(f"Scanning: {source_path}")
-    logger.info(f"Scope: {scope_desc}")
 
-    # Create lazy frame - this doesn't load any data yet!
-    logger.info("Creating lazy query plan...")
-    df = pl.scan_parquet(source_path)
+def show_query_plan(df: pl.LazyFrame) -> None:
+    """Show Polars query plan if requested."""
+    sample_query = df.select(
+        pl.len(),
+        pl.col("token_count").sum(),
+        pl.col("language").n_unique(),
+    )
+    print("\nQuery Plan (showing Polars optimization):")
+    print("=" * 60)
+    print(sample_query.explain())
+    print("=" * 60)
+    print("\nNote: Polars uses projection pushdown - only reads columns needed!")
+    print("The 'text' column is never loaded, making this very fast.\n")
 
-    # Apply limit if specified
-    if args.limit:
-        logger.info(f"Limiting to first {args.limit:,} rows")
-        df = df.head(args.limit)
 
-    # Show query plan if requested
-    if args.show_plan:
-        # Build a sample query to show the plan
-        sample_query = df.select(
-            pl.len(),
-            pl.col("token_count").sum(),
-            pl.col("language").n_unique(),
-        )
-        print("\nQuery Plan (showing Polars optimization):")
-        print("=" * 60)
-        print(sample_query.explain())
-        print("=" * 60)
-        print("\nNote: Polars uses projection pushdown - only reads columns needed!")
-        print("The 'text' column is never loaded, making this very fast.\n")
-
-    # Create output directory
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Single scan: compute temporal stats
-    logger.info("Computing temporal stats (single scan)...")
-    start = time.perf_counter()
-    temporal_path = output_dir / "temporal_stats.parquet"
-    temporal_raw = compute_temporal_stats(df, temporal_path)
-    scan_time = time.perf_counter() - start
-    logger.info(f"Scan complete in {scan_time:.2f}s - {len(temporal_raw)} dumps")
-
-    # Compute stats
-    global_stats = compute_global_stats(temporal_raw)
-    temporal_stats = format_temporal_stats(temporal_raw)
-
-    # Save
-    global_stats.write_parquet(output_dir / "global_stats.parquet")
-    temporal_stats.write_parquet(output_dir / "temporal_stats.parquet")
-
-    # Print results
-    total_docs = global_stats["total_docs"][0]
-    docs_per_sec = total_docs / scan_time if scan_time > 0 else 0
-
+def print_results(
+    scope_desc: str,
+    global_stats: pl.DataFrame,
+    temporal_stats: pl.DataFrame,
+    ascii_charts: str,
+    scan_time: float,
+    total_docs: int,
+    docs_per_sec: float,
+    output_dir: Path,
+) -> None:
+    """Print analysis results to stdout."""
     print("\n" + "=" * 70)
     print("IS THE WEB GETTING MORE EDUCATIONAL?")
     print("=" * 70)
 
     print(f"\nScope: {scope_desc}")
-    print(f"Dataset: {args.source_dataset}")
+    print(f"Dataset: {global_stats['total_docs'][0] and '' or ''}")
 
     print("\n" + "-" * 70)
     print("GLOBAL STATS")
@@ -449,8 +426,6 @@ def main():
     else:
         print(temporal_stats)
 
-    # Create ASCII charts
-    ascii_charts = create_ascii_charts(temporal_stats)
     print("\n" + "-" * 70)
     print("TREND VISUALIZATION")
     print("-" * 70)
@@ -461,86 +436,4 @@ def main():
     print("-" * 70)
     print(f"Scan time: {scan_time:.2f}s")
     print(f"Documents: {total_docs:,}")
-    print(f"Throughput: {docs_per_sec:,.0f} docs/sec")
-
-    logger.info(f"Results saved to: {output_dir}")
-
-    # Upload to HF Hub if requested
-    if args.output_repo:
-        hf_token = args.hf_token or os.environ.get("HF_TOKEN")
-        if hf_token:
-            login(token=hf_token)
-
-        api = HfApi(token=hf_token)
-
-        logger.info(f"Creating/updating dataset repository: {args.output_repo}")
-        create_repo(
-            args.output_repo,
-            repo_type="dataset",
-            private=args.private,
-            token=hf_token,
-            exist_ok=True,
-        )
-
-        # Upload each as a dataset config
-        configs = [
-            ("global_stats", global_stats),
-            ("temporal_stats", temporal_stats),
-        ]
-
-        for config_name, stats_df in configs:
-            logger.info(f"Uploading {config_name}...")
-            ds = Dataset.from_polars(stats_df)
-            ds.push_to_hub(
-                args.output_repo,
-                config_name=config_name,
-                token=hf_token,
-                private=args.private,
-            )
-            time.sleep(1)  # Avoid 409 conflicts
-
-        # Upload README
-        readme_content = create_readme(
-            args, global_stats, temporal_stats, scan_time, ascii_charts
-        )
-        api.upload_file(
-            path_or_fileobj=readme_content.encode(),
-            path_in_repo="README.md",
-            repo_id=args.output_repo,
-            repo_type="dataset",
-            token=hf_token,
-        )
-
-        dataset_url = f"https://huggingface.co/datasets/{args.output_repo}"
-        logger.info(f"Dataset uploaded: {dataset_url}")
-        print(f"\nResults uploaded to: {dataset_url}")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("Is the Web Getting More Educational?")
-        print("=" * 40)
-        print("\nAnalyze educational quality trends across CommonCrawl dumps")
-        print("using Polars streaming - no download needed!\n")
-        print("Example commands:\n")
-        print("# Quick test:")
-        print("uv run finepdfs-stats.py --limit 10000\n")
-        print("# Analyze English PDFs:")
-        print("uv run finepdfs-stats.py\n")
-        print("# Analyze ALL 70+ languages:")
-        print("uv run finepdfs-stats.py --all-languages\n")
-        print("# Show query plan (see Polars optimization):")
-        print("uv run finepdfs-stats.py --show-plan --limit 1000\n")
-        print("# Save results to HF Hub:")
-        print("uv run finepdfs-stats.py --output-repo username/temporal-stats\n")
-        print("# Run on HF Jobs:")
-        print("hf jobs uv run \\")
-        print("    -s HF_TOKEN \\")
-        print("    -e HF_XET_HIGH_PERFORMANCE=1 \\")
-        print(
-            "    https://huggingface.co/datasets/uv-scripts/dataset-stats/raw/main/finepdfs-stats.py \\"
-        )
-        print("    -- --output-repo username/stats")
-        sys.exit(0)
-
-    main()
+    print(f"Throughput: {docs_per_sec:
