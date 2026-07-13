@@ -30,6 +30,49 @@ def parse_session_file(path: Path) -> list[SessionEntry]:
     return entries
 
 
+def _parse_content_blocks(content, text_parts: list, tool_calls: list, files_modified: list):
+    """Extrai texto, tool_calls e arquivos modificados dos blocos de conteúdo."""
+    if isinstance(content, str):
+        text_parts.append(content)
+        return
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type", "")
+        if block_type == "text":
+            text_parts.append(block.get("text", ""))
+        elif block_type == "tool_use":
+            tool_name = block.get("name", "")
+            tool_input = block.get("input", {})
+            tool_calls.append({"name": tool_name, "input": tool_input})
+            if tool_name in FILE_MODIFYING_TOOLS:
+                fp = tool_input.get("file_path", "")
+                if fp:
+                    files_modified.append({"path": fp, "action": tool_name.lower()})
+        elif block_type == "tool_result":
+            result_content = block.get("content", "")
+            if isinstance(result_content, list):
+                for rc in result_content:
+                    if isinstance(rc, dict) and rc.get("type") == "text":
+                        text_parts.append(rc.get("text", ""))
+            elif isinstance(result_content, str):
+                text_parts.append(result_content)
+
+
+def _parse_token_usage(usage: dict) -> dict:
+    """Converte o dict de usage em token_usage estruturado."""
+    if not usage:
+        return {}
+    return {
+        "input": usage.get("input_tokens", 0),
+        "output": usage.get("output_tokens", 0),
+        "cache_read": usage.get("cache_read_input_tokens", 0),
+        "cache_creation": usage.get("cache_creation_input_tokens", 0),
+    }
+
+
 def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
     """Converte um dict JSON bruto em SessionEntry."""
     entry_type = raw.get("type", "")
@@ -51,51 +94,16 @@ def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
     session_id = raw.get("sessionId", "")
     timestamp = raw.get("timestamp", "")
 
-    # Extrair texto e tool_calls do content
     text_parts = []
     tool_calls = []
     files_modified = []
     model = msg.get("model", "")
 
-    content = msg.get("content", "")
-    if isinstance(content, str):
-        text_parts.append(content)
-    elif isinstance(content, list):
-        for block in content:
-            if not isinstance(block, dict):
-                continue
-            block_type = block.get("type", "")
-            if block_type == "text":
-                text_parts.append(block.get("text", ""))
-            elif block_type == "tool_use":
-                tool_name = block.get("name", "")
-                tool_input = block.get("input", {})
-                tool_calls.append({"name": tool_name, "input": tool_input})
-                # Detectar arquivos modificados
-                if tool_name in FILE_MODIFYING_TOOLS:
-                    fp = tool_input.get("file_path", "")
-                    if fp:
-                        files_modified.append({"path": fp, "action": tool_name.lower()})
-            elif block_type == "tool_result":
-                # Resultados de ferramentas (em mensagens do user)
-                result_content = block.get("content", "")
-                if isinstance(result_content, list):
-                    for rc in result_content:
-                        if isinstance(rc, dict) and rc.get("type") == "text":
-                            text_parts.append(rc.get("text", ""))
-                elif isinstance(result_content, str):
-                    text_parts.append(result_content)
+    _parse_content_blocks(
+        msg.get("content", ""), text_parts, tool_calls, files_modified
+    )
 
-    # Token usage
-    usage = msg.get("usage", {})
-    token_usage = {}
-    if usage:
-        token_usage = {
-            "input": usage.get("input_tokens", 0),
-            "output": usage.get("output_tokens", 0),
-            "cache_read": usage.get("cache_read_input_tokens", 0),
-            "cache_creation": usage.get("cache_creation_input_tokens", 0),
-        }
+    token_usage = _parse_token_usage(msg.get("usage", {}))
 
     return SessionEntry(
         type=entry_type,
