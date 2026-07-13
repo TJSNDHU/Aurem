@@ -30,34 +30,12 @@ def parse_session_file(path: Path) -> list[SessionEntry]:
     return entries
 
 
-def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
-    """Converte um dict JSON bruto em SessionEntry."""
-    entry_type = raw.get("type", "")
-
-    if entry_type == "queue-operation":
-        return SessionEntry(
-            type="queue",
-            timestamp=raw.get("timestamp", ""),
-            session_id=raw.get("sessionId", ""),
-            content=raw.get("content", ""),
-        )
-
-    if entry_type not in ("user", "assistant"):
-        return None
-
-    msg = raw.get("message", {})
-    role = msg.get("role", "")
-    slug = raw.get("slug", "")
-    session_id = raw.get("sessionId", "")
-    timestamp = raw.get("timestamp", "")
-
-    # Extrair texto e tool_calls do content
+def _parse_content_blocks(content) -> tuple[list[str], list[dict], list[dict]]:
+    """Extrai texto, tool_calls e files_modified dos content blocks."""
     text_parts = []
     tool_calls = []
     files_modified = []
-    model = msg.get("model", "")
 
-    content = msg.get("content", "")
     if isinstance(content, str):
         text_parts.append(content)
     elif isinstance(content, list):
@@ -86,16 +64,47 @@ def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
                 elif isinstance(result_content, str):
                     text_parts.append(result_content)
 
-    # Token usage
-    usage = msg.get("usage", {})
-    token_usage = {}
-    if usage:
-        token_usage = {
-            "input": usage.get("input_tokens", 0),
-            "output": usage.get("output_tokens", 0),
-            "cache_read": usage.get("cache_read_input_tokens", 0),
-            "cache_creation": usage.get("cache_creation_input_tokens", 0),
-        }
+    return text_parts, tool_calls, files_modified
+
+
+def _parse_token_usage(usage: dict) -> dict:
+    """Converte o dict de usage em token_usage normalizado."""
+    if not usage:
+        return {}
+    return {
+        "input": usage.get("input_tokens", 0),
+        "output": usage.get("output_tokens", 0),
+        "cache_read": usage.get("cache_read_input_tokens", 0),
+        "cache_creation": usage.get("cache_creation_input_tokens", 0),
+    }
+
+
+def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
+    """Converte um dict JSON bruto em SessionEntry."""
+    entry_type = raw.get("type", "")
+
+    if entry_type == "queue-operation":
+        return SessionEntry(
+            type="queue",
+            timestamp=raw.get("timestamp", ""),
+            session_id=raw.get("sessionId", ""),
+            content=raw.get("content", ""),
+        )
+
+    if entry_type not in ("user", "assistant"):
+        return None
+
+    msg = raw.get("message", {})
+    role = msg.get("role", "")
+    slug = raw.get("slug", "")
+    session_id = raw.get("sessionId", "")
+    timestamp = raw.get("timestamp", "")
+    model = msg.get("model", "")
+
+    text_parts, tool_calls, files_modified = _parse_content_blocks(
+        msg.get("content", "")
+    )
+    token_usage = _parse_token_usage(msg.get("usage", {}))
 
     return SessionEntry(
         type=entry_type,
