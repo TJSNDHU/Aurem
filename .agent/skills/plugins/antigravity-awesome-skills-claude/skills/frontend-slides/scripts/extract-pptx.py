@@ -15,6 +15,65 @@ import sys
 from pptx import Presentation
 
 
+def _extract_text_from_shape(slide, shape, slide_data):
+    """Extract text content from a shape into slide_data."""
+    if not shape.has_text_frame:
+        return
+    if shape == slide.shapes.title:
+        slide_data["title"] = shape.text
+    else:
+        slide_data["content"].append(
+            {"type": "text", "content": shape.text}
+        )
+
+
+def _extract_image_from_shape(shape, slide_data, slide_num, assets_dir):
+    """Extract an image from a shape into slide_data."""
+    if shape.shape_type != 13:  # Picture type
+        return
+    image = shape.image
+    image_bytes = image.blob
+    image_ext = image.ext
+    image_name = f"slide{slide_num + 1}_img{len(slide_data['images']) + 1}.{image_ext}"
+    image_path = os.path.join(assets_dir, image_name)
+
+    with open(image_path, "wb") as f:
+        f.write(image_bytes)
+
+    slide_data["images"].append(
+        {
+            "path": f"assets/{image_name}",
+            "width": shape.width,
+            "height": shape.height,
+        }
+    )
+
+
+def _extract_notes(slide, slide_data):
+    """Extract speaker notes from a slide into slide_data."""
+    if slide.has_notes_slide:
+        notes_frame = slide.notes_slide.notes_text_frame
+        slide_data["notes"] = notes_frame.text
+
+
+def _process_slide(slide, slide_num, assets_dir):
+    """Process a single slide and return its data dict."""
+    slide_data = {
+        "number": slide_num + 1,
+        "title": "",
+        "content": [],
+        "images": [],
+        "notes": "",
+    }
+
+    for shape in slide.shapes:
+        _extract_text_from_shape(slide, shape, slide_data)
+        _extract_image_from_shape(shape, slide_data, slide_num, assets_dir)
+
+    _extract_notes(slide, slide_data)
+    return slide_data
+
+
 def extract_pptx(file_path, output_dir="."):
     """
     Extract all content from a PowerPoint file.
@@ -28,48 +87,7 @@ def extract_pptx(file_path, output_dir="."):
     os.makedirs(assets_dir, exist_ok=True)
 
     for slide_num, slide in enumerate(prs.slides):
-        slide_data = {
-            "number": slide_num + 1,
-            "title": "",
-            "content": [],
-            "images": [],
-            "notes": "",
-        }
-
-        for shape in slide.shapes:
-            # Extract text content
-            if shape.has_text_frame:
-                if shape == slide.shapes.title:
-                    slide_data["title"] = shape.text
-                else:
-                    slide_data["content"].append(
-                        {"type": "text", "content": shape.text}
-                    )
-
-            # Extract images
-            if shape.shape_type == 13:  # Picture type
-                image = shape.image
-                image_bytes = image.blob
-                image_ext = image.ext
-                image_name = f"slide{slide_num + 1}_img{len(slide_data['images']) + 1}.{image_ext}"
-                image_path = os.path.join(assets_dir, image_name)
-
-                with open(image_path, "wb") as f:
-                    f.write(image_bytes)
-
-                slide_data["images"].append(
-                    {
-                        "path": f"assets/{image_name}",
-                        "width": shape.width,
-                        "height": shape.height,
-                    }
-                )
-
-        # Extract speaker notes
-        if slide.has_notes_slide:
-            notes_frame = slide.notes_slide.notes_text_frame
-            slide_data["notes"] = notes_frame.text
-
+        slide_data = _process_slide(slide, slide_num, assets_dir)
         slides_data.append(slide_data)
 
     return slides_data
