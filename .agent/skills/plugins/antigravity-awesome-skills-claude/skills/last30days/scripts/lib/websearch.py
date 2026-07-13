@@ -34,6 +34,11 @@ MONTH_MAP = {
     "dec": 12, "december": 12,
 }
 
+_MONTH_PATTERN = (
+    r'(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
+    r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+)
+
 
 def extract_date_from_url(url: str) -> Optional[str]:
     """Try to extract a date from URL path.
@@ -73,31 +78,11 @@ def extract_date_from_url(url: str) -> Optional[str]:
     return None
 
 
-def extract_date_from_snippet(text: str) -> Optional[str]:
-    """Try to extract a date from text snippet or title.
-
-    Looks for patterns like:
-    - January 24, 2026 or Jan 24, 2026
-    - 24 January 2026
-    - 2026-01-24
-    - "3 days ago", "yesterday", "last week"
-
-    Args:
-        text: Text to parse
-
-    Returns:
-        Date string in YYYY-MM-DD format, or None
-    """
-    if not text:
-        return None
-
-    text_lower = text.lower()
-
+def _extract_month_day_year(text_lower: str) -> Optional[str]:
+    """Extract date from 'Month DD, YYYY' or 'DD Month YYYY' patterns."""
     # Pattern 1: Month DD, YYYY (e.g., "January 24, 2026")
     match = re.search(
-        r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
-        r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
-        r'\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})\b',
+        r'\b' + _MONTH_PATTERN + r'\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})\b',
         text_lower
     )
     if match:
@@ -108,10 +93,7 @@ def extract_date_from_snippet(text: str) -> Optional[str]:
 
     # Pattern 2: DD Month YYYY (e.g., "24 January 2026")
     match = re.search(
-        r'\b(\d{1,2})(?:st|nd|rd|th)?\s+'
-        r'(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|'
-        r'jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
-        r'\s+(\d{4})\b',
+        r'\b(\d{1,2})(?:st|nd|rd|th)?\s+' + _MONTH_PATTERN + r'\s+(\d{4})\b',
         text_lower
     )
     if match:
@@ -120,14 +102,21 @@ def extract_date_from_snippet(text: str) -> Optional[str]:
         if month and 2020 <= int(year) <= 2030 and 1 <= int(day) <= 31:
             return f"{year}-{month:02d}-{int(day):02d}"
 
-    # Pattern 3: YYYY-MM-DD (ISO format)
+    return None
+
+
+def _extract_iso_date(text: str) -> Optional[str]:
+    """Extract date from YYYY-MM-DD (ISO format) pattern."""
     match = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', text)
     if match:
         year, month, day = match.groups()
         if 2020 <= int(year) <= 2030 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
             return f"{year}-{month}-{day}"
+    return None
 
-    # Pattern 4: Relative dates ("3 days ago", "yesterday", etc.)
+
+def _extract_relative_date(text_lower: str) -> Optional[str]:
+    """Extract date from relative date expressions like '3 days ago'."""
     today = datetime.now()
 
     if "yesterday" in text_lower:
@@ -159,6 +148,41 @@ def extract_date_from_snippet(text: str) -> Optional[str]:
     if "this week" in text_lower:
         date = today - timedelta(days=3)
         return date.strftime("%Y-%m-%d")
+
+    return None
+
+
+def extract_date_from_snippet(text: str) -> Optional[str]:
+    """Try to extract a date from text snippet or title.
+
+    Looks for patterns like:
+    - January 24, 2026 or Jan 24, 2026
+    - 24 January 2026
+    - 2026-01-24
+    - "3 days ago", "yesterday", "last week"
+
+    Args:
+        text: Text to parse
+
+    Returns:
+        Date string in YYYY-MM-DD format, or None
+    """
+    if not text:
+        return None
+
+    text_lower = text.lower()
+
+    date = _extract_month_day_year(text_lower)
+    if date:
+        return date
+
+    date = _extract_iso_date(text)
+    if date:
+        return date
+
+    date = _extract_relative_date(text_lower)
+    if date:
+        return date
 
     return None
 
