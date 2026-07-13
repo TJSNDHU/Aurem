@@ -69,35 +69,7 @@ def check_cuda():
     logger.info(f"CUDA available: {torch.cuda.get_device_name(0)}")
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Fine-tune LLMs with Unsloth optimizations",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Quick test run
-  uv run unsloth_sft_example.py \\
-      --dataset mlabonne/FineTome-100k \\
-      --max-steps 50 \\
-      --output-repo username/model-test
-
-  # Full training with eval
-  uv run unsloth_sft_example.py \\
-      --dataset mlabonne/FineTome-100k \\
-      --num-epochs 1 \\
-      --eval-split 0.2 \\
-      --output-repo username/model-finetuned
-
-  # With Trackio monitoring
-  uv run unsloth_sft_example.py \\
-      --dataset mlabonne/FineTome-100k \\
-      --num-epochs 1 \\
-      --output-repo username/model-finetuned \\
-      --trackio-space username/trackio
-        """,
-    )
-
-    # Model and data
+def _add_model_data_args(parser):
     parser.add_argument(
         "--base-model",
         default="LiquidAI/LFM2.5-1.2B-Instruct",
@@ -114,7 +86,8 @@ Examples:
         help="HF Hub repo to push model to (e.g., 'username/model-finetuned')",
     )
 
-    # Training config
+
+def _add_training_args(parser):
     parser.add_argument(
         "--num-epochs",
         type=float,
@@ -152,7 +125,8 @@ Examples:
         help="Maximum sequence length (default: 2048)",
     )
 
-    # LoRA config
+
+def _add_lora_args(parser):
     parser.add_argument(
         "--lora-r",
         type=int,
@@ -166,7 +140,8 @@ Examples:
         help="LoRA alpha (default: 16). Same as r per Unsloth recommendation",
     )
 
-    # Logging
+
+def _add_logging_args(parser):
     parser.add_argument(
         "--trackio-space",
         default=None,
@@ -183,7 +158,8 @@ Examples:
         help="Local directory to save model (default: unsloth-output)",
     )
 
-    # Evaluation and data control
+
+def _add_eval_data_args(parser):
     parser.add_argument(
         "--eval-split",
         type=float,
@@ -208,6 +184,41 @@ Examples:
         default=False,
         help="Merge LoRA weights into base model before uploading (larger file, easier to use)",
     )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Fine-tune LLMs with Unsloth optimizations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Quick test run
+  uv run unsloth_sft_example.py \\
+      --dataset mlabonne/FineTome-100k \\
+      --max-steps 50 \\
+      --output-repo username/model-test
+
+  # Full training with eval
+  uv run unsloth_sft_example.py \\
+      --dataset mlabonne/FineTome-100k \\
+      --num-epochs 1 \\
+      --eval-split 0.2 \\
+      --output-repo username/model-finetuned
+
+  # With Trackio monitoring
+  uv run unsloth_sft_example.py \\
+      --dataset mlabonne/FineTome-100k \\
+      --num-epochs 1 \\
+      --output-repo username/model-finetuned \\
+      --trackio-space username/trackio
+        """,
+    )
+
+    _add_model_data_args(parser)
+    _add_training_args(parser)
+    _add_lora_args(parser)
+    _add_logging_args(parser)
+    _add_eval_data_args(parser)
 
     return parser.parse_args()
 
@@ -436,77 +447,4 @@ def main():
     if train_loss:
         print(f"  Final train loss: {train_loss:.4f}")
 
-    # Print eval results if eval was enabled
-    if eval_data:
-        print("\nRunning final evaluation...")
-        try:
-            eval_results = trainer.evaluate()
-            eval_loss = eval_results.get("eval_loss")
-            if eval_loss:
-                print(f"  Final eval loss: {eval_loss:.4f}")
-                if train_loss:
-                    ratio = eval_loss / train_loss
-                    if ratio > 1.5:
-                        print(f"  Warning: Eval loss is {ratio:.1f}x train loss - possible overfitting")
-                    else:
-                        print(f"  Eval/train ratio: {ratio:.2f} - model generalizes well")
-        except Exception as e:
-            print(f"  Warning: Final evaluation failed: {e}")
-            print("  Continuing to save model...")
-
-    # 5. Save and push
-    print("\n[5/5] Saving model...")
-
-    if args.merge_model:
-        print("Merging LoRA weights into base model...")
-        print(f"\nPushing merged model to {args.output_repo}...")
-        model.push_to_hub_merged(
-            args.output_repo,
-            tokenizer=tokenizer,
-            save_method="merged_16bit",
-        )
-        print(f"Merged model available at: https://huggingface.co/{args.output_repo}")
-    else:
-        model.save_pretrained(args.save_local)
-        tokenizer.save_pretrained(args.save_local)
-        print(f"Saved locally to {args.save_local}/")
-
-        print(f"\nPushing adapter to {args.output_repo}...")
-        model.push_to_hub(args.output_repo, tokenizer=tokenizer)
-        print(f"Adapter available at: https://huggingface.co/{args.output_repo}")
-
-    print("\n" + "=" * 70)
-    print("Done!")
-    print("=" * 70)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("=" * 70)
-        print("LLM Fine-tuning with Unsloth")
-        print("=" * 70)
-        print("\nFine-tune language models with optional train/eval split.")
-        print("\nFeatures:")
-        print("  - ~60% less VRAM with Unsloth optimizations")
-        print("  - 2x faster training vs standard methods")
-        print("  - Epoch-based or step-based training")
-        print("  - Optional evaluation to detect overfitting")
-        print("  - Trains only on assistant responses (masked user inputs)")
-        print("\nEpoch-based training:")
-        print("\n  uv run unsloth_sft_example.py \\")
-        print("      --dataset mlabonne/FineTome-100k \\")
-        print("      --num-epochs 1 \\")
-        print("      --eval-split 0.2 \\")
-        print("      --output-repo your-username/model-finetuned")
-        print("\nHF Jobs example:")
-        print("\n  hf jobs uv run unsloth_sft_example.py \\")
-        print("      --flavor a10g-small --secrets HF_TOKEN --timeout 4h \\")
-        print("      -- --dataset mlabonne/FineTome-100k \\")
-        print("         --num-epochs 1 \\")
-        print("         --eval-split 0.2 \\")
-        print("         --output-repo your-username/model-finetuned")
-        print("\nFor full help: uv run unsloth_sft_example.py --help")
-        print("=" * 70)
-        sys.exit(0)
-
-    main()
+    # Print eval results
