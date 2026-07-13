@@ -268,8 +268,8 @@ async def auto_refresh_if_needed(account_id: Optional[int] = None) -> Optional[s
 
 # ── Setup Flow ────────────────────────────────────────────────────────────────
 
-async def setup() -> None:
-    """Fluxo completo de setup OAuth."""
+def _print_setup_header() -> None:
+    """Exibe o cabeçalho de configuração OAuth."""
     print("=" * 60)
     print("CONFIGURAÇÃO OAUTH - INSTAGRAM GRAPH API")
     print("=" * 60)
@@ -278,7 +278,9 @@ async def setup() -> None:
     print("Crie em: https://developers.facebook.com/apps/")
     print()
 
-    # App credentials
+
+def _get_app_credentials() -> tuple[str, str]:
+    """Obtém App ID e App Secret do ambiente ou do input do usuário."""
     app_id = os.environ.get("INSTAGRAM_APP_ID") or input("App ID: ").strip()
     app_secret = os.environ.get("INSTAGRAM_APP_SECRET") or input("App Secret: ").strip()
 
@@ -286,15 +288,24 @@ async def setup() -> None:
         print("ERRO: App ID e App Secret são obrigatórios.")
         sys.exit(1)
 
-    # Construir URL de autorização
+    return app_id, app_secret
+
+
+def _build_auth_url(app_id: str) -> str:
+    """Constrói a URL de autorização OAuth."""
     scopes = ",".join(OAUTH_SCOPES)
-    auth_url = (
+    return (
         f"{OAUTH_AUTHORIZE_URL}?"
         f"client_id={app_id}&"
         f"redirect_uri={OAUTH_REDIRECT_URI}&"
         f"scope={scopes}&"
         f"response_type=code"
     )
+
+
+def _authorize_and_get_code(app_id: str) -> str:
+    """Abre o browser para autorização e aguarda o código de callback."""
+    auth_url = _build_auth_url(app_id)
 
     print("\nAbrindo browser para autorização...")
     print("A URL de autorização e o App ID não serão exibidos para evitar vazamento de credenciais.\n")
@@ -309,7 +320,13 @@ async def setup() -> None:
         sys.exit(1)
 
     print("Código de autorização recebido. Trocando por token...")
+    return code
 
+
+async def _exchange_tokens(
+    code: str, app_id: str, app_secret: str,
+) -> tuple[str, str]:
+    """Troca o código de autorização por um long-lived token. Retorna (token, expires_at)."""
     # Trocar por short-lived token
     short_result = await exchange_code_for_short_token(code, app_id, app_secret)
     short_token = short_result["access_token"]
@@ -322,11 +339,16 @@ async def setup() -> None:
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
     print(f"Token longo obtido. Expira em: {expires_at[:10]}")
 
-    # Descobrir conta Instagram
+    return long_token, expires_at
+
+
+async def _discover_and_save_account(
+    long_token: str, expires_at: str, app_id: str, app_secret: str,
+) -> tuple[int, dict]:
+    """Descobre a conta Instagram e salva no banco. Retorna (account_id, ig_info)."""
     print("Buscando conta Instagram vinculada...")
     ig_info = await discover_instagram_account(long_token)
 
-    # Salvar no banco
     account_id = db.upsert_account({
         "ig_user_id": ig_info["ig_user_id"],
         "username": ig_info["username"],
@@ -338,6 +360,11 @@ async def setup() -> None:
         "app_secret": app_secret,
     })
 
+    return account_id, ig_info
+
+
+def _print_setup_summary(account_id: int, ig_info: dict, expires_at: str) -> None:
+    """Exibe o resumo final da configuração."""
     print()
     print("=" * 60)
     print("CONFIGURAÇÃO CONCLUÍDA")
@@ -351,6 +378,23 @@ async def setup() -> None:
     print(f"  Account ID (interno): {account_id}")
     print()
     print("Pronto! Use 'python scripts/status.py' para verificar.")
+
+
+async def setup() -> None:
+    """Fluxo completo de setup OAuth."""
+    _print_setup_header()
+
+    app_id, app_secret = _get_app_credentials()
+
+    code = _authorize_and_get_code(app_id)
+
+    long_token, expires_at = await _exchange_tokens(code, app_id, app_secret)
+
+    account_id, ig_info = await _discover_and_save_account(
+        long_token, expires_at, app_id, app_secret
+    )
+
+    _print_setup_summary(account_id, ig_info, expires_at)
 
 
 async def show_status() -> None:
@@ -374,47 +418,4 @@ async def show_status() -> None:
         "status": token_status,
         "username": account["username"],
         "account_type": account["account_type"],
-        "ig_user_id": account["ig_user_id"],
-        "token_expires_at": expires_at,
-        "days_remaining": days_left,
-        "auto_refresh": days_left <= 7 if days_left >= 0 else False,
-    }
-    print(json.dumps(result, indent=2, ensure_ascii=False))
-
-
-async def do_refresh() -> None:
-    """Força renovação do token."""
-    token = await auto_refresh_if_needed()
-    if token:
-        print("Token renovado com sucesso.")
-        await show_status()
-    else:
-        print("Nenhuma conta configurada para renovar.")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Autenticação OAuth Instagram")
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--setup", action="store_true", help="Configuração inicial completa")
-    group.add_argument("--refresh", action="store_true", help="Renovar token")
-    group.add_argument("--status", action="store_true", help="Ver status do token")
-    group.add_argument("--revoke", action="store_true", help="Revogar token (desativar conta)")
-    args = parser.parse_args()
-
-    if args.setup:
-        asyncio.run(setup())
-    elif args.refresh:
-        asyncio.run(do_refresh())
-    elif args.status:
-        asyncio.run(show_status())
-    elif args.revoke:
-        account = db.get_active_account()
-        if account:
-            db._connect().execute("UPDATE accounts SET is_active = 0 WHERE id = ?", [account["id"]])
-            print(f"Conta @{account['username']} desativada.")
-        else:
-            print("Nenhuma conta ativa para revogar.")
-
-
-if __name__ == "__main__":
-    main()
+        "ig_user_id
