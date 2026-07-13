@@ -165,6 +165,187 @@ uv run https://huggingface.co/datasets/uv-scripts/vllm/raw/main/generate-respons
 """
 
 
+def setup_gpu_config(tensor_parallel_size: Optional[int]) -> int:
+    """Configure GPU settings and return the tensor parallel size."""
+    num_gpus = check_gpu_availability()
+    if tensor_parallel_size is None:
+        tensor_parallel_size = num_gpus
+        logger.info(
+            f"Auto-detected {num_gpus} GPU(s), using tensor_parallel_size={tensor_parallel_size}"
+        )
+    else:
+        logger.info(f"Using specified tensor_parallel_size={tensor_parallel_size}")
+        if tensor_parallel_size > num_gpus:
+            logger.warning(
+                f"Requested {tensor_parallel_size} GPUs but only {num_gpus} available"
+            )
+    return tensor_parallel_size
+
+
+def setup_auth(hf_token: Optional[str]) -> str:
+    """Authenticate with Hugging Face Hub."""
+    HF_TOKEN = hf_token or os.environ.get("HF_TOKEN") or get_token()
+
+    if not HF_TOKEN:
+        logger.error("No HuggingFace token found. Please provide token via:")
+        logger.error("  1. --hf-token argument")
+        logger.error("  2. HF_TOKEN environment variable")
+        logger.error("  3. Run 'hf auth login' or use login() in Python")
+        sys.exit(1)
+
+    logger.info("HuggingFace token found, authenticating...")
+    login(token=HF_TOKEN)
+    return HF_TOKEN
+
+
+def init_llm(
+    model_id: str,
+    tensor_parallel_size: int,
+    gpu_memory_utilization: float,
+    max_model_len: Optional[int],
+) -> LLM:
+    """Initialize the vLLM model."""
+    logger.info(f"Loading model: {model_id}")
+    vllm_kwargs = {
+        "model": model_id,
+        "tensor_parallel_size": tensor_parallel_size,
+        "gpu_memory_utilization": gpu_memory_utilization,
+    }
+    if max_model_len is not None:
+        vllm_kwargs["max_model_len"] = max_model_len
+        logger.info(f"Using max_model_len={max_model_len}")
+
+    return LLM(**vllm_kwargs)
+
+
+def load_and_validate_dataset(
+    src_dataset_hub_id: str,
+    messages_column: str,
+    prompt_column: Optional[str],
+    max_samples: Optional[int],
+) -> tuple:
+    """Load dataset from Hub and validate column configuration."""
+    logger.info(f"Loading dataset: {src_dataset_hub_id}")
+    dataset = load_dataset(src_dataset_hub_id, split="train")
+
+    if max_samples is not None and max_samples < len(dataset):
+        logger.info(f"Limiting dataset to {max_samples} samples")
+        dataset = dataset.select(range(max_samples))
+
+    total_examples = len(dataset)
+    logger.info(f"Dataset loaded with {total_examples:,} examples")
+
+    if prompt_column:
+        if prompt_column not in dataset.column_names:
+            logger.error(
+                f"Column '{prompt_column}' not found. Available columns: {dataset.column_names}"
+            )
+            sys.exit(1)
+        logger.info(f"Using prompt column mode with column: '{prompt_column}'")
+        use_messages = False
+    else:
+        if messages_column not in dataset.column_names:
+            logger.error(
+                f"Column '{messages_column}' not found. Available columns: {dataset.column_names}"
+            )
+            sys.exit(1)
+        logger.info(f"Using messages column mode with column: '{messages_column}'")
+        use_messages = True
+
+    return dataset, total_examples, use_messages
+
+
+def prepare_prompts(
+    dataset,
+    tokenizer,
+    messages_column: str,
+    prompt_column: Optional[str],
+    use_messages: bool,
+    skip_long_prompts: bool,
+    effective_max_len: int,
+    total_examples: int,
+) -> tuple:
+    """Process dataset examples into prompts, optionally filtering long ones."""
+    logger.info("Preparing prompts...")
+    all_prompts = []
+    valid_prompts = []
+    valid_indices = []
+    skipped_info = []
+
+    for i, example in enumerate(tqdm(dataset, desc="Processing prompts")):
+        if use_messages:
+            messages = example[messages_column]
+            prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            user_prompt = example[prompt_column]
+            messages = [{"role": "user", "content": user_prompt}]
+            prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+
+        all_prompts.append(prompt)
+
+        if skip_long_prompts:
+            tokens = tokenizer.encode(prompt)
+            if len(tokens) <= effective_max_len:
+                valid_prompts.append(prompt)
+                valid_indices.append(i)
+            else:
+                skipped_info.append((i, len(tokens)))
+        else:
+            valid_prompts.append(prompt)
+            valid_indices.append(i)
+
+    if skip_long_prompts and skipped_info:
+        logger.warning(
+            f"Skipped {len(skipped_info)} prompts that exceed max_model_len ({effective_max_len} tokens)"
+        )
+        logger.info("Skipped prompt details (first 10):")
+        for idx, (prompt_idx, token_count) in enumerate(skipped_info[:10]):
+            logger.info(
+                f"  - Example {prompt_idx}: {token_count} tokens (exceeds by {token_count - effective_max_len})"
+            )
+        if len(skipped_info) > 10:
+            logger.info(f"  ... and {len(skipped_info) - 10} more")
+
+        skip_percentage = (len(skipped_info) / total_examples) * 100
+        if skip_percentage > 10:
+            logger.warning(f"WARNING: {skip_percentage:.1f}% of prompts were skipped!")
+
+    if not valid_prompts:
+        logger.error("No valid prompts to process after filtering!")
+        sys.exit(1)
+
+    return valid_prompts, valid_indices, skipped_info
+
+
+def generate_and_extract(
+    llm: LLM,
+    sampling_params: SamplingParams,
+    valid_prompts: list,
+    valid_indices: list,
+    total_examples: int,
+    output_column: str,
+):
+    """Generate responses using vLLM and extract text into a response list."""
+    logger.info(f"Starting generation for {len(valid_prompts):,} valid prompts...")
+    logger.info("vLLM will handle batching and scheduling automatically")
+
+    outputs = llm.generate(valid_prompts, sampling_params)
+
+    logger.info("Extracting generated responses...")
+    responses = [""] * total_examples
+
+    for idx, output in enumerate(outputs):
+        original_idx = valid_indices[idx]
+        response = output.outputs[0].text.strip()
+        responses[original_idx] = response
+
+    return responses
+
+
 def main(
     src_dataset_hub_id: str,
     output_dataset_hub_id: str,
@@ -210,51 +391,14 @@ def main(
     """
     generation_start_time = datetime.now().isoformat()
 
-    # GPU check and configuration
-    num_gpus = check_gpu_availability()
-    if tensor_parallel_size is None:
-        tensor_parallel_size = num_gpus
-        logger.info(
-            f"Auto-detected {num_gpus} GPU(s), using tensor_parallel_size={tensor_parallel_size}"
-        )
-    else:
-        logger.info(f"Using specified tensor_parallel_size={tensor_parallel_size}")
-        if tensor_parallel_size > num_gpus:
-            logger.warning(
-                f"Requested {tensor_parallel_size} GPUs but only {num_gpus} available"
-            )
+    tensor_parallel_size = setup_gpu_config(tensor_parallel_size)
+    HF_TOKEN = setup_auth(hf_token)
 
-    # Authentication - try multiple methods
-    HF_TOKEN = hf_token or os.environ.get("HF_TOKEN") or get_token()
+    llm = init_llm(model_id, tensor_parallel_size, gpu_memory_utilization, max_model_len)
 
-    if not HF_TOKEN:
-        logger.error("No HuggingFace token found. Please provide token via:")
-        logger.error("  1. --hf-token argument")
-        logger.error("  2. HF_TOKEN environment variable")
-        logger.error("  3. Run 'hf auth login' or use login() in Python")
-        sys.exit(1)
-
-    logger.info("HuggingFace token found, authenticating...")
-    login(token=HF_TOKEN)
-
-    # Initialize vLLM
-    logger.info(f"Loading model: {model_id}")
-    vllm_kwargs = {
-        "model": model_id,
-        "tensor_parallel_size": tensor_parallel_size,
-        "gpu_memory_utilization": gpu_memory_utilization,
-    }
-    if max_model_len is not None:
-        vllm_kwargs["max_model_len"] = max_model_len
-        logger.info(f"Using max_model_len={max_model_len}")
-
-    llm = LLM(**vllm_kwargs)
-
-    # Load tokenizer for chat template
     logger.info("Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_id)
 
-    # Create sampling parameters
     sampling_params = SamplingParams(
         temperature=temperature,
         top_p=top_p,
@@ -264,324 +408,32 @@ def main(
         repetition_penalty=repetition_penalty,
     )
 
-    # Load dataset
-    logger.info(f"Loading dataset: {src_dataset_hub_id}")
-    dataset = load_dataset(src_dataset_hub_id, split="train")
+    dataset, total_examples, use_messages = load_and_validate_dataset(
+        src_dataset_hub_id, messages_column, prompt_column, max_samples
+    )
 
-    # Apply max_samples if specified
-    if max_samples is not None and max_samples < len(dataset):
-        logger.info(f"Limiting dataset to {max_samples} samples")
-        dataset = dataset.select(range(max_samples))
-
-    total_examples = len(dataset)
-    logger.info(f"Dataset loaded with {total_examples:,} examples")
-
-    # Determine which column to use and validate
-    if prompt_column:
-        # Use prompt column mode
-        if prompt_column not in dataset.column_names:
-            logger.error(
-                f"Column '{prompt_column}' not found. Available columns: {dataset.column_names}"
-            )
-            sys.exit(1)
-        logger.info(f"Using prompt column mode with column: '{prompt_column}'")
-        use_messages = False
-    else:
-        # Use messages column mode
-        if messages_column not in dataset.column_names:
-            logger.error(
-                f"Column '{messages_column}' not found. Available columns: {dataset.column_names}"
-            )
-            sys.exit(1)
-        logger.info(f"Using messages column mode with column: '{messages_column}'")
-        use_messages = True
-
-    # Get effective max length for filtering
     if max_model_len is not None:
         effective_max_len = max_model_len
     else:
-        # Get model's default max length
         effective_max_len = llm.llm_engine.model_config.max_model_len
     logger.info(f"Using effective max model length: {effective_max_len}")
 
-    # Process messages and apply chat template
-    logger.info("Preparing prompts...")
-    all_prompts = []
-    valid_prompts = []
-    valid_indices = []
-    skipped_info = []
+    valid_prompts, valid_indices, skipped_info = prepare_prompts(
+        dataset, tokenizer, messages_column, prompt_column, use_messages,
+        skip_long_prompts, effective_max_len, total_examples,
+    )
 
-    for i, example in enumerate(tqdm(dataset, desc="Processing prompts")):
-        if use_messages:
-            # Messages mode: use existing chat messages
-            messages = example[messages_column]
-            # Apply chat template
-            prompt = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-        else:
-            # Prompt mode: convert plain text to messages format
-            user_prompt = example[prompt_column]
-            messages = [{"role": "user", "content": user_prompt}]
-            # Apply chat template
-            prompt = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
+    responses = generate_and_extract(
+        llm, sampling_params, valid_prompts, valid_indices, total_examples, output_column,
+    )
 
-        all_prompts.append(prompt)
-
-        # Count tokens if filtering is enabled
-        if skip_long_prompts:
-            tokens = tokenizer.encode(prompt)
-            if len(tokens) <= effective_max_len:
-                valid_prompts.append(prompt)
-                valid_indices.append(i)
-            else:
-                skipped_info.append((i, len(tokens)))
-        else:
-            valid_prompts.append(prompt)
-            valid_indices.append(i)
-
-    # Log filtering results
-    if skip_long_prompts and skipped_info:
-        logger.warning(
-            f"Skipped {len(skipped_info)} prompts that exceed max_model_len ({effective_max_len} tokens)"
-        )
-        logger.info("Skipped prompt details (first 10):")
-        for idx, (prompt_idx, token_count) in enumerate(skipped_info[:10]):
-            logger.info(
-                f"  - Example {prompt_idx}: {token_count} tokens (exceeds by {token_count - effective_max_len})"
-            )
-        if len(skipped_info) > 10:
-            logger.info(f"  ... and {len(skipped_info) - 10} more")
-
-        skip_percentage = (len(skipped_info) / total_examples) * 100
-        if skip_percentage > 10:
-            logger.warning(f"WARNING: {skip_percentage:.1f}% of prompts were skipped!")
-
-    if not valid_prompts:
-        logger.error("No valid prompts to process after filtering!")
-        sys.exit(1)
-
-    # Generate responses - vLLM handles batching internally
-    logger.info(f"Starting generation for {len(valid_prompts):,} valid prompts...")
-    logger.info("vLLM will handle batching and scheduling automatically")
-
-    outputs = llm.generate(valid_prompts, sampling_params)
-
-    # Extract generated text and create full response list
-    logger.info("Extracting generated responses...")
-    responses = [""] * total_examples  # Initialize with empty strings
-
-    for idx, output in enumerate(outputs):
-        original_idx = valid_indices[idx]
-        response = output.outputs[0].text.strip()
-        responses[original_idx] = response
-
-    # Add responses to dataset
     logger.info("Adding responses to dataset...")
     dataset = dataset.add_column(output_column, responses)
 
-    # Create dataset card
     logger.info("Creating dataset card...")
     card_content = create_dataset_card(
         source_dataset=src_dataset_hub_id,
         model_id=model_id,
         messages_column=messages_column,
         prompt_column=prompt_column,
-        sampling_params=sampling_params,
-        tensor_parallel_size=tensor_parallel_size,
-        num_examples=total_examples,
-        generation_time=generation_start_time,
-        num_skipped=len(skipped_info) if skip_long_prompts else 0,
-        max_model_len_used=effective_max_len if skip_long_prompts else None,
-    )
-
-    # Push dataset to hub
-    logger.info(f"Pushing dataset to: {output_dataset_hub_id}")
-    dataset.push_to_hub(output_dataset_hub_id, token=HF_TOKEN)
-
-    # Push dataset card
-    card = DatasetCard(card_content)
-    card.push_to_hub(output_dataset_hub_id, token=HF_TOKEN)
-
-    logger.info("✅ Generation complete!")
-    logger.info(
-        f"Dataset available at: https://huggingface.co/datasets/{output_dataset_hub_id}"
-    )
-
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        parser = argparse.ArgumentParser(
-            description="Generate responses for dataset prompts using vLLM",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog="""
-Examples:
-  # Basic usage with default Qwen model
-  uv run generate-responses.py input-dataset output-dataset
-  
-  # With custom model and parameters
-  uv run generate-responses.py input-dataset output-dataset \\
-    --model-id meta-llama/Llama-3.1-8B-Instruct \\
-    --temperature 0.9 \\
-    --max-tokens 2048
-  
-  # Force specific GPU configuration
-  uv run generate-responses.py input-dataset output-dataset \\
-    --tensor-parallel-size 2 \\
-    --gpu-memory-utilization 0.95
-  
-  # Using environment variable for token
-  HF_TOKEN=hf_xxx uv run generate-responses.py input-dataset output-dataset
-            """,
-        )
-
-        parser.add_argument(
-            "src_dataset_hub_id",
-            help="Input dataset on Hugging Face Hub (e.g., username/dataset-name)",
-        )
-        parser.add_argument(
-            "output_dataset_hub_id", help="Output dataset name on Hugging Face Hub"
-        )
-        parser.add_argument(
-            "--model-id",
-            type=str,
-            default="Qwen/Qwen3-30B-A3B-Instruct-2507",
-            help="Model to use for generation (default: Qwen3-30B-A3B-Instruct-2507)",
-        )
-        parser.add_argument(
-            "--messages-column",
-            type=str,
-            default="messages",
-            help="Column containing chat messages (default: messages)",
-        )
-        parser.add_argument(
-            "--prompt-column",
-            type=str,
-            help="Column containing plain text prompts (alternative to --messages-column)",
-        )
-        parser.add_argument(
-            "--output-column",
-            type=str,
-            default="response",
-            help="Column name for generated responses (default: response)",
-        )
-        parser.add_argument(
-            "--max-samples",
-            type=int,
-            help="Maximum number of samples to process (default: all)",
-        )
-        parser.add_argument(
-            "--temperature",
-            type=float,
-            default=0.7,
-            help="Sampling temperature (default: 0.7)",
-        )
-        parser.add_argument(
-            "--top-p",
-            type=float,
-            default=0.8,
-            help="Top-p sampling parameter (default: 0.8)",
-        )
-        parser.add_argument(
-            "--top-k",
-            type=int,
-            default=20,
-            help="Top-k sampling parameter (default: 20)",
-        )
-        parser.add_argument(
-            "--min-p",
-            type=float,
-            default=0.0,
-            help="Minimum probability threshold (default: 0.0)",
-        )
-        parser.add_argument(
-            "--max-tokens",
-            type=int,
-            default=16384,
-            help="Maximum tokens to generate (default: 16384)",
-        )
-        parser.add_argument(
-            "--repetition-penalty",
-            type=float,
-            default=1.0,
-            help="Repetition penalty (default: 1.0)",
-        )
-        parser.add_argument(
-            "--gpu-memory-utilization",
-            type=float,
-            default=0.90,
-            help="GPU memory utilization factor (default: 0.90)",
-        )
-        parser.add_argument(
-            "--max-model-len",
-            type=int,
-            help="Maximum model context length (default: model's default)",
-        )
-        parser.add_argument(
-            "--tensor-parallel-size",
-            type=int,
-            help="Number of GPUs to use (default: auto-detect)",
-        )
-        parser.add_argument(
-            "--hf-token",
-            type=str,
-            help="Hugging Face token (can also use HF_TOKEN env var)",
-        )
-        parser.add_argument(
-            "--skip-long-prompts",
-            action="store_true",
-            default=True,
-            help="Skip prompts that exceed max_model_len instead of failing (default: True)",
-        )
-        parser.add_argument(
-            "--no-skip-long-prompts",
-            dest="skip_long_prompts",
-            action="store_false",
-            help="Fail on prompts that exceed max_model_len",
-        )
-
-        args = parser.parse_args()
-
-        main(
-            src_dataset_hub_id=args.src_dataset_hub_id,
-            output_dataset_hub_id=args.output_dataset_hub_id,
-            model_id=args.model_id,
-            messages_column=args.messages_column,
-            prompt_column=args.prompt_column,
-            output_column=args.output_column,
-            temperature=args.temperature,
-            top_p=args.top_p,
-            top_k=args.top_k,
-            min_p=args.min_p,
-            max_tokens=args.max_tokens,
-            repetition_penalty=args.repetition_penalty,
-            gpu_memory_utilization=args.gpu_memory_utilization,
-            max_model_len=args.max_model_len,
-            tensor_parallel_size=args.tensor_parallel_size,
-            skip_long_prompts=args.skip_long_prompts,
-            max_samples=args.max_samples,
-            hf_token=args.hf_token,
-        )
-    else:
-        # Show HF Jobs example when run without arguments
-        print("""
-vLLM Response Generation Script
-==============================
-
-This script requires arguments. For usage information:
-    uv run generate-responses.py --help
-
-Example HF Jobs command with multi-GPU:
-    # If you're logged in with hf auth, token will be auto-detected
-    hf jobs uv run \\
-        --flavor l4x4 \\
-        https://huggingface.co/datasets/uv-scripts/vllm/raw/main/generate-responses.py \\
-        username/input-dataset \\
-        username/output-dataset \\
-        --messages-column messages \\
-        --model-id Qwen/Qwen3-30B-A3B-Instruct-2507 \\
-        --temperature 0.7 \\
-        --max-tokens 16384
-        """)
+        sampling_params=s
