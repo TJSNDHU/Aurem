@@ -138,27 +138,8 @@ def search_reddit(
     return http.post(OPENAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
 
 
-def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse OpenAI response to extract Reddit items.
-
-    Args:
-        response: Raw API response
-
-    Returns:
-        List of item dicts
-    """
-    items = []
-
-    # Check for API errors first
-    if "error" in response and response["error"]:
-        error = response["error"]
-        err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
-        _log_error(f"OpenAI API error: {err_msg}")
-        if http.DEBUG:
-            _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
-        return items
-
-    # Try to find the output text
+def _extract_output_text(response: Dict[str, Any]) -> str:
+    """Extract output text from an OpenAI API response."""
     output_text = ""
     if "output" in response:
         output = response["output"]
@@ -187,44 +168,81 @@ def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
                 output_text = choice["message"].get("content", "")
                 break
 
-    if not output_text:
-        print(f"[REDDIT WARNING] No output text found in OpenAI response. Keys present: {list(response.keys())}", flush=True)
-        return items
+    return output_text
 
-    # Extract JSON from the response
+
+def _extract_items_from_text(output_text: str) -> List[Dict[str, Any]]:
+    """Extract items list from JSON embedded in output text."""
     json_match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
     if json_match:
         try:
             data = json.loads(json_match.group())
-            items = data.get("items", [])
+            return data.get("items", [])
         except json.JSONDecodeError:
             pass
+    return []
+
+
+def _clean_item(index: int, item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Validate and clean a single Reddit item. Returns None if invalid."""
+    if not isinstance(item, dict):
+        return None
+
+    url = item.get("url", "")
+    if not url or "reddit.com" not in url:
+        return None
+
+    clean_item = {
+        "id": f"R{index+1}",
+        "title": str(item.get("title", "")).strip(),
+        "url": url,
+        "subreddit": str(item.get("subreddit", "")).strip().lstrip("r/"),
+        "date": item.get("date"),
+        "why_relevant": str(item.get("why_relevant", "")).strip(),
+        "relevance": min(1.0, max(0.0, float(item.get("relevance", 0.5)))),
+    }
+
+    # Validate date format
+    if clean_item["date"]:
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(clean_item["date"])):
+            clean_item["date"] = None
+
+    return clean_item
+
+
+def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse OpenAI response to extract Reddit items.
+
+    Args:
+        response: Raw API response
+
+    Returns:
+        List of item dicts
+    """
+    items = []
+
+    # Check for API errors first
+    if "error" in response and response["error"]:
+        error = response["error"]
+        err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+        _log_error(f"OpenAI API error: {err_msg}")
+        if http.DEBUG:
+            _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
+        return items
+
+    output_text = _extract_output_text(response)
+
+    if not output_text:
+        print(f"[REDDIT WARNING] No output text found in OpenAI response. Keys present: {list(response.keys())}", flush=True)
+        return items
+
+    items = _extract_items_from_text(output_text)
 
     # Validate and clean items
     clean_items = []
     for i, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-
-        url = item.get("url", "")
-        if not url or "reddit.com" not in url:
-            continue
-
-        clean_item = {
-            "id": f"R{i+1}",
-            "title": str(item.get("title", "")).strip(),
-            "url": url,
-            "subreddit": str(item.get("subreddit", "")).strip().lstrip("r/"),
-            "date": item.get("date"),
-            "why_relevant": str(item.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(item.get("relevance", 0.5)))),
-        }
-
-        # Validate date format
-        if clean_item["date"]:
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(clean_item["date"])):
-                clean_item["date"] = None
-
-        clean_items.append(clean_item)
+        clean_item = _clean_item(i, item)
+        if clean_item is not None:
+            clean_items.append(clean_item)
 
     return clean_items
