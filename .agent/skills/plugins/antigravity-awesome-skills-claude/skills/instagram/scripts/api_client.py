@@ -91,6 +91,52 @@ class InstagramAPI:
 
     # ── Core Request ──────────────────────────────────────────────────────────
 
+    def _build_url(self, endpoint: str) -> str:
+        return f"{GRAPH_API_BASE}/{endpoint}" if not endpoint.startswith("http") else endpoint
+
+    async def _send_request(
+        self,
+        client: httpx.AsyncClient,
+        method: str,
+        url: str,
+        params: Dict[str, Any],
+        data: Optional[Dict[str, Any]],
+    ) -> httpx.Response:
+        if method.upper() == "POST":
+            return await client.post(url, params=params, data=data)
+        elif method.upper() == "DELETE":
+            return await client.delete(url, params=params)
+        else:
+            return await client.get(url, params=params)
+
+    def _parse_api_error(self, result: Dict[str, Any]) -> Optional[InstagramAPIError]:
+        if "error" not in result:
+            return None
+        error = result["error"]
+        return InstagramAPIError(
+            message=error.get("message", "Unknown error"),
+            code=error.get("code"),
+            subcode=error.get("error_subcode"),
+        )
+
+    async def _handle_api_error(
+        self,
+        api_error: InstagramAPIError,
+        attempt: int,
+    ) -> bool:
+        """Retorna True se deve continuar o retry, False caso contrário."""
+        if api_error.is_rate_limit():
+            logger.warning("Rate limit da API atingido (code %s). Aguardando...", api_error.code)
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(60)
+                return True
+        if api_error.is_permission_error():
+            raise api_error
+        if attempt < MAX_RETRIES:
+            await asyncio.sleep(RETRY_BACKOFF_BASE ** attempt)
+            return True
+        raise api_error
+
     async def _request(
         self,
         method: str,
@@ -105,7 +151,7 @@ class InstagramAPI:
         # Verificar rate limit
         self._gov.check_rate_limit(action_name, self.account_id)
 
-        url = f"{GRAPH_API_BASE}/{endpoint}" if not endpoint.startswith("http") else endpoint
+        url = self._build_url(endpoint)
         params = params or {}
         params["access_token"] = self.access_token
 
@@ -113,35 +159,14 @@ class InstagramAPI:
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                if method.upper() == "POST":
-                    resp = await client.post(url, params=params, data=data)
-                elif method.upper() == "DELETE":
-                    resp = await client.delete(url, params=params)
-                else:
-                    resp = await client.get(url, params=params)
-
-                # Parse response
+                resp = await self._send_request(client, method, url, params, data)
                 result = resp.json()
 
-                # Verificar erro da API
-                if "error" in result:
-                    error = result["error"]
-                    api_error = InstagramAPIError(
-                        message=error.get("message", "Unknown error"),
-                        code=error.get("code"),
-                        subcode=error.get("error_subcode"),
-                    )
-                    if api_error.is_rate_limit():
-                        logger.warning("Rate limit da API atingido (code %s). Aguardando...", api_error.code)
-                        if attempt < MAX_RETRIES:
-                            await asyncio.sleep(60)  # espera 1 min para rate limits da API
-                            continue
-                    if api_error.is_permission_error():
-                        raise api_error  # não faz retry para erros de permissão
-                    if attempt < MAX_RETRIES:
-                        await asyncio.sleep(RETRY_BACKOFF_BASE ** attempt)
+                api_error = self._parse_api_error(result)
+                if api_error is not None:
+                    should_continue = await self._handle_api_error(api_error, attempt)
+                    if should_continue:
                         continue
-                    raise api_error
 
                 resp.raise_for_status()
 
@@ -401,44 +426,4 @@ class InstagramAPI:
     # ── Messaging ─────────────────────────────────────────────────────────────
 
     async def send_message(self, recipient_id: str, text: str) -> Dict[str, Any]:
-        return await self.post(
-            f"{self.ig_user_id}/messages",
-            data={
-                "recipient": json.dumps({"id": recipient_id}),
-                "message": json.dumps({"text": text}),
-            },
-            action="send_dm",
-        )
-
-    async def get_conversations(self, limit: int = 20) -> Dict[str, Any]:
-        return await self.get(
-            f"{self.ig_user_id}/conversations",
-            params={
-                "fields": "id,participants,updated_time",
-                "limit": str(limit),
-                "platform": "instagram",
-            },
-            action="get_conversations",
-        )
-
-    # ── Imgur Upload (mídia local → URL pública) ──────────────────────────────
-
-    async def upload_to_imgur(self, file_path: str) -> str:
-        """
-        Faz upload de arquivo local para o Imgur (anônimo).
-        Retorna a URL pública da imagem.
-        """
-        client = await self._get_client()
-        with open(file_path, "rb") as f:
-            resp = await client.post(
-                IMGUR_UPLOAD_URL,
-                headers={"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"},
-                files={"image": f},
-            )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("success"):
-            url = data["data"]["link"]
-            logger.info("Upload Imgur: %s → %s", file_path, url)
-            return url
-        raise InstagramAPIError(f"Imgur upload falhou: {data}")
+        return await
