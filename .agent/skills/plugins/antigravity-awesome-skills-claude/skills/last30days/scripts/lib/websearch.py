@@ -251,6 +251,155 @@ def is_excluded_domain(url: str) -> bool:
         return False
 
 
+def _resolve_date(
+    result: Dict[str, Any],
+    url: str,
+    snippet: str,
+    title: str,
+) -> Tuple[Optional[str], str]:
+    """Resolve the best date and confidence for a single result.
+
+    Args:
+        result: Raw result dict (may contain a pre-supplied date)
+        url: Page URL
+        snippet: Page snippet/description
+        title: Page title
+
+    Returns:
+        Tuple of (date_string_or_None, confidence)
+    """
+    date = result.get("date")
+    date_confidence = "low"
+
+    if date and re.match(r'^\d{4}-\d{2}-\d{2}$', str(date)):
+        # Provided date is valid
+        date_confidence = "med"
+    else:
+        # Try to extract date from URL/snippet/title
+        extracted_date, confidence = extract_date_signals(url, snippet, title)
+        if extracted_date:
+            date = extracted_date
+            date_confidence = confidence
+
+    return date, date_confidence
+
+
+def _is_within_date_range(
+    date: Optional[str],
+    from_date: str,
+    to_date: str,
+) -> bool:
+    """Check whether a date passes the hard date filters.
+
+    Args:
+        date: Date string (YYYY-MM-DD) or None
+        from_date: Start date (YYYY-MM-DD)
+        to_date: End date (YYYY-MM-DD)
+
+    Returns:
+        True if the item should be kept, False if it should be dropped
+    """
+    # Hard filter: if we found a date and it's too old, skip
+    if date and from_date and date < from_date:
+        return False  # DROP - verified old content
+
+    # Hard filter: if date is in the future, skip (parsing error)
+    if date and to_date and date > to_date:
+        return False  # DROP - future date
+
+    return True
+
+
+def _build_item(
+    index: int,
+    title: str,
+    url: str,
+    snippet: str,
+    date: Optional[str],
+    date_confidence: str,
+    relevance: float,
+    why_relevant: str,
+) -> Dict[str, Any]:
+    """Build a normalized item dict from extracted fields.
+
+    Args:
+        index: Zero-based index of the result
+        title: Page title
+        url: Page URL
+        snippet: Page snippet
+        date: Resolved date string or None
+        date_confidence: Confidence level for the date
+        relevance: Relevance score (0.0–1.0)
+        why_relevant: Explanation of relevance
+
+    Returns:
+        Normalized item dict
+    """
+    return {
+        "id": f"W{index+1}",
+        "title": title[:200],  # Truncate long titles
+        "url": url,
+        "source_domain": extract_domain(url),
+        "snippet": snippet[:500],  # Truncate long snippets
+        "date": date,
+        "date_confidence": date_confidence,
+        "relevance": relevance,
+        "why_relevant": why_relevant,
+    }
+
+
+def _parse_single_result(
+    result: Dict[str, Any],
+    index: int,
+    from_date: str,
+    to_date: str,
+) -> Optional[Dict[str, Any]]:
+    """Parse a single WebSearch result into a normalized item dict.
+
+    Args:
+        result: Raw result dict
+        index: Zero-based index (used for ID generation)
+        from_date: Start date for filtering (YYYY-MM-DD)
+        to_date: End date for filtering (YYYY-MM-DD)
+
+    Returns:
+        Normalized item dict, or None if the result should be skipped
+    """
+    url = result.get("url", "")
+    if not url:
+        return None
+
+    # Skip Reddit/X URLs (handled separately)
+    if is_excluded_domain(url):
+        return None
+
+    title = str(result.get("title", "")).strip()
+    snippet = str(result.get("snippet", result.get("description", ""))).strip()
+
+    if not title and not snippet:
+        return None
+
+    # Resolve date and confidence
+    date, date_confidence = _resolve_date(result, url, snippet, title)
+
+    # Apply hard date filters
+    if not _is_within_date_range(date, from_date, to_date):
+        return None
+
+    # Get relevance if provided, default to 0.5
+    relevance = result.get("relevance", 0.5)
+    try:
+        relevance = min(1.0, max(0.0, float(relevance)))
+    except (TypeError, ValueError):
+        relevance = 0.5
+
+    why_relevant = str(result.get("why_relevant", "")).strip()
+
+    return _build_item(
+        index, title, url, snippet, date, date_confidence, relevance, why_relevant
+    )
+
+
 def parse_websearch_results(
     results: List[Dict[str, Any]],
     topic: str,
@@ -282,63 +431,9 @@ def parse_websearch_results(
     for i, result in enumerate(results):
         if not isinstance(result, dict):
             continue
-
-        url = result.get("url", "")
-        if not url:
-            continue
-
-        # Skip Reddit/X URLs (handled separately)
-        if is_excluded_domain(url):
-            continue
-
-        title = str(result.get("title", "")).strip()
-        snippet = str(result.get("snippet", result.get("description", ""))).strip()
-
-        if not title and not snippet:
-            continue
-
-        # Use Date Detective to extract date signals
-        date = result.get("date")  # Use provided date if available
-        date_confidence = "low"
-
-        if date and re.match(r'^\d{4}-\d{2}-\d{2}$', str(date)):
-            # Provided date is valid
-            date_confidence = "med"
-        else:
-            # Try to extract date from URL/snippet/title
-            extracted_date, confidence = extract_date_signals(url, snippet, title)
-            if extracted_date:
-                date = extracted_date
-                date_confidence = confidence
-
-        # Hard filter: if we found a date and it's too old, skip
-        if date and from_date and date < from_date:
-            continue  # DROP - verified old content
-
-        # Hard filter: if date is in the future, skip (parsing error)
-        if date and to_date and date > to_date:
-            continue  # DROP - future date
-
-        # Get relevance if provided, default to 0.5
-        relevance = result.get("relevance", 0.5)
-        try:
-            relevance = min(1.0, max(0.0, float(relevance)))
-        except (TypeError, ValueError):
-            relevance = 0.5
-
-        item = {
-            "id": f"W{i+1}",
-            "title": title[:200],  # Truncate long titles
-            "url": url,
-            "source_domain": extract_domain(url),
-            "snippet": snippet[:500],  # Truncate long snippets
-            "date": date,
-            "date_confidence": date_confidence,
-            "relevance": relevance,
-            "why_relevant": str(result.get("why_relevant", "")).strip(),
-        }
-
-        items.append(item)
+        item = _parse_single_result(result, i, from_date, to_date)
+        if item is not None:
+            items.append(item)
 
     return items
 
@@ -346,56 +441,3 @@ def parse_websearch_results(
 def normalize_websearch_items(
     items: List[Dict[str, Any]],
     from_date: str,
-    to_date: str,
-) -> List[schema.WebSearchItem]:
-    """Convert parsed dicts to WebSearchItem objects.
-
-    Args:
-        items: List of parsed item dicts
-        from_date: Start of date range (YYYY-MM-DD)
-        to_date: End of date range (YYYY-MM-DD)
-
-    Returns:
-        List of WebSearchItem objects
-    """
-    result = []
-
-    for item in items:
-        web_item = schema.WebSearchItem(
-            id=item["id"],
-            title=item["title"],
-            url=item["url"],
-            source_domain=item["source_domain"],
-            snippet=item["snippet"],
-            date=item.get("date"),
-            date_confidence=item.get("date_confidence", "low"),
-            relevance=item.get("relevance", 0.5),
-            why_relevant=item.get("why_relevant", ""),
-        )
-        result.append(web_item)
-
-    return result
-
-
-def dedupe_websearch(items: List[schema.WebSearchItem]) -> List[schema.WebSearchItem]:
-    """Remove duplicate WebSearch items.
-
-    Deduplication is based on URL.
-
-    Args:
-        items: List of WebSearchItem objects
-
-    Returns:
-        Deduplicated list
-    """
-    seen_urls = set()
-    result = []
-
-    for item in items:
-        # Normalize URL for comparison
-        url_key = item.url.lower().rstrip("/")
-        if url_key not in seen_urls:
-            seen_urls.add(url_key)
-            result.append(item)
-
-    return result
