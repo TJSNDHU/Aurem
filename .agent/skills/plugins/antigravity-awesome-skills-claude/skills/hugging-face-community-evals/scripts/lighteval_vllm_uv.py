@@ -169,7 +169,8 @@ def run_lighteval_accelerate(
         sys.exit(exc.returncode)
 
 
-def main() -> None:
+def _build_argument_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for the lighteval CLI."""
     parser = argparse.ArgumentParser(
         description="Run lighteval evaluations with vLLM or accelerate backend on custom HuggingFace models",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -263,34 +264,49 @@ Task format:
         help="System prompt for chat models",
     )
 
+    return parser
+
+
+def _dispatch_vllm(args: argparse.Namespace) -> None:
+    """Dispatch evaluation to the vLLM backend."""
+    run_lighteval_vllm(
+        model_id=args.model,
+        tasks=args.tasks,
+        output_dir=args.output_dir,
+        max_samples=args.max_samples,
+        batch_size=args.batch_size,
+        tensor_parallel_size=args.tensor_parallel_size,
+        gpu_memory_utilization=args.gpu_memory_utilization,
+        dtype=args.dtype,
+        trust_remote_code=args.trust_remote_code,
+        use_chat_template=args.use_chat_template,
+        system_prompt=args.system_prompt,
+    )
+
+
+def _dispatch_accelerate(args: argparse.Namespace) -> None:
+    """Dispatch evaluation to the accelerate backend."""
+    run_lighteval_accelerate(
+        model_id=args.model,
+        tasks=args.tasks,
+        output_dir=args.output_dir,
+        max_samples=args.max_samples,
+        batch_size=args.batch_size,
+        dtype=args.dtype if args.dtype != "auto" else "bfloat16",
+        trust_remote_code=args.trust_remote_code,
+        use_chat_template=args.use_chat_template,
+        system_prompt=args.system_prompt,
+    )
+
+
+def main() -> None:
+    parser = _build_argument_parser()
     args = parser.parse_args()
 
     if args.backend == "vllm":
-        run_lighteval_vllm(
-            model_id=args.model,
-            tasks=args.tasks,
-            output_dir=args.output_dir,
-            max_samples=args.max_samples,
-            batch_size=args.batch_size,
-            tensor_parallel_size=args.tensor_parallel_size,
-            gpu_memory_utilization=args.gpu_memory_utilization,
-            dtype=args.dtype,
-            trust_remote_code=args.trust_remote_code,
-            use_chat_template=args.use_chat_template,
-            system_prompt=args.system_prompt,
-        )
+        _dispatch_vllm(args)
     else:
-        run_lighteval_accelerate(
-            model_id=args.model,
-            tasks=args.tasks,
-            output_dir=args.output_dir,
-            max_samples=args.max_samples,
-            batch_size=args.batch_size,
-            dtype=args.dtype if args.dtype != "auto" else "bfloat16",
-            trust_remote_code=args.trust_remote_code,
-            use_chat_template=args.use_chat_template,
-            system_prompt=args.system_prompt,
-        )
+        _dispatch_accelerate(args)
 
 
 if __name__ == "__main__":
