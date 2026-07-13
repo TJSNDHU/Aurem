@@ -26,6 +26,116 @@ db.init()
 gov = GovernanceManager(db)
 
 
+async def _resolve_media_url(api: InstagramAPI, post: dict, post_id: int) -> str:
+    """Resolve a media_url, fazendo upload para Imgur se necessário."""
+    media_url = post.get("media_url", "")
+    if not media_url and post.get("local_path"):
+        media_url = await api.upload_to_imgur(post["local_path"])
+        db.update_post_status(post_id, post["status"], media_url=media_url)
+    return media_url
+
+
+async def _wait_for_container(api: InstagramAPI, container_id: str, media_type: str) -> None:
+    """Aguarda o processamento do container para vídeos e reels."""
+    if media_type not in ("VIDEO", "REEL"):
+        return
+    for _ in range(60):
+        status = await api.check_container_status(container_id)
+        if status.get("status_code") == "FINISHED":
+            break
+        if status.get("status_code") == "ERROR":
+            raise Exception(status.get("status", "Erro no processamento"))
+        await asyncio.sleep(5)
+
+
+async def _publish_from_container(api: InstagramAPI, post_id: int, container_id: str) -> dict:
+    """Publica mídia a partir de um container já criado."""
+    result = await api.publish_media(container_id)
+    ig_media_id = result.get("id")
+    details = await api.get_media_details(ig_media_id)
+    db.update_post_status(
+        post_id, "published",
+        ig_media_id=ig_media_id,
+        permalink=details.get("permalink", ""),
+        published_at=details.get("timestamp", ""),
+    )
+    return {"post_id": post_id, "status": "published", "ig_media_id": ig_media_id, "permalink": details.get("permalink", "")}
+
+
+async def _process_post(api: InstagramAPI, post: dict, account: dict) -> dict:
+    """Processa um único post, retornando o resultado."""
+    post_id = post["id"]
+    try:
+        gov.check_rate_limit(f"publish_{post['media_type'].lower()}", account["id"])
+    except RateLimitExceeded as e:
+        return {"post_id": post_id, "status": "rate_limited", "error": str(e)}
+
+    try:
+        # Recovery: se já tem container criado, tenta publicar direto
+        if post["status"] == "container_created" and post.get("ig_container_id"):
+            result = await api.publish_media(post["ig_container_id"])
+            ig_media_id = result.get("id")
+            details = await api.get_media_details(ig_media_id)
+            db.update_post_status(
+                post_id, "published",
+                ig_media_id=ig_media_id,
+                permalink=details.get("permalink", ""),
+                published_at=details.get("timestamp", ""),
+            )
+            return {"post_id": post_id, "status": "published", "ig_media_id": ig_media_id}
+
+        # Publicação normal
+        media_url = await _resolve_media_url(api, post, post_id)
+
+        media_type = post["media_type"].upper()
+        ig_type_map = {"PHOTO": "IMAGE", "VIDEO": "VIDEO", "REEL": "REELS", "STORY": "STORIES"}
+        ig_type = ig_type_map.get(media_type, "IMAGE")
+
+        if media_type == "CAROUSEL":
+            return {"post_id": post_id, "status": "skipped", "reason": "Carrosséis precisam ser publicados via publish.py"}
+
+        # Step 1: Container
+        container_params = {"caption": post.get("caption")}
+        if ig_type == "IMAGE":
+            container_params["media_type"] = "IMAGE"
+            container_params["image_url"] = media_url
+        else:
+            container_params["media_type"] = ig_type
+            container_params["video_url"] = media_url
+
+        container = await api.create_media_container(**container_params)
+        container_id = container["id"]
+        db.update_post_status(post_id, "container_created", ig_container_id=container_id)
+
+        await _wait_for_container(api, container_id, media_type)
+
+        # Step 2: Publicar
+        result = await api.publish_media(container_id)
+        ig_media_id = result.get("id")
+        details = await api.get_media_details(ig_media_id)
+        permalink = details.get("permalink", "")
+
+        db.update_post_status(
+            post_id, "published",
+            ig_media_id=ig_media_id,
+            permalink=permalink,
+            published_at=details.get("timestamp", ""),
+        )
+
+        gov.log_action(
+            f"publish_{media_type.lower()}",
+            params={"post_id": post_id},
+            result={"ig_media_id": ig_media_id, "permalink": permalink},
+            account_id=account["id"],
+        )
+
+        return {"post_id": post_id, "status": "published", "ig_media_id": ig_media_id, "permalink": permalink}
+
+    except Exception as e:
+        db.update_post_status(post_id, "failed", error_msg=str(e))
+        return {"post_id": post_id, "status": "failed", "error": str(e)}
+
+
 async def process_pending() -> None:
     """Processa todos os posts approved/scheduled prontos para publicar."""
     await auto_refresh_if_needed()
@@ -44,90 +154,10 @@ async def process_pending() -> None:
     results = []
 
     for post in posts:
-        post_id = post["id"]
-        try:
-            gov.check_rate_limit(f"publish_{post['media_type'].lower()}", account["id"])
-        except RateLimitExceeded as e:
-            results.append({"post_id": post_id, "status": "rate_limited", "error": str(e)})
+        result = await _process_post(api, post, account)
+        results.append(result)
+        if result.get("status") == "rate_limited":
             break
-
-        try:
-            # Recovery: se já tem container criado, tenta publicar direto
-            if post["status"] == "container_created" and post.get("ig_container_id"):
-                result = await api.publish_media(post["ig_container_id"])
-                ig_media_id = result.get("id")
-                details = await api.get_media_details(ig_media_id)
-                db.update_post_status(
-                    post_id, "published",
-                    ig_media_id=ig_media_id,
-                    permalink=details.get("permalink", ""),
-                    published_at=details.get("timestamp", ""),
-                )
-                results.append({"post_id": post_id, "status": "published", "ig_media_id": ig_media_id})
-                continue
-
-            # Publicação normal
-            media_url = post.get("media_url", "")
-            if not media_url and post.get("local_path"):
-                media_url = await api.upload_to_imgur(post["local_path"])
-                db.update_post_status(post_id, post["status"], media_url=media_url)
-
-            media_type = post["media_type"].upper()
-            ig_type_map = {"PHOTO": "IMAGE", "VIDEO": "VIDEO", "REEL": "REELS", "STORY": "STORIES"}
-            ig_type = ig_type_map.get(media_type, "IMAGE")
-
-            if media_type == "CAROUSEL":
-                results.append({"post_id": post_id, "status": "skipped", "reason": "Carrosséis precisam ser publicados via publish.py"})
-                continue
-
-            # Step 1: Container
-            container_params = {"caption": post.get("caption")}
-            if ig_type == "IMAGE":
-                container_params["media_type"] = "IMAGE"
-                container_params["image_url"] = media_url
-            else:
-                container_params["media_type"] = ig_type
-                container_params["video_url"] = media_url
-
-            container = await api.create_media_container(**container_params)
-            container_id = container["id"]
-            db.update_post_status(post_id, "container_created", ig_container_id=container_id)
-
-            # Para vídeos, aguardar processamento
-            if media_type in ("VIDEO", "REEL"):
-                for _ in range(60):
-                    status = await api.check_container_status(container_id)
-                    if status.get("status_code") == "FINISHED":
-                        break
-                    if status.get("status_code") == "ERROR":
-                        raise Exception(status.get("status", "Erro no processamento"))
-                    await asyncio.sleep(5)
-
-            # Step 2: Publicar
-            result = await api.publish_media(container_id)
-            ig_media_id = result.get("id")
-            details = await api.get_media_details(ig_media_id)
-            permalink = details.get("permalink", "")
-
-            db.update_post_status(
-                post_id, "published",
-                ig_media_id=ig_media_id,
-                permalink=permalink,
-                published_at=details.get("timestamp", ""),
-            )
-
-            gov.log_action(
-                f"publish_{media_type.lower()}",
-                params={"post_id": post_id},
-                result={"ig_media_id": ig_media_id, "permalink": permalink},
-                account_id=account["id"],
-            )
-
-            results.append({"post_id": post_id, "status": "published", "ig_media_id": ig_media_id, "permalink": permalink})
-
-        except Exception as e:
-            db.update_post_status(post_id, "failed", error_msg=str(e))
-            results.append({"post_id": post_id, "status": "failed", "error": str(e)})
 
     await api.close()
     print(json.dumps({"processed": len(results), "results": results}, indent=2, ensure_ascii=False))
