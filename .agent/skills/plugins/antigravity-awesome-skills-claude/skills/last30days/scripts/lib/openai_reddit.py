@@ -138,27 +138,20 @@ def search_reddit(
     return http.post(OPENAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
 
 
-def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse OpenAI response to extract Reddit items.
+def _check_api_error(response: Dict[str, Any]) -> bool:
+    """Check response for API errors and log them. Returns True if error found."""
+    if "error" not in response or not response["error"]:
+        return False
+    error = response["error"]
+    err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+    _log_error(f"OpenAI API error: {err_msg}")
+    if http.DEBUG:
+        _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
+    return True
 
-    Args:
-        response: Raw API response
 
-    Returns:
-        List of item dicts
-    """
-    items = []
-
-    # Check for API errors first
-    if "error" in response and response["error"]:
-        error = response["error"]
-        err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
-        _log_error(f"OpenAI API error: {err_msg}")
-        if http.DEBUG:
-            _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
-        return items
-
-    # Try to find the output text
+def _extract_output_text(response: Dict[str, Any]) -> str:
+    """Extract output text from an OpenAI response (supports multiple formats)."""
     output_text = ""
     if "output" in response:
         output = response["output"]
@@ -187,20 +180,23 @@ def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
                 output_text = choice["message"].get("content", "")
                 break
 
-    if not output_text:
-        print(f"[REDDIT WARNING] No output text found in OpenAI response. Keys present: {list(response.keys())}", flush=True)
-        return items
+    return output_text
 
-    # Extract JSON from the response
+
+def _extract_json_items(output_text: str) -> List[Dict[str, Any]]:
+    """Extract items list from JSON embedded in output text."""
     json_match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
     if json_match:
         try:
             data = json.loads(json_match.group())
-            items = data.get("items", [])
+            return data.get("items", [])
         except json.JSONDecodeError:
             pass
+    return []
 
-    # Validate and clean items
+
+def _clean_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Validate and clean raw items from the API response."""
     clean_items = []
     for i, item in enumerate(items):
         if not isinstance(item, dict):
@@ -228,3 +224,24 @@ def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
         clean_items.append(clean_item)
 
     return clean_items
+
+
+def parse_reddit_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse OpenAI response to extract Reddit items.
+
+    Args:
+        response: Raw API response
+
+    Returns:
+        List of item dicts
+    """
+    if _check_api_error(response):
+        return []
+
+    output_text = _extract_output_text(response)
+    if not output_text:
+        print(f"[REDDIT WARNING] No output text found in OpenAI response. Keys present: {list(response.keys())}", flush=True)
+        return []
+
+    items = _extract_json_items(output_text)
+    return _clean_items(items)
