@@ -233,6 +233,104 @@ def _extract_findings(assistant_messages: list[str]) -> list[str]:
     return list(dict.fromkeys(findings))[:5]
 
 
+def _format_section(title: str, items: list[str]) -> list[str]:
+    """Formata uma seção com título e lista de itens."""
+    if not items:
+        return []
+    lines = [f"## {title}"]
+    for item in items:
+        lines.append(f"- {item}")
+    lines.append("")
+    return lines
+
+
+def _format_topics(summary: SessionSummary) -> list[str]:
+    if not summary.topics:
+        return []
+    return _format_section("Tópicos", summary.topics)
+
+
+def _format_decisions(summary: SessionSummary) -> list[str]:
+    if not summary.decisions:
+        return []
+    return _format_section("Decisões", summary.decisions)
+
+
+def _format_completed_tasks(summary: SessionSummary) -> list[str]:
+    if not summary.tasks_completed:
+        return []
+    return _format_section("Tarefas Concluídas", [f"[x] {t}" for t in summary.tasks_completed])
+
+
+def _format_pending_tasks(summary: SessionSummary) -> list[str]:
+    if not summary.tasks_pending:
+        return []
+    lines = ["## Tarefas Pendentes"]
+    for t in summary.tasks_pending:
+        if isinstance(t, PendingTask):
+            lines.append(f"- [ ] {t.description} (prioridade: {t.priority})")
+        else:
+            lines.append(f"- [ ] {t}")
+    lines.append("")
+    return lines
+
+
+def _format_files_modified(summary: SessionSummary) -> list[str]:
+    if not summary.files_modified:
+        return []
+    lines = ["## Arquivos Modificados"]
+    for f in summary.files_modified:
+        lines.append(f"- `{f['path']}` — {f['action']}")
+    lines.append("")
+    return lines
+
+
+def _format_findings(summary: SessionSummary) -> list[str]:
+    if not summary.key_findings:
+        return []
+    return _format_section("Descobertas", summary.key_findings)
+
+
+def _format_errors(summary: SessionSummary) -> list[str]:
+    if not summary.errors_resolved:
+        return []
+    lines = ["## Erros Resolvidos"]
+    for e in summary.errors_resolved:
+        lines.append(f"- {e['error']}")
+    lines.append("")
+    return lines
+
+
+def _format_open_questions(summary: SessionSummary) -> list[str]:
+    if not summary.open_questions:
+        return []
+    return _format_section("Questões em Aberto", summary.open_questions)
+
+
+def _format_technical_debt(summary: SessionSummary) -> list[str]:
+    if not summary.technical_debt:
+        return []
+    return _format_section("Dívida Técnica", summary.technical_debt)
+
+
+def _format_metrics(summary: SessionSummary) -> list[str]:
+    lines = ["## Métricas"]
+    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
+    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
+    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
+    lines.append(f"- Mensagens: {summary.message_count}")
+    lines.append(f"- Tool calls: {summary.tool_call_count}")
+    lines.append("")
+    return lines
+
+
+def _format_prev_session_link(summary: SessionSummary) -> list[str]:
+    if summary.session_number <= 1:
+        return []
+    prev = summary.session_number - 1
+    return ["---", f"*Sessão anterior: [session-{prev:03d}](session-{prev:03d}.md)*"]
+
+
 def save_session_summary(summary: SessionSummary):
     """Salva resumo como arquivo markdown."""
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,76 +342,17 @@ def save_session_summary(summary: SessionSummary):
         "",
     ]
 
-    if summary.topics:
-        lines.append("## Tópicos")
-        for t in summary.topics:
-            lines.append(f"- {t}")
-        lines.append("")
-
-    if summary.decisions:
-        lines.append("## Decisões")
-        for d in summary.decisions:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    if summary.tasks_completed:
-        lines.append("## Tarefas Concluídas")
-        for t in summary.tasks_completed:
-            lines.append(f"- [x] {t}")
-        lines.append("")
-
-    if summary.tasks_pending:
-        lines.append("## Tarefas Pendentes")
-        for t in summary.tasks_pending:
-            if isinstance(t, PendingTask):
-                lines.append(f"- [ ] {t.description} (prioridade: {t.priority})")
-            else:
-                lines.append(f"- [ ] {t}")
-        lines.append("")
-
-    if summary.files_modified:
-        lines.append("## Arquivos Modificados")
-        for f in summary.files_modified:
-            lines.append(f"- `{f['path']}` — {f['action']}")
-        lines.append("")
-
-    if summary.key_findings:
-        lines.append("## Descobertas")
-        for f in summary.key_findings:
-            lines.append(f"- {f}")
-        lines.append("")
-
-    if summary.errors_resolved:
-        lines.append("## Erros Resolvidos")
-        for e in summary.errors_resolved:
-            lines.append(f"- {e['error']}")
-        lines.append("")
-
-    if summary.open_questions:
-        lines.append("## Questões em Aberto")
-        for q in summary.open_questions:
-            lines.append(f"- {q}")
-        lines.append("")
-
-    if summary.technical_debt:
-        lines.append("## Dívida Técnica")
-        for d in summary.technical_debt:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    lines.append("## Métricas")
-    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
-    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
-    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
-    lines.append(f"- Mensagens: {summary.message_count}")
-    lines.append(f"- Tool calls: {summary.tool_call_count}")
-    lines.append("")
-
-    # Link para sessão anterior
-    if summary.session_number > 1:
-        prev = summary.session_number - 1
-        lines.append("---")
-        lines.append(f"*Sessão anterior: [session-{prev:03d}](session-{prev:03d}.md)*")
+    lines.extend(_format_topics(summary))
+    lines.extend(_format_decisions(summary))
+    lines.extend(_format_completed_tasks(summary))
+    lines.extend(_format_pending_tasks(summary))
+    lines.extend(_format_files_modified(summary))
+    lines.extend(_format_findings(summary))
+    lines.extend(_format_errors(summary))
+    lines.extend(_format_open_questions(summary))
+    lines.extend(_format_technical_debt(summary))
+    lines.extend(_format_metrics(summary))
+    lines.extend(_format_prev_session_link(summary))
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
