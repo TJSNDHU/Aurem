@@ -41,6 +41,109 @@ class JucisrsScraper(AbstractJuntaScraper):
 
     _POST_URL = "https://sistemas.jucisrs.rs.gov.br/leiloeiros/busca/listar"
 
+    def _extract_matricula_nome(self, lines: List[str]):
+        """
+        Extrai matricula e nome das primeiras linhas de um bloco.
+        Retorna (matricula, nome, situacao, remaining_lines) ou None.
+        """
+        for i, line in enumerate(lines):
+            # Padrao 1: matricula e nome na mesma linha "365 - NOME"
+            m = RE_MATRICULA_NOME.match(line)
+            if m:
+                matricula = m.group(1)
+                nome_raw = m.group(2).strip()
+                situacao = None
+                if RE_CANCELADO.search(nome_raw):
+                    situacao = "CANCELADO"
+                    nome_raw = RE_CANCELADO.sub("", nome_raw).strip(" ")
+                nome = self.clean(nome_raw)
+                return matricula, nome, situacao, lines[i+1:]
+            # Padrao 2: so matricula (numero puro), proximo e "- NOME"
+            if line.isdigit() and i + 1 < len(lines):
+                next_line = lines[i+1]
+                if next_line.startswith("- ") or next_line.startswith("– "):
+                    matricula = line
+                    nome_raw = next_line[2:].strip()
+                    situacao = None
+                    if RE_CANCELADO.search(nome_raw):
+                        situacao = "CANCELADO"
+                        nome_raw = RE_CANCELADO.sub("", nome_raw).strip(" ")
+                    nome = self.clean(nome_raw)
+                    return matricula, nome, situacao, lines[i+2:]
+        return None
+
+    def _fill_record_fields(self, record: dict, remaining: List[str]) -> None:
+        """Preenche os campos do record a partir das linhas restantes."""
+        for line in remaining:
+            if not line:
+                continue
+            # Cancelado inline (linha separada como "(Cancelado)")
+            if RE_CANCELADO.search(line) and not record["situacao"]:
+                record["situacao"] = "CANCELADO"
+                continue
+            m = RE_POSSE.search(line)
+            if m:
+                record["data_registro"] = m.group(1)
+                continue
+            m = RE_TELEFONE.search(line)
+            if m:
+                record["telefone"] = self.clean(m.group(1))
+                continue
+            m = RE_EMAIL.search(line)
+            if m:
+                record["email"] = self.clean(m.group(1))
+                continue
+            m = RE_PREPOSTO.match(line)
+            if m:
+                continue  # ignorar preposto
+            # Cidade/UF: "CANELA - RS" ou "PORTO ALEGRE - RS"
+            m = RE_CIDADE_UF.search(line)
+            if m:
+                record["municipio"] = m.group(1).strip()
+                continue
+            if RE_CEP.search(line):
+                continue  # linha de CEP
+            # Linha de url (site)
+            if line.startswith("www.") or line.startswith("http"):
+                continue
+            # Linha de endereco
+            if (not record["endereco"] and len(line) > 5 and
+                    re.search(r"[A-ZÁÉÍÓÚÀÃÕÇ]", line)):
+                record["endereco"] = line
+
+    def _parse_block(self, block: str) -> dict | None:
+        """Parseia um unico bloco HTML separado por <hr> e retorna um record ou None."""
+        from bs4 import BeautifulSoup
+
+        block_soup = BeautifulSoup(block, "lxml")
+        lines_raw = block_soup.get_text("\n").splitlines()
+        lines = [l.strip() for l in lines_raw if l.strip()]
+
+        if not lines:
+            return None
+
+        result = self._extract_matricula_nome(lines)
+        if result is None:
+            return None
+
+        matricula, nome, situacao, remaining = result
+        if not nome or len(nome) < 3:
+            return None
+
+        record = {
+            "nome": nome,
+            "matricula": matricula,
+            "situacao": situacao,
+            "municipio": "Porto Alegre",
+            "data_registro": None,
+            "telefone": None,
+            "email": None,
+            "endereco": None,
+        }
+
+        self._fill_record_fields(record, remaining)
+        return record
+
     def _parse_plain_html(self, html: str) -> List[dict]:
         """
         Parseia o formato plano HTML da JUCISRS.
@@ -56,8 +159,6 @@ class JucisrsScraper(AbstractJuntaScraper):
           e-Mail : xxx@yyy<br/>
           Preposto : NOME<hr/>
         """
-        from bs4 import BeautifulSoup
-
         records = []
 
         # Dividir o HTML bruto pelo separador <hr> ou <hr/>
@@ -68,102 +169,9 @@ class JucisrsScraper(AbstractJuntaScraper):
         for block in blocks:
             if not block.strip():
                 continue
-
-            # Parsear o bloco como HTML para extrair texto estruturado
-            block_soup = BeautifulSoup(block, "lxml")
-            lines_raw = block_soup.get_text("\n").splitlines()
-            lines = [l.strip() for l in lines_raw if l.strip()]
-
-            if not lines:
-                continue
-
-            # Primeira linha com matricula e nome: "NNN - NOME SOBRENOME"
-            # NOTA: O <font> de cor separa matricula e nome em linhas distintas:
-            #   lines[0] = "365"  (matricula dentro do <font>)
-            #   lines[1] = "- ADAIR ABRAAO..."  (nome apos o <font>)
-            # Precisamos reconhecer e juntar esses dois fragmentos.
-            nome = None
-            matricula = None
-            situacao = None
-            remaining = []
-
-            for i, line in enumerate(lines):
-                # Padrao 1: matricula e nome na mesma linha "365 - NOME"
-                m = RE_MATRICULA_NOME.match(line)
-                if m:
-                    matricula = m.group(1)
-                    nome_raw = m.group(2).strip()
-                    if RE_CANCELADO.search(nome_raw):
-                        situacao = "CANCELADO"
-                        nome_raw = RE_CANCELADO.sub("", nome_raw).strip(" ")
-                    nome = self.clean(nome_raw)
-                    remaining = lines[i+1:]
-                    break
-                # Padrao 2: so matricula (numero puro), proximo e "- NOME"
-                if line.isdigit() and i + 1 < len(lines):
-                    next_line = lines[i+1]
-                    if next_line.startswith("- ") or next_line.startswith("– "):
-                        matricula = line
-                        nome_raw = next_line[2:].strip()
-                        if RE_CANCELADO.search(nome_raw):
-                            situacao = "CANCELADO"
-                            nome_raw = RE_CANCELADO.sub("", nome_raw).strip(" ")
-                        nome = self.clean(nome_raw)
-                        remaining = lines[i+2:]
-                        break
-
-            if not nome or len(nome) < 3:
-                continue
-
-            record = {
-                "nome": nome,
-                "matricula": matricula,
-                "situacao": situacao,
-                "municipio": "Porto Alegre",
-                "data_registro": None,
-                "telefone": None,
-                "email": None,
-                "endereco": None,
-            }
-
-            for line in remaining:
-                if not line:
-                    continue
-                # Cancelado inline (linha separada como "(Cancelado)")
-                if RE_CANCELADO.search(line) and not record["situacao"]:
-                    record["situacao"] = "CANCELADO"
-                    continue
-                m = RE_POSSE.search(line)
-                if m:
-                    record["data_registro"] = m.group(1)
-                    continue
-                m = RE_TELEFONE.search(line)
-                if m:
-                    record["telefone"] = self.clean(m.group(1))
-                    continue
-                m = RE_EMAIL.search(line)
-                if m:
-                    record["email"] = self.clean(m.group(1))
-                    continue
-                m = RE_PREPOSTO.match(line)
-                if m:
-                    continue  # ignorar preposto
-                # Cidade/UF: "CANELA - RS" ou "PORTO ALEGRE - RS"
-                m = RE_CIDADE_UF.search(line)
-                if m:
-                    record["municipio"] = m.group(1).strip()
-                    continue
-                if RE_CEP.search(line):
-                    continue  # linha de CEP
-                # Linha de url (site)
-                if line.startswith("www.") or line.startswith("http"):
-                    continue
-                # Linha de endereco
-                if (not record["endereco"] and len(line) > 5 and
-                        re.search(r"[A-ZÁÉÍÓÚÀÃÕÇ]", line)):
-                    record["endereco"] = line
-
-            records.append(record)
+            record = self._parse_block(block)
+            if record is not None:
+                records.append(record)
 
         return records
 
