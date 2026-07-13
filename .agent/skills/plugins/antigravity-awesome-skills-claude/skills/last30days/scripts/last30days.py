@@ -158,53 +158,36 @@ def _search_x(
     return x_items, raw_xai, x_error
 
 
-def run_research(
+def _run_parallel_searches(
     topic: str,
-    sources: str,
     config: dict,
     selected_models: dict,
     from_date: str,
     to_date: str,
-    depth: str = "default",
-    mock: bool = False,
-    progress: ui.ProgressDisplay = None,
+    depth: str,
+    mock: bool,
+    sources: str,
+    progress: ui.ProgressDisplay,
 ) -> tuple:
-    """Run the research pipeline.
+    """Run Reddit and X searches in parallel.
 
     Returns:
-        Tuple of (reddit_items, x_items, web_needed, raw_openai, raw_xai, raw_reddit_enriched, reddit_error, x_error)
-
-    Note: web_needed is True when WebSearch should be performed by Claude.
-    The script outputs a marker and Claude handles WebSearch in its session.
+        Tuple of (reddit_items, x_items, raw_openai, raw_xai, reddit_error, x_error)
     """
     reddit_items = []
     x_items = []
     raw_openai = None
     raw_xai = None
-    raw_reddit_enriched = []
     reddit_error = None
     x_error = None
 
-    # Check if WebSearch is needed (always needed in web-only mode)
-    web_needed = sources in ("all", "web", "reddit-web", "x-web")
-
-    # Web-only mode: no API calls needed, Claude handles everything
-    if sources == "web":
-        if progress:
-            progress.start_web_only()
-            progress.end_web_only()
-        return reddit_items, x_items, True, raw_openai, raw_xai, raw_reddit_enriched, reddit_error, x_error
-
-    # Determine which searches to run
     run_reddit = sources in ("both", "reddit", "all", "reddit-web")
     run_x = sources in ("both", "x", "all", "x-web")
 
-    # Run Reddit and X searches in parallel
     reddit_future = None
     x_future = None
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        # Submit both searches
         if run_reddit:
             if progress:
                 progress.start_reddit()
@@ -221,7 +204,6 @@ def run_research(
                 from_date, to_date, depth, mock
             )
 
-        # Collect results
         if reddit_future:
             try:
                 reddit_items, raw_openai, reddit_error = reddit_future.result()
@@ -246,30 +228,85 @@ def run_research(
             if progress:
                 progress.end_x(len(x_items))
 
-    # Enrich Reddit items with real data (sequential, but with error handling per-item)
-    if reddit_items:
+    return reddit_items, x_items, raw_openai, raw_xai, reddit_error, x_error
+
+
+def _enrich_reddit_items(
+    reddit_items: list,
+    mock: bool,
+    progress: ui.ProgressDisplay,
+) -> list:
+    """Enrich Reddit items with real data (sequential, with per-item error handling).
+
+    Returns:
+        List of enriched reddit items (also mutates reddit_items in place).
+    """
+    raw_reddit_enriched = []
+
+    if not reddit_items:
+        return raw_reddit_enriched
+
+    if progress:
+        progress.start_reddit_enrich(1, len(reddit_items))
+
+    for i, item in enumerate(reddit_items):
+        if progress and i > 0:
+            progress.update_reddit_enrich(i + 1, len(reddit_items))
+
+        try:
+            if mock:
+                mock_thread = load_fixture("reddit_thread_sample.json")
+                reddit_items[i] = reddit_enrich.enrich_reddit_item(item, mock_thread)
+            else:
+                reddit_items[i] = reddit_enrich.enrich_reddit_item(item)
+        except Exception as e:
+            if progress:
+                progress.show_error(f"Enrich failed for {item.get('url', 'unknown')}: {e}")
+
+        raw_reddit_enriched.append(reddit_items[i])
+
+    if progress:
+        progress.end_reddit_enrich()
+
+    return raw_reddit_enriched
+
+
+def run_research(
+    topic: str,
+    sources: str,
+    config: dict,
+    selected_models: dict,
+    from_date: str,
+    to_date: str,
+    depth: str = "default",
+    mock: bool = False,
+    progress: ui.ProgressDisplay = None,
+) -> tuple:
+    """Run the research pipeline.
+
+    Returns:
+        Tuple of (reddit_items, x_items, web_needed, raw_openai, raw_xai, raw_reddit_enriched, reddit_error, x_error)
+
+    Note: web_needed is True when WebSearch should be performed by Claude.
+    The script outputs a marker and Claude handles WebSearch in its session.
+    """
+    # Check if WebSearch is needed (always needed in web-only mode)
+    web_needed = sources in ("all", "web", "reddit-web", "x-web")
+
+    # Web-only mode: no API calls needed, Claude handles everything
+    if sources == "web":
         if progress:
-            progress.start_reddit_enrich(1, len(reddit_items))
+            progress.start_web_only()
+            progress.end_web_only()
+        return [], [], True, None, None, [], None, None
 
-        for i, item in enumerate(reddit_items):
-            if progress and i > 0:
-                progress.update_reddit_enrich(i + 1, len(reddit_items))
+    # Run Reddit and X searches in parallel
+    reddit_items, x_items, raw_openai, raw_xai, reddit_error, x_error = _run_parallel_searches(
+        topic, config, selected_models, from_date, to_date, depth, mock, sources, progress
+    )
 
-            try:
-                if mock:
-                    mock_thread = load_fixture("reddit_thread_sample.json")
-                    reddit_items[i] = reddit_enrich.enrich_reddit_item(item, mock_thread)
-                else:
-                    reddit_items[i] = reddit_enrich.enrich_reddit_item(item)
-            except Exception as e:
-                # Log but don't crash - keep the unenriched item
-                if progress:
-                    progress.show_error(f"Enrich failed for {item.get('url', 'unknown')}: {e}")
-
-            raw_reddit_enriched.append(reddit_items[i])
-
-        if progress:
-            progress.end_reddit_enrich()
+    # Enrich Reddit items with real data
+    raw_reddit_enriched = _enrich_reddit_items(reddit_items, mock, progress)
 
     return reddit_items, x_items, web_needed, raw_openai, raw_xai, raw_reddit_enriched, reddit_error, x_error
 
@@ -443,79 +480,4 @@ def main():
     sorted_x = score.sort_items(scored_x)
 
     # Dedupe items
-    deduped_reddit = dedupe.dedupe_reddit(sorted_reddit)
-    deduped_x = dedupe.dedupe_x(sorted_x)
-
-    progress.end_processing()
-
-    # Create report
-    report = schema.create_report(
-        args.topic,
-        from_date,
-        to_date,
-        mode,
-        selected_models.get("openai"),
-        selected_models.get("xai"),
-    )
-    report.reddit = deduped_reddit
-    report.x = deduped_x
-    report.reddit_error = reddit_error
-    report.x_error = x_error
-
-    # Generate context snippet
-    report.context_snippet_md = render.render_context_snippet(report)
-
-    # Write outputs
-    render.write_outputs(report, raw_openai, raw_xai, raw_reddit_enriched)
-
-    # Show completion
-    if sources == "web":
-        progress.show_web_only_complete()
-    else:
-        progress.show_complete(len(deduped_reddit), len(deduped_x))
-
-    # Output result
-    output_result(report, args.emit, web_needed, args.topic, from_date, to_date, missing_keys)
-
-
-def output_result(
-    report: schema.Report,
-    emit_mode: str,
-    web_needed: bool = False,
-    topic: str = "",
-    from_date: str = "",
-    to_date: str = "",
-    missing_keys: str = "none",
-):
-    """Output the result based on emit mode."""
-    if emit_mode == "compact":
-        print(render.render_compact(report, missing_keys=missing_keys))
-    elif emit_mode == "json":
-        print(json.dumps(report.to_dict(), indent=2))
-    elif emit_mode == "md":
-        print(render.render_full_report(report))
-    elif emit_mode == "context":
-        print(report.context_snippet_md)
-    elif emit_mode == "path":
-        print(render.get_context_path())
-
-    # Output WebSearch instructions if needed
-    if web_needed:
-        print("\n" + "="*60)
-        print("### WEBSEARCH REQUIRED ###")
-        print("="*60)
-        print(f"Topic: {topic}")
-        print(f"Date range: {from_date} to {to_date}")
-        print("")
-        print("Claude: Use your WebSearch tool to find 8-15 relevant web pages.")
-        print("EXCLUDE: reddit.com, x.com, twitter.com (already covered above)")
-        print("INCLUDE: blogs, docs, news, tutorials from the last 30 days")
-        print("")
-        print("After searching, synthesize WebSearch results WITH the Reddit/X")
-        print("results above. WebSearch items should rank LOWER than comparable")
-        print("Reddit/X items (they lack engagement metrics).")
-        print("="*60)
-
-
-if __name__ == "__main__":
-    main()
+    deduped_re
