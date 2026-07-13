@@ -109,76 +109,98 @@ class XMLEditor:
             elem = editor.get_node(tag="w:t", contains="&#8220;Agreement")  # Entity notation
             elem = editor.get_node(tag="w:t", contains="\u201cAgreement")   # Unicode character
         """
+        matches = self._find_matching_elements(tag, attrs, line_number, contains)
+        self._validate_matches(matches, tag, attrs, line_number, contains)
+        return matches[0]
+
+    def _find_matching_elements(self, tag, attrs, line_number, contains):
+        """Find all elements matching the given filters."""
         matches = []
         for elem in self.dom.getElementsByTagName(tag):
-            # Check line_number filter
-            if line_number is not None:
-                parse_pos = getattr(elem, "parse_position", (None,))
-                elem_line = parse_pos[0]
+            if self._element_matches_filters(elem, attrs, line_number, contains):
+                matches.append(elem)
+        return matches
 
-                # Handle both single line number and range
-                if isinstance(line_number, range):
-                    if elem_line not in line_number:
-                        continue
-                else:
-                    if elem_line != line_number:
-                        continue
+    def _element_matches_filters(self, elem, attrs, line_number, contains):
+        """Check if an element matches all specified filters."""
+        if not self._matches_line_number(elem, line_number):
+            return False
+        if not self._matches_attrs(elem, attrs):
+            return False
+        if not self._matches_contains(elem, contains):
+            return False
+        return True
 
-            # Check attrs filter
-            if attrs is not None:
-                if not all(
-                    elem.getAttribute(attr_name) == attr_value
-                    for attr_name, attr_value in attrs.items()
-                ):
-                    continue
+    def _matches_line_number(self, elem, line_number):
+        """Check if element matches line number filter."""
+        if line_number is None:
+            return True
+        parse_pos = getattr(elem, "parse_position", (None,))
+        elem_line = parse_pos[0]
+        if isinstance(line_number, range):
+            return elem_line in line_number
+        return elem_line == line_number
 
-            # Check contains filter
-            if contains is not None:
-                elem_text = self._get_element_text(elem)
-                # Normalize the search string: convert HTML entities to Unicode characters
-                # This allows searching for both "&#8220;Rowan" and ""Rowan"
-                normalized_contains = html.unescape(contains)
-                if normalized_contains not in elem_text:
-                    continue
+    def _matches_attrs(self, elem, attrs):
+        """Check if element matches attribute filter."""
+        if attrs is None:
+            return True
+        return all(
+            elem.getAttribute(attr_name) == attr_value
+            for attr_name, attr_value in attrs.items()
+        )
 
-            # If all applicable filters passed, this is a match
-            matches.append(elem)
+    def _matches_contains(self, elem, contains):
+        """Check if element matches text content filter."""
+        if contains is None:
+            return True
+        elem_text = self._get_element_text(elem)
+        normalized_contains = html.unescape(contains)
+        return normalized_contains in elem_text
 
+    def _validate_matches(self, matches, tag, attrs, line_number, contains):
+        """Validate that exactly one match was found, raise error otherwise."""
         if not matches:
-            # Build descriptive error message
-            filters = []
-            if line_number is not None:
-                line_str = (
-                    f"lines {line_number.start}-{line_number.stop - 1}"
-                    if isinstance(line_number, range)
-                    else f"line {line_number}"
-                )
-                filters.append(f"at {line_str}")
-            if attrs is not None:
-                filters.append(f"with attributes {attrs}")
-            if contains is not None:
-                filters.append(f"containing '{contains}'")
-
-            filter_desc = " ".join(filters) if filters else ""
-            base_msg = f"Node not found: <{tag}> {filter_desc}".strip()
-
-            # Add helpful hint based on filters used
-            if contains:
-                hint = "Text may be split across elements or use different wording."
-            elif line_number:
-                hint = "Line numbers may have changed if document was modified."
-            elif attrs:
-                hint = "Verify attribute values are correct."
-            else:
-                hint = "Try adding filters (attrs, line_number, or contains)."
-
-            raise ValueError(f"{base_msg}. {hint}")
+            self._raise_not_found_error(tag, attrs, line_number, contains)
         if len(matches) > 1:
             raise ValueError(
                 f"Multiple nodes found: <{tag}>. "
                 f"Add more filters (attrs, line_number, or contains) to narrow the search."
             )
-        return matches[0]
+
+    def _raise_not_found_error(self, tag, attrs, line_number, contains):
+        """Raise a descriptive error when no matches are found."""
+        filters = self._build_filter_description(attrs, line_number, contains)
+        filter_desc = " ".join(filters) if filters else ""
+        base_msg = f"Node not found: <{tag}> {filter_desc}".strip()
+        hint = self._get_search_hint(contains, line_number, attrs)
+        raise ValueError(f"{base_msg}. {hint}")
+
+    def _build_filter_description(self, attrs, line_number, contains):
+        """Build a human-readable description of active filters."""
+        filters = []
+        if line_number is not None:
+            line_str = (
+                f"lines {line_number.start}-{line_number.stop - 1}"
+                if isinstance(line_number, range)
+                else f"line {line_number}"
+            )
+            filters.append(f"at {line_str}")
+        if attrs is not None:
+            filters.append(f"with attributes {attrs}")
+        if contains is not None:
+            filters.append(f"containing '{contains}'")
+        return filters
+
+    def _get_search_hint(self, contains, line_number, attrs):
+        """Get a helpful hint based on which filters were used."""
+        if contains:
+            return "Text may be split across elements or use different wording."
+        if line_number:
+            return "Line numbers may have changed if document was modified."
+        if attrs:
+            return "Verify attribute values are correct."
+        return "Try adding filters (attrs, line_number, or contains)."
 
     def _get_element_text(self, elem):
         """
@@ -326,49 +348,4 @@ class XMLEditor:
         root_elem = self.dom.documentElement
         namespaces = []
         if root_elem and root_elem.attributes:
-            for i in range(root_elem.attributes.length):
-                attr = root_elem.attributes.item(i)
-                if attr.name.startswith("xmlns"):  # type: ignore
-                    namespaces.append(f'{attr.name}="{attr.value}"')  # type: ignore
-
-        ns_decl = " ".join(namespaces)
-        wrapper = f"<root {ns_decl}>{xml_content}</root>"
-        fragment_doc = defusedxml.minidom.parseString(wrapper)
-        nodes = [
-            self.dom.importNode(child, deep=True)
-            for child in fragment_doc.documentElement.childNodes  # type: ignore
-        ]
-        elements = [n for n in nodes if n.nodeType == n.ELEMENT_NODE]
-        assert elements, "Fragment must contain at least one element"
-        return nodes
-
-
-def _create_line_tracking_parser():
-    """
-    Create a SAX parser that tracks line and column numbers for each element.
-
-    Monkey patches the SAX content handler to store the current line and column
-    position from the underlying expat parser onto each element as a parse_position
-    attribute (line, column) tuple.
-
-    Returns:
-        defusedxml.sax.xmlreader.XMLReader: Configured SAX parser
-    """
-
-    def set_content_handler(dom_handler):
-        def startElementNS(name, tagName, attrs):
-            orig_start_cb(name, tagName, attrs)
-            cur_elem = dom_handler.elementStack[-1]
-            cur_elem.parse_position = (
-                parser._parser.CurrentLineNumber,  # type: ignore
-                parser._parser.CurrentColumnNumber,  # type: ignore
-            )
-
-        orig_start_cb = dom_handler.startElementNS
-        dom_handler.startElementNS = startElementNS
-        orig_set_content_handler(dom_handler)
-
-    parser = defusedxml.sax.make_parser()
-    orig_set_content_handler = parser.setContentHandler
-    parser.setContentHandler = set_content_handler  # type: ignore
-    return parser
+            for i in range(root_elem.attributes
