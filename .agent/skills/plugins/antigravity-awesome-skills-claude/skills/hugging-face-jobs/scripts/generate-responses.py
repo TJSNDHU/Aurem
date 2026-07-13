@@ -79,6 +79,88 @@ def check_gpu_availability() -> int:
     return num_gpus
 
 
+def _build_filtering_section(
+    num_skipped: int, num_examples: int, max_model_len_used: Optional[int]
+) -> str:
+    """Build the filtering statistics section for the dataset card."""
+    if num_skipped <= 0:
+        return ""
+    skip_percentage = (num_skipped / num_examples) * 100
+    processed = num_examples - num_skipped
+    return f"""
+
+### Filtering Statistics
+
+- **Total Examples**: {num_examples:,}
+- **Processed**: {processed:,} ({100 - skip_percentage:.1f}%)
+- **Skipped (too long)**: {num_skipped:,} ({skip_percentage:.1f}%)
+- **Max Model Length Used**: {max_model_len_used:,} tokens
+
+Note: Prompts exceeding the maximum model length were skipped and have empty responses."""
+
+
+def _build_sampling_params_section(sampling_params: SamplingParams) -> str:
+    """Build the sampling parameters section for the dataset card."""
+    return f"""
+### Sampling Parameters
+
+- **Temperature**: {sampling_params.temperature}
+- **Top P**: {sampling_params.top_p}
+- **Top K**: {sampling_params.top_k}
+- **Min P**: {sampling_params.min_p}
+- **Max Tokens**: {sampling_params.max_tokens}
+- **Repetition Penalty**: {sampling_params.repetition_penalty}"""
+
+
+def _build_hardware_section(tensor_parallel_size: int) -> str:
+    """Build the hardware configuration section for the dataset card."""
+    return f"""
+### Hardware Configuration
+
+- **Tensor Parallel Size**: {tensor_parallel_size}
+- **GPU Configuration**: {tensor_parallel_size} GPU(s)"""
+
+
+def _build_generation_script_section(
+    source_dataset: str,
+    model_id: str,
+    messages_column: str,
+    prompt_column: Optional[str],
+    sampling_params: SamplingParams,
+    max_model_len_used: Optional[int],
+) -> str:
+    """Build the reproduction script section for the dataset card."""
+    column_arg = (
+        f"--prompt-column {prompt_column}"
+        if prompt_column
+        else f"--messages-column {messages_column}"
+    )
+    max_len_arg = (
+        f" \\\\\\n    --max-model-len {max_model_len_used}"
+        if max_model_len_used
+        else ""
+    )
+    return f"""
+## Generation Script
+
+Generated using the vLLM inference script from [uv-scripts/vllm](https://huggingface.co/datasets/uv-scripts/vllm).
+
+To reproduce this generation:
+
+```bash
+uv run https://huggingface.co/datasets/uv-scripts/vllm/raw/main/generate-responses.py \\
+    {source_dataset} \\
+    <output-dataset> \\
+    --model-id {model_id} \\
+    {column_arg} \\
+    --temperature {sampling_params.temperature} \\
+    --top-p {sampling_params.top_p} \\
+    --top-k {sampling_params.top_k} \\
+    --max-tokens {sampling_params.max_tokens}{max_len_arg}
+```
+"""
+
+
 def create_dataset_card(
     source_dataset: str,
     model_id: str,
@@ -92,22 +174,13 @@ def create_dataset_card(
     max_model_len_used: Optional[int] = None,
 ) -> str:
     """Create a comprehensive dataset card documenting the generation process."""
-    filtering_section = ""
-    if num_skipped > 0:
-        skip_percentage = (num_skipped / num_examples) * 100
-        processed = num_examples - num_skipped
-        filtering_section = f"""
+    filtering_section = _build_filtering_section(
+        num_skipped, num_examples, max_model_len_used
+    )
+    input_column = prompt_column if prompt_column else messages_column
+    input_type = "plain text prompts" if prompt_column else "chat messages"
 
-### Filtering Statistics
-
-- **Total Examples**: {num_examples:,}
-- **Processed**: {processed:,} ({100 - skip_percentage:.1f}%)
-- **Skipped (too long)**: {num_skipped:,} ({skip_percentage:.1f}%)
-- **Max Model Length Used**: {max_model_len_used:,} tokens
-
-Note: Prompts exceeding the maximum model length were skipped and have empty responses."""
-
-    return f"""---
+    header = f"""---
 tags:
 - generated
 - vllm
@@ -121,48 +194,30 @@ This dataset contains generated responses for prompts from [{source_dataset}](ht
 ## Generation Details
 
 - **Source Dataset**: [{source_dataset}](https://huggingface.co/datasets/{source_dataset})
-- **Input Column**: `{prompt_column if prompt_column else messages_column}` ({"plain text prompts" if prompt_column else "chat messages"})
+- **Input Column**: `{input_column}` ({input_type})
 - **Model**: [{model_id}](https://huggingface.co/{model_id})
 - **Number of Examples**: {num_examples:,}
-- **Generation Date**: {generation_time}{filtering_section}
+- **Generation Date**: {generation_time}{filtering_section}"""
 
-### Sampling Parameters
+    sampling_section = _build_sampling_params_section(sampling_params)
+    hardware_section = _build_hardware_section(tensor_parallel_size)
+    script_section = _build_generation_script_section(
+        source_dataset,
+        model_id,
+        messages_column,
+        prompt_column,
+        sampling_params,
+        max_model_len_used,
+    )
 
-- **Temperature**: {sampling_params.temperature}
-- **Top P**: {sampling_params.top_p}
-- **Top K**: {sampling_params.top_k}
-- **Min P**: {sampling_params.min_p}
-- **Max Tokens**: {sampling_params.max_tokens}
-- **Repetition Penalty**: {sampling_params.repetition_penalty}
-
-### Hardware Configuration
-
-- **Tensor Parallel Size**: {tensor_parallel_size}
-- **GPU Configuration**: {tensor_parallel_size} GPU(s)
-
+    structure_section = """
 ## Dataset Structure
 
 The dataset contains all columns from the source dataset plus:
 - `response`: The generated response from the model
-
-## Generation Script
-
-Generated using the vLLM inference script from [uv-scripts/vllm](https://huggingface.co/datasets/uv-scripts/vllm).
-
-To reproduce this generation:
-
-```bash
-uv run https://huggingface.co/datasets/uv-scripts/vllm/raw/main/generate-responses.py \\
-    {source_dataset} \\
-    <output-dataset> \\
-    --model-id {model_id} \\
-    {"--prompt-column " + prompt_column if prompt_column else "--messages-column " + messages_column} \\
-    --temperature {sampling_params.temperature} \\
-    --top-p {sampling_params.top_p} \\
-    --top-k {sampling_params.top_k} \\
-    --max-tokens {sampling_params.max_tokens}{f" \\\\\\n    --max-model-len {max_model_len_used}" if max_model_len_used else ""}
-```
 """
+
+    return header + sampling_section + hardware_section + structure_section + script_section
 
 
 def main(
@@ -385,203 +440,4 @@ def main(
     # Create dataset card
     logger.info("Creating dataset card...")
     card_content = create_dataset_card(
-        source_dataset=src_dataset_hub_id,
-        model_id=model_id,
-        messages_column=messages_column,
-        prompt_column=prompt_column,
-        sampling_params=sampling_params,
-        tensor_parallel_size=tensor_parallel_size,
-        num_examples=total_examples,
-        generation_time=generation_start_time,
-        num_skipped=len(skipped_info) if skip_long_prompts else 0,
-        max_model_len_used=effective_max_len if skip_long_prompts else None,
-    )
-
-    # Push dataset to hub
-    logger.info(f"Pushing dataset to: {output_dataset_hub_id}")
-    dataset.push_to_hub(output_dataset_hub_id, token=HF_TOKEN)
-
-    # Push dataset card
-    card = DatasetCard(card_content)
-    card.push_to_hub(output_dataset_hub_id, token=HF_TOKEN)
-
-    logger.info("✅ Generation complete!")
-    logger.info(
-        f"Dataset available at: https://huggingface.co/datasets/{output_dataset_hub_id}"
-    )
-
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        parser = argparse.ArgumentParser(
-            description="Generate responses for dataset prompts using vLLM",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog="""
-Examples:
-  # Basic usage with default Qwen model
-  uv run generate-responses.py input-dataset output-dataset
-  
-  # With custom model and parameters
-  uv run generate-responses.py input-dataset output-dataset \\
-    --model-id meta-llama/Llama-3.1-8B-Instruct \\
-    --temperature 0.9 \\
-    --max-tokens 2048
-  
-  # Force specific GPU configuration
-  uv run generate-responses.py input-dataset output-dataset \\
-    --tensor-parallel-size 2 \\
-    --gpu-memory-utilization 0.95
-  
-  # Using environment variable for token
-  HF_TOKEN=hf_xxx uv run generate-responses.py input-dataset output-dataset
-            """,
-        )
-
-        parser.add_argument(
-            "src_dataset_hub_id",
-            help="Input dataset on Hugging Face Hub (e.g., username/dataset-name)",
-        )
-        parser.add_argument(
-            "output_dataset_hub_id", help="Output dataset name on Hugging Face Hub"
-        )
-        parser.add_argument(
-            "--model-id",
-            type=str,
-            default="Qwen/Qwen3-30B-A3B-Instruct-2507",
-            help="Model to use for generation (default: Qwen3-30B-A3B-Instruct-2507)",
-        )
-        parser.add_argument(
-            "--messages-column",
-            type=str,
-            default="messages",
-            help="Column containing chat messages (default: messages)",
-        )
-        parser.add_argument(
-            "--prompt-column",
-            type=str,
-            help="Column containing plain text prompts (alternative to --messages-column)",
-        )
-        parser.add_argument(
-            "--output-column",
-            type=str,
-            default="response",
-            help="Column name for generated responses (default: response)",
-        )
-        parser.add_argument(
-            "--max-samples",
-            type=int,
-            help="Maximum number of samples to process (default: all)",
-        )
-        parser.add_argument(
-            "--temperature",
-            type=float,
-            default=0.7,
-            help="Sampling temperature (default: 0.7)",
-        )
-        parser.add_argument(
-            "--top-p",
-            type=float,
-            default=0.8,
-            help="Top-p sampling parameter (default: 0.8)",
-        )
-        parser.add_argument(
-            "--top-k",
-            type=int,
-            default=20,
-            help="Top-k sampling parameter (default: 20)",
-        )
-        parser.add_argument(
-            "--min-p",
-            type=float,
-            default=0.0,
-            help="Minimum probability threshold (default: 0.0)",
-        )
-        parser.add_argument(
-            "--max-tokens",
-            type=int,
-            default=16384,
-            help="Maximum tokens to generate (default: 16384)",
-        )
-        parser.add_argument(
-            "--repetition-penalty",
-            type=float,
-            default=1.0,
-            help="Repetition penalty (default: 1.0)",
-        )
-        parser.add_argument(
-            "--gpu-memory-utilization",
-            type=float,
-            default=0.90,
-            help="GPU memory utilization factor (default: 0.90)",
-        )
-        parser.add_argument(
-            "--max-model-len",
-            type=int,
-            help="Maximum model context length (default: model's default)",
-        )
-        parser.add_argument(
-            "--tensor-parallel-size",
-            type=int,
-            help="Number of GPUs to use (default: auto-detect)",
-        )
-        parser.add_argument(
-            "--hf-token",
-            type=str,
-            help="Hugging Face token (can also use HF_TOKEN env var)",
-        )
-        parser.add_argument(
-            "--skip-long-prompts",
-            action="store_true",
-            default=True,
-            help="Skip prompts that exceed max_model_len instead of failing (default: True)",
-        )
-        parser.add_argument(
-            "--no-skip-long-prompts",
-            dest="skip_long_prompts",
-            action="store_false",
-            help="Fail on prompts that exceed max_model_len",
-        )
-
-        args = parser.parse_args()
-
-        main(
-            src_dataset_hub_id=args.src_dataset_hub_id,
-            output_dataset_hub_id=args.output_dataset_hub_id,
-            model_id=args.model_id,
-            messages_column=args.messages_column,
-            prompt_column=args.prompt_column,
-            output_column=args.output_column,
-            temperature=args.temperature,
-            top_p=args.top_p,
-            top_k=args.top_k,
-            min_p=args.min_p,
-            max_tokens=args.max_tokens,
-            repetition_penalty=args.repetition_penalty,
-            gpu_memory_utilization=args.gpu_memory_utilization,
-            max_model_len=args.max_model_len,
-            tensor_parallel_size=args.tensor_parallel_size,
-            skip_long_prompts=args.skip_long_prompts,
-            max_samples=args.max_samples,
-            hf_token=args.hf_token,
-        )
-    else:
-        # Show HF Jobs example when run without arguments
-        print("""
-vLLM Response Generation Script
-==============================
-
-This script requires arguments. For usage information:
-    uv run generate-responses.py --help
-
-Example HF Jobs command with multi-GPU:
-    # If you're logged in with hf auth, token will be auto-detected
-    hf jobs uv run \\
-        --flavor l4x4 \\
-        https://huggingface.co/datasets/uv-scripts/vllm/raw/main/generate-responses.py \\
-        username/input-dataset \\
-        username/output-dataset \\
-        --messages-column messages \\
-        --model-id Qwen/Qwen3-30B-A3B-Instruct-2507 \\
-        --temperature 0.7 \\
-        --max-tokens 16384
-        """)
+        source
