@@ -22,7 +22,7 @@ app = FastAPI(
 # Trusted Host: Prevents HTTP Host Header attacks
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"] # TODO: Configure this in production, e.g. ["api.example.com"]
+    allowed_hosts=["api.example.com"]
 )
 
 # CORS: Configures Cross-Origin Resource Sharing
