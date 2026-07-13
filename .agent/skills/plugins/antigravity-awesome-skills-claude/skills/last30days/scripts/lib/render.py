@@ -34,32 +34,19 @@ def _assess_data_freshness(report: schema.Report) -> dict:
     }
 
 
-def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "none") -> str:
-    """Render compact output for Claude to synthesize.
-
-    Args:
-        report: Report data
-        limit: Max items per source
-        missing_keys: 'both', 'reddit', 'x', or 'none'
-
-    Returns:
-        Compact markdown string
-    """
+def _render_compact_header(report: schema.Report, freshness: dict, missing_keys: str) -> List[str]:
+    """Render the header section of compact output."""
     lines = []
 
-    # Header
     lines.append(f"## Research Results: {report.topic}")
     lines.append("")
 
-    # Assess data freshness and add honesty warning if needed
-    freshness = _assess_data_freshness(report)
     if freshness["is_sparse"]:
         lines.append("**⚠️ LIMITED RECENT DATA** - Few discussions from the last 30 days.")
         lines.append(f"Only {freshness['total_recent']} item(s) confirmed from {report.range_from} to {report.range_to}.")
         lines.append("Results below may include older/evergreen content. Be transparent with the user about this.")
         lines.append("")
 
-    # Web-only mode banner (when no API keys)
     if report.mode == "web-only":
         lines.append("**🌐 WEB SEARCH MODE** - Claude will search blogs, docs & news")
         lines.append("")
@@ -71,7 +58,6 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append("---")
         lines.append("")
 
-    # Cache indicator
     if report.from_cache:
         age_str = f"{report.cache_age_hours:.1f}h old" if report.cache_age_hours else "cached"
         lines.append(f"**⚡ CACHED RESULTS** ({age_str}) - use `--refresh` for fresh data")
@@ -85,7 +71,6 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append(f"**xAI Model:** {report.xai_model_used}")
     lines.append("")
 
-    # Coverage note for partial coverage
     if report.mode == "reddit-only" and missing_keys == "x":
         lines.append("*💡 Tip: Add XAI_API_KEY for X/Twitter data and better triangulation.*")
         lines.append("")
@@ -93,7 +78,13 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append("*💡 Tip: Add OPENAI_API_KEY for Reddit data and better triangulation.*")
         lines.append("")
 
-    # Reddit items
+    return lines
+
+
+def _render_reddit_section(report: schema.Report, limit: int) -> List[str]:
+    """Render the Reddit section of compact output."""
+    lines = []
+
     if report.reddit_error:
         lines.append("### Reddit Threads")
         lines.append("")
@@ -135,7 +126,13 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
 
             lines.append("")
 
-    # X items
+    return lines
+
+
+def _render_x_section(report: schema.Report, limit: int) -> List[str]:
+    """Render the X posts section of compact output."""
+    lines = []
+
     if report.x_error:
         lines.append("### X Posts")
         lines.append("")
@@ -170,7 +167,13 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
             lines.append(f"  *{item.why_relevant}*")
             lines.append("")
 
-    # Web items (if any - populated by Claude)
+    return lines
+
+
+def _render_web_section(report: schema.Report, limit: int) -> List[str]:
+    """Render the Web results section of compact output."""
+    lines = []
+
     if report.web_error:
         lines.append("### Web Results")
         lines.append("")
@@ -189,6 +192,27 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
             lines.append(f"  {item.snippet[:150]}...")
             lines.append(f"  *{item.why_relevant}*")
             lines.append("")
+
+    return lines
+
+
+def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "none") -> str:
+    """Render compact output for Claude to synthesize.
+
+    Args:
+        report: Report data
+        limit: Max items per source
+        missing_keys: 'both', 'reddit', 'x', or 'none'
+
+    Returns:
+        Compact markdown string
+    """
+    freshness = _assess_data_freshness(report)
+
+    lines = _render_compact_header(report, freshness, missing_keys)
+    lines.extend(_render_reddit_section(report, limit))
+    lines.extend(_render_x_section(report, limit))
+    lines.extend(_render_web_section(report, limit))
 
     return "\n".join(lines)
 
