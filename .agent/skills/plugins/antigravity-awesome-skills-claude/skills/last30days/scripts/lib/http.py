@@ -31,6 +31,84 @@ class HTTPError(Exception):
         self.body = body
 
 
+def _build_request(
+    method: str,
+    url: str,
+    headers: Optional[Dict[str, str]],
+    json_data: Optional[Dict[str, Any]],
+) -> urllib.request.Request:
+    """Build a urllib Request object from parameters."""
+    headers = headers or {}
+    headers.setdefault("User-Agent", USER_AGENT)
+
+    data = None
+    if json_data is not None:
+        data = json.dumps(json_data).encode('utf-8')
+        headers.setdefault("Content-Type", "application/json")
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+
+    log(f"{method} {url}")
+    if json_data:
+        log(f"Payload keys: {list(json_data.keys())}")
+
+    return req
+
+
+def _read_http_error_body(e: urllib.error.HTTPError) -> Optional[str]:
+    """Read the body from an HTTPError, returning None on failure."""
+    try:
+        return e.read().decode('utf-8')
+    except:
+        return None
+
+
+def _attempt_request(
+    req: urllib.request.Request,
+    timeout: int,
+) -> Dict[str, Any]:
+    """Execute a single request attempt, returning parsed JSON or raising."""
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        body = response.read().decode('utf-8')
+        log(f"Response: {response.status} ({len(body)} bytes)")
+        return json.loads(body) if body else {}
+
+
+def _handle_http_error(
+    e: urllib.error.HTTPError,
+    attempt: int,
+    retries: int,
+) -> HTTPError:
+    """Handle an HTTPError, raising immediately for non-retryable errors."""
+    body = _read_http_error_body(e)
+    log(f"HTTP Error {e.code}: {e.reason}")
+    if body:
+        log(f"Error body: {body[:500]}")
+    error = HTTPError(f"HTTP {e.code}: {e.reason}", e.code, body)
+
+    # Don't retry client errors (4xx) except rate limits
+    if 400 <= e.code < 500 and e.code != 429:
+        raise error
+
+    if attempt < retries - 1:
+        time.sleep(RETRY_DELAY * (attempt + 1))
+
+    return error
+
+
+def _handle_retryable_error(
+    e: Exception,
+    attempt: int,
+    retries: int,
+) -> HTTPError:
+    """Handle a retryable error (URLError, OSError, etc.)."""
+    log(f"{type(e).__name__}: {e}")
+    error = HTTPError(f"{type(e).__name__}: {e}")
+    if attempt < retries - 1:
+        time.sleep(RETRY_DELAY * (attempt + 1))
+    return error
+
+
 def request(
     method: str,
     url: str,
@@ -55,59 +133,22 @@ def request(
     Raises:
         HTTPError: On request failure
     """
-    headers = headers or {}
-    headers.setdefault("User-Agent", USER_AGENT)
-
-    data = None
-    if json_data is not None:
-        data = json.dumps(json_data).encode('utf-8')
-        headers.setdefault("Content-Type", "application/json")
-
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-
-    log(f"{method} {url}")
-    if json_data:
-        log(f"Payload keys: {list(json_data.keys())}")
+    req = _build_request(method, url, headers, json_data)
 
     last_error = None
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                body = response.read().decode('utf-8')
-                log(f"Response: {response.status} ({len(body)} bytes)")
-                return json.loads(body) if body else {}
+            return _attempt_request(req, timeout)
         except urllib.error.HTTPError as e:
-            body = None
-            try:
-                body = e.read().decode('utf-8')
-            except:
-                pass
-            log(f"HTTP Error {e.code}: {e.reason}")
-            if body:
-                log(f"Error body: {body[:500]}")
-            last_error = HTTPError(f"HTTP {e.code}: {e.reason}", e.code, body)
-
-            # Don't retry client errors (4xx) except rate limits
-            if 400 <= e.code < 500 and e.code != 429:
-                raise last_error
-
-            if attempt < retries - 1:
-                time.sleep(RETRY_DELAY * (attempt + 1))
+            last_error = _handle_http_error(e, attempt, retries)
         except urllib.error.URLError as e:
-            log(f"URL Error: {e.reason}")
-            last_error = HTTPError(f"URL Error: {e.reason}")
-            if attempt < retries - 1:
-                time.sleep(RETRY_DELAY * (attempt + 1))
+            last_error = _handle_retryable_error(e, attempt, retries)
         except json.JSONDecodeError as e:
             log(f"JSON decode error: {e}")
             last_error = HTTPError(f"Invalid JSON response: {e}")
             raise last_error
         except (OSError, TimeoutError, ConnectionResetError) as e:
-            # Handle socket-level errors (connection reset, timeout, etc.)
-            log(f"Connection error: {type(e).__name__}: {e}")
-            last_error = HTTPError(f"Connection error: {type(e).__name__}: {e}")
-            if attempt < retries - 1:
-                time.sleep(RETRY_DELAY * (attempt + 1))
+            last_error = _handle_retryable_error(e, attempt, retries)
 
     if last_error:
         raise last_error
