@@ -109,76 +109,88 @@ class XMLEditor:
             elem = editor.get_node(tag="w:t", contains="&#8220;Agreement")  # Entity notation
             elem = editor.get_node(tag="w:t", contains="\u201cAgreement")   # Unicode character
         """
-        matches = []
-        for elem in self.dom.getElementsByTagName(tag):
-            # Check line_number filter
-            if line_number is not None:
-                parse_pos = getattr(elem, "parse_position", (None,))
-                elem_line = parse_pos[0]
-
-                # Handle both single line number and range
-                if isinstance(line_number, range):
-                    if elem_line not in line_number:
-                        continue
-                else:
-                    if elem_line != line_number:
-                        continue
-
-            # Check attrs filter
-            if attrs is not None:
-                if not all(
-                    elem.getAttribute(attr_name) == attr_value
-                    for attr_name, attr_value in attrs.items()
-                ):
-                    continue
-
-            # Check contains filter
-            if contains is not None:
-                elem_text = self._get_element_text(elem)
-                # Normalize the search string: convert HTML entities to Unicode characters
-                # This allows searching for both "&#8220;Rowan" and ""Rowan"
-                normalized_contains = html.unescape(contains)
-                if normalized_contains not in elem_text:
-                    continue
-
-            # If all applicable filters passed, this is a match
-            matches.append(elem)
+        matches = self._find_matching_nodes(tag, attrs, line_number, contains)
 
         if not matches:
-            # Build descriptive error message
-            filters = []
-            if line_number is not None:
-                line_str = (
-                    f"lines {line_number.start}-{line_number.stop - 1}"
-                    if isinstance(line_number, range)
-                    else f"line {line_number}"
-                )
-                filters.append(f"at {line_str}")
-            if attrs is not None:
-                filters.append(f"with attributes {attrs}")
-            if contains is not None:
-                filters.append(f"containing '{contains}'")
-
-            filter_desc = " ".join(filters) if filters else ""
-            base_msg = f"Node not found: <{tag}> {filter_desc}".strip()
-
-            # Add helpful hint based on filters used
-            if contains:
-                hint = "Text may be split across elements or use different wording."
-            elif line_number:
-                hint = "Line numbers may have changed if document was modified."
-            elif attrs:
-                hint = "Verify attribute values are correct."
-            else:
-                hint = "Try adding filters (attrs, line_number, or contains)."
-
-            raise ValueError(f"{base_msg}. {hint}")
+            raise ValueError(self._build_not_found_error(tag, attrs, line_number, contains))
         if len(matches) > 1:
             raise ValueError(
                 f"Multiple nodes found: <{tag}>. "
                 f"Add more filters (attrs, line_number, or contains) to narrow the search."
             )
         return matches[0]
+
+    def _find_matching_nodes(self, tag, attrs, line_number, contains):
+        """Find all elements matching the given filters."""
+        matches = []
+        for elem in self.dom.getElementsByTagName(tag):
+            if not self._matches_line_number(elem, line_number):
+                continue
+            if not self._matches_attrs(elem, attrs):
+                continue
+            if not self._matches_contains(elem, contains):
+                continue
+            matches.append(elem)
+        return matches
+
+    def _matches_line_number(self, elem, line_number):
+        """Check if element matches the line_number filter."""
+        if line_number is None:
+            return True
+        parse_pos = getattr(elem, "parse_position", (None,))
+        elem_line = parse_pos[0]
+        if isinstance(line_number, range):
+            return elem_line in line_number
+        return elem_line == line_number
+
+    def _matches_attrs(self, elem, attrs):
+        """Check if element matches the attrs filter."""
+        if attrs is None:
+            return True
+        return all(
+            elem.getAttribute(attr_name) == attr_value
+            for attr_name, attr_value in attrs.items()
+        )
+
+    def _matches_contains(self, elem, contains):
+        """Check if element matches the contains filter."""
+        if contains is None:
+            return True
+        elem_text = self._get_element_text(elem)
+        # Normalize the search string: convert HTML entities to Unicode characters
+        # This allows searching for both "&#8220;Rowan" and ""Rowan"
+        normalized_contains = html.unescape(contains)
+        return normalized_contains in elem_text
+
+    def _build_not_found_error(self, tag, attrs, line_number, contains):
+        """Build a descriptive error message for when no node is found."""
+        filters = []
+        if line_number is not None:
+            line_str = (
+                f"lines {line_number.start}-{line_number.stop - 1}"
+                if isinstance(line_number, range)
+                else f"line {line_number}"
+            )
+            filters.append(f"at {line_str}")
+        if attrs is not None:
+            filters.append(f"with attributes {attrs}")
+        if contains is not None:
+            filters.append(f"containing '{contains}'")
+
+        filter_desc = " ".join(filters) if filters else ""
+        base_msg = f"Node not found: <{tag}> {filter_desc}".strip()
+
+        # Add helpful hint based on filters used
+        if contains:
+            hint = "Text may be split across elements or use different wording."
+        elif line_number:
+            hint = "Line numbers may have changed if document was modified."
+        elif attrs:
+            hint = "Verify attribute values are correct."
+        else:
+            hint = "Try adding filters (attrs, line_number, or contains)."
+
+        return f"{base_msg}. {hint}"
 
     def _get_element_text(self, elem):
         """
