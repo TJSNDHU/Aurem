@@ -223,15 +223,17 @@ class Report:
             d['cache_age_hours'] = self.cache_age_hours
         return d
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Report":
-        """Create Report from serialized dict (handles cache format)."""
-        # Handle range field conversion
+    @staticmethod
+    def _parse_range(data: Dict[str, Any]) -> tuple:
+        """Extract range_from and range_to from serialized data."""
         range_data = data.get('range', {})
         range_from = range_data.get('from', data.get('range_from', ''))
         range_to = range_data.get('to', data.get('range_to', ''))
+        return range_from, range_to
 
-        # Reconstruct Reddit items
+    @staticmethod
+    def _parse_reddit_items(data: Dict[str, Any]) -> List[RedditItem]:
+        """Reconstruct Reddit items from serialized data."""
         reddit_items = []
         for r in data.get('reddit', []):
             eng = None
@@ -254,8 +256,11 @@ class Report:
                 subs=subs,
                 score=r.get('score', 0),
             ))
+        return reddit_items
 
-        # Reconstruct X items
+    @staticmethod
+    def _parse_x_items(data: Dict[str, Any]) -> List[XItem]:
+        """Reconstruct X items from serialized data."""
         x_items = []
         for x in data.get('x', []):
             eng = None
@@ -275,8 +280,11 @@ class Report:
                 subs=subs,
                 score=x.get('score', 0),
             ))
+        return x_items
 
-        # Reconstruct Web items
+    @staticmethod
+    def _parse_web_items(data: Dict[str, Any]) -> List[WebSearchItem]:
+        """Reconstruct Web search items from serialized data."""
         web_items = []
         for w in data.get('web', []):
             subs = SubScores(**w.get('subs', {})) if w.get('subs') else SubScores()
@@ -293,6 +301,15 @@ class Report:
                 subs=subs,
                 score=w.get('score', 0),
             ))
+        return web_items
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Report":
+        """Create Report from serialized dict (handles cache format)."""
+        range_from, range_to = cls._parse_range(data)
+        reddit_items = cls._parse_reddit_items(data)
+        x_items = cls._parse_x_items(data)
+        web_items = cls._parse_web_items(data)
 
         return cls(
             topic=data['topic'],
