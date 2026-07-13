@@ -36,6 +36,49 @@ class JucemgScraper(AbstractJuntaScraper):
     # URL da lista por antiguidade com tabela (nome + matricula)
     _URL_ANT = "https://jucemg.mg.gov.br/pagina/141/leiloeiros-antiguidade"
 
+    def _collect_paragraph_lines(self, p, strong, nome_raw) -> List[str]:
+        """Coleta linhas de texto do paragrafo apos o elemento <strong>."""
+        lines = []
+        for el in p.children:
+            if el == strong:
+                continue
+            if hasattr(el, "get_text"):
+                line = self.clean(el.get_text())
+            elif isinstance(el, str):
+                line = self.clean(str(el))
+            else:
+                continue
+            if line and line != nome_raw:
+                lines.append(line)
+        return lines
+
+    def _parse_line_into_record(self, line: str, record: dict) -> None:
+        """Atualiza *record* com dados extraidos de uma linha de texto."""
+        m = RE_MATRICULA_MG.search(line)
+        if m:
+            record["matricula"] = m.group(1) or m.group(3)
+            if m.group(2):
+                record["data_registro"] = m.group(2)
+            return
+        m = RE_TELEFONE.search(line)
+        if m:
+            record["telefone"] = self.clean(m.group(1))
+            return
+        m = RE_EMAIL.search(line)
+        if m:
+            record["email"] = self.clean(m.group(1))
+            return
+        # Linha de endereco: contem cidade/MG ou CEP
+        if (re.search(r"/\s*MG\b|\bMG\s*,?\s*CEP|CEP\s*\d", line) or
+                (len(line) > 10 and not RE_PREPOSTO.match(line) and
+                 not RE_SITE.match(line) and
+                 not record.get("endereco"))):
+            m_cidade = re.search(r"([A-ZÁÉÍÓÚÀÃÕÇ][A-Za-záéíóúàãõç\s]+)\s*-?\s*MG", line)
+            if m_cidade:
+                record["municipio"] = m_cidade.group(1).strip()
+            if not record.get("endereco"):
+                record["endereco"] = line
+
     def _parse_alfabetica(self, soup) -> List[dict]:
         """
         Parseia a pagina /pagina/140 (ordem alfabetica).
@@ -71,19 +114,7 @@ class JucemgScraper(AbstractJuntaScraper):
                 situacao = status_match.group(0).strip("()")
                 nome_raw = RE_STATUS_INLINE.sub("", nome_raw).strip()
 
-            # Coletar linhas do paragrafo (apos o <strong>)
-            lines = []
-            for el in p.children:
-                if el == strong:
-                    continue
-                if hasattr(el, "get_text"):
-                    line = self.clean(el.get_text())
-                elif isinstance(el, str):
-                    line = self.clean(str(el))
-                else:
-                    continue
-                if line and line != nome_raw:
-                    lines.append(line)
+            lines = self._collect_paragraph_lines(p, strong, nome_raw)
 
             record = {
                 "nome": nome_raw,
@@ -92,30 +123,7 @@ class JucemgScraper(AbstractJuntaScraper):
             }
 
             for line in lines:
-                m = RE_MATRICULA_MG.search(line)
-                if m:
-                    record["matricula"] = m.group(1) or m.group(3)
-                    if m.group(2):
-                        record["data_registro"] = m.group(2)
-                    continue
-                m = RE_TELEFONE.search(line)
-                if m:
-                    record["telefone"] = self.clean(m.group(1))
-                    continue
-                m = RE_EMAIL.search(line)
-                if m:
-                    record["email"] = self.clean(m.group(1))
-                    continue
-                # Linha de endereco: contem cidade/MG ou CEP
-                if (re.search(r"/\s*MG\b|\bMG\s*,?\s*CEP|CEP\s*\d", line) or
-                        (len(line) > 10 and not RE_PREPOSTO.match(line) and
-                         not RE_SITE.match(line) and
-                         not record.get("endereco"))):
-                    m_cidade = re.search(r"([A-ZÁÉÍÓÚÀÃÕÇ][A-Za-záéíóúàãõç\s]+)\s*-?\s*MG", line)
-                    if m_cidade:
-                        record["municipio"] = m_cidade.group(1).strip()
-                    if not record.get("endereco"):
-                        record["endereco"] = line
+                self._parse_line_into_record(line, record)
 
             records.append(record)
 
