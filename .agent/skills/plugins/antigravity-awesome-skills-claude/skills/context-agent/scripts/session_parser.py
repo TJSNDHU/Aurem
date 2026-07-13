@@ -30,17 +30,59 @@ def parse_session_file(path: Path) -> list[SessionEntry]:
     return entries
 
 
+def _parse_queue_operation(raw: dict) -> Optional[SessionEntry]:
+    """Converte uma entrada queue-operation em SessionEntry."""
+    return SessionEntry(
+        type="queue",
+        timestamp=raw.get("timestamp", ""),
+        session_id=raw.get("sessionId", ""),
+        content=raw.get("content", ""),
+    )
+
+
+def _parse_content_block(block: dict, text_parts: list, tool_calls: list, files_modified: list) -> None:
+    """Processa um bloco de conteúdo, populando text_parts, tool_calls e files_modified."""
+    block_type = block.get("type", "")
+    if block_type == "text":
+        text_parts.append(block.get("text", ""))
+    elif block_type == "tool_use":
+        tool_name = block.get("name", "")
+        tool_input = block.get("input", {})
+        tool_calls.append({"name": tool_name, "input": tool_input})
+        # Detectar arquivos modificados
+        if tool_name in FILE_MODIFYING_TOOLS:
+            fp = tool_input.get("file_path", "")
+            if fp:
+                files_modified.append({"path": fp, "action": tool_name.lower()})
+    elif block_type == "tool_result":
+        # Resultados de ferramentas (em mensagens do user)
+        result_content = block.get("content", "")
+        if isinstance(result_content, list):
+            for rc in result_content:
+                if isinstance(rc, dict) and rc.get("type") == "text":
+                    text_parts.append(rc.get("text", ""))
+        elif isinstance(result_content, str):
+            text_parts.append(result_content)
+
+
+def _parse_token_usage(usage: dict) -> dict:
+    """Extrai métricas de uso de tokens do dict de usage."""
+    if not usage:
+        return {}
+    return {
+        "input": usage.get("input_tokens", 0),
+        "output": usage.get("output_tokens", 0),
+        "cache_read": usage.get("cache_read_input_tokens", 0),
+        "cache_creation": usage.get("cache_creation_input_tokens", 0),
+    }
+
+
 def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
     """Converte um dict JSON bruto em SessionEntry."""
     entry_type = raw.get("type", "")
 
     if entry_type == "queue-operation":
-        return SessionEntry(
-            type="queue",
-            timestamp=raw.get("timestamp", ""),
-            session_id=raw.get("sessionId", ""),
-            content=raw.get("content", ""),
-        )
+        return _parse_queue_operation(raw)
 
     if entry_type not in ("user", "assistant"):
         return None
@@ -62,40 +104,10 @@ def _parse_raw_entry(raw: dict) -> Optional[SessionEntry]:
         text_parts.append(content)
     elif isinstance(content, list):
         for block in content:
-            if not isinstance(block, dict):
-                continue
-            block_type = block.get("type", "")
-            if block_type == "text":
-                text_parts.append(block.get("text", ""))
-            elif block_type == "tool_use":
-                tool_name = block.get("name", "")
-                tool_input = block.get("input", {})
-                tool_calls.append({"name": tool_name, "input": tool_input})
-                # Detectar arquivos modificados
-                if tool_name in FILE_MODIFYING_TOOLS:
-                    fp = tool_input.get("file_path", "")
-                    if fp:
-                        files_modified.append({"path": fp, "action": tool_name.lower()})
-            elif block_type == "tool_result":
-                # Resultados de ferramentas (em mensagens do user)
-                result_content = block.get("content", "")
-                if isinstance(result_content, list):
-                    for rc in result_content:
-                        if isinstance(rc, dict) and rc.get("type") == "text":
-                            text_parts.append(rc.get("text", ""))
-                elif isinstance(result_content, str):
-                    text_parts.append(result_content)
+            if isinstance(block, dict):
+                _parse_content_block(block, text_parts, tool_calls, files_modified)
 
-    # Token usage
-    usage = msg.get("usage", {})
-    token_usage = {}
-    if usage:
-        token_usage = {
-            "input": usage.get("input_tokens", 0),
-            "output": usage.get("output_tokens", 0),
-            "cache_read": usage.get("cache_read_input_tokens", 0),
-            "cache_creation": usage.get("cache_creation_input_tokens", 0),
-        }
+    token_usage = _parse_token_usage(msg.get("usage", {}))
 
     return SessionEntry(
         type=entry_type,
