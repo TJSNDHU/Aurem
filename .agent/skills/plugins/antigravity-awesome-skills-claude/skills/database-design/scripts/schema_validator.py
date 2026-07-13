@@ -91,33 +91,32 @@ def validate_prisma_schema(file_path: Path) -> list:
     return issues
 
 
-def main():
-    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
-    
+def print_header(project_path: Path) -> None:
+    """Print the script header."""
     print(f"\n{'='*60}")
     print(f"[SCHEMA VALIDATOR] Database Schema Validation")
     print(f"{'='*60}")
     print(f"Project: {project_path}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-"*60)
-    
-    # Find schema files
-    schemas = find_schema_files(project_path)
-    print(f"Found {len(schemas)} schema files")
-    
-    if not schemas:
-        output = {
-            "script": "schema_validator",
-            "project": str(project_path),
-            "schemas_checked": 0,
-            "issues_found": 0,
-            "passed": True,
-            "message": "No schema files found"
-        }
-        print(json.dumps(output, indent=2))
-        sys.exit(0)
-    
-    # Validate each schema
+
+
+def handle_no_schemas(project_path: Path) -> None:
+    """Handle the case where no schema files are found."""
+    output = {
+        "script": "schema_validator",
+        "project": str(project_path),
+        "schemas_checked": 0,
+        "issues_found": 0,
+        "passed": True,
+        "message": "No schema files found"
+    }
+    print(json.dumps(output, indent=2))
+    sys.exit(0)
+
+
+def validate_schemas(schemas: list) -> list:
+    """Validate each schema file and return all issues."""
     all_issues = []
     
     for schema_type, file_path in schemas:
@@ -135,7 +134,11 @@ def main():
                 "issues": issues
             })
     
-    # Summary
+    return all_issues
+
+
+def print_summary(all_issues: list) -> None:
+    """Print the schema issues summary."""
     print("\n" + "="*60)
     print("SCHEMA ISSUES")
     print("="*60)
@@ -149,6 +152,25 @@ def main():
                 print(f"  ... and {len(item['issues']) - 5} more issues")
     else:
         print("No schema issues found!")
+
+
+def main():
+    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
+    
+    print_header(project_path)
+    
+    # Find schema files
+    schemas = find_schema_files(project_path)
+    print(f"Found {len(schemas)} schema files")
+    
+    if not schemas:
+        handle_no_schemas(project_path)
+    
+    # Validate each schema
+    all_issues = validate_schemas(schemas)
+    
+    # Summary
+    print_summary(all_issues)
     
     total_issues = sum(len(item["issues"]) for item in all_issues)
     # Schema issues are warnings, not failures
