@@ -233,87 +233,49 @@ def _extract_findings(assistant_messages: list[str]) -> list[str]:
     return list(dict.fromkeys(findings))[:5]
 
 
-def save_session_summary(summary: SessionSummary):
-    """Salva resumo como arquivo markdown."""
-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    path = SESSIONS_DIR / f"session-{summary.session_number:03d}.md"
-
-    lines = [
+def _format_session_header(summary: SessionSummary) -> list[str]:
+    """Formata o cabeçalho da sessão."""
+    return [
         f"# Sessão {summary.session_number:03d} — {summary.date}",
         f"**Slug:** {summary.slug} | **Duração:** ~{summary.duration_minutes}min | **Modelo:** {summary.model}",
         "",
     ]
 
-    if summary.topics:
-        lines.append("## Tópicos")
-        for t in summary.topics:
-            lines.append(f"- {t}")
-        lines.append("")
 
-    if summary.decisions:
-        lines.append("## Decisões")
-        for d in summary.decisions:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    if summary.tasks_completed:
-        lines.append("## Tarefas Concluídas")
-        for t in summary.tasks_completed:
-            lines.append(f"- [x] {t}")
-        lines.append("")
-
-    if summary.tasks_pending:
-        lines.append("## Tarefas Pendentes")
-        for t in summary.tasks_pending:
-            if isinstance(t, PendingTask):
-                lines.append(f"- [ ] {t.description} (prioridade: {t.priority})")
-            else:
-                lines.append(f"- [ ] {t}")
-        lines.append("")
-
-    if summary.files_modified:
-        lines.append("## Arquivos Modificados")
-        for f in summary.files_modified:
-            lines.append(f"- `{f['path']}` — {f['action']}")
-        lines.append("")
-
-    if summary.key_findings:
-        lines.append("## Descobertas")
-        for f in summary.key_findings:
-            lines.append(f"- {f}")
-        lines.append("")
-
-    if summary.errors_resolved:
-        lines.append("## Erros Resolvidos")
-        for e in summary.errors_resolved:
-            lines.append(f"- {e['error']}")
-        lines.append("")
-
-    if summary.open_questions:
-        lines.append("## Questões em Aberto")
-        for q in summary.open_questions:
-            lines.append(f"- {q}")
-        lines.append("")
-
-    if summary.technical_debt:
-        lines.append("## Dívida Técnica")
-        for d in summary.technical_debt:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    lines.append("## Métricas")
-    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
-    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
-    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
-    lines.append(f"- Mensagens: {summary.message_count}")
-    lines.append(f"- Tool calls: {summary.tool_call_count}")
+def _format_topics_section(summary: SessionSummary) -> list[str]:
+    """Formata a seção de tópicos."""
+    if not summary.topics:
+        return []
+    lines = ["## Tópicos"]
+    for t in summary.topics:
+        lines.append(f"- {t}")
     lines.append("")
+    return lines
 
-    # Link para sessão anterior
-    if summary.session_number > 1:
-        prev = summary.session_number - 1
-        lines.append("---")
-        lines.append(f"*Sessão anterior: [session-{prev:03d}](session-{prev:03d}.md)*")
 
-    path.write_text("\n".join(lines), encoding="utf-8")
-    return path
+def _format_decisions_section(summary: SessionSummary) -> list[str]:
+    """Formata a seção de decisões."""
+    if not summary.decisions:
+        return []
+    lines = ["## Decisões"]
+    for d in summary.decisions:
+        lines.append(f"- {d}")
+    lines.append("")
+    return lines
+
+
+def _format_completed_tasks_section(summary: SessionSummary) -> list[str]:
+    """Formata a seção de tarefas concluídas."""
+    if not summary.tasks_completed:
+        return []
+    lines = ["## Tarefas Concluídas"]
+    for t in summary.tasks_completed:
+        lines.append(f"- [x] {t}")
+    lines.append("")
+    return lines
+
+
+def _format_pending_tasks_section(summary: SessionSummary) -> list[str]:
+    """Formata a seção de tarefas pendentes."""
+    if not summary.tasks_pending:
+        return []
