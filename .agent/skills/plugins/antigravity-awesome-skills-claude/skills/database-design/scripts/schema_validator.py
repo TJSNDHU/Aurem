@@ -91,15 +91,59 @@ def validate_prisma_schema(file_path: Path) -> list:
     return issues
 
 
-def main():
-    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
-    
+def print_header(project_path: Path):
+    """Print script header."""
     print(f"\n{'='*60}")
     print(f"[SCHEMA VALIDATOR] Database Schema Validation")
     print(f"{'='*60}")
     print(f"Project: {project_path}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-"*60)
+
+
+def validate_schemas(schemas: list) -> list:
+    """Validate each schema file and return all issues."""
+    all_issues = []
+    
+    for schema_type, file_path in schemas:
+        print(f"\nValidating: {file_path.name} ({schema_type})")
+        
+        if schema_type == 'prisma':
+            issues = validate_prisma_schema(file_path)
+        else:
+            issues = []  # Drizzle validation could be added
+        
+        if issues:
+            all_issues.append({
+                "file": str(file_path.name),
+                "type": schema_type,
+                "issues": issues
+            })
+    
+    return all_issues
+
+
+def print_summary(all_issues: list):
+    """Print schema issues summary."""
+    print("\n" + "="*60)
+    print("SCHEMA ISSUES")
+    print("="*60)
+    
+    if all_issues:
+        for item in all_issues:
+            print(f"\n{item['file']} ({item['type']}):")
+            for issue in item["issues"][:5]:  # Limit per file
+                print(f"  - {issue}")
+            if len(item["issues"]) > 5:
+                print(f"  ... and {len(item['issues']) - 5} more issues")
+    else:
+        print("No schema issues found!")
+
+
+def main():
+    project_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
+    
+    print_header(project_path)
     
     # Find schema files
     schemas = find_schema_files(project_path)
@@ -118,37 +162,10 @@ def main():
         sys.exit(0)
     
     # Validate each schema
-    all_issues = []
-    
-    for schema_type, file_path in schemas:
-        print(f"\nValidating: {file_path.name} ({schema_type})")
-        
-        if schema_type == 'prisma':
-            issues = validate_prisma_schema(file_path)
-        else:
-            issues = []  # Drizzle validation could be added
-        
-        if issues:
-            all_issues.append({
-                "file": str(file_path.name),
-                "type": schema_type,
-                "issues": issues
-            })
+    all_issues = validate_schemas(schemas)
     
     # Summary
-    print("\n" + "="*60)
-    print("SCHEMA ISSUES")
-    print("="*60)
-    
-    if all_issues:
-        for item in all_issues:
-            print(f"\n{item['file']} ({item['type']}):")
-            for issue in item["issues"][:5]:  # Limit per file
-                print(f"  - {issue}")
-            if len(item["issues"]) > 5:
-                print(f"  ... and {len(item['issues']) - 5} more issues")
-    else:
-        print("No schema issues found!")
+    print_summary(all_issues)
     
     total_issues = sum(len(item["issues"]) for item in all_issues)
     # Schema issues are warnings, not failures
