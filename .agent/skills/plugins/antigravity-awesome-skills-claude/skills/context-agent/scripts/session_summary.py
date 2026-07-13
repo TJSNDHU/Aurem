@@ -233,6 +233,35 @@ def _extract_findings(assistant_messages: list[str]) -> list[str]:
     return list(dict.fromkeys(findings))[:5]
 
 
+def _append_section(lines: list[str], title: str, items: list[str], formatter=None) -> None:
+    """Adiciona uma seção ao markdown se houver itens."""
+    if not items:
+        return
+    lines.append(f"## {title}")
+    for item in items:
+        lines.append(formatter(item) if formatter else f"- {item}")
+    lines.append("")
+
+
+def _append_metrics(lines: list[str], summary: SessionSummary) -> None:
+    """Adiciona a seção de métricas."""
+    lines.append("## Métricas")
+    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
+    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
+    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
+    lines.append(f"- Mensagens: {summary.message_count}")
+    lines.append(f"- Tool calls: {summary.tool_call_count}")
+    lines.append("")
+
+
+def _append_prev_link(lines: list[str], session_number: int) -> None:
+    """Adiciona link para a sessão anterior, se aplicável."""
+    if session_number > 1:
+        prev = session_number - 1
+        lines.append("---")
+        lines.append(f"*Sessão anterior: [session-{prev:03d}](session-{prev:03d}.md)*")
+
+
 def save_session_summary(summary: SessionSummary):
     """Salva resumo como arquivo markdown."""
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,23 +273,9 @@ def save_session_summary(summary: SessionSummary):
         "",
     ]
 
-    if summary.topics:
-        lines.append("## Tópicos")
-        for t in summary.topics:
-            lines.append(f"- {t}")
-        lines.append("")
-
-    if summary.decisions:
-        lines.append("## Decisões")
-        for d in summary.decisions:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    if summary.tasks_completed:
-        lines.append("## Tarefas Concluídas")
-        for t in summary.tasks_completed:
-            lines.append(f"- [x] {t}")
-        lines.append("")
+    _append_section(lines, "Tópicos", summary.topics)
+    _append_section(lines, "Decisões", summary.decisions)
+    _append_section(lines, "Tarefas Concluídas", summary.tasks_completed, lambda t: f"- [x] {t}")
 
     if summary.tasks_pending:
         lines.append("## Tarefas Pendentes")
@@ -271,49 +286,14 @@ def save_session_summary(summary: SessionSummary):
                 lines.append(f"- [ ] {t}")
         lines.append("")
 
-    if summary.files_modified:
-        lines.append("## Arquivos Modificados")
-        for f in summary.files_modified:
-            lines.append(f"- `{f['path']}` — {f['action']}")
-        lines.append("")
+    _append_section(lines, "Arquivos Modificados", summary.files_modified, lambda f: f"- `{f['path']}` — {f['action']}")
+    _append_section(lines, "Descobertas", summary.key_findings)
+    _append_section(lines, "Erros Resolvidos", summary.errors_resolved, lambda e: f"- {e['error']}")
+    _append_section(lines, "Questões em Aberto", summary.open_questions)
+    _append_section(lines, "Dívida Técnica", summary.technical_debt)
 
-    if summary.key_findings:
-        lines.append("## Descobertas")
-        for f in summary.key_findings:
-            lines.append(f"- {f}")
-        lines.append("")
-
-    if summary.errors_resolved:
-        lines.append("## Erros Resolvidos")
-        for e in summary.errors_resolved:
-            lines.append(f"- {e['error']}")
-        lines.append("")
-
-    if summary.open_questions:
-        lines.append("## Questões em Aberto")
-        for q in summary.open_questions:
-            lines.append(f"- {q}")
-        lines.append("")
-
-    if summary.technical_debt:
-        lines.append("## Dívida Técnica")
-        for d in summary.technical_debt:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    lines.append("## Métricas")
-    lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
-    lines.append(f"- Output tokens: {summary.total_output_tokens:,}")
-    lines.append(f"- Cache tokens: {summary.total_cache_tokens:,}")
-    lines.append(f"- Mensagens: {summary.message_count}")
-    lines.append(f"- Tool calls: {summary.tool_call_count}")
-    lines.append("")
-
-    # Link para sessão anterior
-    if summary.session_number > 1:
-        prev = summary.session_number - 1
-        lines.append("---")
-        lines.append(f"*Sessão anterior: [session-{prev:03d}](session-{prev:03d}.md)*")
+    _append_metrics(lines, summary)
+    _append_prev_link(lines, summary.session_number)
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
