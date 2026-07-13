@@ -72,29 +72,19 @@ async def scrape_state(estado: str, semaphore: asyncio.Semaphore) -> dict:
             }
 
 
-async def run(estados: Optional[List[str]], concurrency: int, dry_run: bool) -> None:
-    estados_alvo = [e.upper() for e in estados] if estados else list(SCRAPERS.keys())
+def _print_dry_run(estados_alvo: List[str]) -> None:
+    """Mostra o que seria coletado sem executar."""
+    print(f"\n[DRY-RUN] Estados que seriam coletados ({len(estados_alvo)}):")
+    for uf in estados_alvo:
+        s = get_scraper(uf)
+        if s:
+            print(f"  {uf}: {s.junta} -> {s.url}")
+        else:
+            print(f"  {uf}: scraper nao encontrado")
 
-    if dry_run:
-        print(f"\n[DRY-RUN] Estados que seriam coletados ({len(estados_alvo)}):")
-        for uf in estados_alvo:
-            s = get_scraper(uf)
-            if s:
-                print(f"  {uf}: {s.junta} -> {s.url}")
-            else:
-                print(f"  {uf}: scraper nao encontrado")
-        return
 
-    logger.info("Iniciando coleta de %d estados (concurrency=%d)", len(estados_alvo), concurrency)
-
-    semaphore = asyncio.Semaphore(concurrency)
-    tasks = [scrape_state(uf, semaphore) for uf in estados_alvo]
-    results = await asyncio.gather(*tasks)
-
-    # Persistir no banco
-    db = Database()
-    db.init()
-
+def _process_results(results: list, db: Database) -> tuple:
+    """Persiste resultados no banco e retorna totais + log entries."""
     total_coletados = 0
     total_salvos = 0
     log_entries = []
@@ -124,7 +114,11 @@ async def run(estados: Optional[List[str]], concurrency: int, dry_run: bool) -> 
             "scraped_at": res["scraped_at"],
         })
 
-    # Salvar log
+    return total_coletados, total_salvos, log_entries
+
+
+def _save_log(estados_alvo: List[str], total_coletados: int, total_salvos: int, log_entries: list) -> None:
+    """Salva o log de execução em arquivo JSON."""
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(LOG_FILE, "w", encoding="utf-8") as f:
         json.dump(
@@ -140,7 +134,9 @@ async def run(estados: Optional[List[str]], concurrency: int, dry_run: bool) -> 
             indent=2,
         )
 
-    # Resumo final
+
+def _print_summary(log_entries: list, total_coletados: int, total_salvos: int) -> None:
+    """Imprime o resumo final da coleta."""
     print("\n" + "=" * 60)
     print(f"RESUMO DA COLETA")
     print("=" * 60)
@@ -155,7 +151,9 @@ async def run(estados: Optional[List[str]], concurrency: int, dry_run: bool) -> 
     print(f"  LOG: {LOG_FILE}")
     print("=" * 60)
 
-    # Estatísticas do banco
+
+def _print_stats(db: Database) -> None:
+    """Imprime estatísticas do banco por estado."""
     stats = db.get_stats()
     if stats:
         print("\nESTATÍSTICAS POR ESTADO:")
@@ -163,6 +161,35 @@ async def run(estados: Optional[List[str]], concurrency: int, dry_run: bool) -> 
         print("-" * 35)
         for s in stats:
             print(f"{s['estado']:<5} {s['junta']:<12} {s['total']:>6} {s['ativos']:>7}")
+
+
+async def run(estados: Optional[List[str]], concurrency: int, dry_run: bool) -> None:
+    estados_alvo = [e.upper() for e in estados] if estados else list(SCRAPERS.keys())
+
+    if dry_run:
+        _print_dry_run(estados_alvo)
+        return
+
+    logger.info("Iniciando coleta de %d estados (concurrency=%d)", len(estados_alvo), concurrency)
+
+    semaphore = asyncio.Semaphore(concurrency)
+    tasks = [scrape_state(uf, semaphore) for uf in estados_alvo]
+    results = await asyncio.gather(*tasks)
+
+    # Persistir no banco
+    db = Database()
+    db.init()
+
+    total_coletados, total_salvos, log_entries = _process_results(results, db)
+
+    # Salvar log
+    _save_log(estados_alvo, total_coletados, total_salvos, log_entries)
+
+    # Resumo final
+    _print_summary(log_entries, total_coletados, total_salvos)
+
+    # Estatísticas do banco
+    _print_stats(db)
 
 
 def main():
