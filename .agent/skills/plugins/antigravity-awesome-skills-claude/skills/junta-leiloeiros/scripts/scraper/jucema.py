@@ -75,6 +75,71 @@ class JucemaScraper(AbstractJuntaScraper):
             logger.error("[MA] Erro na API: %s", exc)
             return []
 
+    def _extract_paragraphs(self, soup) -> List[str]:
+        """Extrai lista de textos limpos a partir dos elementos do HTML."""
+        paragraphs = [self.clean(p.get_text()) for p in soup.find_all("p") if self.clean(p.get_text())]
+
+        # Tambem tentar com outros elementos se nao houver <p>
+        if len(paragraphs) < 3:
+            paragraphs = [
+                self.clean(el.get_text())
+                for el in soup.find_all(["p", "li", "div", "span"])
+                if self.clean(el.get_text()) and len(self.clean(el.get_text())) > 3
+            ]
+
+        return paragraphs
+
+    def _apply_field_match(self, text: str, current: dict | None) -> bool:
+        """
+        Tenta casar a linha com um campo conhecido (matricula, situacao, etc.).
+        Retorna True se a linha foi consumida por algum campo.
+        """
+        m_matr = RE_MATRICULA.search(text)
+        m_sit = RE_SITUACAO.search(text)
+        m_cont = RE_CONTATO.search(text)
+        m_email = RE_EMAIL.search(text)
+        m_end = RE_ENDERECO.search(text)
+
+        if m_matr:
+            if current:
+                current["matricula"] = m_matr.group(1)
+                current["data_registro"] = m_matr.group(2)
+            return True
+        if m_sit:
+            if current:
+                current["situacao"] = self.clean(m_sit.group(1))
+            return True
+        if m_cont:
+            if current:
+                current.setdefault("telefone", self.clean(m_cont.group(1)))
+            return True
+        if m_email:
+            if current:
+                current["email"] = self.clean(m_email.group(1))
+            return True
+        if m_end:
+            if current:
+                current["endereco"] = self.clean(m_end.group(1))
+                m_cidade = re.search(r"([A-ZÁÉÍÓÚÀÃÕÇ][A-Za-záéíóúàãõç\s]+)/MA", text)
+                if m_cidade:
+                    current["municipio"] = m_cidade.group(1).strip()
+            return True
+
+        return False
+
+    def _is_nome(self, text: str) -> bool:
+        """Verifica se a linha representa o inicio de uma nova entrada (nome em maiusculas)."""
+        is_nome = (
+            len(text) > 8 and
+            not re.match(r"(SITUA|Matr|MATR|[Ee]ndere|[Cc]ontato|[Ee]-?mail|www\.|http|^\d|Site:|CEP:|RELA[ÇC])", text) and
+            not re.search(r"^(RELA[ÇC][ÃA]O|LISTA|CADASTRO|JUNTA|COMERCIAL|LEILOEIROS\s*$)", text, re.IGNORECASE) and
+            sum(1 for c in text if c.isupper()) > len(text) * 0.3 and
+            " " in text and
+            len(text.split()) >= 2 and
+            len(text) < 120
+        )
+        return is_nome
+
     def _parse_cms_content(self, soup) -> List[dict]:
         """
         Parseia conteudo HTML do CMS da JUCEMA.
@@ -87,15 +152,7 @@ class JucemaScraper(AbstractJuntaScraper):
           <p>E-mail: ...</p>
         """
         records = []
-        paragraphs = [self.clean(p.get_text()) for p in soup.find_all("p") if self.clean(p.get_text())]
-
-        # Tambem tentar com outros elementos se nao houver <p>
-        if len(paragraphs) < 3:
-            paragraphs = [
-                self.clean(el.get_text())
-                for el in soup.find_all(["p", "li", "div", "span"])
-                if self.clean(el.get_text()) and len(self.clean(el.get_text())) > 3
-            ]
+        paragraphs = self._extract_paragraphs(soup)
 
         current: dict | None = None
 
@@ -103,50 +160,10 @@ class JucemaScraper(AbstractJuntaScraper):
             if not text:
                 continue
 
-            m_matr = RE_MATRICULA.search(text)
-            m_sit = RE_SITUACAO.search(text)
-            m_cont = RE_CONTATO.search(text)
-            m_email = RE_EMAIL.search(text)
-            m_end = RE_ENDERECO.search(text)
-
-            if m_matr:
-                if current:
-                    current["matricula"] = m_matr.group(1)
-                    current["data_registro"] = m_matr.group(2)
-                continue
-            if m_sit:
-                if current:
-                    current["situacao"] = self.clean(m_sit.group(1))
-                continue
-            if m_cont:
-                if current:
-                    current.setdefault("telefone", self.clean(m_cont.group(1)))
-                continue
-            if m_email:
-                if current:
-                    current["email"] = self.clean(m_email.group(1))
-                continue
-            if m_end:
-                if current:
-                    current["endereco"] = self.clean(m_end.group(1))
-                    m_cidade = re.search(r"([A-ZÁÉÍÓÚÀÃÕÇ][A-Za-záéíóúàãõç\s]+)/MA", text)
-                    if m_cidade:
-                        current["municipio"] = m_cidade.group(1).strip()
+            if self._apply_field_match(text, current):
                 continue
 
-            # Detectar inicio de nova entrada: nome em maiusculas
-            # Excluir titulos de secao como "RELACAO DOS LEILOEIROS", "CEP:", linhas curtas
-            is_nome = (
-                len(text) > 8 and
-                not re.match(r"(SITUA|Matr|MATR|[Ee]ndere|[Cc]ontato|[Ee]-?mail|www\.|http|^\d|Site:|CEP:|RELA[ÇC])", text) and
-                not re.search(r"^(RELA[ÇC][ÃA]O|LISTA|CADASTRO|JUNTA|COMERCIAL|LEILOEIROS\s*$)", text, re.IGNORECASE) and
-                sum(1 for c in text if c.isupper()) > len(text) * 0.3 and
-                " " in text and
-                len(text.split()) >= 2 and
-                len(text) < 120
-            )
-
-            if is_nome:
+            if self._is_nome(text):
                 if current and current.get("nome"):
                     records.append(current)
                 current = {"nome": text, "municipio": "Sao Luis"}
