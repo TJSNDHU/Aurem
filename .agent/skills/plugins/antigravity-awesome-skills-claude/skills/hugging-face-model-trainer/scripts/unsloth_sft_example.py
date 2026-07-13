@@ -43,6 +43,7 @@ import logging
 import os
 import sys
 import time
+from functools import partial
 
 # Force unbuffered output for HF Jobs logs
 sys.stdout.reconfigure(line_buffering=True)
@@ -212,6 +213,17 @@ Examples:
     return parser.parse_args()
 
 
+def formatting_prompts_func(examples, tokenizer):
+    """Apply chat template and remove BOS token to avoid duplicates."""
+    texts = tokenizer.apply_chat_template(
+        examples["conversations"],
+        tokenize=False,
+        add_generation_prompt=False,
+    )
+    # Remove BOS token to avoid duplicates
+    return {"text": [x.removeprefix(tokenizer.bos_token) for x in texts]}
+
+
 def main():
     args = parse_args()
 
@@ -318,16 +330,10 @@ def main():
     dataset = standardize_data_formats(dataset)
 
     # Apply chat template
-    def formatting_prompts_func(examples):
-        texts = tokenizer.apply_chat_template(
-            examples["conversations"],
-            tokenize=False,
-            add_generation_prompt=False,
-        )
-        # Remove BOS token to avoid duplicates
-        return {"text": [x.removeprefix(tokenizer.bos_token) for x in texts]}
-
-    dataset = dataset.map(formatting_prompts_func, batched=True)
+    dataset = dataset.map(
+        partial(formatting_prompts_func, tokenizer=tokenizer),
+        batched=True,
+    )
 
     # Split for evaluation if requested
     if args.eval_split > 0:
@@ -377,136 +383,4 @@ def main():
         gradient_accumulation_steps=args.gradient_accumulation,
         warmup_steps=5,
         num_train_epochs=args.num_epochs if args.num_epochs else 1,
-        max_steps=args.max_steps if args.max_steps else -1,
-        learning_rate=args.learning_rate,
-        logging_steps=logging_steps,
-        optim="adamw_8bit",
-        weight_decay=0.01,
-        lr_scheduler_type="linear",
-        seed=args.seed,
-        max_length=args.max_seq_length,
-        report_to=report_to,
-        run_name=run_name,
-        push_to_hub=True,
-        hub_model_id=args.output_repo,
-        save_steps=save_steps,
-        save_total_limit=3,
-    )
-
-    # Add evaluation config if eval is enabled
-    if eval_data:
-        if args.num_epochs:
-            training_config.eval_strategy = "epoch"
-            print("  Evaluation enabled: every epoch")
-        else:
-            training_config.eval_strategy = "steps"
-            training_config.eval_steps = max(1, args.max_steps // 5)
-            print(f"  Evaluation enabled: every {training_config.eval_steps} steps")
-
-    trainer = SFTTrainer(
-        model=model,
-        tokenizer=tokenizer,
-        train_dataset=train_data,
-        eval_dataset=eval_data,
-        args=training_config,
-    )
-
-    # Train on responses only (mask user inputs)
-    trainer = train_on_responses_only(
-        trainer,
-        instruction_part="<|im_start|>user\n",
-        response_part="<|im_start|>assistant\n",
-    )
-
-    # 4. Train
-    print(f"\n[4/5] Training for {duration_str}...")
-    if args.num_epochs:
-        print(f"  (~{steps_per_epoch} steps/epoch, {int(steps_per_epoch * args.num_epochs)} total steps)")
-    start = time.time()
-
-    train_result = trainer.train()
-
-    train_time = time.time() - start
-    total_steps = train_result.metrics.get("train_steps", args.max_steps or steps_per_epoch * args.num_epochs)
-    print(f"\nTraining completed in {train_time / 60:.1f} minutes")
-    print(f"  Speed: {total_steps / train_time:.2f} steps/s")
-
-    # Print training metrics
-    train_loss = train_result.metrics.get("train_loss")
-    if train_loss:
-        print(f"  Final train loss: {train_loss:.4f}")
-
-    # Print eval results if eval was enabled
-    if eval_data:
-        print("\nRunning final evaluation...")
-        try:
-            eval_results = trainer.evaluate()
-            eval_loss = eval_results.get("eval_loss")
-            if eval_loss:
-                print(f"  Final eval loss: {eval_loss:.4f}")
-                if train_loss:
-                    ratio = eval_loss / train_loss
-                    if ratio > 1.5:
-                        print(f"  Warning: Eval loss is {ratio:.1f}x train loss - possible overfitting")
-                    else:
-                        print(f"  Eval/train ratio: {ratio:.2f} - model generalizes well")
-        except Exception as e:
-            print(f"  Warning: Final evaluation failed: {e}")
-            print("  Continuing to save model...")
-
-    # 5. Save and push
-    print("\n[5/5] Saving model...")
-
-    if args.merge_model:
-        print("Merging LoRA weights into base model...")
-        print(f"\nPushing merged model to {args.output_repo}...")
-        model.push_to_hub_merged(
-            args.output_repo,
-            tokenizer=tokenizer,
-            save_method="merged_16bit",
-        )
-        print(f"Merged model available at: https://huggingface.co/{args.output_repo}")
-    else:
-        model.save_pretrained(args.save_local)
-        tokenizer.save_pretrained(args.save_local)
-        print(f"Saved locally to {args.save_local}/")
-
-        print(f"\nPushing adapter to {args.output_repo}...")
-        model.push_to_hub(args.output_repo, tokenizer=tokenizer)
-        print(f"Adapter available at: https://huggingface.co/{args.output_repo}")
-
-    print("\n" + "=" * 70)
-    print("Done!")
-    print("=" * 70)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("=" * 70)
-        print("LLM Fine-tuning with Unsloth")
-        print("=" * 70)
-        print("\nFine-tune language models with optional train/eval split.")
-        print("\nFeatures:")
-        print("  - ~60% less VRAM with Unsloth optimizations")
-        print("  - 2x faster training vs standard methods")
-        print("  - Epoch-based or step-based training")
-        print("  - Optional evaluation to detect overfitting")
-        print("  - Trains only on assistant responses (masked user inputs)")
-        print("\nEpoch-based training:")
-        print("\n  uv run unsloth_sft_example.py \\")
-        print("      --dataset mlabonne/FineTome-100k \\")
-        print("      --num-epochs 1 \\")
-        print("      --eval-split 0.2 \\")
-        print("      --output-repo your-username/model-finetuned")
-        print("\nHF Jobs example:")
-        print("\n  hf jobs uv run unsloth_sft_example.py \\")
-        print("      --flavor a10g-small --secrets HF_TOKEN --timeout 4h \\")
-        print("      -- --dataset mlabonne/FineTome-100k \\")
-        print("         --num-epochs 1 \\")
-        print("         --eval-split 0.2 \\")
-        print("         --output-repo your-username/model-finetuned")
-        print("\nFor full help: uv run unsloth_sft_example.py --help")
-        print("=" * 70)
-        sys.exit(0)
-
-    main()
+        max_steps=args.max_steps if args.max_steps else -
