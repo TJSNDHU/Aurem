@@ -114,27 +114,23 @@ def search_x(
     return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
 
 
-def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse xAI response to extract X items.
+def _check_api_error(response: Dict[str, Any]) -> bool:
+    """Check response for API errors and log them.
 
-    Args:
-        response: Raw API response
-
-    Returns:
-        List of item dicts
+    Returns True if an error was found.
     """
-    items = []
+    if "error" not in response or not response["error"]:
+        return False
+    error = response["error"]
+    err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+    _log_error(f"xAI API error: {err_msg}")
+    if http.DEBUG:
+        _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
+    return True
 
-    # Check for API errors first
-    if "error" in response and response["error"]:
-        error = response["error"]
-        err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
-        _log_error(f"xAI API error: {err_msg}")
-        if http.DEBUG:
-            _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
-        return items
 
-    # Try to find the output text
+def _extract_output_text(response: Dict[str, Any]) -> str:
+    """Extract the output text from an xAI response."""
     output_text = ""
     if "output" in response:
         output = response["output"]
@@ -163,10 +159,12 @@ def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
                 output_text = choice["message"].get("content", "")
                 break
 
-    if not output_text:
-        return items
+    return output_text
 
-    # Extract JSON from the response
+
+def _extract_items_from_text(output_text: str) -> List[Dict[str, Any]]:
+    """Extract items list from the output text via JSON parsing."""
+    items = []
     json_match = re.search(r'\{[\s\S]*"items"[\s\S]*\}', output_text)
     if json_match:
         try:
@@ -174,44 +172,78 @@ def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
             items = data.get("items", [])
         except json.JSONDecodeError:
             pass
+    return items
+
+
+def _parse_engagement(eng_raw: Any) -> Optional[Dict[str, Any]]:
+    """Parse raw engagement data into a normalized dict."""
+    if not isinstance(eng_raw, dict):
+        return None
+    return {
+        "likes": int(eng_raw.get("likes", 0)) if eng_raw.get("likes") else None,
+        "reposts": int(eng_raw.get("reposts", 0)) if eng_raw.get("reposts") else None,
+        "replies": int(eng_raw.get("replies", 0)) if eng_raw.get("replies") else None,
+        "quotes": int(eng_raw.get("quotes", 0)) if eng_raw.get("quotes") else None,
+    }
+
+
+def _clean_item(item: Dict[str, Any], index: int) -> Optional[Dict[str, Any]]:
+    """Validate and clean a single raw item.
+
+    Returns None if the item should be skipped.
+    """
+    if not isinstance(item, dict):
+        return None
+
+    url = item.get("url", "")
+    if not url:
+        return None
+
+    engagement = _parse_engagement(item.get("engagement"))
+
+    clean_item = {
+        "id": f"X{index+1}",
+        "text": str(item.get("text", "")).strip()[:500],  # Truncate long text
+        "url": url,
+        "author_handle": str(item.get("author_handle", "")).strip().lstrip("@"),
+        "date": item.get("date"),
+        "engagement": engagement,
+        "why_relevant": str(item.get("why_relevant", "")).strip(),
+        "relevance": min(1.0, max(0.0, float(item.get("relevance", 0.5)))),
+    }
+
+    # Validate date format
+    if clean_item["date"]:
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(clean_item["date"])):
+            clean_item["date"] = None
+
+    return clean_item
+
+
+def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse xAI response to extract X items.
+
+    Args:
+        response: Raw API response
+
+    Returns:
+        List of item dicts
+    """
+    # Check for API errors first
+    if _check_api_error(response):
+        return []
+
+    output_text = _extract_output_text(response)
+    if not output_text:
+        return []
+
+    items = _extract_items_from_text(output_text)
 
     # Validate and clean items
     clean_items = []
     for i, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-
-        url = item.get("url", "")
-        if not url:
-            continue
-
-        # Parse engagement
-        engagement = None
-        eng_raw = item.get("engagement")
-        if isinstance(eng_raw, dict):
-            engagement = {
-                "likes": int(eng_raw.get("likes", 0)) if eng_raw.get("likes") else None,
-                "reposts": int(eng_raw.get("reposts", 0)) if eng_raw.get("reposts") else None,
-                "replies": int(eng_raw.get("replies", 0)) if eng_raw.get("replies") else None,
-                "quotes": int(eng_raw.get("quotes", 0)) if eng_raw.get("quotes") else None,
-            }
-
-        clean_item = {
-            "id": f"X{i+1}",
-            "text": str(item.get("text", "")).strip()[:500],  # Truncate long text
-            "url": url,
-            "author_handle": str(item.get("author_handle", "")).strip().lstrip("@"),
-            "date": item.get("date"),
-            "engagement": engagement,
-            "why_relevant": str(item.get("why_relevant", "")).strip(),
-            "relevance": min(1.0, max(0.0, float(item.get("relevance", 0.5)))),
-        }
-
-        # Validate date format
-        if clean_item["date"]:
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(clean_item["date"])):
-                clean_item["date"] = None
-
-        clean_items.append(clean_item)
+        clean_item = _clean_item(item, i)
+        if clean_item is not None:
+            clean_items.append(clean_item)
 
     return clean_items
