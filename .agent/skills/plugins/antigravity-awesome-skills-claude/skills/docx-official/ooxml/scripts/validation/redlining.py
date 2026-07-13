@@ -28,6 +28,24 @@ class RedliningValidator:
             return False
 
         # First, check if there are any tracked changes by Claude to validate
+        if not self._has_claude_tracked_changes(modified_file):
+            if self.verbose:
+                print("PASSED - No tracked changes by Claude found.")
+            return True
+
+        # Create temporary directory for unpacking original docx
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Unpack original docx
+            original_file = self._unpack_original_docx(temp_path)
+            if original_file is None:
+                return False
+
+            return self._compare_documents(modified_file, original_file)
+
+    def _has_claude_tracked_changes(self, modified_file):
+        """Check if there are any tracked changes by Claude in the modified file."""
         try:
             import xml.etree.ElementTree as ET
 
@@ -52,64 +70,65 @@ class RedliningValidator:
 
             # Redlining validation is only needed if tracked changes by Claude have been used.
             if not claude_del_elements and not claude_ins_elements:
-                if self.verbose:
-                    print("PASSED - No tracked changes by Claude found.")
-                return True
+                return False
 
         except Exception:
             # If we can't parse the XML, continue with full validation
             pass
 
-        # Create temporary directory for unpacking original docx
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
+        return True
 
-            # Unpack original docx
-            try:
-                with zipfile.ZipFile(self.original_docx, "r") as zip_ref:
-                    zip_ref.extractall(temp_path)
-            except Exception as e:
-                print(f"FAILED - Error unpacking original docx: {e}")
-                return False
+    def _unpack_original_docx(self, temp_path):
+        """Unpack original docx and return path to document.xml, or None on failure."""
+        try:
+            with zipfile.ZipFile(self.original_docx, "r") as zip_ref:
+                zip_ref.extractall(temp_path)
+        except Exception as e:
+            print(f"FAILED - Error unpacking original docx: {e}")
+            return None
 
-            original_file = temp_path / "word" / "document.xml"
-            if not original_file.exists():
-                print(
-                    f"FAILED - Original document.xml not found in {self.original_docx}"
-                )
-                return False
+        original_file = temp_path / "word" / "document.xml"
+        if not original_file.exists():
+            print(
+                f"FAILED - Original document.xml not found in {self.original_docx}"
+            )
+            return None
 
-            # Parse both XML files using xml.etree.ElementTree for redlining validation
-            try:
-                import xml.etree.ElementTree as ET
+        return original_file
 
-                modified_tree = ET.parse(modified_file)
-                modified_root = modified_tree.getroot()
-                original_tree = ET.parse(original_file)
-                original_root = original_tree.getroot()
-            except ET.ParseError as e:
-                print(f"FAILED - Error parsing XML files: {e}")
-                return False
+    def _compare_documents(self, modified_file, original_file):
+        """Parse, normalize, and compare the two document XML files."""
+        # Parse both XML files using xml.etree.ElementTree for redlining validation
+        try:
+            import xml.etree.ElementTree as ET
 
-            # Remove Claude's tracked changes from both documents
-            self._remove_claude_tracked_changes(original_root)
-            self._remove_claude_tracked_changes(modified_root)
+            modified_tree = ET.parse(modified_file)
+            modified_root = modified_tree.getroot()
+            original_tree = ET.parse(original_file)
+            original_root = original_tree.getroot()
+        except ET.ParseError as e:
+            print(f"FAILED - Error parsing XML files: {e}")
+            return False
 
-            # Extract and compare text content
-            modified_text = self._extract_text_content(modified_root)
-            original_text = self._extract_text_content(original_root)
+        # Remove Claude's tracked changes from both documents
+        self._remove_claude_tracked_changes(original_root)
+        self._remove_claude_tracked_changes(modified_root)
 
-            if modified_text != original_text:
-                # Show detailed character-level differences for each paragraph
-                error_message = self._generate_detailed_diff(
-                    original_text, modified_text
-                )
-                print(error_message)
-                return False
+        # Extract and compare text content
+        modified_text = self._extract_text_content(modified_root)
+        original_text = self._extract_text_content(original_root)
 
-            if self.verbose:
-                print("PASSED - All changes by Claude are properly tracked")
-            return True
+        if modified_text != original_text:
+            # Show detailed character-level differences for each paragraph
+            error_message = self._generate_detailed_diff(
+                original_text, modified_text
+            )
+            print(error_message)
+            return False
+
+        if self.verbose:
+            print("PASSED - All changes by Claude are properly tracked")
+        return True
 
     def _generate_detailed_diff(self, original_text, modified_text):
         """Generate detailed word-level differences using git word diff."""
