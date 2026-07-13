@@ -78,6 +78,88 @@ class JucerjaScraper(AbstractJuntaScraper):
 
         return records
 
+    def _build_headers(self) -> dict:
+        return {
+            **self.HEADERS,
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": self.url,
+        }
+
+    def _page_url(self, pagina: int) -> str:
+        return (
+            f"{self._PAGINAR_URL}"
+            f"?pagina={pagina}&ordenacao=matricula&Nome=&SituacaoFuncionalId="
+        )
+
+    async def _fetch_page_records(self, client, pagina: int) -> List[dict]:
+        """Busca e parseia uma unica pagina de leiloeiros."""
+        url_pagina = self._page_url(pagina)
+        try:
+            resp = await client.get(url_pagina)
+            if resp.status_code >= 400:
+                logger.warning("[RJ] Pagina %d retornou HTTP %d", pagina, resp.status_code)
+                return []
+        except Exception as exc:
+            logger.error("[RJ] Erro na pagina %d: %s", pagina, exc)
+            return []
+
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(resp.text, "lxml")
+        return self._parse_lista(soup)
+
+    async def _collect_pages(self, client) -> List[Leiloeiro]:
+        """Itera pelas paginas AJAX coletando leiloeiros sem duplicatas."""
+        results: List[Leiloeiro] = []
+        seen_names: set = set()
+        pagina = 1
+
+        while True:
+            page_records = await self._fetch_page_records(client, pagina)
+
+            if not page_records:
+                logger.debug("[RJ] Pagina %d sem registros — fim da paginacao", pagina)
+                break
+
+            novos = 0
+            for r in page_records:
+                key = r["nome"].upper()
+                if key not in seen_names:
+                    seen_names.add(key)
+                    if not r.get("municipio"):
+                        r["municipio"] = "Rio de Janeiro"
+                    results.append(self.make_leiloeiro(**r))
+                    novos += 1
+
+            logger.debug("[RJ] Pagina %d: %d novos (total=%d)", pagina, novos, len(results))
+
+            if novos == 0:
+                break  # Pagina repetiu dados — parar
+
+            pagina += 1
+            if pagina > 100:  # Limite de seguranca
+                logger.warning("[RJ] Limite de paginas atingido")
+                break
+
+            await asyncio.sleep(0.3)  # Evita sobrecarga
+
+        return results
+
+    async def _playwright_fallback(self) -> List[Leiloeiro]:
+        """Fallback via Playwright para pagina estatica."""
+        results: List[Leiloeiro] = []
+        logger.info("[RJ] Tentando Playwright como fallback")
+        soup = await self.fetch_page_js(
+            url=self.url,
+            wait_selector="li",
+            wait_ms=5000,
+        )
+        if soup:
+            for r in self._parse_lista(soup):
+                if not r.get("municipio"):
+                    r["municipio"] = "Rio de Janeiro"
+                results.append(self.make_leiloeiro(**r))
+        return results
+
     async def parse_leiloeiros(self) -> List[Leiloeiro]:
         """
         Coleta todos os leiloeiros via endpoint AJAX de paginacao.
@@ -86,85 +168,22 @@ class JucerjaScraper(AbstractJuntaScraper):
         """
         import httpx
         results: List[Leiloeiro] = []
-        pagina = 1
-        seen_names: set = set()
-
-        headers = {
-            **self.HEADERS,
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": self.url,
-        }
 
         try:
             async with httpx.AsyncClient(
-                headers=headers,
+                headers=self._build_headers(),
                 verify=True,
                 follow_redirects=True,
                 timeout=60.0,
             ) as client:
                 # Primeiro GET na pagina principal para obter cookies
                 await client.get(self.url)
-
-                while True:
-                    url_pagina = (
-                        f"{self._PAGINAR_URL}"
-                        f"?pagina={pagina}&ordenacao=matricula&Nome=&SituacaoFuncionalId="
-                    )
-                    try:
-                        resp = await client.get(url_pagina)
-                        if resp.status_code >= 400:
-                            logger.warning("[RJ] Pagina %d retornou HTTP %d", pagina, resp.status_code)
-                            break
-                    except Exception as exc:
-                        logger.error("[RJ] Erro na pagina %d: %s", pagina, exc)
-                        break
-
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(resp.text, "lxml")
-                    page_records = self._parse_lista(soup)
-
-                    if not page_records:
-                        logger.debug("[RJ] Pagina %d sem registros — fim da paginacao", pagina)
-                        break
-
-                    # Evita duplicatas (mesmo nome ja visto)
-                    novos = 0
-                    for r in page_records:
-                        key = r["nome"].upper()
-                        if key not in seen_names:
-                            seen_names.add(key)
-                            if not r.get("municipio"):
-                                r["municipio"] = "Rio de Janeiro"
-                            results.append(self.make_leiloeiro(**r))
-                            novos += 1
-
-                    logger.debug("[RJ] Pagina %d: %d novos (total=%d)", pagina, novos, len(results))
-
-                    if novos == 0:
-                        break  # Pagina repetiu dados — parar
-
-                    pagina += 1
-                    if pagina > 100:  # Limite de seguranca
-                        logger.warning("[RJ] Limite de paginas atingido")
-                        break
-
-                    await asyncio.sleep(0.3)  # Evita sobrecarga
+                results = await self._collect_pages(client)
 
         except Exception as exc:
             logger.error("[RJ] Erro geral na coleta: %s", exc)
 
         if not results:
-            # Fallback: Playwright para pagina estatica com qualquer registro
-            logger.info("[RJ] Tentando Playwright como fallback")
-            soup = await self.fetch_page_js(
-                url=self.url,
-                wait_selector="li",
-                wait_ms=5000,
-            )
-            if soup:
-                for r in self._parse_lista(soup):
-                    if not r.get("municipio"):
-                        r["municipio"] = "Rio de Janeiro"
-                    results.append(self.make_leiloeiro(**r))
+            results = await self._playwright_fallback()
 
         return results
