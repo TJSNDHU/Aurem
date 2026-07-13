@@ -20,7 +20,7 @@ from datetime import datetime
 # Fix Windows console encoding
 try:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-except:
+except Exception:
     pass
 
 
@@ -50,7 +50,7 @@ def detect_project_type(project_path: Path) -> dict:
             if "typescript" in deps or (project_path / "tsconfig.json").exists():
                 result["linters"].append({"name": "tsc", "cmd": ["npx", "tsc", "--noEmit"]})
                 
-        except:
+        except Exception:
             pass
     
     # Python project
