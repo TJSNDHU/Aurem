@@ -34,32 +34,24 @@ def _assess_data_freshness(report: schema.Report) -> dict:
     }
 
 
-def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "none") -> str:
-    """Render compact output for Claude to synthesize.
-
-    Args:
-        report: Report data
-        limit: Max items per source
-        missing_keys: 'both', 'reddit', 'x', or 'none'
-
-    Returns:
-        Compact markdown string
-    """
+def _render_header(report: schema.Report, freshness: dict) -> List[str]:
+    """Render the header section including freshness warning."""
     lines = []
-
-    # Header
     lines.append(f"## Research Results: {report.topic}")
     lines.append("")
 
-    # Assess data freshness and add honesty warning if needed
-    freshness = _assess_data_freshness(report)
     if freshness["is_sparse"]:
         lines.append("**⚠️ LIMITED RECENT DATA** - Few discussions from the last 30 days.")
         lines.append(f"Only {freshness['total_recent']} item(s) confirmed from {report.range_from} to {report.range_to}.")
         lines.append("Results below may include older/evergreen content. Be transparent with the user about this.")
         lines.append("")
 
-    # Web-only mode banner (when no API keys)
+    return lines
+
+
+def _render_mode_banner(report: schema.Report) -> List[str]:
+    """Render the web-only mode banner if applicable."""
+    lines = []
     if report.mode == "web-only":
         lines.append("**🌐 WEB SEARCH MODE** - Claude will search blogs, docs & news")
         lines.append("")
@@ -70,13 +62,22 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append("- Edit `~/.config/last30days/.env` to add keys")
         lines.append("---")
         lines.append("")
+    return lines
 
-    # Cache indicator
+
+def _render_cache_indicator(report: schema.Report) -> List[str]:
+    """Render the cache indicator if report is from cache."""
+    lines = []
     if report.from_cache:
         age_str = f"{report.cache_age_hours:.1f}h old" if report.cache_age_hours else "cached"
         lines.append(f"**⚡ CACHED RESULTS** ({age_str}) - use `--refresh` for fresh data")
         lines.append("")
+    return lines
 
+
+def _render_metadata(report: schema.Report, missing_keys: str) -> List[str]:
+    """Render date range, mode, models, and coverage notes."""
+    lines = []
     lines.append(f"**Date Range:** {report.range_from} to {report.range_to}")
     lines.append(f"**Mode:** {report.mode}")
     if report.openai_model_used:
@@ -85,7 +86,6 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append(f"**xAI Model:** {report.xai_model_used}")
     lines.append("")
 
-    # Coverage note for partial coverage
     if report.mode == "reddit-only" and missing_keys == "x":
         lines.append("*💡 Tip: Add XAI_API_KEY for X/Twitter data and better triangulation.*")
         lines.append("")
@@ -93,7 +93,12 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
         lines.append("*💡 Tip: Add OPENAI_API_KEY for Reddit data and better triangulation.*")
         lines.append("")
 
-    # Reddit items
+    return lines
+
+
+def _render_reddit_section(report: schema.Report, limit: int) -> List[str]:
+    """Render the Reddit threads section."""
+    lines = []
     if report.reddit_error:
         lines.append("### Reddit Threads")
         lines.append("")
@@ -134,8 +139,12 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
                     lines.append(f"    - {insight}")
 
             lines.append("")
+    return lines
 
-    # X items
+
+def _render_x_section(report: schema.Report, limit: int) -> List[str]:
+    """Render the X posts section."""
+    lines = []
     if report.x_error:
         lines.append("### X Posts")
         lines.append("")
@@ -169,8 +178,12 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
             lines.append(f"  {item.url}")
             lines.append(f"  *{item.why_relevant}*")
             lines.append("")
+    return lines
 
-    # Web items (if any - populated by Claude)
+
+def _render_web_section(report: schema.Report, limit: int) -> List[str]:
+    """Render the web results section."""
+    lines = []
     if report.web_error:
         lines.append("### Web Results")
         lines.append("")
@@ -189,6 +202,30 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
             lines.append(f"  {item.snippet[:150]}...")
             lines.append(f"  *{item.why_relevant}*")
             lines.append("")
+    return lines
+
+
+def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "none") -> str:
+    """Render compact output for Claude to synthesize.
+
+    Args:
+        report: Report data
+        limit: Max items per source
+        missing_keys: 'both', 'reddit', 'x', or 'none'
+
+    Returns:
+        Compact markdown string
+    """
+    freshness = _assess_data_freshness(report)
+
+    lines = []
+    lines.extend(_render_header(report, freshness))
+    lines.extend(_render_mode_banner(report))
+    lines.extend(_render_cache_indicator(report))
+    lines.extend(_render_metadata(report, missing_keys))
+    lines.extend(_render_reddit_section(report, limit))
+    lines.extend(_render_x_section(report, limit))
+    lines.extend(_render_web_section(report, limit))
 
     return "\n".join(lines)
 
@@ -370,14 +407,4 @@ def write_outputs(
             json.dump(raw_openai, f, indent=2)
 
     if raw_xai:
-        with open(OUTPUT_DIR / "raw_xai.json", 'w') as f:
-            json.dump(raw_xai, f, indent=2)
-
-    if raw_reddit_enriched:
-        with open(OUTPUT_DIR / "raw_reddit_threads_enriched.json", 'w') as f:
-            json.dump(raw_reddit_enriched, f, indent=2)
-
-
-def get_context_path() -> str:
-    """Get path to context file."""
-    return str(OUTPUT_DIR / "last30days.context.md")
+        with open(OUTPUT_DIR / "raw_xai.json", 'w')
