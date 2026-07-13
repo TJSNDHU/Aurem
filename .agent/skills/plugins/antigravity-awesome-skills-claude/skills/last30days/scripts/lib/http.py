@@ -31,6 +31,68 @@ class HTTPError(Exception):
         self.body = body
 
 
+def _build_request(
+    method: str,
+    url: str,
+    headers: Optional[Dict[str, str]],
+    json_data: Optional[Dict[str, Any]],
+) -> urllib.request.Request:
+    """Build a urllib Request object with standard headers."""
+    headers = headers or {}
+    headers.setdefault("User-Agent", USER_AGENT)
+
+    data = None
+    if json_data is not None:
+        data = json.dumps(json_data).encode('utf-8')
+        headers.setdefault("Content-Type", "application/json")
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+
+    log(f"{method} {url}")
+    if json_data:
+        log(f"Payload keys: {list(json_data.keys())}")
+
+    return req
+
+
+def _read_http_error_body(e: urllib.error.HTTPError) -> Optional[str]:
+    """Attempt to read the response body from an HTTPError."""
+    try:
+        return e.read().decode('utf-8')
+    except:
+        return None
+
+
+def _handle_http_error(e: urllib.error.HTTPError) -> HTTPError:
+    """Convert an HTTPError into an HTTPError exception, logging details."""
+    body = _read_http_error_body(e)
+    log(f"HTTP Error {e.code}: {e.reason}")
+    if body:
+        log(f"Error body: {body[:500]}")
+    return HTTPError(f"HTTP {e.code}: {e.reason}", e.code, body)
+
+
+def _should_retry_http(status_code: int) -> bool:
+    """Return True if the HTTP status code warrants a retry."""
+    if 400 <= status_code < 500 and status_code != 429:
+        return False
+    return True
+
+
+def _execute_attempt(
+    req: urllib.request.Request,
+    timeout: int,
+) -> Dict[str, Any]:
+    """Execute a single request attempt and return parsed JSON.
+
+    Raises HTTPError, URLError, or other exceptions on failure.
+    """
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        body = response.read().decode('utf-8')
+        log(f"Response: {response.status} ({len(body)} bytes)")
+        return json.loads(body) if body else {}
+
+
 def request(
     method: str,
     url: str,
@@ -55,42 +117,16 @@ def request(
     Raises:
         HTTPError: On request failure
     """
-    headers = headers or {}
-    headers.setdefault("User-Agent", USER_AGENT)
-
-    data = None
-    if json_data is not None:
-        data = json.dumps(json_data).encode('utf-8')
-        headers.setdefault("Content-Type", "application/json")
-
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-
-    log(f"{method} {url}")
-    if json_data:
-        log(f"Payload keys: {list(json_data.keys())}")
+    req = _build_request(method, url, headers, json_data)
 
     last_error = None
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                body = response.read().decode('utf-8')
-                log(f"Response: {response.status} ({len(body)} bytes)")
-                return json.loads(body) if body else {}
+            return _execute_attempt(req, timeout)
         except urllib.error.HTTPError as e:
-            body = None
-            try:
-                body = e.read().decode('utf-8')
-            except:
-                pass
-            log(f"HTTP Error {e.code}: {e.reason}")
-            if body:
-                log(f"Error body: {body[:500]}")
-            last_error = HTTPError(f"HTTP {e.code}: {e.reason}", e.code, body)
-
-            # Don't retry client errors (4xx) except rate limits
-            if 400 <= e.code < 500 and e.code != 429:
+            last_error = _handle_http_error(e)
+            if not _should_retry_http(e.code):
                 raise last_error
-
             if attempt < retries - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))
         except urllib.error.URLError as e:
