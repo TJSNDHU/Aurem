@@ -233,73 +233,42 @@ def _extract_findings(assistant_messages: list[str]) -> list[str]:
     return list(dict.fromkeys(findings))[:5]
 
 
-def save_session_summary(summary: SessionSummary):
-    """Salva resumo como arquivo markdown."""
-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    path = SESSIONS_DIR / f"session-{summary.session_number:03d}.md"
+def _section(title: str, items: list, formatter) -> list[str]:
+    """Constrói uma seção do markdown se houver itens."""
+    if not items:
+        return []
+    out = [f"## {title}"]
+    for item in items:
+        out.append(formatter(item))
+    out.append("")
+    return out
 
+
+def _build_summary_lines(summary: SessionSummary) -> list[str]:
+    """Constrói as linhas de markdown do resumo da sessão."""
     lines = [
         f"# Sessão {summary.session_number:03d} — {summary.date}",
         f"**Slug:** {summary.slug} | **Duração:** ~{summary.duration_minutes}min | **Modelo:** {summary.model}",
         "",
     ]
 
-    if summary.topics:
-        lines.append("## Tópicos")
-        for t in summary.topics:
-            lines.append(f"- {t}")
-        lines.append("")
-
-    if summary.decisions:
-        lines.append("## Decisões")
-        for d in summary.decisions:
-            lines.append(f"- {d}")
-        lines.append("")
-
-    if summary.tasks_completed:
-        lines.append("## Tarefas Concluídas")
-        for t in summary.tasks_completed:
-            lines.append(f"- [x] {t}")
-        lines.append("")
-
-    if summary.tasks_pending:
-        lines.append("## Tarefas Pendentes")
-        for t in summary.tasks_pending:
-            if isinstance(t, PendingTask):
-                lines.append(f"- [ ] {t.description} (prioridade: {t.priority})")
-            else:
-                lines.append(f"- [ ] {t}")
-        lines.append("")
-
-    if summary.files_modified:
-        lines.append("## Arquivos Modificados")
-        for f in summary.files_modified:
-            lines.append(f"- `{f['path']}` — {f['action']}")
-        lines.append("")
-
-    if summary.key_findings:
-        lines.append("## Descobertas")
-        for f in summary.key_findings:
-            lines.append(f"- {f}")
-        lines.append("")
-
-    if summary.errors_resolved:
-        lines.append("## Erros Resolvidos")
-        for e in summary.errors_resolved:
-            lines.append(f"- {e['error']}")
-        lines.append("")
-
-    if summary.open_questions:
-        lines.append("## Questões em Aberto")
-        for q in summary.open_questions:
-            lines.append(f"- {q}")
-        lines.append("")
-
-    if summary.technical_debt:
-        lines.append("## Dívida Técnica")
-        for d in summary.technical_debt:
-            lines.append(f"- {d}")
-        lines.append("")
+    lines += _section("Tópicos", summary.topics, lambda t: f"- {t}")
+    lines += _section("Decisões", summary.decisions, lambda d: f"- {d}")
+    lines += _section("Tarefas Concluídas", summary.tasks_completed, lambda t: f"- [x] {t}")
+    lines += _section(
+        "Tarefas Pendentes",
+        summary.tasks_pending,
+        lambda t: f"- [ ] {t.description} (prioridade: {t.priority})" if isinstance(t, PendingTask) else f"- [ ] {t}",
+    )
+    lines += _section(
+        "Arquivos Modificados",
+        summary.files_modified,
+        lambda f: f"- `{f['path']}` — {f['action']}",
+    )
+    lines += _section("Descobertas", summary.key_findings, lambda f: f"- {f}")
+    lines += _section("Erros Resolvidos", summary.errors_resolved, lambda e: f"- {e['error']}")
+    lines += _section("Questões em Aberto", summary.open_questions, lambda q: f"- {q}")
+    lines += _section("Dívida Técnica", summary.technical_debt, lambda d: f"- {d}")
 
     lines.append("## Métricas")
     lines.append(f"- Input tokens: {summary.total_input_tokens:,}")
@@ -309,11 +278,18 @@ def save_session_summary(summary: SessionSummary):
     lines.append(f"- Tool calls: {summary.tool_call_count}")
     lines.append("")
 
-    # Link para sessão anterior
     if summary.session_number > 1:
         prev = summary.session_number - 1
         lines.append("---")
         lines.append(f"*Sessão anterior: [session-{prev:03d}](session-{prev:03d}.md)*")
 
+    return lines
+
+
+def save_session_summary(summary: SessionSummary):
+    """Salva resumo como arquivo markdown."""
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    path = SESSIONS_DIR / f"session-{summary.session_number:03d}.md"
+    lines = _build_summary_lines(summary)
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
