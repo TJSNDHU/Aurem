@@ -96,17 +96,8 @@ def find_web_pages(project_path: Path) -> list:
     return files[:30]  # Limit to 30 pages
 
 
-def check_page(file_path: Path) -> dict:
-    """Check a single web page for GEO elements."""
-    try:
-        content = file_path.read_text(encoding='utf-8', errors='ignore')
-    except Exception as e:
-        return {'file': str(file_path.name), 'passed': [], 'issues': [f"Error: {e}"], 'score': 0}
-    
-    issues = []
-    passed = []
-    
-    # 1. JSON-LD Structured Data (Critical for AI)
+def _check_structured_data(content: str, passed: list, issues: list):
+    """Check for JSON-LD structured data."""
     if 'application/ld+json' in content:
         passed.append("JSON-LD structured data found")
         if '"@type"' in content:
@@ -118,8 +109,10 @@ def check_page(file_path: Path) -> dict:
                 passed.append("Entity schema present")
     else:
         issues.append("No JSON-LD structured data (AI engines prefer structured content)")
-    
-    # 2. Heading Structure
+
+
+def _check_headings(content: str, passed: list, issues: list):
+    """Check heading structure."""
     h1_count = len(re.findall(r'<h1[^>]*>', content, re.I))
     h2_count = len(re.findall(r'<h2[^>]*>', content, re.I))
     
@@ -134,40 +127,52 @@ def check_page(file_path: Path) -> dict:
         passed.append(f"{h2_count} H2 subheadings (good structure)")
     else:
         issues.append("Add more H2 subheadings for scannable content")
-    
-    # 3. Author Attribution (E-E-A-T signal)
+
+
+def _check_author(content: str, passed: list, issues: list):
+    """Check author attribution (E-E-A-T signal)."""
     author_patterns = ['author', 'byline', 'written-by', 'contributor', 'rel="author"']
     has_author = any(p in content.lower() for p in author_patterns)
     if has_author:
         passed.append("Author attribution found")
     else:
         issues.append("No author info (AI prefers attributed content)")
-    
-    # 4. Publication Date (Freshness signal)
+
+
+def _check_date(content: str, passed: list, issues: list):
+    """Check publication date (freshness signal)."""
     date_patterns = ['datePublished', 'dateModified', 'datetime=', 'pubdate', 'article:published']
     has_date = any(re.search(p, content, re.I) for p in date_patterns)
     if has_date:
         passed.append("Publication date found")
     else:
         issues.append("No publication date (freshness matters for AI)")
-    
-    # 5. FAQ Section (Highly citable)
+
+
+def _check_faq(content: str, passed: list):
+    """Check for FAQ section (highly citable)."""
     faq_patterns = [r'<details', r'faq', r'frequently.?asked', r'"FAQPage"']
     has_faq = any(re.search(p, content, re.I) for p in faq_patterns)
     if has_faq:
         passed.append("FAQ section detected (highly citable)")
-    
-    # 6. Lists (Structured content)
+
+
+def _check_lists(content: str, passed: list):
+    """Check for lists (structured content)."""
     list_count = len(re.findall(r'<(ul|ol)[^>]*>', content, re.I))
     if list_count >= 2:
         passed.append(f"{list_count} lists (structured content)")
-    
-    # 7. Tables (Comparison data)
+
+
+def _check_tables(content: str, passed: list):
+    """Check for tables (comparison data)."""
     table_count = len(re.findall(r'<table[^>]*>', content, re.I))
     if table_count >= 1:
         passed.append(f"{table_count} table(s) (comparison data)")
-    
-    # 8. Entity Recognition (E-E-A-T signal) - NEW 2025
+
+
+def _check_entity(content: str, passed: list):
+    """Check entity recognition (E-E-A-T signal) - NEW 2025."""
     entity_patterns = [
         r'"@type"\s*:\s*"Organization"',
         r'"@type"\s*:\s*"LocalBusiness"', 
@@ -178,8 +183,10 @@ def check_page(file_path: Path) -> dict:
     has_entity = any(re.search(p, content, re.I) for p in entity_patterns)
     if has_entity:
         passed.append("Entity/Brand recognition (E-E-A-T)")
-    
-    # 9. Original Statistics/Data (AI citation magnet) - NEW 2025
+
+
+def _check_statistics(content: str, passed: list):
+    """Check original statistics/data (AI citation magnet) - NEW 2025."""
     stat_patterns = [
         r'\d+%',                    # Percentages
         r'\$[\d,]+',                # Dollar amounts
@@ -192,8 +199,10 @@ def check_page(file_path: Path) -> dict:
     stat_matches = sum(1 for p in stat_patterns if re.search(p, content, re.I))
     if stat_matches >= 2:
         passed.append("Original statistics/data (citation magnet)")
-    
-    # 10. Conversational/Direct answers - NEW 2025
+
+
+def _check_direct_answers(content: str, passed: list):
+    """Check conversational/direct answers - NEW 2025."""
     direct_answer_patterns = [
         r'is defined as',
         r'refers to',
@@ -206,6 +215,28 @@ def check_page(file_path: Path) -> dict:
     has_direct = any(re.search(p, content, re.I) for p in direct_answer_patterns)
     if has_direct:
         passed.append("Direct answer patterns (LLM-friendly)")
+
+
+def check_page(file_path: Path) -> dict:
+    """Check a single web page for GEO elements."""
+    try:
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+    except Exception as e:
+        return {'file': str(file_path.name), 'passed': [], 'issues': [f"Error: {e}"], 'score': 0}
+    
+    issues = []
+    passed = []
+    
+    _check_structured_data(content, passed, issues)
+    _check_headings(content, passed, issues)
+    _check_author(content, passed, issues)
+    _check_date(content, passed, issues)
+    _check_faq(content, passed)
+    _check_lists(content, passed)
+    _check_tables(content, passed)
+    _check_entity(content, passed)
+    _check_statistics(content, passed)
+    _check_direct_answers(content, passed)
     
     # Calculate score
     total = len(passed) + len(issues)
