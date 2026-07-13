@@ -148,8 +148,13 @@ def collate_fn(batch):
 seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction="mean")
 
 
+def _extract_predicted_masks(outputs):
+    """Squeeze and return the predicted masks from model outputs."""
+    return outputs.pred_masks.squeeze(1)
+
+
 def compute_loss(outputs, labels, num_items_in_batch=None):
-    predicted_masks = outputs.pred_masks.squeeze(1)
+    predicted_masks = _extract_predicted_masks(outputs)
     return seg_loss(predicted_masks, labels.float())
 
 
