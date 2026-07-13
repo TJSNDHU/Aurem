@@ -199,71 +199,64 @@ def format_value_preview(value: Any, max_chars: int) -> str:
         return preview[:max_chars] + ("..." if len(preview) > max_chars else "")
 
 
-def main():
-    args = parse_args()
-    
+def fetch_dataset_info(args):
+    """Fetch splits and rows data from the Datasets Server API."""
     print(f"Fetching dataset info via Datasets Server API...")
     
-    try:
-        # Get splits info
-        splits_data = get_splits(args.dataset)
-        if not splits_data or "splits" not in splits_data:
-            print(f"ERROR: Could not fetch splits for dataset '{args.dataset}'")
-            print(f"       Dataset may not exist or is not accessible via Datasets Server API")
-            sys.exit(1)
-        
-        # Find the right config
-        available_configs = set()
-        split_found = False
-        config_to_use = args.config
-        
-        for split_info in splits_data["splits"]:
-            available_configs.add(split_info["config"])
-            if split_info["config"] == args.config and split_info["split"] == args.split:
-                split_found = True
-        
-        # If default config not found, try first available
-        if not split_found and available_configs:
-            config_to_use = list(available_configs)[0]
-            print(f"Config '{args.config}' not found, trying '{config_to_use}'...")
-        
-        # Get rows
-        rows_data = get_rows(args.dataset, config_to_use, args.split, offset=0, length=args.samples)
-        
-        if not rows_data or "rows" not in rows_data:
-            print(f"ERROR: Could not fetch rows for dataset '{args.dataset}'")
-            print(f"       Split '{args.split}' may not exist")
-            print(f"       Available configs: {', '.join(sorted(available_configs))}")
-            sys.exit(1)
-        
-        rows = rows_data["rows"]
-        if not rows:
-            print(f"ERROR: No rows found in split '{args.split}'")
-            sys.exit(1)
-        
-        # Extract column info from first row
-        first_row = rows[0]["row"]
-        columns = list(first_row.keys())
-        features = rows_data.get("features", [])
-        
-        # Get total count if available
-        total_examples = "Unknown"
-        for split_info in splits_data["splits"]:
-            if split_info["config"] == config_to_use and split_info["split"] == args.split:
-                total_examples = f"{split_info.get('num_examples', 'Unknown'):,}" if isinstance(split_info.get('num_examples'), int) else "Unknown"
-                break
-        
-    except Exception as e:
-        print(f"ERROR: {str(e)}")
+    splits_data = get_splits(args.dataset)
+    if not splits_data or "splits" not in splits_data:
+        print(f"ERROR: Could not fetch splits for dataset '{args.dataset}'")
+        print(f"       Dataset may not exist or is not accessible via Datasets Server API")
         sys.exit(1)
     
-    # Run compatibility checks
-    sft_info = check_sft_compatibility(columns)
-    dpo_info = check_dpo_compatibility(columns)
-    grpo_info = check_grpo_compatibility(columns)
-    kto_info = check_kto_compatibility(columns)
+    available_configs = set()
+    split_found = False
+    config_to_use = args.config
     
-    # Determine recommended methods
+    for split_info in splits_data["splits"]:
+        available_configs.add(split_info["config"])
+        if split_info["config"] == args.config and split_info["split"] == args.split:
+            split_found = True
+    
+    if not split_found and available_configs:
+        config_to_use = list(available_configs)[0]
+        print(f"Config '{args.config}' not found, trying '{config_to_use}'...")
+    
+    rows_data = get_rows(args.dataset, config_to_use, args.split, offset=0, length=args.samples)
+    
+    if not rows_data or "rows" not in rows_data:
+        print(f"ERROR: Could not fetch rows for dataset '{args.dataset}'")
+        print(f"       Split '{args.split}' may not exist")
+        print(f"       Available configs: {', '.join(sorted(available_configs))}")
+        sys.exit(1)
+    
+    rows = rows_data["rows"]
+    if not rows:
+        print(f"ERROR: No rows found in split '{args.split}'")
+        sys.exit(1)
+    
+    first_row = rows[0]["row"]
+    columns = list(first_row.keys())
+    features = rows_data.get("features", [])
+    
+    total_examples = "Unknown"
+    for split_info in splits_data["splits"]:
+        if split_info["config"] == config_to_use and split_info["split"] == args.split:
+            total_examples = f"{split_info.get('num_examples', 'Unknown'):,}" if isinstance(split_info.get('num_examples'), int) else "Unknown"
+            break
+    
+    return {
+        "config_to_use": config_to_use,
+        "rows": rows,
+        "first_row": first_row,
+        "columns": columns,
+        "features": features,
+        "total_examples": total_examples,
+    }
+
+
+def determine_recommended_methods(sft_info, dpo_info, grpo_info, kto_info):
+    """Determine recommended training methods from compatibility info."""
     recommended = []
     if sft_info["ready"]:
         recommended.append("SFT")
@@ -283,56 +276,32 @@ def main():
     if kto_info["ready"]:
         recommended.append("KTO")
     
-    # JSON output mode
-    if args.json_output:
-        result = {
-            "dataset": args.dataset,
-            "config": config_to_use,
-            "split": args.split,
-            "total_examples": total_examples,
-            "columns": columns,
-            "features": [{"name": f["name"], "type": f["type"]} for f in features] if features else [],
-            "compatibility": {
-                "SFT": sft_info,
-                "DPO": dpo_info,
-                "GRPO": grpo_info,
-                "KTO": kto_info,
-            },
-            "recommended_methods": recommended,
-        }
-        print(json.dumps(result, indent=2))
-        sys.exit(0)
-    
-    # Human-readable output optimized for LLM parsing
-    print("=" * 80)
-    print(f"DATASET INSPECTION RESULTS")
-    print("=" * 80)
-    
-    print(f"\nDataset: {args.dataset}")
-    print(f"Config: {config_to_use}")
-    print(f"Split: {args.split}")
-    print(f"Total examples: {total_examples}")
-    print(f"Samples fetched: {len(rows)}")
-    
-    print(f"\n{'COLUMNS':-<80}")
-    if features:
-        for feature in features:
-            print(f"  {feature['name']}: {feature['type']}")
-    else:
-        for col in columns:
-            print(f"  {col}: (type info not available)")
-    
-    print(f"\n{'EXAMPLE DATA':-<80}")
-    example = first_row
-    for col in columns:
-        value = example.get(col)
-        display = format_value_preview(value, args.preview)
-        print(f"\n{col}:")
-        print(f"  {display}")
-    
-    print(f"\n{'TRAINING METHOD COMPATIBILITY':-<80}")
-    
-    # SFT
+    return recommended
+
+
+def output_json(args, info, sft_info, dpo_info, grpo_info, kto_info, recommended):
+    """Output results as JSON."""
+    result = {
+        "dataset": args.dataset,
+        "config": info["config_to_use"],
+        "split": args.split,
+        "total_examples": info["total_examples"],
+        "columns": info["columns"],
+        "features": [{"name": f["name"], "type": f["type"]} for f in info["features"]] if info["features"] else [],
+        "compatibility": {
+            "SFT": sft_info,
+            "DPO": dpo_info,
+            "GRPO": grpo_info,
+            "KTO": kto_info,
+        },
+        "recommended_methods": recommended,
+    }
+    print(json.dumps(result, indent=2))
+    sys.exit(0)
+
+
+def print_sft_section(sft_info):
+    """Print SFT compatibility section."""
     print(f"\n[SFT] {'✓ READY' if sft_info['ready'] else '✗ NEEDS MAPPING'}")
     if sft_info["ready"]:
         print(f"  Reason: Dataset has '{sft_info['reason']}' field")
@@ -342,8 +311,10 @@ def main():
         print(f"  Action: Apply mapping code (see below)")
     else:
         print(f"  Status: Cannot determine mapping - manual inspection needed")
-    
-    # DPO
+
+
+def print_dpo_section(dpo_info):
+    """Print DPO compatibility section."""
     print(f"\n[DPO] {'✓ READY' if dpo_info['ready'] else '✗ NEEDS MAPPING' if dpo_info['can_map'] else '✗ INCOMPATIBLE'}")
     if dpo_info["ready"]:
         print(f"  Reason: Dataset has 'prompt', 'chosen', 'rejected' fields")
@@ -353,8 +324,10 @@ def main():
         print(f"  Action: Apply mapping code (see below)")
     else:
         print(f"  Status: Missing required fields (prompt + chosen + rejected)")
-    
-    # GRPO
+
+
+def print_grpo_section(grpo_info):
+    """Print GRPO compatibility section."""
     print(f"\n[GRPO] {'✓ READY' if grpo_info['ready'] else '✗ NEEDS MAPPING' if grpo_info['can_map'] else '✗ INCOMPATIBLE'}")
     if grpo_info["ready"]:
         print(f"  Reason: Dataset has 'prompt' field")
@@ -364,54 +337,22 @@ def main():
         print(f"  Action: Apply mapping code (see below)")
     else:
         print(f"  Status: Missing prompt field")
-    
-    # KTO
+
+
+def print_kto_section(kto_info):
+    """Print KTO compatibility section."""
     print(f"\n[KTO] {'✓ READY' if kto_info['ready'] else '✗ INCOMPATIBLE'}")
     if kto_info["ready"]:
         print(f"  Reason: Dataset has 'prompt', 'completion', 'label' fields")
         print(f"  Action: Use directly with KTOTrainer")
     else:
         print(f"  Status: Missing required fields (prompt + completion + label)")
-    
-    # Mapping code
+
+
+def print_mapping_section(sft_info, dpo_info, grpo_info):
+    """Print mapping code section."""
     print(f"\n{'MAPPING CODE (if needed)':-<80}")
     
     mapping_needed = False
     
     sft_mapping = generate_mapping_code("SFT", sft_info)
-    if sft_mapping:
-        print(f"\n# For SFT Training:")
-        print(sft_mapping)
-        mapping_needed = True
-    
-    dpo_mapping = generate_mapping_code("DPO", dpo_info)
-    if dpo_mapping:
-        print(f"\n# For DPO Training:")
-        print(dpo_mapping)
-        mapping_needed = True
-    
-    grpo_mapping = generate_mapping_code("GRPO", grpo_info)
-    if grpo_mapping:
-        print(f"\n# For GRPO Training:")
-        print(grpo_mapping)
-        mapping_needed = True
-    
-    if not mapping_needed:
-        print("\nNo mapping needed - dataset is ready for training!")
-    
-    print(f"\n{'SUMMARY':-<80}")
-    print(f"Recommended training methods: {', '.join(recommended) if recommended else 'None (dataset needs formatting)'}")
-    print(f"\nNote: Used Datasets Server API (instant, no download required)")
-    
-    print("\n" + "=" * 80)
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        sys.exit(0)
-    except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
