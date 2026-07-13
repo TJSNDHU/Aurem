@@ -40,23 +40,19 @@ class JucerScraper(AbstractJuntaScraper):
     junta = "JUCER"
     url = "https://rondonia.ro.gov.br/jucer/lista-de-leiloeiros-oficiais/"
 
-    def _parse_dl_structure(self, soup) -> List[dict]:
-        """
-        Parseia estrutura DL/DT/DD do WordPress com anotacao malformada.
-        Estrategia: encontrar todos <dt><strong>NOME</strong></dt>
-        e coletar os <dd> subsequentes ate o proximo <dt> ou <hr>.
-        """
-        records = []
-
-        # Encontrar area de conteudo
+    def _find_content(self, soup):
+        """Localiza a area de conteudo principal dentro do soup."""
         content = soup.select_one(
             ".entry-content, .post-content, article .content, .conteudo, "
             "#conteudo, main article, .page-content"
         )
         if not content:
             content = soup.body or soup
+        return content
 
-        # Abordagem 1: dt/dd estruturado
+    def _parse_dt_dd(self, content) -> List[dict]:
+        """Abordagem 1: parsear estrutura dt/dd estruturada."""
+        records = []
         dts = content.find_all("dt")
         for dt in dts:
             strong = dt.find("strong")
@@ -85,12 +81,11 @@ class JucerScraper(AbstractJuntaScraper):
                 sibling = sibling.next_sibling
 
             records.append(record)
+        return records
 
-        if records:
-            return records
-
-        # Abordagem 2: Segmentar por <hr> e parsear cada bloco
-        # Obter HTML como string e dividir por <hr>
+    def _parse_hr_segments(self, content) -> List[dict]:
+        """Abordagem 2: segmentar por <hr> e parsear cada bloco de texto."""
+        records = []
         full_text = content.get_text("\n")
         # Usa separadores de linha longa como delimitadores de entrada
         segments = re.split(r"\n\s*[-_]{5,}\s*\n|\n(?=\d+\.\s+[A-Z])", full_text)
@@ -120,6 +115,22 @@ class JucerScraper(AbstractJuntaScraper):
             records.append(record)
 
         return records
+
+    def _parse_dl_structure(self, soup) -> List[dict]:
+        """
+        Parseia estrutura DL/DT/DD do WordPress com anotacao malformada.
+        Estrategia: encontrar todos <dt><strong>NOME</strong></dt>
+        e coletar os <dd> subsequentes ate o proximo <dt> ou <hr>.
+        """
+        content = self._find_content(soup)
+
+        # Abordagem 1: dt/dd estruturado
+        records = self._parse_dt_dd(content)
+        if records:
+            return records
+
+        # Abordagem 2: Segmentar por <hr> e parsear cada bloco
+        return self._parse_hr_segments(content)
 
     def _extract_dd_field(self, text: str, record: dict) -> None:
         """Extrai campos de uma linha de texto e popula o record."""
