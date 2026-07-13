@@ -169,7 +169,8 @@ def run_lighteval_accelerate(
         sys.exit(exc.returncode)
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for the lighteval CLI."""
     parser = argparse.ArgumentParser(
         description="Run lighteval evaluations with vLLM or accelerate backend on custom HuggingFace models",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -263,6 +264,11 @@ Task format:
         help="System prompt for chat models",
     )
 
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
 
     if args.backend == "vllm":
