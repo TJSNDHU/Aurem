@@ -1,3 +1,4 @@
+<!-- AUREM README -->
 # AUREM
 
 **The Autonomous Business Operating System for Canadian SMBs.**
@@ -31,5 +32,3 @@ Live: **[https://aurem.live](https://aurem.live)** · Preview: internal Emergent
 19. [Known debt](#known-debt)
 20. [Conventions & rules](#conventions--rules)
 21. [License](#license)
-
-[Rest of existing README content remains unchanged...]
