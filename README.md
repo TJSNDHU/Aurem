@@ -1,3 +1,4 @@
+// QA smoke test marker - safe to revert
 <!-- Reviewed -->
 <!-- AUREM README -->
 # AUREM
