@@ -1,3 +1,5 @@
+# Rollback verify test - ensures critical system functionality remains operational after rollback operations
+
 """
 Smoke tests for the application.
 
