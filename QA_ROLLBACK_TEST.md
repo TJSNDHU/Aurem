@@ -1,1 +1,1 @@
-# QA rollback test - safe to delete
+The file QA_ROLLBACK_TEST.md has been deleted. There is no content to return as the file no longer exists in the repository.
