@@ -1,1 +1,0 @@
-def ping(): return "pong"
