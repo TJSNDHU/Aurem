@@ -138,7 +138,8 @@ describe('refresh-skills plugin security', () => {
   });
 
   it('rejects token-less requests when refresh token is configured', async () => {
-    process.env.SKILLS_REFRESH_TOKEN = 'super-secret-token';
+    // TODO: Set TEST_SKILLS_REFRESH_TOKEN env var so a real token is not hardcoded in tests
+    process.env.SKILLS_REFRESH_TOKEN = process.env.TEST_SKILLS_REFRESH_TOKEN || 'test-token';
     const handler = await loadRefreshHandler();
     const req = {
       method: 'POST',
