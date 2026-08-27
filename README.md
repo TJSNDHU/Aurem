@@ -1,4 +1,3 @@
-# Real UI test - ship/rollback verification
 # Health check test
 # Health check test ok
 # Health check test
