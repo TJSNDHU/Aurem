@@ -1,1 +1,1 @@
-Starting at $9/month
+[x] README.md → done
