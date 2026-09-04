@@ -7,7 +7,7 @@ and maintains a centralized registry (registry.json).
 
 Features:
 - Runs automatically on every request (called by CLAUDE.md)
-- Ultra-fast via MD5 hash caching (~<100ms when nothing changed)
+- Ultra-fast via SHA-256 hash caching (~<100ms when nothing changed)
 - Auto-includes new skills, auto-removes deleted skills
 - Zero manual intervention required
 
@@ -132,9 +132,9 @@ CAPABILITY_MAP = {
 
 # ── Utility Functions ──────────────────────────────────────────────────────
 
-def md5_file(path: Path) -> str:
-    """Compute MD5 hash of a file."""
-    h = hashlib.md5()
+def sha256_file(path: Path) -> str:
+    """Compute SHA-256 hash of a file."""
+    h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
@@ -348,161 +348,3 @@ def build_skill_entry(skill_md_path: Path) -> dict:
         "has_data": (skill_dir / "data").exists(),
         "capabilities": all_caps,
         "triggers": extract_triggers(description),
-        "language": detect_language(skill_dir),
-        "status": assess_status(skill_dir),
-        "last_modified": datetime.fromtimestamp(
-            skill_md_path.stat().st_mtime
-        ).isoformat(),
-    }
-
-
-def scan(force: bool = False) -> dict:
-    """
-    Main scan function.
-
-    With hash caching:
-    1. Find all SKILL.md files
-    2. Compare MD5 hashes with stored values
-    3. Only re-parse files that changed, were added, or removed
-    4. Update registry incrementally
-    """
-    current_files = find_skill_files()
-    current_paths = {str(f): f for f in current_files}
-
-    stored_hashes = load_hashes()
-    registry = load_registry()
-
-    # Build lookup of existing registry entries by skill_md path
-    existing_by_path = {}
-    for entry in registry.get("skills", []):
-        existing_by_path[entry.get("skill_md", "")] = entry
-
-    # Compute current hashes
-    new_hashes = {}
-    changed = False
-
-    for path_str, path_obj in current_paths.items():
-        current_hash = md5_file(path_obj)
-        new_hashes[path_str] = current_hash
-
-        if force or path_str not in stored_hashes or stored_hashes[path_str] != current_hash:
-            # New or modified - rebuild entry
-            entry = build_skill_entry(path_obj)
-            existing_by_path[path_str] = entry
-            changed = True
-
-    # Detect removed skills
-    for old_path in list(existing_by_path.keys()):
-        if old_path not in current_paths and old_path != "":
-            del existing_by_path[old_path]
-            changed = True
-
-    # Check if file set changed (additions/removals)
-    if set(new_hashes.keys()) != set(stored_hashes.keys()):
-        changed = True
-
-    # Deduplicate by skill name (case-insensitive).
-    # When the same skill exists in both skills/ and .claude/skills/,
-    # prefer the primary location (skills/) over the registered copy.
-    if changed or not REGISTRY_PATH.exists():
-        by_name = {}
-        for entry in existing_by_path.values():
-            name = entry.get("name", "").lower()
-            if not name:
-                continue
-            if name not in by_name:
-                by_name[name] = entry
-            else:
-                # Prefer the version NOT in .claude/skills/ (the primary source)
-                existing = by_name[name]
-                existing_is_registered = existing.get("registered", False)
-                new_is_registered = entry.get("registered", False)
-                if existing_is_registered and not new_is_registered:
-                    by_name[name] = entry
-                # If both are primary or both registered, keep first found
-
-        registry["skills"] = sorted(by_name.values(), key=lambda s: s.get("name", ""))
-        save_registry(registry)
-        save_hashes(new_hashes)
-        return registry
-    else:
-        # Nothing changed, return existing
-        return registry
-
-
-def print_status(registry: dict):
-    """Print a formatted status table."""
-    skills = registry.get("skills", [])
-
-    if not skills:
-        print("No skills found in the ecosystem.")
-        return
-
-    print(f"\n{'='*80}")
-    print(f"  Agent Orchestrator - Skill Registry Status")
-    print(f"  Scanned at: {registry.get('generated_at', 'N/A')}")
-    print(f"  Root: {registry.get('skills_root', 'N/A')}")
-    print(f"{'='*80}\n")
-
-    # Header
-    print(f"  {'Name':<22} {'Status':<12} {'Lang':<10} {'Registered':<12} {'Capabilities'}")
-    print(f"  {'-'*22} {'-'*12} {'-'*10} {'-'*12} {'-'*30}")
-
-    for s in sorted(skills, key=lambda x: x.get("name", "")):
-        name = s.get("name", "?")[:20]
-        status = s.get("status", "?")
-        lang = s.get("language", "none")
-        reg = "Yes" if s.get("registered") else "No"
-        caps = ", ".join(s.get("capabilities", []))[:30]
-        print(f"  {name:<22} {status:<12} {lang:<10} {reg:<12} {caps}")
-
-    print(f"\n  Total: {len(skills)} skills")
-
-    # Recommendations
-    unregistered = [s for s in skills if not s.get("registered")]
-    incomplete = [s for s in skills if s.get("status") == "incomplete"]
-
-    if unregistered:
-        print(f"\n  [!] {len(unregistered)} skill(s) not registered in .claude/skills/:")
-        for s in unregistered:
-            print(f"      - {s['name']} ({s['location']})")
-
-    if incomplete:
-        print(f"\n  [!] {len(incomplete)} skill(s) with incomplete status:")
-        for s in incomplete:
-            print(f"      - {s['name']} ({s['location']})")
-
-    print()
-
-
-# ── CLI Entry Point ────────────────────────────────────────────────────────
-
-def main():
-    force = "--force" in sys.argv
-    show_status = "--status" in sys.argv
-
-    registry = scan(force=force)
-
-    if show_status:
-        print_status(registry)
-    else:
-        # Default: output JSON summary for Claude to parse
-        skills = registry.get("skills", [])
-        summary = {
-            "total": len(skills),
-            "active": len([s for s in skills if s.get("status") == "active"]),
-            "incomplete": len([s for s in skills if s.get("status") == "incomplete"]),
-            "skills": [
-                {
-                    "name": s.get("name"),
-                    "status": s.get("status"),
-                    "capabilities": s.get("capabilities", []),
-                }
-                for s in skills
-            ],
-        }
-        print(json.dumps(summary, indent=2, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()
