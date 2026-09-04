@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unpack and format XML contents of Office files (.docx, .pptx, .xlsx)"""
 
+import defusedxml.minidom
 import random
 import shutil
 import stat
@@ -46,8 +47,6 @@ def extract_archive_safely(input_file: str | Path, output_dir: str | Path):
 
 
 def pretty_print_xml(output_path: Path):
-    import defusedxml.minidom
-
     xml_files = list(output_path.rglob("*.xml")) + list(output_path.rglob("*.rels"))
     for xml_file in xml_files:
         content = xml_file.read_text(encoding="utf-8")
