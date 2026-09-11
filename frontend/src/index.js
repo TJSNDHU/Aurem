@@ -1,3 +1,4 @@
+// regression test 2
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
@@ -9,15 +10,15 @@ import "./utils/incidentReporter";
 
 console.log('[AUREM] Autonomous AI Workforce Platform Starting...');
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // AUREM SENTINEL — Client-side error observability + auto-heal
 // Installs global error listeners + fetch sniffer that ship to
 // /api/sentinel/client-error for admin review. AI diagnosis is
 // triggered manually by an admin; code is never auto-modified.
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 installSentinel();
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // STALE-PREVIEW-POD URL AUTO-HEAL (Apr 2026)
 // ---------------------------------------------------------------
 // Production bundles deployed to aurem.live can carry a baked-in
@@ -30,7 +31,7 @@ installSentinel();
 // on the production host (aurem.live), ANY request to a known stale
 // preview-pod hostname is rewritten to same-origin before the network
 // call leaves the browser. Rest of the fetch behavior stays untouched.
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 (function installApiUrlHealer() {
   try {
     if (typeof window === 'undefined' || !window.fetch) return;
@@ -73,7 +74,7 @@ installSentinel();
   }
 })();
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // CHUNK LOAD ERROR AUTO-RECOVERY
 // ---------------------------------------------------------------
 // When a stale Service Worker / stale HTML references Webpack chunks
@@ -81,7 +82,7 @@ installSentinel();
 // or "Unexpected token '<'". We detect this and force a one-time
 // hard reload after clearing the SW caches, so users don't get stuck
 // on a blank / broken screen.
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 const RELOAD_FLAG = '__aurem_chunk_reload__';
 
 async function nukeCachesAndReload() {
