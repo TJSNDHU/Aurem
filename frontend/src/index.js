@@ -1,5 +1,6 @@
 // regression test 2
 // regression test 3
+// regression test round3
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
@@ -9,7 +10,8 @@ import { installSentinel } from "./lib/sentinel";
 // unhandledrejection → POST /api/incident/report. Side-effect import only.
 import "./utils/incidentReporter";
 
-console.log('[AUREM] Autonomous AI Workforce Platform Starting...');
+if (process.env.NODE_ENV === 'development') {
+}
 
 // ════════════════════════════════════════════════════
 // AUREM SENTINEL — Client-side error observability + auto-heal
@@ -44,4 +46,4 @@ installSentinel();
             u.hostname !== window.location.hostname &&
             STALE_MARKERS.some((m) => u.hostname.endsWith(m));
           if (isStale) {
-            const healed = window.location.origin + u.pathname + u.search + u.hash;        if (typeof input === 'string') {          input = healed;     else { input = new Request(healed, input); }}}} catch (_e) { /* swallow and fall through */ }return origFetch(input, init);};console.log('[AUREM] API URL auto-healer installed (production mode)');} catch (e) { console.warn('[AUREM] API URL healer install failed:', e); }D})();
+            const healed = window.location.origin + u.pathname + u.search + u.hash;        if (typeof input === 'string') {          input = healed;     else { input = new Request(healed, input); }}}} catch (_e) { /* swallow and fall through */ }return origFetch(input, init);};} catch (e) { console.warn('[AUREM] API URL healer install failed:', e); }D})();
