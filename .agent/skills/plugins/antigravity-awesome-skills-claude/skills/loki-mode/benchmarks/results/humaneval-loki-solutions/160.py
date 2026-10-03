@@ -3,6 +3,9 @@
 # Attempts: 1
 # Passed: True
 
+import ast
+import operator as op_module
+
 def do_algebra(operator, operand):
     """
     Given two lists operator, and operand. The first list has basic algebra operations, and 
@@ -31,4 +34,25 @@ def do_algebra(operator, operand):
     expression = str(operand[0])
     for i, op in enumerate(operator):
         expression += op + str(operand[i + 1])
-    return eval(expression)
+    return _safe_eval(ast.parse(expression, mode='eval'))
+
+
+_ALLOWED_OPS = {
+    ast.Add: op_module.add,
+    ast.Sub: op_module.sub,
+    ast.Mult: op_module.mul,
+    ast.FloorDiv: op_module.floordiv,
+    ast.Pow: op_module.pow,
+}
+
+
+def _safe_eval(node):
+    if isinstance(node, ast.Expression):
+        return _safe_eval(node.body)
+    if isinstance(node, ast.BinOp):
+        left = _safe_eval(node.left)
+        right = _safe_eval(node.right)
+        return _ALLOWED_OPS[type(node.op)](left, right)
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        return node.value
+    raise ValueError("Unsafe expression")
