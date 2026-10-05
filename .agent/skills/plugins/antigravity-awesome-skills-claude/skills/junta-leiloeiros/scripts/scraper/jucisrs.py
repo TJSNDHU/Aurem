@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
+import ssl
 from typing import List
 
 from .base_scraper import AbstractJuntaScraper, Leiloeiro
@@ -31,6 +32,13 @@ RE_PREPOSTO = re.compile(r"[Pp]reposto\s*:\s*(.+)")
 RE_CEP = re.compile(r"CEP\s+([\d.]+)")
 RE_CANCELADO = re.compile(r"CANCELAD|CANCELAMENTO|canc\.", re.IGNORECASE)
 RE_CIDADE_UF = re.compile(r"^([A-ZÁÉÍÓÚÀÃÕÇ][A-ZÁÉÍÓÚÀÃÕÇ\s]+)\s+-\s+RS$")
+
+def create_secure_ssl_context() -> ssl.SSLContext:
+    """Create default secure SSL context with modern settings."""
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    return ctx
 
 
 class JucisrsScraper(AbstractJuntaScraper):
@@ -174,10 +182,12 @@ class JucisrsScraper(AbstractJuntaScraper):
         """
         import httpx
 
+        ssl_context = create_secure_ssl_context()
+        
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,  # Cert autoassinado/invalido
+                verify=ssl_context,  # Try secure connection first
                 follow_redirects=True,
                 timeout=60.0,
             ) as client:
@@ -208,6 +218,44 @@ class JucisrsScraper(AbstractJuntaScraper):
                 logger.info("[RS] POST OK - tamanho resposta: %d bytes", len(resp.content))
                 return self._parse_plain_html(resp.text)
 
+        except ssl.SSLError as ssl_exc:
+            logger.warning("[RS] SSL verification failed, falling back to insecure connection: %s", ssl_exc)
+            try:
+                async with httpx.AsyncClient(
+                    headers=self.HEADERS,
+                    verify=False,  # Fallback to insecure
+                    follow_redirects=True,
+                    timeout=60.0,
+                ) as client:
+                    # GET primeiro para obter cookies/CSRF se necessario
+                    try:
+                        await client.get(self.url)
+                    except Exception:
+                        pass
+
+                    resp = await client.post(
+                        self._POST_URL,
+                        data={
+                            "Nome": "",
+                            "CodMunicipio": "0",  # 0 = Todas as cidades
+                            "Situacao": "TODOS",
+                            "Funcao": "LEILOEIRO",
+                        },
+                        headers={
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "Referer": self.url,
+                            "Origin": "https://sistemas.jucisrs.rs.gov.br",
+                        },
+                    )
+                    if resp.status_code >= 400:
+                        logger.warning("[RS] POST retornou HTTP %d", resp.status_code)
+                        return []
+
+                    logger.info("[RS] POST OK (insecure fallback) - tamanho resposta: %d bytes", len(resp.content))
+                    return self._parse_plain_html(resp.text)
+            except Exception as exc:
+                logger.error("[RS] Erro no POST (insecure fallback): %s", exc)
+                return []
         except Exception as exc:
             logger.error("[RS] Erro no POST: %s", exc)
             return []
@@ -220,10 +268,12 @@ class JucisrsScraper(AbstractJuntaScraper):
         import httpx
         from bs4 import BeautifulSoup
 
+        ssl_context = create_secure_ssl_context()
+
         try:
             async with httpx.AsyncClient(
                 headers=self.HEADERS,
-                verify=False,
+                verify=ssl_context,  # Try secure connection first
                 follow_redirects=True,
                 timeout=30.0,
             ) as client:
@@ -232,6 +282,23 @@ class JucisrsScraper(AbstractJuntaScraper):
                     return []
                 soup = BeautifulSoup(resp.text, "lxml")
                 return self._parse_plain_html(resp.text)
+        except ssl.SSLError as ssl_exc:
+            logger.warning("[RS] SSL verification failed, falling back to insecure connection: %s", ssl_exc)
+            try:
+                async with httpx.AsyncClient(
+                    headers=self.HEADERS,
+                    verify=False,  # Fallback to insecure
+                    follow_redirects=True,
+                    timeout=30.0,
+                ) as client:
+                    resp = await client.get(self.url)
+                    if resp.status_code >= 400:
+                        return []
+                    soup = BeautifulSoup(resp.text, "lxml")
+                    return self._parse_plain_html(resp.text)
+            except Exception as exc:
+                logger.error("[RS] Erro no GET (insecure fallback): %s", exc)
+                return []
         except Exception as exc:
             logger.error("[RS] Erro no GET: %s", exc)
             return []
@@ -297,3 +364,4 @@ class JucisrsScraper(AbstractJuntaScraper):
 
         logger.info("[RS] Total de registros encontrados: %d", len(records))
         return [self.make_leiloeiro(**r) for r in records if r.get("nome")]
+
