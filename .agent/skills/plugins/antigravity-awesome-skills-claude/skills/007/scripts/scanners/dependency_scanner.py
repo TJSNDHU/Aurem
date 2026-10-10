@@ -9,7 +9,6 @@ Usage:
     python dependency_scanner.py --target /path/to/project --output json --verbose
 """
 
-# pylint: disable=too-many-lines
 import argparse
 import json
 import os
@@ -97,4 +96,181 @@ _PY_PACKAGE_RE = re.compile(
 # Hash present
 _PY_HASH_RE = re.compile(r"""--hash[=:]""")
 
-# Known risky
+# Known risky Python packages or patterns
+_RISKY_PYTHON_PACKAGES = {
+    "pyyaml": "PyYAML with yaml.load() (without SafeLoader) enables arbitrary code execution",
+    "pickle": "pickle module allows arbitrary code execution during deserialization",
+    "shelve": "shelve uses pickle internally, same deserialization risks",
+    "marshal": "marshal module can execute arbitrary code during deserialization",
+    "dill": "dill extends pickle with same arbitrary code execution risks",
+    "cloudpickle": "cloudpickle extends pickle with same security concerns",
+    "jsonpickle": "jsonpickle can deserialize to arbitrary objects",
+    "pyinstaller": "PyInstaller bundles can hide malicious code in executables",
+    "subprocess32": "Deprecated subprocess replacement; use stdlib subprocess instead",
+}
+
+
+# ---------------------------------------------------------------------------
+# Node.js analysis patterns
+# ---------------------------------------------------------------------------
+
+# Exact version:  "1.2.3"
+# Pinned prefix:  "1.2.3" (no ^ or ~ or * or > or <)
+# Loose:          "^1.2.3"  "~1.2.3"  ">=1.0"  "*"  "latest"
+
+_NODE_EXACT_VERSION_RE = re.compile(
+    r"""^\d+\.\d+\.\d+$"""
+)
+
+_NODE_LOOSE_INDICATORS = re.compile(
+    r"""^[\^~*><=]|latest|next|canary""", re.IGNORECASE
+)
+
+# Risky postinstall script patterns
+_NODE_RISKY_SCRIPTS = re.compile(
+    r"""(?:curl|wget|fetch|http|eval|exec|child_process|\.sh\b|powershell)""",
+    re.IGNORECASE,
+)
+
+
+# ---------------------------------------------------------------------------
+# Dockerfile analysis patterns
+# ---------------------------------------------------------------------------
+
+_DOCKER_FROM_RE = re.compile(
+    r"""^\s*FROM\s+(\S+)""", re.IGNORECASE
+)
+
+_DOCKER_FROM_LATEST_RE = re.compile(
+    r"""(?::latest\s*$|^[^:]+\s*$)"""
+)
+
+_DOCKER_USER_RE = re.compile(
+    r"""^\s*USER\s+""", re.IGNORECASE
+)
+
+_DOCKER_COPY_SENSITIVE_RE = re.compile(
+    r"""^\s*(?:COPY|ADD)\s+.*?(?:\.env|\.key|\.pem|\.p12|\.pfx|id_rsa|id_ed25519|\.secret)""",
+    re.IGNORECASE,
+)
+
+_DOCKER_CURL_PIPE_RE = re.compile(
+    r"""(?:curl|wget)\s+[^|]*\|\s*(?:bash|sh|zsh|python|perl|ruby|node)""",
+    re.IGNORECASE,
+)
+
+# Known trusted base images (prefixes)
+_DOCKER_TRUSTED_BASES = {
+    "python", "node", "golang", "ruby", "openjdk", "amazoncorretto",
+    "alpine", "ubuntu", "debian", "centos", "fedora", "archlinux",
+    "nginx", "httpd", "redis", "postgres", "mysql", "mongo", "memcached",
+    "mcr.microsoft.com/", "gcr.io/", "ghcr.io/", "docker.io/library/",
+    "registry.access.redhat.com/",
+}
+
+
+# ---------------------------------------------------------------------------
+# Finding builder
+# ---------------------------------------------------------------------------
+
+def _make_finding(
+    file: str,
+    line: int,
+    severity: str,
+    description: str,
+    recommendation: str,
+    pattern: str = "dependency",
+) -> dict:
+    """Create a standardized finding dict.
+
+    Args:
+        file:           Absolute path to the dependency file.
+        line:           Line number where the issue was found (1-based, 0 if N/A).
+        severity:       CRITICAL, HIGH, MEDIUM, or LOW.
+        description:    Human-readable description of the issue.
+        recommendation: Actionable fix suggestion.
+        pattern:        Finding sub-type for aggregation.
+
+    Returns:
+        Finding dict compatible with other 007 scanners.
+    """
+    return {
+        "type": "supply_chain",
+        "pattern": pattern,
+        "severity": severity,
+        "file": file,
+        "line": line,
+        "description": description,
+        "recommendation": recommendation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Python dependency analysis
+# ---------------------------------------------------------------------------
+
+def _analyze_requirements_line(
+    line_no_comment: str,
+    raw_line: str,
+    line_num: int,
+    file_str: str,
+) -> dict | None:
+    """Analyze a single requirements.txt line for package info.
+
+    Args:
+        line_no_comment: Line text with inline comments stripped.
+        raw_line:        Original line text (for hash detection).
+        line_num:        1-based line number.
+        file_str:        String path to the file (for findings).
+
+    Returns:
+        Dict with pkg_name, is_pinned, has_hash, is_risky, risky_desc,
+        or None if the line is not a package declaration.
+    """
+    pkg_match = _PY_PACKAGE_RE.match(line_no_comment)
+    if not pkg_match:
+        return None
+
+    pkg_name = pkg_match.group(1).lower()
+    is_pinned = bool(_PY_PINNED_RE.match(line_no_comment))
+    has_hash = bool(_PY_HASH_RE.search(raw_line))
+    is_risky = pkg_name in _RISKY_PYTHON_PACKAGES
+    risky_desc = _RISKY_PYTHON_PACKAGES.get(pkg_name, "")
+
+    return {
+        "pkg_name": pkg_name,
+        "is_pinned": is_pinned,
+        "has_hash": has_hash,
+        "is_risky": is_risky,
+        "risky_desc": risky_desc,
+    }
+
+
+def analyze_requirements_txt(filepath: Path, verbose: bool = False) -> dict:
+    """Analyze a Python requirements.txt file.
+
+    Returns:
+        Dict with keys: deps_total, deps_pinned, deps_hashed,
+        deps_unpinned, findings.
+    """
+    findings: list[dict] = []
+    file_str = str(filepath)
+    deps_total = 0
+    deps_pinned = 0
+    deps_hashed = 0
+    deps_unpinned: list[str] = []
+
+    try:
+        text = filepath.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        if verbose:
+            logger.debug("Cannot read %s: %s", filepath, exc)
+        return {
+            "deps_total": 0, "deps_pinned": 0, "deps_hashed": 0,
+            "deps_unpinned": [], "findings": findings,
+        }
+
+    for line_num, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+
+        # Skip comments, options
