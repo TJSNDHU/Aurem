@@ -229,11 +229,49 @@ def save_image(
 
 
 # =============================================================================
-# HELPERS PARA REFATORACAO
+# FUNCAO PRINCIPAL — COM FALLBACK DE API KEYS
 # =============================================================================
 
-def _validate_and_get_api_keys():
-    """Valida e retorna API keys disponiveis."""
+def generate(
+    prompt: str,
+    mode: str = DEFAULT_MODE,
+    format_name: str = DEFAULT_FORMAT,
+    humanization: str = DEFAULT_HUMANIZATION,
+    lighting: str | None = None,
+    model_name: str = DEFAULT_MODEL,
+    num_images: int = 1,
+    template: str = "custom",
+    template_context: str | None = None,
+    output_dir: Path | None = None,
+    skip_humanization: bool = False,
+    resolution: str = DEFAULT_RESOLUTION,
+    person_generation: str = DEFAULT_PERSON_GENERATION,
+    reference_images: list[Path] | None = None,
+    shot_type: str | None = None,
+    force_paid: bool = False,
+) -> list[Path]:
+    """
+    Funcao principal de geracao de imagens.
+
+    Fluxo:
+    1. Valida e tenta API keys com fallback
+    2. Humaniza o prompt (se nao skip)
+    3. Chama a API apropriada (Imagen ou Gemini)
+    4. Salva imagens + metadados completos
+    5. Retorna paths dos arquivos gerados
+    """
+    # 0. CONTROLADOR DE SEGURANCA — verifica modelo e limite diario
+    allowed, msg = safety_check_model(model_name, force=force_paid)
+    if not allowed:
+        raise SystemExit(f"[SAFETY] {msg}")
+    print(f"[SAFETY] {msg}")
+
+    allowed, msg = safety_check_daily_limit(num_images)
+    if not allowed:
+        raise SystemExit(f"[SAFETY] {msg}")
+    print(f"[SAFETY] {msg}")
+
+    # 1. Obter API keys
     api_keys = get_all_api_keys()
     if not api_keys:
         print("=" * 60)
@@ -246,137 +284,143 @@ def _validate_and_get_api_keys():
         print()
         print("  Obtenha sua key em: https://aistudio.google.com/apikey")
         sys.exit(1)
-    return api_keys
 
+    # 2. Resolver formato (suporta aliases)
+    format_name = resolve_format(format_name)
+    if format_name not in IMAGE_FORMATS:
+        format_name = DEFAULT_FORMAT
 
-def _prepare_prompt(
-    prompt: str,
-    skip_humanization: bool,
-    mode: str,
-    humanization: str,
-    lighting: str | None,
-    template_context: str | None,
-    shot_type: str | None,
-    resolution: str,
-) -> str:
-    """Prepara e humaniza o prompt se necessario."""
+    # 3. Humanizar prompt
     if skip_humanization:
-        return prompt
-    return humanize_prompt(
-        user_prompt=prompt,
-        mode=mode,
-        humanization=humanization,
-        lighting=lighting,
-        template_context=template_context,
-        shot_type=shot_type,
-        resolution=resolution,
-    )
+        final_prompt = prompt
+    else:
+        final_prompt = humanize_prompt(
+            user_prompt=prompt,
+            mode=mode,
+            humanization=humanization,
+            lighting=lighting,
+            template_context=template_context,
+            shot_type=shot_type,
+            resolution=resolution,
+        )
 
+    # 4. Configuracoes do modelo
+    model_config = MODELS.get(model_name, MODELS[DEFAULT_MODEL])
+    format_config = IMAGE_FORMATS[format_name]
+    aspect_ratio = format_config["aspect_ratio"]
 
-def _print_generation_info(
-    model_config: dict,
-    mode: str,
-    format_name: str,
-    aspect_ratio: str,
-    humanization: str,
-    resolution: str,
-    num_images: int,
-    lighting: str | None,
-    reference_images: list[Path] | None,
-    output_dir: Path,
-):
-    """Imprime informacoes sobre a geracao."""
+    if output_dir is None:
+        output_dir = OUTPUTS_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    num_images = min(num_images, model_config["max_images"])
+
     print("=" * 60)
     print("  AI STUDIO IMAGE — Gerando Imagem Humanizada")
     print("=" * 60)
     print(f"  Modelo:         {model_config['id']}")
     print(f"  Tipo:           {model_config['type']}")
-    print(f"  Modo:           {mode}")
-    print(f"  Formato:        {format_name} ({aspect_ratio})")
-    print(f"  Humanizacao:    {humanization}")
-    print(f"  Resolucao:      {resolution}")
-    print(f"  Imagens:        {num_images}")
-    if lighting:
-        print(f"  Iluminacao:     {lighting}")
-    if reference_images:
-        print(f"  Referencias:    {len(reference_images)} imagem(ns)")
-    print(f"  Output:         {output_dir}")
-    print("=" * 60)
-    print()
+     print(f"  Modo:           {mode}")
+     print(f"  Formato:        {format_name} ({aspect_ratio})")
+     print(f"  Humanizacao:   {humanization}")
+     print(f"  Resolucao:      {resolution}")
+     print(f"  Imagens:       {num_images}")
+     if lighting:
+         print(f"  Iluminacao:     {lighting}")
+     if reference_images:
+         print(f"  Referencias:   {len(reference_images)} imagem(ns)")
+     print(f"  Output:         {output_dir}")
+     print("=" * 60)
+     print()
 
+     # 5. Gerar com fallback de API keys
+     images = []
+     used_key_index = 0
+     start_time = time.time()
 
-def _handle_generation_error(error_msg: str, is_last_key: bool, is_rate_limit: bool):
-    """Trata erros de geracao."""
-    if not is_last_key:
-        print(f"  Key falhou ({error_msg[:60]}...), tentando backup...")
-        return
-    
-    print(f"\n  ERRO: Todas as tentativas falharam.")
-    print(f"  Ultimo erro: {error_msg[:200]}")
-    print()
-    if is_rate_limit:
-        print("  Rate limit esgotado. Sugestoes:")
-        print("  - Aguarde alguns minutos e tente novamente")
-        print("  - Habilite billing no Google Cloud para limites maiores")
-        print("  - Use um modelo diferente (--model imagen-4-fast)")
-    else:
-        print("  Dicas:")
-        print("  - Verifique se a API key e valida")
-        print("  - O prompt pode conter conteudo restrito")
-        print("  - Tente simplificar o prompt")
-    print("  - Verifique: https://aistudio.google.com/")
+     max_retries = 3
+     retry_delay = 15  # seconds
 
+     for attempt in range(max_retries):
+         for i, api_key in enumerate(api_keys):
+             try:
+                 if model_config["type"] == "imagen":
+                     images = generate_with_imagen(
+                         prompt=final_prompt,
+                         model_id=model_config["id"],
+                         aspect_ratio=aspect_ratio,
+                         num_images=num_images,
+                         api_key=api_key,
+                         resolution=resolution,
+                         person_generation=person_generation,
+                     )
+                 else:
+                     images = generate_with_gemini(
+                         prompt=final_prompt,
+                         model_id=model_config["id"],
+                         aspect_ratio=aspect_ratio,
+                         api_key=api_key,
+                         resolution=resolution,
+                         reference_images=reference_images,
+                     )
 
-def _generate_images_with_retry(
-    final_prompt: str,
-    model_config: dict,
-    aspect_ratio: str,
-    num_images: int,
-    api_keys: list[str],
-    resolution: str,
-    person_generation: str,
-    reference_images: list[Path] | None,
-) -> tuple[list[dict], int]:
-    """Gera imagens com retry e fallback de API keys."""
-    images = []
-    used_key_index = 0
-    max_retries = 3
-    retry_delay = 15
+                 if images:
+                     used_key_index = i
+                     break
 
-    for attempt in range(max_retries):
-        for i, api_key in enumerate(api_keys):
-            try:
-                if model_config["type"] == "imagen":
-                    images = generate_with_imagen(
-                        prompt=final_prompt,
-                        model_id=model_config["id"],
-                        aspect_ratio=aspect_ratio,
-                        num_images=num_images,
-                        api_key=api_key,
-                        resolution=resolution,
-                        person_generation=person_generation,
-                    )
-                else:
-                    images = generate_with_gemini(
-                        prompt=final_prompt,
-                        model_id=model_config["id"],
-                        aspect_ratio=aspect_ratio,
-                        api_key=api_key,
-                        resolution=resolution,
-                        reference_images=reference_images,
-                    )
+             except Exception as e:
+                 error_msg = str(e)
+                 is_rate_limit = "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg
+                 is_last_key = i >= len(api_keys) - 1
 
-                if images:
-                    used_key_index = i
-                    return images, used_key_index
+                 if not is_last_key:
+                     print(f"  Key {i+1} falhou ({error_msg[:60]}...), tentando backup...")
+                     continue
+                 elif is_rate_limit and attempt < max_retries - 1:
+                     # Extrair delay sugerido da resposta se possivel
+                     delay_match = re.search(r'retryDelay.*?(\d+)', error_msg)
+                     wait_time = int(delay_match.group(1)) if delay_match else retry_delay
+                     wait_time = min(wait_time + 5, 60)  # cap at 60s
+                     print(f"  Rate limit atingido. Aguardando {wait_time}s (tentativa {attempt+1}/{max_retries})...")
+                     time.sleep(wait_time)
+                     break  # Break inner loop to retry all keys
+                 else:
+                     print(f"\n  ERRO: Todas as tentativas falharam.")
+                     print(f"  Ultimo erro: {error_msg[:200]}")
+                     print()
+                     if is_rate_limit:
+                         print("  Rate limit esgotado. Sugestoes:")
+                         print("  - Aguarde alguns minutos e tente novamente")
+                         print("  - Habilite billing no Google Cloud para limites maiores")
+                         print("  - Use um modelo diferente (--model imagen-4-fast)")
+                     else:
+                         print("  Dicas:")
+                         print("  - Verifique se a API key e valida")
+                         print("  - O prompt pode conter conteudo restrito")
+                         print("  - Tente simplificar o prompt")
+                     print("  - Verifique: https://aistudio.google.com/")
+                     return []
 
-            except Exception as e:
-                error_msg = str(e)
-                is_rate_limit = "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg
-                is_last_key = i >= len(api_keys) - 1
+         if images:
+             break
 
-                if not is_last_key:
-                    _handle_generation_error(error_msg, is_last_key, is_rate_limit)
-                    continue
-                elif is_rate_limit and attempt < max_retries - 1:
-                    delay_match = re.search(r'retryDelay.*?(\d+)', error_msg)
+     elapsed = time.time() - start_time
+
+     if not images:
+         print("\n  Nenhuma imagem gerada. Verifique o prompt e tente novamente.")
+         return []
+
+     # 6. Salvar imagens e metadados
+     metadata = {
+         "original_prompt": prompt,
+         "humanized_prompt": final_prompt,
+         "mode": mode,
+         "format": format_name,
+         "aspect_ratio": aspect_ratio,
+         "humanization": humanization,
+         "lighting": lighting,
+         "shot_type": shot_type,
+         "model": model_config["id"],
+         "model_name": model_name,
+         "model_type": model_config["type"],
+         "resolution": resolution,
