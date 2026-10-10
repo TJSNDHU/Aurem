@@ -70,3 +70,131 @@ logger = setup_logging("007-full-audit")
 # =========================================================================
 # RED TEAM SCENARIO TEMPLATES
 # =========================================================================
+# Mapping from finding type/pattern -> attack scenario template.
+
+_RED_TEAM_TEMPLATES: dict[str, dict] = {
+    # --- Secrets ---
+    "secret": {
+        "title": "Credential Theft via Leaked Secret",
+        "persona": "External attacker / Insider",
+        "scenario": (
+            "Attacker discovers leaked credential ({pattern}) in {file} "
+            "and uses it to gain unauthorized access to the associated "
+            "service or resource. Depending on the credential scope, "
+            "the attacker may escalate to full account takeover."
+        ),
+        "impact": "Unauthorized access, data exfiltration, lateral movement",
+        "difficulty": "Easy (if credential is in public repo) / Medium (if private)",
+    },
+    # --- Injection ---
+    "code_injection": {
+        "title": "Remote Code Execution via Code Injection",
+        "persona": "Malicious user / Compromised agent",
+        "scenario": (
+            "Attacker crafts malicious input targeting {pattern} in {file}. "
+            "The injected code executes in the server context, allowing "
+            "arbitrary command execution, data access, or system compromise."
+        ),
+        "impact": "Full server compromise, data breach, service disruption",
+        "difficulty": "Medium",
+    },
+    "command_injection": {
+        "title": "System Compromise via Command Injection",
+        "persona": "Malicious user / API abuser",
+        "scenario": (
+            "Attacker injects OS commands through {pattern} in {file}. "
+            "The shell executes attacker-controlled commands, enabling "
+            "file access, reverse shells, or privilege escalation."
+        ),
+        "impact": "Full system compromise, lateral movement",
+        "difficulty": "Medium",
+    },
+    "sql_injection": {
+        "title": "Data Breach via SQL Injection",
+        "persona": "Malicious user / Bot",
+        "scenario": (
+            "Attacker crafts SQL payload targeting {pattern} in {file}. "
+            "The malformed query bypasses authentication, extracts sensitive "
+            "data, modifies records, or drops tables."
+        ),
+        "impact": "Data breach, data loss, authentication bypass",
+        "difficulty": "Easy to Medium",
+    },
+    "prompt_injection": {
+        "title": "AI Manipulation via Prompt Injection",
+        "persona": "Malicious user / Compromised data source",
+        "scenario": (
+            "Attacker injects adversarial prompt through {pattern} in {file}. "
+            "The LLM follows injected instructions, potentially exfiltrating "
+            "data, bypassing safety controls, or performing unauthorized actions."
+        ),
+        "impact": "Data leakage, unauthorized actions, reputation damage",
+        "difficulty": "Easy to Medium",
+    },
+    "xss": {
+        "title": "User Account Takeover via XSS",
+        "persona": "Malicious user",
+        "scenario": (
+            "Attacker injects JavaScript through {pattern} in {file}. "
+            "The script executes in victim browsers, stealing session tokens, "
+            "redirecting users, or performing actions on their behalf."
+        ),
+        "impact": "Session hijacking, credential theft, phishing",
+        "difficulty": "Easy",
+    },
+    "ssrf": {
+        "title": "Internal Network Scanning via SSRF",
+        "persona": "External attacker",
+        "scenario": (
+            "Attacker manipulates server-side request through {pattern} in {file}. "
+            "The server makes requests to internal services, cloud metadata endpoints, "
+            "or other internal resources on the attacker's behalf."
+        ),
+        "impact": "Internal network exposure, cloud credential theft, data access",
+        "difficulty": "Medium",
+    },
+    "path_traversal": {
+        "title": "Sensitive File Access via Path Traversal",
+        "persona": "Malicious user",
+        "scenario": (
+            "Attacker uses directory traversal sequences (../) through {pattern} "
+            "in {file} to access files outside the intended directory, "
+            "including configuration files, credentials, or system files."
+        ),
+        "impact": "Credential exposure, configuration leak, source code theft",
+        "difficulty": "Easy",
+    },
+    # --- Dependencies ---
+    "dependency": {
+        "title": "Supply Chain Attack via Vulnerable Dependency",
+        "persona": "Supply chain attacker",
+        "scenario": (
+            "Attacker compromises a dependency ({pattern}) used in {file}. "
+            "Malicious code in the dependency executes during install or runtime, "
+            "exfiltrating secrets, installing backdoors, or modifying behavior."
+        ),
+        "impact": "Full compromise, backdoor installation, data exfiltration",
+        "difficulty": "Hard (requires compromising upstream package)",
+    },
+    # --- Auth missing ---
+    "no_auth": {
+        "title": "Unauthorized Access to Unprotected Endpoints",
+        "persona": "Any external attacker / Bot",
+        "scenario": (
+            "Attacker discovers unprotected API endpoints or routes "
+            "with no authentication middleware. Direct access allows "
+            "data extraction, modification, or service abuse without credentials."
+        ),
+        "impact": "Data breach, unauthorized actions, resource abuse",
+        "difficulty": "Easy",
+    },
+    # --- Dangerous code ---
+    "dangerous_code": {
+        "title": "Exploitation of Dangerous Code Pattern",
+        "persona": "Malicious user / Insider",
+        "scenario": (
+            "Attacker exploits dangerous code construct ({pattern}) in {file}. "
+            "The construct allows unintended behavior such as arbitrary code "
+            "execution, deserialization attacks, or unsafe data processing."
+        ),
+        "
