@@ -154,8 +154,7 @@ def _only_hardcoded_string(line: str) -> bool:
         return False
     inside = line[paren:]
     # If the argument is just a string literal, treat as hardcoded
-    _HARDCODED_STR_RE = re.compile(r"\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)")
-    if _HARDCODED_STR_RE.match(inside):
+    if re.match(r"""\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)""", inside):
         return True
     return False
 
@@ -199,4 +198,89 @@ _INJECTION_DEFS: list[tuple[str, str, str, str, str]] = [
         r"""\bcompile\s*\([^)]*(?:\bvar\b|\bdata\b|\brequest\b|\binput\b|\bargv\b|"""
         r"""\bparams?\b|\bquery\b|\bform\b|\buser\b|\bf['\"])""",
         "CRITICAL",
-        "code_injection
+        "code_injection",
+        "compile() with potential user input",
+    ),
+    (
+        "py_dunder_import_dynamic",
+        r"""\b__import__\s*\([^'\"][^)]*\)""",
+        "HIGH",
+        "code_injection",
+        "__import__() with dynamic name",
+    ),
+    (
+        "py_importlib_dynamic",
+        r"""\bimportlib\.import_module\s*\([^'\"][^)]*\)""",
+        "HIGH",
+        "code_injection",
+        "importlib.import_module() with dynamic name",
+    ),
+    # Node.js code injection
+    (
+        "js_eval_any",
+        r"""\beval\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "eval() in JavaScript -- verify input is not user-controlled",
+    ),
+    (
+        "js_function_constructor",
+        r"""\bnew\s+Function\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "Function() constructor -- equivalent to eval",
+    ),
+    (
+        "js_vm_run",
+        r"""\bvm\.run(?:InNewContext|InThisContext|InContext)?\s*\(""",
+        "HIGH",
+        "code_injection",
+        "vm.run*() -- verify input is not user-controlled",
+    ),
+    # Template injection
+    (
+        "template_injection_fstring",
+        r"""(?:render|template|jinja|mako|render_template_string)\s*\(.*\bf['\"]""",
+        "CRITICAL",
+        "code_injection",
+        "f-string in template rendering context (template injection)",
+    ),
+    (
+        "template_injection_format",
+        r"""(?:render|template|jinja|mako|render_template_string)\s*\(.*\.format\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        ".format() in template rendering context (template injection)",
+    ),
+
+    # -----------------------------------------------------------------
+    # 2. COMMAND INJECTION
+    # -----------------------------------------------------------------
+    (
+        "subprocess_shell_true",
+        r"""\bsubprocess\.(?:call|run|Popen|check_output|check_call)\s*\("""
+        r"""[^)]*shell\s*=\s*True""",
+        "CRITICAL",
+        "command_injection",
+        "subprocess with shell=True -- command injection risk if input is variable",
+    ),
+    (
+        "os_system_var",
+        r"""\bos\.system\s*\(""",
+        "CRITICAL",
+        "command_injection",
+        "os.system() -- always uses a shell; prefer subprocess without shell=True",
+    ),
+    (
+        "os_popen_var",
+        r"""\bos\.popen\s*\(""",
+        "HIGH",
+        "command_injection",
+        "os.popen() -- shell command execution",
+    ),
+    (
+        "child_process_exec",
+        r"""\b(?:child_process\.exec|execSync|exec)\s*\(""",
+        "CRITICAL",
+        "command_injection",
+        "child_process.exec
