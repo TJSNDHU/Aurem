@@ -242,3 +242,7 @@ def compute_score(findings: list[dict]) -> int:
 # ---------------------------------------------------------------------------
 
 def aggregate_by_severity(findings: list[dict]) -> dict[str, int]:
+    """Count findings per severity level."""
+    counts: dict[str, int] = {sev: 0 for sev in SEVERITY}
+    for f in findings:
+        se
