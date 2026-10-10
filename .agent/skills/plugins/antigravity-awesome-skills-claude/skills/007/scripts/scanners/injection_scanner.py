@@ -136,6 +136,24 @@ def _has_variable_interpolation(line: str) -> bool:
     return False
 
 
+_SIMPLE_STRING_LITERAL_ARG_RE = re.compile(
+    r"""\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)"""
+)
+
+
+def _is_simple_string_literal_call(inside_parens: str) -> bool:
+    """Return True if *inside_parens* looks like ``('literal')`` or ``('''multi''')``."""
+    return bool(_SIMPLE_STRING_LITERAL_ARG_RE.match(inside_parens))
+
+
+def _extract_first_call_args(line: str):
+    """Return the substring starting at the first '(' or None when absent."""
+    paren = line.find("(")
+    if paren == -1:
+        return None
+    return line[paren:]
+
+
 def _only_hardcoded_string(line: str) -> bool:
     """Heuristic: return True if the dangerous call appears to use only literals.
 
@@ -148,15 +166,11 @@ def _only_hardcoded_string(line: str) -> bool:
     if _has_user_input(line):
         return False
     # Check for variable references inside the call parens
-    # Look for identifiers that aren't string literals
-    paren = line.find("(")
-    if paren == -1:
+    inside = _extract_first_call_args(line)
+    if inside is None:
         return False
-    inside = line[paren:]
     # If the argument is just a string literal, treat as hardcoded
-    if re.match(r"""\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)""", inside):
-        return True
-    return False
+    return _is_simple_string_literal_call(inside)
 
 
 # =========================================================================
@@ -341,19 +355,4 @@ _INJECTION_DEFS: list[tuple[str, str, str, str, str]] = [
     (
         "prompt_injection_fstring",
         r"""(?i)(?:prompt|system_prompt|user_prompt|message|messages)\s*=\s*f['\"]"""
-        r"""[^'\"]*\{(?:user|input|query|request|data|text|content|message)""",
-        "HIGH",
-        "prompt_injection",
-        "User input directly in LLM prompt via f-string",
-    ),
-    (
-        "prompt_injection_concat",
-        r"""(?i)(?:prompt|system_prompt|user_prompt|messages?)\s*(?:=|\+=)\s*"""
-        r"""[^=\n]*(?:user_input|user_message|request\.(?:body|data|form|json)|input\()""",
-        "HIGH",
-        "prompt_injection",
-        "User input concatenated into LLM prompt",
-    ),
-    (
-        "prompt_injection_openai",
-        r"""(?i)(?:openai|anthropic|llm|chat|completion).*\bf['\"][^'\"]*\{"""
+        r"""[^'\"]*\{(?:user
