@@ -7,36 +7,226 @@ by tracking user-input sources and adjusting severity for hardcoded values,
 test files, comments, and docstrings.
 
 Usage:
-	p python injection_scanner.py --target /path/to/project
+    python injection_scanner.py --target /path/to/project
+    python injection_scanner.py --target /path/to/project --output json --verbose
+    python injection_scanner.py --target /path/to/project --include-low
+"""
 
-	t python injection_scanner.py --target /path/to/project --output json --verbose
+import argparse
+import json
+import os
+import re
+import sys
+import time
+from pathlib import Path
 
-	u python injection_scanner.py --target /path/to/project --include-low
+# ---------------------------------------------------------------------------
+# Import from the 007 config hub (parent directory)
+# ---------------------------------------------------------------------------
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-	v """
+import config  # noqa: E402
 
-	import argparse
+# ---------------------------------------------------------------------------
+# Logger
+# ---------------------------------------------------------------------------
+logger = config.setup_logging("007-injection-scanner")
 
-	import json
+# ---------------------------------------------------------------------------
+# Context markers: sources of user input
+# ---------------------------------------------------------------------------
+# If a line (or nearby lines) contain any of these tokens, variables on that
+# line are treated as *tainted* (user-controlled).  When a dangerous pattern
+# uses only a hardcoded literal, severity is reduced.
 
-	import os
+_USER_INPUT_MARKERS_PY = re.compile(
+    r"""(?:request\.(?:args|form|json|data|files|values|headers|cookies|get_json)|"""
+    r"""request\.GET|request\.POST|request\.query_params|"""
+    r"""sys\.argv|input\s*\(|os\.environ|"""
+    r"""flask\.request|django\.http|"""
+    r"""click\.argument|click\.option|argparse|"""
+    r"""websocket\.recv|channel\.receive|"""
+    r"""getattr\s*\(\s*request)""",
+    re.IGNORECASE,
+)
 
-	import re
+_USER_INPUT_MARKERS_JS = re.compile(
+    r"""(?:req\.(?:body|params|query|headers|cookies)|"""
+    r"""request\.(?:body|params|query|headers)|"""
+    r"""process\.argv|"""
+    r"""\.useParams|\.useSearchParams|"""
+    r"""window\.location|document\.location|"""
+    r"""location\.(?:search|hash|href)|"""
+    r"""URLSearchParams|"""
+    r"""event\.(?:target|data)|"""
+    r"""document\.(?:getElementById|querySelector)|\.value|"""
+    r"""localStorage|sessionStorage|"""
+    r"""socket\.on)""",
+    re.IGNORECASE,
+)
 
-	import sys
+_USER_INPUT_MARKERS = re.compile(
+    _USER_INPUT_MARKERS_PY.pattern + r"|" + _USER_INPUT_MARKERS_JS.pattern,
+    re.IGNORECASE,
+)
 
-	import time
+# ---------------------------------------------------------------------------
+# Comment / docstring detection
+# ---------------------------------------------------------------------------
 
-	from pathlib import Path
+_COMMENT_LINE_RE = re.compile(
+    r"""^\s*(?:#|//|/\*|\*|;|rem\b|@rem\b)""", re.IGNORECASE
+)
+
+_TRIPLE_QUOTE_RE = re.compile(r'''^\s*(?:\"{3}|'{3})''')
+
+_MARKDOWN_CODE_FENCE = re.compile(r"""^\s*```""")
 
 
-
-	s y s . p a t h . i n s e r t ( , S t r i n g P a t h F i l e R e s o l v e p a r e n t p a r e n t ) 
-
-
-
-	i m p o r t c o n f i g # n o q a : E 4 0 2 
+def _is_comment_line(line: str) -> bool:
+    """Return True if the line is a single-line comment."""
+    return bool(_COMMENT_LINE_RE.match(line))
 
 
+# ---------------------------------------------------------------------------
+# Test file detection
+# ---------------------------------------------------------------------------
 
-	l o g g e r # c o n f i g . s e t u p L o g g i n g G E T L O G G E R N A M E S T R I N G S H A S H Q U O T E Z E R O Z E R O S E V E N D A S H I N J E C T I O N D A S H S C A N N E R Q U O T E Z E R O Z E R O S E V EN DASH SCAN ER QUOTE ZERO ZERO SEVEN DASH INJECTION DASH SCANNER QUOTE CLOSE PAREN CLOSE PAREN SEMICOLON NEWLINE HASH COMMENT LINE USER INPUT MARKERS PY RE COMPILE RAW STRING OPEN PAREN REQUEST DOT ARGS PIPE FORM PIPE JSON PIPE DATA PIPE FILES PIPE VALUES PIPE HEADERS PIPE COOKIES PIPE GET UNDERSCORE JSON CLOSE PAREN PIPE REQUEST DOT GET UPPER BAR POST UPPER BAR QUERY PARAMS LOWER BAR SYS DOT ARGV BAR INPUT OPEN PAREN BAR OS DOT ENVIRON BAR FLASK DOT REQUEST BAR DJANGO DOT HTTP BAR CLICK DOT ARGUMENT BAR CLICK DOT OPTION BAR ARGPARSE BAR WEBSOCKET DOT RECV BAR CHANNEL DOT RECEIVE BAR GETATTR OPEN PAREN REQUEST CLOSE PAREN IGNORE CASE TRUE COMMA NEWLINE USER INPUT MARKERS JS RE COMPILE RAW STRING REQ BODY PARAMS QUERY HEADERS COOKIES CLOSE PAREN PIPE REQUEST BODY PARAMS QUERY HEADERS CLOSE PAREN PIPE PROCESS ARGV CLOSE PAREN PIPE USEPARAMS USESEARCHPARAMS WINDOW LOCATION DOCUMENT LOCATION LOCATION SEARCH HASH HREF URLSEARCHPARAMS EVENT TARGET DATA LOCALSTORAGE SESSIONSTORAGE SOCKET ON IGNORECASE TRUE COMMA NEWLINE USERINPUTMARKERSCOMMONRECOMPILEPYPATTERNPIPEJSPIPATTERNIGNORECASETRUECOMMACOMMENTLINERE EQUAL SIGN EQUAL SIGN HASH SLASH SLASH SLASH STAR STAR SEMICOLON REM WORD BOUNDARY AT REM WORD BOUNDARY BACKSLASH B IGNORECASE TRUE TRIPLEQUOTERE EQUAL SIGN EQUAL SIGN WHITESPACE CLASS TRIPLE DOUBLE QUOTE SINGLE QUOTE THREE TIMES GROUP MARKDOWNCODEFENCE EQUAL SIGN EQUAL SIGN WHITESPACE CLASS BACKTICK THREE TIMES DEF ISUNDERSCORECOMMENTUNDERSCORELINE STR BOOL COMMENTLINERE MATCH LINE TEST FILE DETECTION TESTFILERE EQUAL SIGN QUESTION LETTER I CARET TEST UNDERSCORE UNDERSCORE TEST PERIOD PY DOLLAR PERIOD TEST PERIOD LEFT BRACKET JT RIGHT BRACKET SX QUESTION DOLLAR PERIOD SPEC LEFT BRACKET JT RIGHT BRACKET SX QUESTION DOLLAR UNDERSCORE UNDERSCORE TESTS UNDERSCORE FIXTURES QUESTION SLASH BACKSLASH TEST SLASH BACKSLASH TESTS SLASH BACKSLASH MOCKS QUESTION SLAH BACKSLSH UNDERSOCRE UNDERSOCRE MOCKS SLAH BACKLSLH SEVERITY HELPERS DEF LOWERUNDERSCORESEVERITY SEVERITY STR ORDER LIST CRITICAL HIGH MEDIUM LOW INFO INDEX ORDER INDEX SEVERITY IF SEVERITY IN ORDER ELSE ZERO RETURN ORDER MIN INDEX PLUS ONE LEN ORDER MINUS ONE DEF HASUNDERSCOREUSERUNDERSCOREINPUT LINE STR BOOL USERINPUTMARKERSCOMMON SEARCH LINE DEF HAS VARIABLE INTERPOLATION LINE STR BOOL IF RE SEARCH FSTRINGBRACESNOTESCAPED LINE RETURN TRUE IF FORMAT METHOD CALL IN LINE RETURN TRUE IF RE SEARCH PERCENT SDIFR AND PERCENT IN LINE RETURN TRUE RETURN FALSE DEF ONLY HARDCODED STRING LINE STR BOOL IF HAS VARIABLE INTERPOLATION LINE RETURN FALSE IF HAS USER INPUT LINE RETURN FALSE PARENTHESES FIND OPEN PARANTHESIS IF NEGATIVE ONE RETURN FALSE INSIDE COLON FROM START TO END OF STRING CHECK FOR IDENTIFIERS THAT ARENT STRING LITERALS LOOK FOR ARGUMENT JUST STRING LITERAL TREAT AS HARDCODED REGEXMATCHGROUPSTARTINSIDEGROUPRETURNTRUEORENDOFINJECTIONDEFSLISTTUPLESTRSTRSTRSTRSTRLEFTBRACKNAMEPATSEVITYPEDESCRIGHTBRACKPY EVAL USER INPUT EVAL OPEN NON CAPTURING VAR DATA REQUEST INPUT ARGV PARAMSQQUERYFORMUSERFSTRINGQUOTE CRITICAL CODE INJECTION EVAL WITH POTENTIAL USER INPUT PY EVAL ANY EVAL OPENCOLONSEMICOLONCRITICALCODEINJECTIONEVALUSAGEVERIFYINPUTISNOTUSER
+_TEST_FILE_RE = re.compile(
+    r"""(?i)(?:^test_|_test\.py$|\.test\.[jt]sx?$|\.spec\.[jt]sx?$|"""
+    r"""__tests__|fixtures?[/\\]|test[/\\]|tests[/\\]|"""
+    r"""mocks?[/\\]|__mocks__[/\\])"""
+)
+
+
+def _is_test_file(filepath: Path) -> bool:
+    """Return True if *filepath* looks like a test or fixture file."""
+    return bool(_TEST_FILE_RE.search(filepath.name)) or bool(
+        _TEST_FILE_RE.search(str(filepath))
+    )
+
+
+# ---------------------------------------------------------------------------
+# Severity helpers
+# ---------------------------------------------------------------------------
+
+def _lower_severity(severity: str) -> str:
+    """Return the next-lower severity level."""
+    order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+    idx = order.index(severity) if severity in order else 0
+    return order[min(idx + 1, len(order) - 1)]
+
+
+def _has_user_input(line: str) -> bool:
+    """Return True if *line* references a known user-input source."""
+    return bool(_USER_INPUT_MARKERS.search(line))
+
+
+def _has_variable_interpolation(line: str) -> bool:
+    """Return True if *line* contains f-string braces, .format(), or % formatting."""
+    # f-string-style braces (not escaped)
+    if re.search(r"""(?<!\{)\{[^{}\s][^{}]*\}(?!\})""", line):
+        return True
+    # .format() call
+    if ".format(" in line:
+        return True
+    # %-style formatting with a variable (%s, %d etc followed by %)
+    if re.search(r"""%[sdifr]""", line) and "%" in line:
+        return True
+    return False
+
+
+def _only_hardcoded_string(line: str) -> bool:
+    """Heuristic: return True if the dangerous call appears to use only literals.
+
+    For example, ``eval("1+1")`` or ``os.system("clear")`` with no variables.
+    """
+    # If there is variable interpolation, not hardcoded
+    if _has_variable_interpolation(line):
+        return False
+    # If there's a user input marker, not hardcoded
+    if _has_user_input(line):
+        return False
+    # Check for variable references inside the call parens
+    # Look for identifiers that aren't string literals
+    paren = line.find("(")
+    if paren == -1:
+        return False
+    inside = line[paren:]
+    # If the argument is just a string literal, treat as hardcoded
+    if re.match(r"""\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)""", inside):
+        return True
+    return False
+
+
+# =========================================================================
+# INJECTION PATTERN DEFINITIONS
+# =========================================================================
+# Each entry: (pattern_name, compiled_regex, base_severity, injection_type,
+#              description)
+# The scanner applies context analysis on top of base_severity.
+
+_INJECTION_DEFS: list[tuple[str, str, str, str, str]] = [
+
+    # -----------------------------------------------------------------
+    # 1. CODE INJECTION (Python)
+    # -----------------------------------------------------------------
+    (
+        "py_eval_user_input",
+        r"""\beval\s*\([^)]*(?:\bvar\b|\bdata\b|\brequest\b|\binput\b|\bargv\b|\bparams?\b|"""
+        r"""\bquery\b|\bform\b|\buser\b|\bf['\"])""",
+        "CRITICAL",
+        "code_injection",
+        "eval() with potential user input",
+    ),
+    (
+        "py_eval_any",
+        r"""\beval\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "eval() usage -- verify input is not user-controlled",
+    ),
+    (
+        "py_exec_any",
+        r"""\bexec\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "exec() usage -- verify input is not user-controlled",
+    ),
+    (
+        "py_compile_external",
+        r"""\bcompile\s*\([^)]*(?:\bvar\b|\bdata\b|\brequest\b|\binput\b|\bargv\b|"""
+        r"""\bparams?\b|\bquery\b|\bform\b|\buser\b|\bf['\"])""",
+        "CRITICAL",
+        "code_injection",
+        "compile() with potential user input",
+    ),
+    (
+        "py_dunder_import_dynamic",
+        r"""\b__import__\s*\([^'\"][^)]*\)""",
+        "HIGH",
+        "code_injection",
+        "__import__() with dynamic name",
+    ),
+    (
+        "py_importlib_dynamic",
+        r"""\bimportlib\.import_module\s*\([^'\"][^)]*\)""",
+        "HIGH",
+        "code_injection",
+        "importlib.import_module() with dynamic name",
+    ),
+    # Node.js code injection
+    (
+        "js_eval_any",
+        r"""\beval\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "eval() in JavaScript -- verify input is not user-controlled",
+    ),
+    (
+        "js_function_constructor",
+        r"""\bnew\s+Function\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "Function() constructor -- equivalent to eval",
+    ),
