@@ -178,3 +178,63 @@ def _make_finding(
     line: int,
     severity: str,
     description: str,
+    recommendation: str,
+    pattern: str = "dependency",
+) -> dict:
+    """Create a standardized finding dict.
+
+    Args:
+        file:           Absolute path to the dependency file.
+        line:           Line number where the issue was found (1-based, 0 if N/A).
+        severity:       CRITICAL, HIGH, MEDIUM, or LOW.
+        description:    Human-readable description of the issue.
+        recommendation: Actionable fix suggestion.
+        pattern:        Finding sub-type for aggregation.
+
+    Returns:
+        Finding dict compatible with other 007 scanners.
+    """
+    return {
+        "type": "supply_chain",
+        "pattern": pattern,
+        "severity": severity,
+        "file": file,
+        "line": line,
+        "description": description,
+        "recommendation": recommendation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Python dependency analysis
+# ---------------------------------------------------------------------------
+
+def analyze_requirements_txt(filepath: Path, verbose: bool = False) -> dict:
+    """Analyze a Python requirements.txt file.
+
+    Returns:
+        Dict with keys: deps_total, deps_pinned, deps_hashed,
+        deps_unpinned, findings.
+    """
+    findings: list[dict] = []
+    file_str = str(filepath)
+    deps_total = 0
+    deps_pinned = 0
+    deps_hashed = 0
+    deps_unpinned: list[str] = []
+
+    try:
+        text = filepath.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        if verbose:
+            logger.debug("Cannot read %s: %s", filepath, exc)
+        return {
+            "deps_total": 0, "deps_pinned": 0, "deps_hashed": 0,
+            "deps_unpinned": [], "findings": findings,
+        }
+
+    for line_num, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+
+        # Skip comments, options, blanks
+        if _PY_COMMENT
