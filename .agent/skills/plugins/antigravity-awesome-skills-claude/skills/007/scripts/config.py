@@ -50,12 +50,9 @@ SCORE_HISTORY_PATH = DATA_DIR / "score_history.json"
 # Ensure required directories exist (safe to call repeatedly)
 # ---------------------------------------------------------------------------
 
-_REQUIRED_DIRECTORIES = (DATA_DIR, REPORTS_DIR, PLAYBOOKS_DIR)
-
-
 def ensure_directories() -> None:
     """Create data directories if they do not already exist."""
-    for directory in _REQUIRED_DIRECTORIES:
+    for directory in (DATA_DIR, REPORTS_DIR, PLAYBOOKS_DIR):
         directory.mkdir(parents=True, exist_ok=True)
 
 
@@ -144,20 +141,12 @@ VERDICT_THRESHOLDS = {
 
 
 def get_verdict(score: float) -> dict:
-    """Return the verdict dict that matches the given score (0-100).
-
-    Args:
-        score: Weighted security score between 0 and 100.
-
-    Returns:
-        A dict with keys: min, max, label, description, emoji.
-    """
+    """Return the verdict dict for a score (0-100)."""
     score = max(0.0, min(100.0, score))
-    for verdict in VERDICT_THRESHOLDS.values():
-        if verdict["min"] <= score <= verdict["max"]:
-            return verdict
-    # Fallback (should never happen)
-    return VERDICT_THRESHOLDS["total_block"]
+    return next(
+        (v for v in VERDICT_THRESHOLDS.values() if v["min"] <= score <= v["max"]),
+        VERDICT_THRESHOLDS["total_block"],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -252,4 +241,18 @@ _DANGEROUS_PATTERN_DEFS = [
     # Python dangerous functions
     ("eval_usage",              r"""\beval\s*\(""",                                    "CRITICAL"),
     ("exec_usage",              r"""\bexec\s*\(""",                                    "CRITICAL"),
-    ("subprocess_shell_true",   r"""subprocess\.\w+\(.*shell\s*
+    ("subprocess_shell_true",   r"""subprocess\.\w+\(.*shell\s*=\s*True""",            "CRITICAL"),
+    ("os_system",              r"""\bos\.system\s*\(""",                               "HIGH"),
+    ("os_popen",               r"""\bos\.popen\s*\(""",                                "HIGH"),
+    ("pickle_loads",           r"""\bpickle\.loads?\s*\(""",                            "HIGH"),
+    ("yaml_unsafe_load",       r"""\byaml\.load\s*\((?!.*Loader\s*=)""",               "HIGH"),
+    ("marshal_loads",          r"""\bmarshal\.loads?\s*\(""",                           "MEDIUM"),
+    ("shelve_open",            r"""\bshelve\.open\s*\(""",                              "MEDIUM"),
+    ("compile_usage",          r"""\bcompile\s*\([^)]*\bexec\b""",                      "HIGH"),
+
+    # Dynamic imports
+    ("importlib_import",       r"""\b__import__\s*\(""",                                "MEDIUM"),
+    ("importlib_module",       r"""\bimportlib\.import_module\s*\(""",                  "MEDIUM"),
+
+    # Shell/command injection vectors
+    ("shell_injection",        r"""\bos\.(?:system
