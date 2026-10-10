@@ -114,4 +114,324 @@ _RISKY_PYTHON_PACKAGES = {
 # Node.js analysis patterns
 # ---------------------------------------------------------------------------
 
-# Exact version:
+# Exact version:  "1.2.3"
+# Pinned prefix:  "1.2.3" (no ^ or ~ or * or > or <)
+# Loose:          "^1.2.3"  "~1.2.3"  ">=1.0"  "*"  "latest"
+
+_NODE_EXACT_VERSION_RE = re.compile(
+    r"""^\d+\.\d+\.\d+$"""
+)
+
+_NODE_LOOSE_INDICATORS = re.compile(
+    r"""^[\^~*><=]|latest|next|canary""", re.IGNORECASE
+)
+
+# Risky postinstall script patterns
+_NODE_RISKY_SCRIPTS = re.compile(
+    r"""(?:curl|wget|fetch|http|eval|exec|child_process|\.sh\b|powershell)""",
+    re.IGNORECASE,
+)
+
+
+# ---------------------------------------------------------------------------
+# Dockerfile analysis patterns
+# ---------------------------------------------------------------------------
+
+_DOCKER_FROM_RE = re.compile(
+    r"""^\s*FROM\s+(\S+)""", re.IGNORECASE
+)
+
+_DOCKER_FROM_LATEST_RE = re.compile(
+    r"""(?::latest\s*$|^[^:]+\s*$)"""
+)
+
+_DOCKER_USER_RE = re.compile(
+    r"""^\s*USER\s+""", re.IGNORECASE
+)
+
+_DOCKER_COPY_SENSITIVE_RE = re.compile(
+    r"""^\s*(?:COPY|ADD)\s+.*?(?:\.env|\.key|\.pem|\.p12|\.pfx|id_rsa|id_ed25519|\.secret)""",
+    re.IGNORECASE,
+)
+
+_DOCKER_CURL_PIPE_RE = re.compile(
+    r"""(?:curl|wget)\s+[^|]*\|\s*(?:bash|sh|zsh|python|perl|ruby|node)""",
+    re.IGNORECASE,
+)
+
+# Known trusted base images (prefixes)
+_DOCKER_TRUSTED_BASES = {
+    "python", "node", "golang", "ruby", "openjdk", "amazoncorretto",
+    "alpine", "ubuntu", "debian", "centos", "fedora", "archlinux",
+    "nginx", "httpd", "redis", "postgres", "mysql", "mongo", "memcached",
+    "mcr.microsoft.com/", "gcr.io/", "ghcr.io/", "docker.io/library/",
+    "registry.access.redhat.com/",
+}
+
+
+# ---------------------------------------------------------------------------
+# Finding builder
+# ---------------------------------------------------------------------------
+
+def _make_finding(
+    file: str,
+    line: int,
+    severity: str,
+    description: str,
+    recommendation: str,
+    pattern: str = "dependency",
+) -> dict:
+    """Create a standardized finding dict.
+
+    Args:
+        file:           Absolute path to the dependency file.
+        line:           Line number where the issue was found (1-based, 0 if N/A).
+        severity:       CRITICAL, HIGH, MEDIUM, or LOW.
+        description:    Human-readable description of the issue.
+        recommendation: Actionable fix suggestion.
+        pattern:        Finding sub-type for aggregation.
+
+    Returns:
+        Finding dict compatible with other 007 scanners.
+    """
+    return {
+        "type": "supply_chain",
+        "pattern": pattern,
+        "severity": severity,
+        "file": file,
+        "line": line,
+        "description": description,
+        "recommendation": recommendation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Python dependency analysis
+# ---------------------------------------------------------------------------
+
+def analyze_requirements_txt(filepath: Path, verbose: bool = False) -> dict:
+    """Analyze a Python requirements.txt file.
+
+    Returns:
+        Dict with keys: deps_total, deps_pinned, deps_hashed,
+        deps_unpinned, findings.
+    """
+    findings: list[dict] = []
+    file_str = str(filepath)
+    deps_total = 0
+    deps_pinned = 0
+    deps_hashed = 0
+    deps_unpinned: list[str] = []
+
+    try:
+        text = filepath.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        if verbose:
+            logger.debug("Cannot read %s: %s", filepath, exc)
+        return {
+            "deps_total": 0, "deps_pinned": 0, "deps_hashed": 0,
+            "deps_unpinned": [], "findings": findings,
+        }
+
+    for line_num, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+
+        # Skip comments, options, blanks
+        if _PY_COMMENT_RE.match(line) or _PY_OPTION_RE.match(line) or _PY_BLANK_RE.match(line):
+            continue
+
+        # Remove inline comments
+        line_no_comment = re.sub(r"""\s+#.*$""", "", line)
+
+        pkg_match = _PY_PACKAGE_RE.match(line_no_comment)
+        if not pkg_match:
+            continue
+
+        pkg_name = pkg_match.group(1).lower()
+        deps_total += 1
+
+        # Check pinning
+        is_pinned = bool(_PY_PINNED_RE.match(line_no_comment))
+        has_hash = bool(_PY_HASH_RE.search(raw_line))
+
+        if is_pinned:
+            deps_pinned += 1
+        else:
+            deps_unpinned.append(pkg_name)
+            findings.append(_make_finding(
+                file=file_str,
+                line=line_num,
+                severity="HIGH",
+                description=f"Dependency '{pkg_name}' is not pinned to an exact version",
+                recommendation=f"Pin to exact version: {pkg_name}==<version>",
+                pattern="unpinned_dependency",
+            ))
+
+        if has_hash:
+            deps_hashed += 1
+
+        # Check risky packages
+        if pkg_name in _RISKY_PYTHON_PACKAGES:
+            findings.append(_make_finding(
+                file=file_str,
+                line=line_num,
+                severity="MEDIUM",
+                description=f"Risky package '{pkg_name}': {_RISKY_PYTHON_PACKAGES[pkg_name]}",
+                recommendation=f"Review usage of '{pkg_name}' and ensure safe configuration",
+                pattern="risky_package",
+            ))
+
+    # Flag if no hashes used at all and there are deps
+    if deps_total > 0 and deps_hashed == 0:
+        findings.append(_make_finding(
+            file=file_str,
+            line=0,
+            severity="LOW",
+            description="No hash verification used for any dependency",
+            recommendation="Consider using --hash for supply chain integrity (pip install --require-hashes)",
+            pattern="no_hash_verification",
+        ))
+
+    # Complexity warning
+    if deps_total > 100:
+        findings.append(_make_finding(
+            file=file_str,
+            line=0,
+            severity="LOW",
+            description=f"High dependency count ({deps_total}). Large dependency trees increase supply chain risk",
+            recommendation="Audit dependencies and remove unused packages. Consider dependency-free alternatives",
+            pattern="high_dependency_count",
+        ))
+
+    return {
+        "deps_total": deps_total,
+        "deps_pinned": deps_pinned,
+        "deps_hashed": deps_hashed,
+        "deps_unpinned": deps_unpinned,
+        "findings": findings,
+    }
+
+
+def _is_pyproject_deps_section(line: str) -> bool:
+    """Check whether *line* opens a dependencies section in pyproject.toml."""
+    if re.match(r"""^\s*\[(?:project\.)?dependencies""", line, re.IGNORECASE):
+        return True
+    if re.match(r"""^\s*\[tool\.poetry\.dependencies""", line, re.IGNORECASE):
+        return True
+    return False
+
+
+def _parse_pyproject_poetry_dep(line: str, line_num: int, file_str: str):
+    """Parse a ``key = "version"`` style Poetry dependency line.
+
+    Returns ``(pkg_name, version_spec, is_pinned, finding_or_none, skip)``
+    where *skip* indicates the entry should be ignored (e.g. ``python``).
+    """
+    poetry_re = re.match(
+        r"""^([A-Za-z0-9_][A-Za-z0-9._-]*)\s*=\s*['"]([^'"]*)['\"]""",
+        line,
+    )
+    if not poetry_re:
+        return None
+
+    pkg_name = poetry_re.group(1).lower()
+    version_spec = poetry_re.group(2)
+    if pkg_name in ("python",):
+        return ("__skip__", version_spec, False, None, True)
+
+    is_pinned = bool(re.match(r"""^\d+\.\d+""", version_spec))
+    finding = None
+    if not is_pinned:
+        finding = _make_finding(
+            file=file_str,
+            line=line_num,
+            severity="MEDIUM",
+            description=f"Dependency '{pkg_name}' version spec '{version_spec}' is not an exact pin",
+            recommendation=f"Pin to exact version: {pkg_name} = \"<exact_version>\"",
+            pattern="unpinned_dependency",
+        )
+    return (pkg_name, version_spec, is_pinned, finding, False)
+
+
+def _parse_pyproject_list_dep(line: str, line_num: int, file_str: str):
+    """Parse a quoted-list style dependency line from pyproject.toml.
+
+    Returns ``(pkg_name, version_spec, is_pinned, finding_or_none)``.
+    """
+    dep_line_re = re.compile(r"""^\s*['"]([A-Za-z0-9_][A-Za-z0-9._-]*)([^'"]*)['\"]""")
+    m = dep_line_re.match(line)
+    if not m:
+        return None
+
+    pkg_name = m.group(1).lower()
+    version_spec = m.group(2).strip()
+
+    if "==" in version_spec:
+        is_pinned = True
+        finding = None
+    else:
+        is_pinned = False
+        if version_spec:
+            finding = _make_finding(
+                file=file_str,
+                line=line_num,
+                severity="MEDIUM",
+                description=f"Dependency '{pkg_name}' has loose version spec '{version_spec}'",
+                recommendation=f"Pin to exact version with ==",
+                pattern="unpinned_dependency",
+            )
+        else:
+            finding = _make_finding(
+                file=file_str,
+                line=line_num,
+                severity="HIGH",
+                description=f"Dependency '{pkg_name}' has no version constraint",
+                recommendation=f"Add exact version pin: {pkg_name}==<version>",
+                pattern="unpinned_dependency",
+            )
+    return (pkg_name, version_spec, is_pinned, finding)
+
+
+def analyze_pyproject_toml(filepath: Path, verbose: bool = False) -> dict:
+    """Analyze a pyproject.toml for dependency information.
+
+    Performs best-effort parsing without a TOML library (stdlib only).
+
+    Returns:
+        Dict with keys: deps_total, deps_pinned, deps_unpinned, findings.
+    """
+    findings: list[dict] = []
+    file_str = str(filepath)
+    deps_total = 0
+    deps_pinned = 0
+    deps_unpinned: list[str] = []
+
+    try:
+        text = filepath.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        if verbose:
+            logger.debug("Cannot read %s: %s", filepath, exc)
+        return {
+            "deps_total": 0, "deps_pinned": 0,
+            "deps_unpinned": [], "findings": findings,
+        }
+
+    in_deps_section = False
+    section_re = re.compile(r"""^\s*\[""")
+
+    for line_num, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+
+        # Track sections
+        if _is_pyproject_deps_section(line):
+            in_deps_section = True
+            continue
+        if section_re.match(line) and in_deps_section:
+            in_deps_section = False
+            continue
+
+        if not in_deps_section:
+            continue
+
+        # Try list-style first, then poetry key=value style.
+        result = _parse_pyproject_list_dep(line, line_num, file
