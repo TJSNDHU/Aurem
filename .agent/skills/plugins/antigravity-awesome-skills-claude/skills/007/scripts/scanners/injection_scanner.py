@@ -154,114 +154,49 @@ def _only_hardcoded_string(line: str) -> bool:
         return False
     inside = line[paren:]
     # If the argument is just a string literal, treat as hardcoded
-    if re.match(r"""\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)""", inside):
+    _HARDCODED_STR_RE = re.compile(r"\(\s*['\"]{1,3}[^'\"]*['\"]{1,3}\s*\)")
+    if _HARDCODED_STR_RE.match(inside):
         return True
     return False
 
 
 # =========================================================================
-# INJECTION PATTERN DEFINITIONS (imported from patterns module)
+# INJECTION PATTERN DEFINITIONS
 # =========================================================================
+# Each entry: (pattern_name, compiled_regex, base_severity, injection_type,
+#              description)
+# The scanner applies context analysis on top of base_severity.
 
-from patterns import INJECTION_PATTERNS  # noqa: E402
+_INJECTION_DEFS: list[tuple[str, str, str, str, str]] = [
 
-
-# =========================================================================
-# File collection
-# =========================================================================
-
-def _should_scan_file(filepath: Path) -> bool:
-    """Decide if a file should be included for injection scanning."""
-    name = filepath.name.lower()
-    suffix = filepath.suffix.lower()
-
-    for ext in config.SCANNABLE_EXTENSIONS:
-        if name.endswith(ext):
-            return True
-    if suffix in config.SCANNABLE_EXTENSIONS:
-        return True
-
-    return False
-
-
-def collect_files(target: Path) -> list[Path]:
-    """Walk *target* recursively and return files for injection scanning."""
-    files: list[Path] = []
-    max_files = config.LIMITS["max_files_per_scan"]
-
-    for root, dirs, filenames in os.walk(target):
-        dirs[:] = [d for d in dirs if d not in config.SKIP_DIRECTORIES]
-
-        for fname in filenames:
-            if len(files) >= max_files:
-                logger.warning(
-                    "Reached max_files_per_scan limit (%d). Stopping.", max_files
-                )
-                return files
-
-            fpath = Path(root) / fname
-            if _should_scan_file(fpath):
-                files.append(fpath)
-
-    return files
-
-
-# =========================================================================
-# Core scanning logic
-# =========================================================================
-
-def _snippet(line: str, match_start: int, context: int = 80) -> str:
-    """Extract a short snippet around the match position."""
-    start = max(0, match_start - context // 4)
-    end = min(len(line), match_start + context)
-    raw = line[start:end].strip()
-    if len(raw) > context:
-        raw = raw[:context] + "..."
-    return raw
-
-
-def _is_in_docstring(lines: list[str], line_idx: int) -> bool:
-    """Rough heuristic: check if line_idx falls inside a Python docstring.
-
-    Counts triple-quote occurrences above the current line.  Odd count
-    means we are inside a docstring.
-    """
-    count = 0
-    for i in range(line_idx):
-        # Count triple quotes in each preceding line
-        content = lines[i]
-        count += len(re.findall(r'''(?:\"{3}|'{3})''', content))
-    return count % 2 == 1
-
-
-def scan_file(filepath: Path, verbose: bool = False) -> list[dict]:
-    """Scan a single file for injection vulnerabilities.
-
-    Returns a list of finding dicts.
-    """
-    findings: list[dict] = []
-    max_findings = config.LIMITS["max_findings_per_file"]
-    file_str = str(filepath)
-    is_test = _is_test_file(filepath)
-
-    # --- File size check ---
-    try:
-        size = filepath.stat().st_size
-    except OSError:
-        return findings
-
-    if size > config.LIMITS["max_file_size_bytes"]:
-        if verbose:
-            logger.debug("Skipping oversized file: %s (%d bytes)", filepath, size)
-        return findings
-
-    # --- Read content ---
-    try:
-        text = filepath.read_text(encoding="utf-8", errors="replace")
-    except OSError as exc:
-        if verbose:
-            logger.debug("Cannot read %s: %s", filepath, exc)
-        return findings
-
-    lines = text.splitlines()
-    in_markdown_block = False
+    # -----------------------------------------------------------------
+    # 1. CODE INJECTION (Python)
+    # -----------------------------------------------------------------
+    (
+        "py_eval_user_input",
+        r"""\beval\s*\([^)]*(?:\bvar\b|\bdata\b|\brequest\b|\binput\b|\bargv\b|\bparams?\b|"""
+        r"""\bquery\b|\bform\b|\buser\b|\bf['\"])""",
+        "CRITICAL",
+        "code_injection",
+        "eval() with potential user input",
+    ),
+    (
+        "py_eval_any",
+        r"""\beval\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "eval() usage -- verify input is not user-controlled",
+    ),
+    (
+        "py_exec_any",
+        r"""\bexec\s*\(""",
+        "CRITICAL",
+        "code_injection",
+        "exec() usage -- verify input is not user-controlled",
+    ),
+    (
+        "py_compile_external",
+        r"""\bcompile\s*\([^)]*(?:\bvar\b|\bdata\b|\brequest\b|\binput\b|\bargv\b|"""
+        r"""\bparams?\b|\bquery\b|\bform\b|\buser\b|\bf['\"])""",
+        "CRITICAL",
+        "code_injection
