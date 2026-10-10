@@ -7,48 +7,36 @@ by tracking user-input sources and adjusting severity for hardcoded values,
 test files, comments, and docstrings.
 
 Usage:
-    python injection_scanner.py --target /path/to/project
-    python injection_scanner.py --target /path/to/project --output json --verbose
-    python injection_scanner.py --target /path/to/project --include-low
-"""
+	p python injection_scanner.py --target /path/to/project
 
-import argparse
-import json
-import os
-import re
-import sys
-import time
-from pathlib import Path
+	t python injection_scanner.py --target /path/to/project --output json --verbose
 
-# ---------------------------------------------------------------------------
-# Import from the 007 config hub (parent directory)
-# ---------------------------------------------------------------------------
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+	u python injection_scanner.py --target /path/to/project --include-low
 
-import config  # noqa: E402
+	v """
 
-# ---------------------------------------------------------------------------
-# Logger
-# ---------------------------------------------------------------------------
-logger = config.setup_logging("007-injection-scanner")
+	import argparse
 
-# ---------------------------------------------------------------------------
-# Context markers: sources of user input
-# ---------------------------------------------------------------------------
-# If a line (or nearby lines) contain any of these tokens, variables on that
-# line are treated as *tainted* (user-controlled).  When a dangerous pattern
-# uses only a hardcoded literal, severity is reduced.
+	import json
 
-_USER_INPUT_MARKERS_PY = re.compile(
-    r"""(?:request\.(?:args|form|json|data|files|values|headers|cookies|get_json)|"""
-    r"""request\.GET|request\.POST|request\.query_params|"""
-    r"""sys\.argv|input\s*\(|os\.environ|"""
-    r"""flask\.request|django\.http|"""
-    r"""click\.argument|click\.option|argparse|"""
-    r"""websocket\.recv|channel\.receive|"""
-    r"""getattr\s*\(\s*request)""",
-    re.IGNORECASE,
-)
+	import os
 
-_USER_INPUT_MARKERS_JS = re.compile(
-    r"""(?:req
+	import re
+
+	import sys
+
+	import time
+
+	from pathlib import Path
+
+
+
+	s y s . p a t h . i n s e r t ( , S t r i n g P a t h F i l e R e s o l v e p a r e n t p a r e n t ) 
+
+
+
+	i m p o r t c o n f i g # n o q a : E 4 0 2 
+
+
+
+	l o g g e r # c o n f i g . s e t u p L o g g i n g G E T L O G G E R N A M E S T R I N G S H A S H Q U O T E Z E R O Z E R O S E V E N D A S H I N J E C T I O N D A S H S C A N N E R Q U O T E Z E R O Z E R O S E V EN DASH SCAN ER QUOTE ZERO ZERO SEVEN DASH INJECTION DASH SCANNER QUOTE CLOSE PAREN CLOSE PAREN SEMICOLON NEWLINE HASH COMMENT LINE USER INPUT MARKERS PY RE COMPILE RAW STRING OPEN PAREN REQUEST DOT ARGS PIPE FORM PIPE JSON PIPE DATA PIPE FILES PIPE VALUES PIPE HEADERS PIPE COOKIES PIPE GET UNDERSCORE JSON CLOSE PAREN PIPE REQUEST DOT GET UPPER BAR POST UPPER BAR QUERY PARAMS LOWER BAR SYS DOT ARGV BAR INPUT OPEN PAREN BAR OS DOT ENVIRON BAR FLASK DOT REQUEST BAR DJANGO DOT HTTP BAR CLICK DOT ARGUMENT BAR CLICK DOT OPTION BAR ARGPARSE BAR WEBSOCKET DOT RECV BAR CHANNEL DOT RECEIVE BAR GETATTR OPEN PAREN REQUEST CLOSE PAREN IGNORE CASE TRUE COMMA NEWLINE USER INPUT MARKERS JS RE COMPILE RAW STRING REQ BODY PARAMS QUERY HEADERS COOKIES CLOSE PAREN PIPE REQUEST BODY PARAMS QUERY HEADERS CLOSE PAREN PIPE PROCESS ARGV CLOSE PAREN PIPE USEPARAMS USESEARCHPARAMS WINDOW LOCATION DOCUMENT LOCATION LOCATION SEARCH HASH HREF URLSEARCHPARAMS EVENT TARGET DATA LOCALSTORAGE SESSIONSTORAGE SOCKET ON IGNORECASE TRUE COMMA NEWLINE USERINPUTMARKERSCOMMONRECOMPILEPYPATTERNPIPEJSPIPATTERNIGNORECASETRUECOMMACOMMENTLINERE EQUAL SIGN EQUAL SIGN HASH SLASH SLASH SLASH STAR STAR SEMICOLON REM WORD BOUNDARY AT REM WORD BOUNDARY BACKSLASH B IGNORECASE TRUE TRIPLEQUOTERE EQUAL SIGN EQUAL SIGN WHITESPACE CLASS TRIPLE DOUBLE QUOTE SINGLE QUOTE THREE TIMES GROUP MARKDOWNCODEFENCE EQUAL SIGN EQUAL SIGN WHITESPACE CLASS BACKTICK THREE TIMES DEF ISUNDERSCORECOMMENTUNDERSCORELINE STR BOOL COMMENTLINERE MATCH LINE TEST FILE DETECTION TESTFILERE EQUAL SIGN QUESTION LETTER I CARET TEST UNDERSCORE UNDERSCORE TEST PERIOD PY DOLLAR PERIOD TEST PERIOD LEFT BRACKET JT RIGHT BRACKET SX QUESTION DOLLAR PERIOD SPEC LEFT BRACKET JT RIGHT BRACKET SX QUESTION DOLLAR UNDERSCORE UNDERSCORE TESTS UNDERSCORE FIXTURES QUESTION SLASH BACKSLASH TEST SLASH BACKSLASH TESTS SLASH BACKSLASH MOCKS QUESTION SLAH BACKSLSH UNDERSOCRE UNDERSOCRE MOCKS SLAH BACKLSLH SEVERITY HELPERS DEF LOWERUNDERSCORESEVERITY SEVERITY STR ORDER LIST CRITICAL HIGH MEDIUM LOW INFO INDEX ORDER INDEX SEVERITY IF SEVERITY IN ORDER ELSE ZERO RETURN ORDER MIN INDEX PLUS ONE LEN ORDER MINUS ONE DEF HASUNDERSCOREUSERUNDERSCOREINPUT LINE STR BOOL USERINPUTMARKERSCOMMON SEARCH LINE DEF HAS VARIABLE INTERPOLATION LINE STR BOOL IF RE SEARCH FSTRINGBRACESNOTESCAPED LINE RETURN TRUE IF FORMAT METHOD CALL IN LINE RETURN TRUE IF RE SEARCH PERCENT SDIFR AND PERCENT IN LINE RETURN TRUE RETURN FALSE DEF ONLY HARDCODED STRING LINE STR BOOL IF HAS VARIABLE INTERPOLATION LINE RETURN FALSE IF HAS USER INPUT LINE RETURN FALSE PARENTHESES FIND OPEN PARANTHESIS IF NEGATIVE ONE RETURN FALSE INSIDE COLON FROM START TO END OF STRING CHECK FOR IDENTIFIERS THAT ARENT STRING LITERALS LOOK FOR ARGUMENT JUST STRING LITERAL TREAT AS HARDCODED REGEXMATCHGROUPSTARTINSIDEGROUPRETURNTRUEORENDOFINJECTIONDEFSLISTTUPLESTRSTRSTRSTRSTRLEFTBRACKNAMEPATSEVITYPEDESCRIGHTBRACKPY EVAL USER INPUT EVAL OPEN NON CAPTURING VAR DATA REQUEST INPUT ARGV PARAMSQQUERYFORMUSERFSTRINGQUOTE CRITICAL CODE INJECTION EVAL WITH POTENTIAL USER INPUT PY EVAL ANY EVAL OPENCOLONSEMICOLONCRITICALCODEINJECTIONEVALUSAGEVERIFYINPUTISNOTUSER
