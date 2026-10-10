@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime
 from enum import Enum
+import os
 
 app = FastAPI(
     title="API Template",
@@ -26,9 +27,11 @@ app.add_middleware(
 )
 
 # CORS: Configures Cross-Origin Resource Sharing
+_cors_origins_raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()] or []
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # TODO: Update this with specific origins in production
+    allow_origins=_cos_origins, # TODO: Set CORS_ALLOWED_ORIGINS env var (comma-separated) in production
     allow_credentials=False, # TODO: Set to True if you need cookies/auth headers, but restrict origins
     allow_methods=["*"],
     allow_headers=["*"],
