@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 """007 Full Audit -- Comprehensive 6-phase security audit orchestrator.
 
 Executes the complete 007 security audit pipeline:
@@ -137,41 +136,4 @@ _RED_TEAM_TEMPLATES: dict[str, dict] = {
         "persona": "Malicious user",
         "scenario": (
             "Attacker injects JavaScript through {pattern} in {file}. "
-            "The script executes in victim browsers, stealing session tokens, "
-            "redirecting users, or performing actions on their behalf."
-        ),
-        "impact": "Session hijacking, credential theft, phishing",
-        "difficulty": "Easy",
-    },
-    "ssrf": {
-        "title": "Internal Network Scanning via SSRF",
-        "persona": "External attacker",
-        "scenario": (
-            "Attacker manipulates server-side request through {pattern} in {file}. "
-            "The server makes requests to internal services, cloud metadata endpoints, "
-            "or other internal resources on the attacker's behalf."
-        ),
-        "impact": "Internal network exposure, cloud credential theft, data access",
-        "difficulty": "Medium",
-    },
-    "path_traversal": {
-        "title": "Sensitive File Access via Path Traversal",
-        "persona": "Malicious user",
-        "scenario": (
-            "Attacker uses directory traversal sequences (../) through {pattern} "
-            "in {file} to access files outside the intended directory, "
-            "including configuration files, credentials, or system files."
-        ),
-        "impact": "Credential exposure, configuration leak, source code theft",
-        "difficulty": "Easy",
-    },
-    # --- Dependencies ---
-    "dependency": {
-        "title": "Supply Chain Attack via Vulnerable Dependency",
-        "persona": "Supply chain attacker",
-        "scenario": (
-            "Attacker compromises a dependency ({pattern}) used in {file}. "
-            "Malicious code in the dependency executes during install or runtime, "
-            "exfiltrating secrets, installing backdoors, or modifying behavior."
-        ),
-        "
+            "The script executes in victim browsers,
