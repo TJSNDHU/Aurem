@@ -138,4 +138,227 @@ CICD_PATTERNS = {
 
 PRIVATE_KEY_EXTENSIONS = {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"}
 
-# Files
+# Files that are test fixtures -- lower severity or skip
+_TEST_FILE_PATTERNS = re.compile(
+    r"""(?i)(?:^test_|_test\.py$|\.test\.[jt]sx?$|\.spec\.[jt]sx?$|__tests__|fixtures?[/\\])"""
+)
+
+# Placeholder / example value patterns -- these are NOT real secrets
+_PLACEHOLDER_PATTERN = re.compile(
+    r"""(?i)(?:example|placeholder|changeme|xxx+|your[_-]?key[_-]?here|"""
+    r"""insert[_-]?here|replace[_-]?me|todo|fixme|dummy|fake|sample|test123|"""
+    r"""sk_test_|pk_test_)"""
+)
+
+
+# ---------------------------------------------------------------------------
+# Entropy calculation
+# ---------------------------------------------------------------------------
+
+def shannon_entropy(s: str) -> float:
+    """Calculate Shannon entropy of a string.
+
+    Higher entropy indicates more randomness, which may suggest a secret/token.
+    Typical English text: ~3.5-4.0 bits. Random tokens: ~4.5-6.0 bits.
+
+    Args:
+        s: Input string.
+
+    Returns:
+        Shannon entropy in bits. Returns 0.0 for empty strings.
+    """
+    if not s:
+        return 0.0
+
+    length = len(s)
+    freq: dict[str, int] = {}
+    for ch in s:
+        freq[ch] = freq.get(ch, 0) + 1
+
+    entropy = 0.0
+    for count in freq.values():
+        probability = count / length
+        if probability > 0:
+            entropy -= probability * math.log2(probability)
+
+    return entropy
+
+
+# ---------------------------------------------------------------------------
+# Base64 detection
+# ---------------------------------------------------------------------------
+
+_BASE64_RE = re.compile(
+    r"""[A-Za-z0-9+/]{20,}={0,2}"""
+)
+
+_BASE64_URL_RE = re.compile(
+    r"""[A-Za-z0-9_-]{20,}"""
+)
+
+
+def _check_base64_secret(token: str) -> bool:
+    """Check if a base64-looking string decodes to something high-entropy.
+
+    Args:
+        token: A candidate base64 string.
+
+    Returns:
+        True if the decoded content has high entropy (likely a secret).
+    """
+    # Pad if needed for standard base64
+    padded = token + "=" * (-len(token) % 4)
+    try:
+        decoded = base64.b64decode(padded, validate=True)
+        decoded_str = decoded.decode("ascii", errors="replace")
+        # Only flag if decoded content is also high entropy
+        return shannon_entropy(decoded_str) > 4.0 and len(decoded) >= 12
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Hardcoded IP detection
+# ---------------------------------------------------------------------------
+
+_IP_RE = re.compile(
+    r"""\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b"""
+)
+
+_SAFE_IP_PREFIXES = (
+    "127.",       # localhost
+    "0.",         # unspecified
+    "10.",        # private class A
+    "192.168.",   # private class C
+    "169.254.",   # link-local
+    "255.",       # broadcast
+)
+
+
+def _is_private_or_localhost(ip: str) -> bool:
+    """Return True if IP is localhost, private range, or otherwise safe."""
+    if ip.startswith(_SAFE_IP_PREFIXES):
+        return True
+    # 172.16.0.0 - 172.31.255.255 (private class B)
+    parts = ip.split(".")
+    try:
+        if parts[0] == "172" and 16 <= int(parts[1]) <= 31:
+            return True
+    except (IndexError, ValueError):
+        pass
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Context-aware false positive reduction
+# ---------------------------------------------------------------------------
+
+_COMMENT_LINE_RE = re.compile(
+    r"""^\s*(?:#|//|/\*|\*|;|rem\b|@rem\b)""", re.IGNORECASE
+)
+
+_MARKDOWN_CODE_FENCE = re.compile(r"""^\s*```""")
+
+
+def _is_comment_line(line: str) -> bool:
+    """Return True if the line appears to be a comment."""
+    return bool(_COMMENT_LINE_RE.match(line))
+
+
+def _is_test_file(filepath: Path) -> bool:
+    """Return True if the file is a test fixture / test file."""
+    return bool(_TEST_FILE_PATTERNS.search(filepath.name)) or bool(
+        _TEST_FILE_PATTERNS.search(str(filepath))
+    )
+
+
+def _is_placeholder_value(line: str) -> bool:
+    """Return True if the matched line contains placeholder/example values."""
+    return bool(_PLACEHOLDER_PATTERN.search(line))
+
+
+def _is_env_example(filepath: Path) -> bool:
+    """Return True if the file is a .env.example or similar template."""
+    name = filepath.name.lower()
+    return name in (".env.example", ".env.sample", ".env.template", ".env.defaults")
+
+
+def _classify_file(filepath: Path) -> str:
+    """Classify a file into a category for reporting.
+
+    Returns one of: 'env', 'config', 'shell', 'docker', 'cicd',
+                     'private_key', 'source', 'other'.
+    """
+    name = filepath.name.lower()
+    suffix = filepath.suffix.lower()
+
+    # .env variants
+    if name.startswith(".env") or name in ENV_FILE_PATTERNS:
+        return "env"
+
+    # Private key files
+    if suffix in PRIVATE_KEY_EXTENSIONS:
+        return "private_key"
+
+    # Config files
+    if suffix in CONFIG_EXTENSIONS:
+        return "config"
+
+    # Shell scripts
+    if suffix in SHELL_EXTENSIONS:
+        return "shell"
+
+    # Docker files
+    if any(name.startswith(prefix) for prefix in DOCKER_PREFIXES):
+        return "docker"
+
+    # CI/CD files
+    filepath_str = str(filepath).replace("\\", "/")
+    for cicd_pattern in CICD_PATTERNS:
+        if cicd_pattern in filepath_str:
+            return "cicd"
+
+    # Source code
+    if suffix in config.SCANNABLE_EXTENSIONS:
+        return "source"
+
+    return "other"
+
+
+# ---------------------------------------------------------------------------
+# File collection (deeper than quick_scan)
+# ---------------------------------------------------------------------------
+
+def _should_scan_file(filepath: Path) -> bool:
+    """Determine if a file should be included in the deep scan.
+
+    More inclusive than quick_scan: also picks up .env variants, Docker files,
+    CI/CD files, and private key files even if their extension is not in
+    SCANNABLE_EXTENSIONS.
+    """
+    name = filepath.name.lower()
+    suffix = filepath.suffix.lower()
+
+    # Always scan .env variants
+    if name.startswith(".env"):
+        return True
+
+    # Always scan private key files (we detect their presence, not content)
+    if suffix in PRIVATE_KEY_EXTENSIONS:
+        return True
+
+    # Always scan Docker files
+    if any(name.startswith(prefix) for prefix in DOCKER_PREFIXES):
+        return True
+
+    # Always scan CI/CD files
+    filepath_str = str(filepath).replace("\\", "/")
+    for cicd_pattern in CICD_PATTERNS:
+        if cicd_pattern in filepath_str or name == Path(cicd_pattern).name:
+            return True
+
+    # Standard scannable extensions
+    for ext in config.SCANNABLE_EXTENSIONS:
+        if name.endswith(ext):
+            return True
+    if suffix in config.SCANNABLE_EXTENSIONS:
