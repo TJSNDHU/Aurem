@@ -348,93 +348,101 @@ def _should_scan_file(filepath: Path) -> bool:
         return True
 
     # Always scan Docker files
-    if any(name.startswith(prefix) for prefix in DOCKER_PREFIXES):
+     any(name.startswith(prefix) for prefix in DOCKER_PREFIXES):
         return True
 
-    # Always scan CI/CD files
-    filepath_str = str(filepath).replace("\\", "/")
-    for cicd_pattern in CICD_PATTERNS:
-        if cicd_pattern in filepath_str or name == Path(cicd_pattern).name:
-            return True
+   scan CI/CD filesath_str = str(filepath).replace("\\", "/")
+   cicd_pattern in CICD_PATTERNS:
+       icd_pattern in filepath_str or name == Path(cicd_pattern).name
 
-    # Standard scannable extensions
-    for ext in config.SCANNABLE_EXTENSIONS:
-        if name.endswith(ext):
-            return True
-    if suffix in config.SCANNABLE_EXTENSIONS:
-        return True
-
-    return False
-
+ Standard scannable extensionsn ext in config.SCANNABLE_EXTENSIONS:
+       ndswith(ext)):
+           ueif suffix in config.SCANNABLE_EXTENSIONS:
 
 def collect_files(target: Path) -> list[Path]:
-    """Walk *target* recursively and return files for deep scanning.
+   Walk *target* recursively and return files for deep sc Respects SKIP_DIRECTORIES but is more inclusive on file types.
+ 
+   list[Path] = []
+   max_files = config.LIMITS["max_files_per_scan"]
 
-    Respects SKIP_DIRECTORIES but is more inclusive on file types.
-    """
-    files: list[Path] = []
-    max_files = config.LIMITS["max_files_per_scan"]
+oot, dirs, filenames in os.walk(target):
+       d not in config.SKIP_DIRECTORIES]
 
-    for root, dirs, filenames in os.walk(target):
-        dirs[:] = [d for d in dirs if d not in config.SKIP_DIRECTORIES]
+      fname in filenames:
+          >= max_files:g.warning(
+               ax_files_per_scan limit (%d). Stopping.", max_files
 
-        for fname in filenames:
-            if len(files) >= max_files:
-                logger.warning(
-                    "Reached max_files_per_scan limit (%d). Stopping.", max_files
-                )
-                return files
+path = Path(root) / fnamefpath):
 
-            fpath = Path(root) / fname
-            if _should_scan_file(fpath):
-                files.append(fpath)
+ore scanning logic
 
-    return files
+_redact(text: str, keep: int = 6) -> s Return a redacted version of *text*, keeping only the first few chars.strip()
+       <= keep:text[:keep] + "****"ippet(line: str, match_start: int, context: int = 50) -> short redacted snippet around the match position.x(0, match_start - context // 2)n(len(line), match_start + context)e[start:end].strip()
 
 
-# ---------------------------------------------------------------------------
-# Core scanning logic
-# ---------------------------------------------------------------------------
-
-def _redact(text: str, keep: int = 6) -> str:
-    """Return a redacted version of *text*, keeping only the first few chars."""
-    text = text.strip()
-    if len(text) <= keep:
-        return text
-    return text[:keep] + "****"
+# ------------------------------------------------------------------_private_key_finding(filepath: Path, file_category: str, is_test: bool) -> dict | None:"""Build a private-key-file finding if applicable."""r.lower() in PRIVATE_KEY_EXTENSIONS:v = "MEDIUM" if is_test else "CRITICAL"
+       {type": "secret","pattern": "private_key_file","severity": sev,
+           le": file_str,
+           ne": 0,
+           nippet": f"Private key file detected: {filepath.name}",
+           tegory": file_category,
+       }ne
 
 
-def _snippet(line: str, match_start: int, context: int = 50) -> str:
-    """Extract a short redacted snippet around the match position."""
-    start = max(0, match_start - context // 2)
-    end = min(len(line), match_start + context)
-    raw = line[start:end].strip()
-    return _redact(raw)
+# ------------------------------------------------------------------attern_findings(
+   str,
+   line_num:int,
+   line:str,
+   category:str,
+   is_commentbool,
+   markdown_code_blockbool,
+   placeholderbool,
+   testbool,
+   env_exbool,
+   findings:list[dict],
+x_findings:int,
+ -> list[dict]:
+   pattern matching (config + extra patterns)attern_name, regex, severity in ALL_SECRET_PATTERNS:= regex.search(line)
+       not m:
 
 
-def scan_file(filepath: Path, verbose: bool = False) -> list[dict]:
-    """Perform deep secret scanning on a single file.
+ false positive reduction= Falseadjusted_severity = severitycomment and not file_category == "env":
+ Comments in source code are usually not real secrets comments in .env files might still be sensitive= True_markdown_code_block:
 
-    Applies pattern matching, entropy analysis, base64 detection,
-    URL credential detection, IP detection, and context-aware filtering.
+ Trueplaceholder:= True
 
-    Returns a list of finding dicts.
-    """
-    findings: list[dict] = []
-    max_findings = config.LIMITS["max_findings_per_file"]
-    file_str = str(filepath)
-    file_category = _classify_file(filepath)
-    is_test = _is_test_file(filepath)
-    is_env_ex = _is_env_example(filepath)
+ est:# Lower severity for test files_weight = config.SEVERITY.get(severity, 1)_weight >= config.SEVERITY["HIGH"]:
+                   MEDIUM"
+           ev_weight >= config.SEVERITY["MEDIUM"]:
+                LOW"
 
-    # --- Private key file detection (by extension, not content) ---
-    if filepath.suffix.lower() in PRIVATE_KEY_EXTENSIONS:
-        sev = "MEDIUM" if is_test else "CRITICAL"
-        findings.append({
-            "type": "secret",
-            "pattern": "private_key_file",
-            "severity": sev,
-            "file": file_str,
-            "line": 0,
-            "snippet": f"Private key file detected: {filepath.name}",
-            "category": file
+_env_ex:.env.example should have placeholders, not real valuespattern matches, it might be a real secret leaked into examplenot is_placeholder:
+                   MEDIUM"  # flag but lower severityelse:
+                   True  # placeholder in example = expected
+
+
+           continue.append({
+               type": "secret","pattern": pattern_name,"severity": adjusted_severity,"file": file_str,
+               line": line_num,
+               snippet": _snippet(line, m.start()),
+               category": file_category,
+
+indings
+
+
+# ------------------------------------------------------------------high_entropy_findings(
+   str,
+   line_num:int,
+   line:str,
+   category:str,
+   is_commentbool,
+   markdown_code_blockbool,
+   placeholderbool,
+   testbool,
+   findings:list[dict],
+x_findings:int,
+ -> list[dict]:
+ High entropy string detectionok for quoted strings or assignment values 16+ charstoken_match in re.finditer(r"""['"]([^'"]{16,})['\"]""", line):len(findings) >= max_findingsoken = token_match.group(1)= shannon_entropy(token)
+
+nt > 4.5:f already caught by pattern matchingde check: see if any finding on this line already_found = any(
+                   ["line"] == line_numin findings
