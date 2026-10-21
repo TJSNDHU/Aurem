@@ -46,4 +46,16 @@ installSentinel();
             u.hostname !== window.location.hostname &&
             STALE_MARKERS.some((m) => u.hostname.endsWith(m));
           if (isStale) {
-            const healed = window.location.origin + u.pathname + u.search + u.hash;        if (typeof input === 'string') {          input = healed;     else { input = new Request(healed, input); }}}} catch (_e) { /* swallow and fall through */ }return origFetch(input, init);};} catch (e) { console.warn('[AUREM] API URL healer install failed:', e); }D})();
+            const healed = window.location.origin + u.pathname + u.search + u.hash;
+            if (typeof input === 'string') {
+              input = healed;
+            } else {
+              input = new Request(healed, input);
+            }
+          }
+        }
+      } catch (_e) { /* swallow and fall through */ }
+      return origFetch(input, init);
+    };
+  } catch (e) { console.warn('[AUREM] API URL healer install failed:', e); }
+})();
