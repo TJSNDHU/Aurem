@@ -22,7 +22,8 @@ OPENFANG_SECRET = os.environ.get("OPENFANG_WEBHOOK_SECRET", "openfang_aurem_2026
 
 # Admin credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = "<REDACTED>"
+# TODO: Set the ADMIN_PASSWORD environment variable
+ADMIN_PASSWORD = <REDACTED>
 
 
 @pytest.fixture(scope="module")
@@ -312,63 +313,4 @@ class TestFollowupORAListener:
         
         # Check ora_command_log for the import entry
         # This proves the webhook processed and logged
-        print(f"PASS: Webhook processed with run_id={actual_run_id}, inserted={webhook_data.get('inserted')}")
-        
-        # The listener should have emitted events - we can verify by checking
-        # if the system is responsive and the webhook completed successfully
-        # Full a2a_events verification would require direct DB access
-        
-        if webhook_data.get("inserted", 0) > 0:
-            print("INFO: Lead inserted - listener should have received new_leads_batch event")
-        else:
-            print("INFO: Lead was duplicate - listener may not have been triggered")
-
-
-class TestOpenFangLeadsRecent:
-    """Test GET /api/openfang/leads/recent (admin-only)"""
-
-    def test_leads_recent_requires_auth(self):
-        """Leads recent endpoint requires admin auth"""
-        resp = requests.get(f"{BASE_URL}/api/openfang/leads/recent", timeout=10)
-        assert resp.status_code in (401, 403), f"Expected 401/403 without auth, got {resp.status_code}"
-        print("PASS: /api/openfang/leads/recent requires auth")
-
-    def test_leads_recent_returns_items(self, admin_headers):
-        """Leads recent returns items array"""
-        resp = requests.get(
-            f"{BASE_URL}/api/openfang/leads/recent?limit=10",
-            headers=admin_headers,
-            timeout=15
-        )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text[:200]}"
-        
-        data = resp.json()
-        assert "items" in data
-        assert isinstance(data["items"], list)
-        print(f"PASS: /api/openfang/leads/recent returns {len(data['items'])} items")
-
-
-class TestBackendHealth:
-    """Basic backend health checks"""
-
-    def test_health_endpoint(self):
-        """Backend health endpoint returns 200"""
-        resp = requests.get(f"{BASE_URL}/api/health", timeout=10)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        print("PASS: /api/health returns 200")
-
-    def test_admin_login(self):
-        """Admin can login successfully"""
-        resp = requests.post(
-            f"{BASE_URL}/api/platform/auth/login",
-            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-            timeout=15
-        )
-        assert resp.status_code == 200, f"Admin login failed: {resp.status_code}"
-        data = resp.json()
-        assert data.get("token") or data.get("access_token")
-        print("PASS: Admin login successful")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--tb=short"])
+        print(f"PASS: Webhook processed with run_id={actual_run_id}, inserted={
