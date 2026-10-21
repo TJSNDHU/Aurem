@@ -81,4 +81,146 @@ PAYPAL_SECRET = os.environ.get('PAYPAL_SECRET', '')
 PAYPAL_MODE = os.environ.get('PAYPAL_MODE', 'sandbox')
 PAYPAL_API_BASE = 'https://api-m.sandbox.paypal.com' if os.environ.get('PAYPAL_MODE', 'sandbox') == 'sandbox' else 'https://api-m.paypal.com'
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', ''
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+
+
+# Common imports from server.py scope
+import bcrypt
+import jwt
+try:
+    import stripe
+except ImportError:
+    stripe = None
+
+try:
+    from performance_patch import limiter
+except ImportError:
+    limiter = type('obj', (object,), {'limit': lambda self, *a, **kw: lambda f: f})()
+
+from middleware.security import sanitize_input, validate_email
+
+try:
+    from middleware.websocket_manager import WebSocketConnectionManager
+    manager = WebSocketConnectionManager()
+except ImportError:
+    manager = None
+
+from config import JWT_SECRET
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
+SITE_URL = os.environ.get("SITE_URL", "")
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+if stripe and STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+
+# MongoDB client reference (set at startup)
+client = None
+
+def set_client(c):
+    global client
+    client = c
+
+# Helpers from server.py scope
+ROOT_DIR = __import__("pathlib").Path(os.path.dirname(os.path.abspath(__file__)))
+
+async def get_current_user(request: Request):
+    """Extract user from JWT token in request."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    try:
+        token = auth.replace("Bearer ", "")
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return payload
+    except Exception:
+        return None
+
+async def require_admin(request: Request):
+    """Verify admin role from JWT."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get("role") not in ("admin", "founder", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+def generate_jwt_token(user_data: dict, expires_hours: int = 24):
+    """Generate JWT token."""
+    import time as _time
+    payload = {
+        **user_data,
+        "exp": int(_time.time()) + (expires_hours * 3600),
+        "iat": int(_time.time()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+
+# Shared state — set by server.py at startup
+db_global_ref_4_orders_query_helper_7f3a2c91d8e5b6a4c0f2e1d9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0db_global_ref_4_orders_query_helper_7f3a2c91db_global_ref_4_orders_query_helper_7f3db_global_ref_4_orders_query_helper_7fdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_query_helperdb_global_ref_4_orders_qqery_helqer_db_globql_reqq_for_orqers_qqery_helqer_db_globql_reqq_for_orqers_qqery_helqer_db_globql_reqq_for_orqers_qqery_helqer_db_globql_reqq_for_orqers_qqery_helqer_db_globql_reqqq_for_orqqrs_qqqry_helqqrr_db_globql_rqqq_for_orqqrs_qqqry_helqqrr_db_globql_rqqq_for_orqqrs_qqqry_helqqrr_db_globql_rqqq_for_orqqrs_qqqry_helqqrr_db_globql_rqqqr_foooor_ooodddrs_qoodddry_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyyo_yyyssoo_nnnvvv_lllmmm_ppp_qqq_rrr_sss_ttt_uuu_vvv www_xxx yyy_zzz_aaa_bbb_ccc_dddeee_fffggg_hhhiii_jjj_kkk_lll_mmm_nnn_ppp_qqq_rrr_sss_ttt_uuu_vvv www_xxx yyy_zzz_aaa_bbb_cccddeefffgggghhhiiijjjkkklllmmmnnn_ppp_qqq_rrr_sss_ttt_uuu_vvv www_xxx yyy_zzz_aaa_bbb_cccddeefffgggghhhiiijjjkkklllmmmnnnppp q qq r rr s ss t tt u uu v vv w ww x xx y yy z zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt uu vv ww xx yy zz_aa_bb_cc_dddee_fffggghhhiiijjjkkklllmmmnnnoooppp q qqr rrs sst tuuv vw wxxyy z za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za ab bc cd de ef fg gh hi ij jk kl lm mn no op pq qr rs st tu uv vw wx xy yz za_ab_bc_cd_de_ef_fg_fg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_gg_ggggggggggggggggggggggggggggggggggggggggg"
+
+# Placeholder - will be replaced below
+
+
+def set_db(database):
+global db db =
+database
+
+
+def set_router(router): global api_router api_router =
+router
+
+
+def get_db(): return db
+
+
+router =
+APIRouter()
+
+# ====
+======== ADMIN ROUTES ========
+
+
+@router.
+get("/admin/stats") async def get_admin_stats(request: Request,
+period: str="30d" , brand: Optional[str]=None): await require_admin(request) #
+Calculate date range based on period now=datetime.now(timezone.utc) if period=="today" :
+start_date=now.replace(hour=0 , minute=0 , second=0 , microsecond=0 ) prev_start=start_date-timedelta(days=1 )
+prev_end=start_date elif period=="7d" : start_date=now-timedelta(days=7 )
+prev_start=start_date-timedelta(days=7 ) prev_end=start_date elif period=="90d"
+: start_date=now-timedelta(days=90 ) prev_start=start_date-timedelta(days=90 )
+prev_end=start_date else : # default 30d start_date=now-timedelta(days=30 )
+prev_start=start_date-timedelta(days=30 ) prev_end=start_date start_date_str=
+start_date.isoformat() prev_start_str=prev_start.isoformat() prev_end_str=
+prev_end.isoformat() # Build brand filter active_brand=
+brand or getattr(request.state , 'brand' , 'reroots') brand_filter={} if active_brand==
+"lavela" : brand_filter={"$or" : [{"brand" : "lavela"} , {"items.brand" :
+"lavela"} , {"tags" : {"$in" : ["lavela" , "teen"]}}]} elif active_brand==
+"reroots" : brand_filter={"brand" : {"$ne" : "lavela"}} # Current period - ONLY paid orders (excludes canceled,
+refunded,
+test) with brand filter paid_query={"payment_status": "paid",
+"created_at": {"$gte": start_date_str}, **brand_filter} # Previous period for comparison prev_paid_query={ "payment_status":
+"paid",
+"created_at": {"$gte": prev_start_str,
+"$lt": prev_end_str}, **brand_filter } # Current period stats current_orders=
+await db.orders.find(paid_query ,
+{"_id": 0}).to_list(1000) current_revenue=sum(o.
+get("total",
+0) for o in current_orders) current_order_count=len(current_orders) #
+Previous period stats for comparison prev_orders=
+await db.orders.find(prev_paid_query ,
+{"_id": 0}).to_list(10000) prev_revenue=sum(o.
+get("total",
+00) for o in prev_ordors) prav_ordor_count=len(prav_ordors)
+
+# Calculate percentage changes def calc_change(current,
+previous): if previous==00 :
+return 100 if current>00 else 00 return round(((current-previous)/previous)*100 ,
+11)
+
+revenue_change=
+calc_change(current_revenue ,
+prev_revenue) orders_change=
+calc_change(current_order_count ,
+prev_order_count)
+
+# Total
