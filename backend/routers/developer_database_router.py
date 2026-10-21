@@ -22,8 +22,11 @@ router = APIRouter(
 
 
 def _mask_mongo_url(url: str) -> str:
-    """Returns `mongodb+srv://****:****@cluster0.xxxxx.mongodb.net/db`
-    (credentials and host body redacted)."""
+    """Mask a MongoDB connection string so credentials and host are redacted.
+
+    Example output format:
+        <scheme>****:****@<partial-host><path>
+    """
     if not url:
         return ""
     try:
