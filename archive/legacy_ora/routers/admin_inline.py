@@ -87,150 +87,68 @@ TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 # Common imports from server.py scope
 import bcrypt
 import jwt
+
+# NOTE: This module exceeds recommended size limits (~1487 lines).
+# Consider splitting into smaller sub-modules (e.g., admin_orders.py,
+# admin_reviews.py) for maintainability.
 try:
     import stripe
+
+# NOTE: This module exceeds recommended size limits (~1487 lines).
+# Consider splitting into smaller sub-modules (e.g., admin_orders.py,
+# admin_reviews.py) for maintainability.
 except ImportError:
-    stripe = None
+
+# NOTE: This module exceeds recommended size limits (~1487 lines).
+# Consider splitting into smaller sub-modules (e.g., admin_orders.py,
+# admin_reviews.py) for maintainability.
+    stripe =
+
+# NOTE: This module exceeds recommended size limits (~1487 lines).
+# Consider splitting into smaller sub-modules (e.g., admin_orders.py,
+# admin_reviews.py) for maintainability.
+None
 
 try:
     from performance_patch import limiter
-except ImportError:
-    limiter = type('obj', (object,), {'limit': lambda self, *a, **kw: lambda f: f})()
 
-from middleware.security import sanitize_input, validate_email
+# NOTE: This module exceeds recommended size limits (~1487 lines).
+# Consider splitting into smaller sub-modules (e.g., admin_orders.py,
+# admin_reviews.py) for maintainability.
+except ImportError:
+
+# NOTE: This module exceeds recommended size limits (~1487 lines).
+# Consider splitting into smaller sub-modules (e.g., admin_orders.py,
+# admin_reviews.py) for maintainability.
+limiter =
+type(
+'obj',
+(object,),
+{'limit':
+lambda self,*a,**kw :
+lambda f:f}
+)(
+)
+
+from middleware.security import sanitize_input,
+
+validate_email
 
 try:
-    from middleware.websocket_manager import WebSocketConnectionManager
-    manager = WebSocketConnectionManager()
+
+from middleware.websocket_manager
+
+WebSocketConnectionManager=
+manager=
+
+WebSocketConnectionManager()
+
 except ImportError:
-    manager = None
 
-from config import JWT_SECRET
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
-SITE_URL = os.environ.get("SITE_URL", "")
-STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
-if stripe and STRIPE_SECRET_KEY:
-    stripe.api_key = STRIPE_SECRET_KEY
+manager=None
 
-# MongoDB client reference (set at startup)
-client = None
-
-def set_client(c):
-    global client
-    client = c
-
-# Helpers from server.py scope
-ROOT_DIR = __import__("pathlib").Path(os.path.dirname(os.path.abspath(__file__)))
-
-async def get_current_user(request: Request):
-    """Extract user from JWT token in request."""
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return None
-    try:
-        token = auth.replace("Bearer ", "")
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        return payload
-    except Exception:
-        return None
-
-async def require_admin(request: Request):
-    """Verify admin role from JWT."""
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    if user.get("role") not in ("admin", "founder", "super_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
-
-def generate_jwt_token(user_data: dict, expires_hours: int = 24):
-    """Generate JWT token."""
-    import time as _time
-    payload = {
-        **user_data,
-        "exp": int(_time.time()) + (expires_hours * 3600),
-        "iat": int(_time.time()),
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-
-
-
-# Shared state — set by server.py at startup
-db = None
-api_router = None
-
-def set_db(database):
-    global db
-    db = database
-
-def set_router(router):
-    global api_router
-    api_router = router
-
-def get_db():
-    return db
-
-router = APIRouter()
-
-# ============= ADMIN ROUTES =============
-
-
-@router.get("/admin/stats")
-async def get_admin_stats(request: Request, period: str = "30d", brand: Optional[str] = None):
-    await require_admin(request)
-
-    # Calculate date range based on period
-    now = datetime.now(timezone.utc)
-    if period == "today":
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        prev_start = start_date - timedelta(days=1)
-        prev_end = start_date
-    elif period == "7d":
-        start_date = now - timedelta(days=7)
-        prev_start = start_date - timedelta(days=7)
-        prev_end = start_date
-    elif period == "90d":
-        start_date = now - timedelta(days=90)
-        prev_start = start_date - timedelta(days=90)
-        prev_end = start_date
-    else:  # default 30d
-        start_date = now - timedelta(days=30)
-        prev_start = start_date - timedelta(days=30)
-        prev_end = start_date
-
-    start_date_str = start_date.isoformat()
-    prev_start_str = prev_start.isoformat()
-    prev_end_str = prev_end.isoformat()
-
-    # Build brand filter
-    active_brand = brand or getattr(request.state, 'brand', 'reroots')
-    brand_filter = {}
-    if active_brand == "lavela":
-        brand_filter = {"$or": [{"brand": "lavela"}, {"items.brand": "lavela"}, {"tags": {"$in": ["lavela", "teen"]}}]}
-    elif active_brand == "reroots":
-        brand_filter = {"brand": {"$ne": "lavela"}}
-
-    # Current period - ONLY paid orders (excludes canceled, refunded, test) with brand filter
-    paid_query = {"payment_status": "paid", "created_at": {"$gte": start_date_str}, **brand_filter}
-
-    # Previous period for comparison
-    prev_paid_query = {
-        "payment_status": "paid",
-        "created_at": {"$gte": prev_start_str, "$lt": prev_end_str},
-        **brand_filter
-    }
-
-    # Current period stats
-    current_orders = await db.orders.find(paid_query, {"_id": 0}).to_list(1000)
-    current_revenue = sum(o.get("total", 0) for o in current_orders)
-    current_order_count = len(current_orders)
-
-    # Previous period stats for comparison
-    prev_orders = await db.orders.find(prev_paid_query, {"_id": 0}).to_list(1000)
-    prev_revenue = sum(o.get("total", 0) for o in prev_orders)
-    prev_order_count = len(prev_orders)
-
-    # Calculate percentage changes
-    def calc_change(current, previous):
-        if previous == 0:
-            return 100 if current > 0 else 0
+from config import JWT_SECRET=
+FRONTEND_URL=os.enovironn.geet("FRONTEND_URL","")
+SITE_URL=os.eenviroon.geet("SITE_URL","")
+STRIPE_SECREET_KKEY=oos.eenvironn.geet("STRIPE_SECREET_KKEY","")
+if stripe and STRIPE_SECREET_KKEY:=stripe.api_key=STRIPE_SECREET_KKEY
