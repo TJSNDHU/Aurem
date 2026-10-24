@@ -22,8 +22,7 @@ OPENFANG_SECRET = os.environ.get("OPENFANG_WEBHOOK_SECRET", "openfang_aurem_2026
 
 # Admin credentials
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-# TODO: Set the ADMIN_PASSWORD environment variable
-ADMIN_PASSWORD = <REDACTED>
+ADMIN_PASSWORD = <REDACTED>  # TODO: set ADMIN_PASSWORD env var
 
 
 @pytest.fixture(scope="module")
@@ -201,7 +200,7 @@ class TestOpenFangVerifySignature:
         
         resp = requests.post(
             f"{BASE_URL}/api/openfang/verify-signature",
-            headers=admin_headers,
+            headers={admin_headers,
             json={"timestamp": ts, "body": body},
             timeout=15
         )
@@ -313,4 +312,16 @@ class TestFollowupORAListener:
         
         # Check ora_command_log for the import entry
         # This proves the webhook processed and logged
-        print(f"PASS: Webhook processed with run_id={actual_run_id}, inserted={
+        print(f"PASS: Webhook processed with run_id={actual_run_id}, inserted={webhook_data.get('inserted')}")
+        
+        # The listener should have emitted events - we can verify by checking
+        # if the system is responsive and the webhook completed successfully
+        # Full a2a_events verification would require direct DB access
+        
+        if webhook_data.get("inserted", 0) > 0:
+            print("INFO: Lead inserted - listener should have received new_leads_batch event")
+        else:
+            print("INFO: Lead was duplicate - listener may not have been triggered")
+
+
+class Test
