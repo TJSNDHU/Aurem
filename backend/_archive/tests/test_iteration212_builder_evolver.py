@@ -21,8 +21,8 @@ if not BASE_URL:
 
 # Admin credentials from test_credentials.md
 ADMIN_EMAIL = "teji.ss1986@gmail.com"
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
-# TODO: Set ADMIN_PASSWORD environment variable with the admin password
+# TODO: Set ADMIN_TEST_PASSWORD environment variable before running tests
+ADMIN_PASSWORD = os.environ.get("ADMIN_TEST_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")
@@ -234,62 +234,4 @@ class TestEvolverGracefulDegradation:
             timeout=15,
         )
         # Should NOT 500 — graceful degradation
-        assert resp.status_code == 200, f"Expected 200 (graceful), got {resp.status_code}: {resp.text[:200]}"
-        data = resp.json()
-        
-        assert data.get("evolver_configured") == False, f"Expected evolver_configured=false: {data}"
-        assert data.get("ok") == False, f"Expected ok=false (offline): {data}"
-        
-        print(f"✅ POST /api/admin/evolver/run-review → 200 (graceful offline), ok=false")
-
-    def test_evolver_approve_invalid_gene_returns_404(self, admin_headers):
-        """POST /api/admin/evolver/genes/{invalid}/approve → 404."""
-        resp = requests.post(
-            f"{BASE_URL}/api/admin/evolver/genes/invalid-gene-id-12345/approve",
-            headers=admin_headers,
-            timeout=10,
-        )
-        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text[:200]}"
-        print("✅ POST /api/admin/evolver/genes/{invalid}/approve → 404")
-
-    def test_evolver_without_auth_returns_401(self):
-        """GET /api/admin/evolver/status without JWT → 401."""
-        resp = requests.get(
-            f"{BASE_URL}/api/admin/evolver/status",
-            timeout=10,
-        )
-        assert resp.status_code == 401, f"Expected 401, got {resp.status_code}"
-        print("✅ GET /api/admin/evolver/status without auth → 401")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 3: ORA Command Center — New Intents (BUILD, FIX, TEST_ENDPOINT)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class TestOraCommandCenterNewIntents:
-    """ORA Command Center — BUILD, FIX, TEST_ENDPOINT intents."""
-
-    def test_ora_command_build_intent(self, admin_headers):
-        """POST /api/ora/command {text:'Build endpoint /api/foo returning 42'} → intent=BUILD."""
-        resp = requests.post(
-            f"{BASE_URL}/api/ora/command",
-            json={"text": "Build endpoint /api/foo returning 42"},
-            headers=admin_headers,
-            timeout=60,  # Builder may take time
-        )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text[:300]}"
-        data = resp.json()
-        
-        assert data.get("intent") == "BUILD", f"Expected intent=BUILD, got {data.get('intent')}"
-        # ok=false expected since budget exceeded
-        # Reply should mention AUREM Builder
-        reply = data.get("reply", "")
-        assert "Builder" in reply or "build" in reply.lower(), f"Reply should mention Builder: {reply[:200]}"
-        
-        print(f"✅ ORA command 'Build endpoint...' → intent=BUILD, ok={data.get('ok')}")
-
-    def test_ora_command_test_endpoint_intent(self, admin_headers):
-        """POST /api/ora/command {text:'Test /api/telegram/status'} → intent=TEST_ENDPOINT."""
-        resp = requests.post(
-            f"{BASE_URL}/api/ora/command",
-            json={"text": "Test /api/
+        assert resp.status_code == 200, f"Expected 200 (graceful), got {
