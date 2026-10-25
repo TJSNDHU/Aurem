@@ -5,7 +5,7 @@ Provides batch verification and COA (Certificate of Analysis) lookup
 for product authenticity and lab data transparency.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict
 from datetime import datetime, timezone
@@ -22,6 +22,19 @@ def get_db():
     """Get MongoDB database connection."""
     client = MongoClient(MONGO_URL)
     return client[DB_NAME]
+
+
+async def require_admin(request: Request):
+    """Verify the caller is an administrator before allowing access."""
+    # TODO(joshua.kerr): Swap this for proper RBAC once Auth0/user-auth stack lands.
+
+    admin_token = os.environ.get("ADMIN_API_TOKEN")
+    bearer = request.headers.get("x-admin-token", "")
+    if not admin_token or bearer != admin_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Admin access required",
+        )
 
 
 # Sample batch data for April 19 launch (to be replaced with real COA data)
@@ -122,108 +135,4 @@ async def lookup_batch(batch_id: str):
             product=batch_data.get("product"),
             production_date=batch_data.get("production_date"),
             expiry_date=batch_data.get("expiry_date"),
-            ph_level=batch_data.get("ph_level"),
-            pdrn_concentration=batch_data.get("pdrn_concentration"),
-            stability_score=batch_data.get("stability_score"),
-            status=batch_data.get("status"),
-            lab_notes=batch_data.get("lab_notes"),
-            timestamp=datetime.now(timezone.utc).isoformat()
-        )
-    
-    # Not found
-    return BatchLookupResponse(
-        found=False,
-        message=f"Batch '{batch_id}' not found. Please check your batch ID and try again.",
-        timestamp=datetime.now(timezone.utc).isoformat()
-    )
-
-
-@router.get("/sample-ids")
-async def get_sample_batch_ids():
-    """
-    Get a list of sample batch IDs for testing.
-    This endpoint is for development/demo purposes.
-    """
-    return {
-        "sample_batch_ids": list(SAMPLE_BATCHES.keys()),
-        "note": "Use these IDs to test the batch verification feature",
-        "april_19_batches": ["APR19-V4", "APR19-V3"]
-    }
-
-
-class BatchRecord(BaseModel):
-    """Model for creating/updating batch records."""
-    batch_id: str
-    product: str
-    production_date: str
-    expiry_date: str
-    ph_level: str
-    pdrn_concentration: Optional[str] = "N/A"
-    stability_score: str
-    status: str = "verified"
-    lab_notes: Optional[str] = ""
-    additional_data: Optional[Dict] = {}
-
-
-@router.post("/admin/create")
-async def create_batch_record(batch: BatchRecord):
-    """
-    Admin endpoint to create a new batch record.
-    This is used when new production batches are completed.
-    """
-    try:
-        db = get_db()
-        
-        # Check if batch already exists
-        existing = db.batch_records.find_one({"batch_id": batch.batch_id.upper()})
-        if existing:
-            raise HTTPException(status_code=400, detail=f"Batch {batch.batch_id} already exists")
-        
-        # Create record
-        record = {
-            "batch_id": batch.batch_id.upper(),
-            "product": batch.product,
-            "production_date": batch.production_date,
-            "expiry_date": batch.expiry_date,
-            "ph_level": batch.ph_level,
-            "pdrn_concentration": batch.pdrn_concentration,
-            "stability_score": batch.stability_score,
-            "status": batch.status,
-            "lab_notes": batch.lab_notes,
-            "additional_data": batch.additional_data,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "created_by": "admin"
-        }
-        
-        db.batch_records.insert_one(record)
-        
-        return {
-            "success": True,
-            "message": f"Batch {batch.batch_id} created successfully",
-            "batch_id": batch.batch_id.upper()
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create batch: {str(e)}")
-
-
-@router.get("/admin/list")
-async def list_batch_records():
-    """
-    Admin endpoint to list all batch records.
-    """
-    try:
-        db = get_db()
-        batches = list(db.batch_records.find({}, {"_id": 0}).sort("created_at", -1).limit(100))
-        
-        # Also include sample batches count
-        return {
-            "database_batches": batches,
-            "sample_batches_available": len(SAMPLE_BATCHES),
-            "total": len(batches) + len(SAMPLE_BATCHES)
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list batches: {str(e)}")
+            ph_level=
