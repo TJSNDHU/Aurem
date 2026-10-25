@@ -10,13 +10,12 @@ GET  /api/edit/site/{slug}      preview/public site fetch (no auth)
 from __future__ import annotations
 
 import base64
-import jwt
 import logging
 import os
 import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Header, Query, UploadFile, File, Form
 from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/edit", tags=["Customer Edit Portal"])
@@ -75,15 +74,34 @@ async def verify(token: str = Query(...)):
 
 @router.post("/nps")
 async def submit_nps(body: Dict[str, Any]):
-    """2-tap customer NPS — body: {token, score, source?}"""
+    """2-tap customer NPS — body: {token, score}"""
     db = _get_db()
     if db is None:
-        raise HTTPException(503, "db unavailable")
+        raise HTTPException(503,"db unavailable")
     token = (body or {}).get("token", "")
     try:
         score = int((body or {}).get("score", 0))
     except Exception:
-        raise HTTPException(400, "score must be int 1..5")
+        raise HTTPException(400,"score must be int 1..5")
     if not token:
-        raise HTTPException(400, "token required")
-    if not (1
+        raise HTTPException(400,"token required")
+    if not (1 <= score <= 5):
+        raise HTTPException(400,"score must be 1..5")
+    from services.nps_service import submit_nps as svc
+    out = await svc(db,
+                      source=(body.get("source") or "edit_portal"))
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
+                      )
