@@ -5,7 +5,7 @@ Provides batch verification and COA (Certificate of Analysis) lookup
 for product authenticity and lab data transparency.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Optional, Dict
 from datetime import datetime, timezone
@@ -22,6 +22,23 @@ def get_db():
     """Get MongoDB database connection."""
     client = MongoClient(MONGO_URL)
     return client[DB_NAME]
+
+
+async def verify_admin_token(authorization: str = Header(...)):
+    """
+    Dependency that verifies the incoming request carries a valid admin token.
+    The expected value is set via the ADMIN_AUTH_TOKEN environment variable.
+    """
+    # TODO: Set ADMIN_AUTH_TOKEN env var on deployment; rotate periodically.
+    expected_token = os.environ.get("ADMIN_AUTH_TOKEN", "")
+    if not expected_token:
+        raise HTTPException(status_code=503, detail="Admin auth not configured.")
+    # Support Bearer scheme: strip optional 'Bearer ' prefix
+    prefix = "Bearer "
+    received = authorization[len(prefix):] if authorization.startswith(prefix) else authorization
+    if received != expected_token:
+        raise HTTPException(status_code=403, detail="Not authorized.")
+    return True
 
 
 # Sample batch data for April 19 launch (to be replaced with real COA data)
@@ -122,7 +139,7 @@ async def lookup_batch(batch_id: str):
             product=batch_data.get("product"),
             production_date=batch_data.get("production_date"),
             expiry_date=batch_data.get("expiry_date"),
-            ph_level=batch_data.get("ph_level"),
+            ph_level = batch_data.get("ph_level"),
             pdrn_concentration=batch_data.get("pdrn_concentration"),
             stability_score=batch_data.get("stability_score"),
             status=batch_data.get("status"),
@@ -165,7 +182,7 @@ class BatchRecord(BaseModel):
     additional_data: Optional[Dict] = {}
 
 
-@router.post("/admin/create")
+@router.post("/admin/create", dependencies=[Depends(verify_admin_token)])
 async def create_batch_record(batch: BatchRecord):
     """
     Admin endpoint to create a new batch record.
@@ -209,7 +226,7 @@ async def create_batch_record(batch: BatchRecord):
         raise HTTPException(status_code=500, detail=f"Failed to create batch: {str(e)}")
 
 
-@router.get("/admin/list")
+@router.get("/admin/list", dependencies=[Depends(verify_admin_token)])
 async def list_batch_records():
     """
     Admin endpoint to list all batch records.
