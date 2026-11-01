@@ -33,7 +33,7 @@ from config import STATIC_DIR
 from db import Database
 
 try:
-    from fastapi import FastAPI, Query
+    from fastapi import Depends, FastAPI, HTTPException, Query, Request
     from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
     import uvicorn
 except ImportError:
@@ -48,6 +48,14 @@ app = FastAPI(
 
 db = Database()
 db.init()
+
+MAX_BODY_BYTES = 1024 * 1024  # 1 MB
+
+
+async def limit_body_size(request: Request):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Request body too large")
 
 
 @app.get("/", summary="Info da API")
@@ -205,7 +213,7 @@ def webhook_stub():
     return {"status": "ok", "message": "Webhook endpoint ready (v2)"}
 
 
-@app.post("/webhook", summary="Webhook receiver (v2)")
+@app.post("/webhook", summary="Webhook receiver (v2)", dependencies=[Depends(limit_body_size)])
 def webhook_receive():
     return {"status": "ok"}
 
